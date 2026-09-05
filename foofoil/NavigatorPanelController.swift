@@ -4,6 +4,7 @@
 //  Created by tolg on 2026/8/26.
 
 import AppKit
+import QuartzCore
 import SwiftUI
 import FoofoilExtensionKit
 
@@ -94,6 +95,9 @@ final class NavigatorPanel: NSPanel {
 /// 桌面态使用独立伴随窗口，避免导航面板宽度进入箔片内容 frame 和比例缩放计算。
 final class NavigatorPanelController: NSWindowController {
     private let appState: AppState
+    private var pendingHide: DispatchWorkItem?
+    private var isHiding = false
+    private let slideDuration: TimeInterval = 0.25
 
     init(appState: AppState) {
         self.appState = appState
@@ -149,7 +153,7 @@ final class NavigatorPanelController: NSWindowController {
         fatalError("init(coder:) has not been implemented")
     }
 
-    var isVisible: Bool { window?.isVisible == true }
+    var isVisible: Bool { window?.isVisible == true && !isHiding }
 
     func owns(_ candidate: NSWindow) -> Bool {
         window === candidate
@@ -157,6 +161,11 @@ final class NavigatorPanelController: NSWindowController {
 
     func show(attachedTo parent: NSWindow) {
         guard let panel = window else { return }
+        let needsReveal = !isVisible
+        let wasOrderedOut = !panel.isVisible
+        pendingHide?.cancel()
+        pendingHide = nil
+        isHiding = false
         if panel.parent !== parent {
             panel.parent?.removeChildWindow(panel)
             parent.addChildWindow(panel, ordered: .above)
@@ -164,16 +173,57 @@ final class NavigatorPanelController: NSWindowController {
         synchronizeAppearance(with: parent)
         updateFrame(relativeTo: parent)
         panel.orderFront(nil)
+        if needsReveal {
+            animateSlide(hidden: false, startingHidden: wasOrderedOut)
+        }
     }
 
-    func hide() {
-        window?.orderOut(nil)
+    func hide(animated: Bool = false) {
+        guard let panel = window else { return }
+        if animated {
+            guard panel.isVisible, !isHiding else { return }
+            isHiding = true
+            animateSlide(hidden: true)
+            let work = DispatchWorkItem { [weak self] in
+                guard let self, self.isHiding else { return }
+                self.window?.orderOut(nil)
+                self.pendingHide = nil
+                self.isHiding = false
+            }
+            pendingHide = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + slideDuration, execute: work)
+        } else {
+            pendingHide?.cancel()
+            pendingHide = nil
+            isHiding = false
+            panel.contentView?.layer?.removeAnimation(forKey: "navigatorSlide")
+            panel.orderOut(nil)
+        }
+    }
+
+    /// 保持伴随窗口 frame 不变，在窗口裁剪范围内滑动内容；快速反向时从当前呈现位置继续。
+    private func animateSlide(hidden: Bool, startingHidden: Bool = false) {
+        guard let panel = window, let layer = panel.contentView?.layer else { return }
+        let hiddenOffset = panel.frame.width * (appState.navigatorPanelSide == .left ? 1 : -1)
+        let currentOffset = startingHidden ? hiddenOffset
+            : (layer.presentation()?.transform.m41 ?? layer.transform.m41)
+        let targetOffset: CGFloat = hidden ? hiddenOffset : 0
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer.transform = CATransform3DMakeTranslation(targetOffset, 0, 0)
+        CATransaction.commit()
+        let animation = CABasicAnimation(keyPath: "transform.translation.x")
+        animation.fromValue = currentOffset
+        animation.toValue = targetOffset
+        animation.duration = slideDuration
+        animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        layer.add(animation, forKey: "navigatorSlide")
     }
 
     func detachAndClose() {
         guard let panel = window else { return }
+        hide()
         panel.parent?.removeChildWindow(panel)
-        panel.orderOut(nil)
         panel.close()
     }
 

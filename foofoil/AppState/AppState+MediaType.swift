@@ -47,6 +47,11 @@ extension AppState {
             isVideoDocument || isAudioDocument
         }
 
+        /// 全屏视频目录复用控制条的显隐状态和计时器，确保同一配置下同步隐藏。
+        var isNavigatorHiddenForVideoInactivity: Bool {
+            isFullScreen && isVideoDocument && !isMediaPlaybackControlsVisible
+        }
+
         /// 内置音频与 Hi-Fi 扩展共享封面/元数据呈现时所对应的当前源文件。
         var currentAudioPresentationURL: URL? {
             if fileList?.kind == .audio, let item = fileList?.currentItem {

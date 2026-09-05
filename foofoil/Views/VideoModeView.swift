@@ -29,12 +29,14 @@ private struct PlayerView: NSViewRepresentable {
 /// 视频模式视图；窗口行为与图片模式一致，鼠标移入时显示播放控件。
 struct VideoModeView: View {
     @ObservedObject var appState: AppState
+    @ObservedObject private var navigatorHover: NavigatorHoverState
     let url: URL
     let shouldHideBorder: Bool
     @StateObject private var controller: VideoPlayerController
 
     init(appState: AppState, url: URL, shouldHideBorder: Bool) {
         self.appState = appState
+        self.navigatorHover = appState.navigatorHover
         self.url = url
         self.shouldHideBorder = shouldHideBorder
         _controller = StateObject(wrappedValue: VideoPlayerController(
@@ -54,17 +56,18 @@ struct VideoModeView: View {
     }
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottom) {
             PlayerView(player: controller.player)
 
             if appState.isMediaPlaybackControlsVisible {
                 // 底部控制条：播放/暂停 + 时间 + 进度条 + 静音 + 播放模式。
                 // 整个控制条区域不触发窗口拖动，控制条以外区域拖拽仍可移动窗口。
-                VStack {
-                    Spacer(minLength: 0)
-                    MediaPlaybackBar(appState: appState, controller: controller)
-                }
-                .transition(.opacity)
+                MediaPlaybackBar(appState: appState, controller: controller)
+                    // 只收窄控制条，视频画面保持原有全屏尺寸。
+                    .padding(appState.navigatorPanelSide == .left ? .leading : .trailing,
+                             appState.fullScreenNavigatorInset)
+                    .transition(.move(edge: .bottom))
+                    .zIndex(1)
             }
 
             // 箔底常显的细进度线；与控制条显隐无关，设置中可关闭。
@@ -75,7 +78,10 @@ struct VideoModeView: View {
             .allowsHitTesting(false)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .animation(.easeInOut(duration: 0.15), value: appState.isMediaPlaybackControlsVisible)
+        // 仅移动控制条自身高度，并裁剪窗口外的过渡内容。
+        .clipped()
+        .animation(.easeInOut(duration: 0.25), value: appState.isMediaPlaybackControlsVisible)
+        .animation(.easeInOut(duration: 0.25), value: appState.fullScreenNavigatorInset)
         // 与图片有边框模式保持一致的 8pt 内容边距
         .padding(shouldHideBorder ? 0 : 8)
         .onAppear {

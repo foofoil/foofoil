@@ -756,7 +756,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private var shouldShowNavigatorPanel: Bool {
-        guard !appState.navigatorContributions.isEmpty else { return false }
+        guard !appState.navigatorContributions.isEmpty,
+              !appState.isNavigatorHiddenForVideoInactivity else { return false }
         if appState.navigatorPanelVisibilityMode == .always { return true }
         return appState.isNavigatorPanelExplicitlyVisible
             || appState.isNavigatorPanelHovered
@@ -826,7 +827,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         // 鼠标跨过主窗口与伴随面板之间的间隙时保留短暂宽限，避免 hover 闪烁。
         let workItem = DispatchWorkItem { [weak self] in
             guard let self, !self.shouldShowNavigatorPanel else { return }
-            self.navigatorPanelController.hide()
+            self.navigatorPanelController.hide(animated: true)
             self.updateNavigatorHoverMonitors()
         }
         pendingNavigatorPanelHide = workItem

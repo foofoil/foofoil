@@ -303,24 +303,22 @@ private struct FullScreenNavigatorOverlay: View {
     }
 
     var body: some View {
-        if appState.isFullScreen,
-           !appState.navigatorContributions.isEmpty,
-           isVisible {
-            HStack(spacing: 0) {
-                if appState.navigatorPanelSide == .right { Spacer(minLength: 0) }
+        // 固定覆盖层容器，只让面板自身从对应侧边滑入，避免按整个窗口宽度移动。
+        ZStack(alignment: appState.navigatorPanelSide == .left ? .leading : .trailing) {
+            if isVisible {
                 NavigatorPanelView(appState: appState, isFullScreenOverlay: true)
                     .frame(width: CGFloat(appState.navigatorPanelWidth))
-                if appState.navigatorPanelSide == .left { Spacer(minLength: 0) }
+                    .transition(.move(edge: appState.navigatorPanelSide == .left ? .leading : .trailing))
             }
-            .zIndex(20)
-            .transition(.move(edge: appState.navigatorPanelSide == .left ? .leading : .trailing))
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity,
+               alignment: appState.navigatorPanelSide == .left ? .leading : .trailing)
+        .clipped()
+        .animation(.easeInOut(duration: 0.25), value: isVisible)
+        .zIndex(20)
     }
 
     private var isVisible: Bool {
-        appState.navigatorPanelVisibilityMode == .always
-            || appState.isNavigatorPanelExplicitlyVisible
-            || hover.isPanelHovered
-            || hover.isPointerInside
+        appState.isFullScreenNavigatorVisible
     }
 }

@@ -116,6 +116,17 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         get { navigatorHover.isPointerInside }
         set { navigatorHover.isPointerInside = newValue }
     }
+    /// 覆盖层与播放控制条共用实际显隐条件，避免侧栏隐藏后仍预留空白。
+    var isFullScreenNavigatorVisible: Bool {
+        isFullScreen && !navigatorContributions.isEmpty && !isNavigatorHiddenForVideoInactivity
+            && (navigatorPanelVisibilityMode == .always || isNavigatorPanelExplicitlyVisible
+                || isNavigatorPanelHovered || isNavigatorEdgeHovered)
+    }
+
+    var fullScreenNavigatorInset: CGFloat {
+        isFullScreenNavigatorVisible ? CGFloat(navigatorPanelWidth) : 0
+    }
+
     @Published var activeNavigatorContributionID: String?
     @Published var expandedNavigatorItemIDs: Set<String> = []
     var isAdjustingNavigatorPanelWidth = false
