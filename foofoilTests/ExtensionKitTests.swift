@@ -597,6 +597,66 @@ struct ExtensionKitTests {
         controller.close()
     }
 
+    @Test func fullScreenControlsReserveOnlyVisibleNavigatorWidth() {
+        let state = AppState()
+        state.originalImageName = "inset-test.mp4"
+        state.builtInNavigatorContributions = [
+            NavigatorContribution(id: "test", titleLocalizationKey: "Navigator", style: .flat,
+                                  items: [NavigatorItem(id: "one", title: "One")])
+        ]
+        state.navigatorPanelVisibilityMode = .onHover
+        state.navigatorPanelWidth = 300
+        state.isFullScreen = true
+        state.isMediaPlaybackControlsVisible = true
+        #expect(state.fullScreenNavigatorInset == 0)
+        for side in [NavigatorPanelSide.left, .right] {
+            state.navigatorPanelSide = side
+            state.isNavigatorPanelHovered = true
+            #expect(state.fullScreenNavigatorInset == 300)
+            state.isMediaPlaybackControlsVisible = false
+            #expect(state.fullScreenNavigatorInset == 0)
+            state.isMediaPlaybackControlsVisible = true
+            state.isFullScreen = false
+            #expect(state.fullScreenNavigatorInset == 0)
+            state.isFullScreen = true
+            state.isNavigatorPanelHovered = false
+        }
+        state.navigatorPanelVisibilityMode = .always
+        #expect(state.fullScreenNavigatorInset == 300)
+        state.builtInNavigatorContributions = []
+        #expect(state.fullScreenNavigatorInset == 0)
+    }
+
+    @Test func navigatorSlideCanReverseBeforeHideCompletes() async throws {
+        let state = AppState()
+        let parent = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 400, height: 300),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
+        parent.isReleasedWhenClosed = false
+        let controller = NavigatorPanelController(appState: state)
+        defer {
+            controller.detachAndClose()
+            parent.close()
+        }
+        for side in [NavigatorPanelSide.left, .right] {
+            state.navigatorPanelSide = side
+            controller.show(attachedTo: parent)
+            let panel = try #require(controller.window)
+            let frame = panel.frame
+            controller.hide(animated: true)
+            #expect(!controller.isVisible)
+            #expect(panel.isVisible)
+            controller.show(attachedTo: parent)
+            try await Task.sleep(for: .milliseconds(350))
+            #expect(controller.isVisible)
+            #expect(panel.frame == frame)
+            #expect(panel.contentView?.layer?.transform.m41 == 0)
+            controller.hide(animated: true)
+            try await Task.sleep(for: .milliseconds(350))
+            #expect(!panel.isVisible)
+            #expect(panel.frame == frame)
+        }
+    }
+
     @Test func windowHoverRemainsAvailableWithoutNavigatorContent() throws {
         let state = AppState()
         let controller = FloatingWindowController(appState: state)
@@ -617,7 +677,15 @@ struct ExtensionKitTests {
         let state = AppState()
         state.originalImageName = "foofoil-hover-test.mp4"
         state.imageURL = URL(fileURLWithPath: "/tmp/foofoil-hover-test.mp4")
+        state.builtInNavigatorContributions = [
+            NavigatorContribution(
+                id: "builtin.test", titleLocalizationKey: "Navigator", style: .flat,
+                items: [NavigatorItem(id: "one", title: "One")]
+            )
+        ]
+        state.navigatorPanelVisibilityMode = .always
         let controller = FloatingWindowController(appState: state)
+        state.isFullScreen = true
         let foilWindow = try #require(controller.window)
         // 先让 imageURL 订阅回调跑完初次显隐推导，避免其异步块重排隐藏计时造成竞态。
         try await Task.sleep(for: .milliseconds(50))
@@ -626,22 +694,33 @@ struct ExtensionKitTests {
         controller.updateNavigatorEdgeHover(at: interior)
         controller.handleMediaPointerActivity(at: interior, autoHideInterval: 0.01)
         #expect(state.isMediaPlaybackControlsVisible)
+        #expect(controller.isNavigatorPanelVisible)
 
         try await Task.sleep(for: .milliseconds(50))
         #expect(state.isPointerInsideWindow)
         #expect(state.isMediaPlaybackControlsVisible == false)
+        #expect(controller.isNavigatorPanelVisible == false)
 
         controller.handleMediaPointerActivity(at: interior, autoHideInterval: 1)
         #expect(state.isMediaPlaybackControlsVisible)
+        #expect(controller.isNavigatorPanelVisible)
 
         let away = NSPoint(x: foilWindow.frame.maxX + 2400, y: foilWindow.frame.minY - 2400)
         controller.refreshNavigatorHoverFromPointer(screenPoint: away)
         #expect(state.isPointerInsideWindow == false)
         #expect(state.isMediaPlaybackControlsVisible)
+        #expect(controller.isNavigatorPanelVisible)
 
         controller.handleMediaPointerExit(autoHideInterval: 0.01)
         try await Task.sleep(for: .milliseconds(50))
         #expect(state.isMediaPlaybackControlsVisible == false)
+        #expect(controller.isNavigatorPanelVisible == false)
+        state.isFullScreen = false
+        #expect(state.isNavigatorHiddenForVideoInactivity == false)
+        state.isFullScreen = true
+        state.originalImageName = "foofoil-hover-test.mp3"
+        #expect(state.isNavigatorHiddenForVideoInactivity == false)
+        state.isFullScreen = false
         controller.close()
     }
 
