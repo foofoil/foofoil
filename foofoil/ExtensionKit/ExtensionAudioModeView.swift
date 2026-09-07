@@ -361,6 +361,7 @@ struct ExtensionAudioModeView: View {
             if loaded.artwork != nil { appState.sidecarCoverDidBecomeAvailable() }
         }
         if loaded.sidecarCoverURL != nil { appState.recordSidecarCoverAccess(for: url) }
+        appState.persistDisplayedArtworkForHistory(loaded.artwork)
         return AudioModeView.overlay(loaded, with: appState.fileList?.currentItem?.cue)
     }
 

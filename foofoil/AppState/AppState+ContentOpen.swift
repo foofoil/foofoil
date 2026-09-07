@@ -204,18 +204,21 @@ extension AppState {
         }
 
         /// 音频无内嵌封面且所在目录未获沙盒授权时，向用户请求文件夹访问权限以载入同目录封面。
-        /// 返回是否获得授权；取消会记住该目录，避免同一文件夹反复打扰。
+        /// 返回调用方是否需要重读元数据：弹面板获授权，或经书签恢复授权后目录已可读，都返回 true；
+        /// 目录本来就可读则返回 false（首次读取已带授权，无需重读）。
+        /// 取消会记住该目录，避免同一文件夹反复打扰。
         func requestSidecarCoverAccessIfNeeded(for audioURL: URL) async -> Bool {
             let directory = audioURL.deletingLastPathComponent()
             // 目录已可读（已持有授权、无需授权或确实没有封面文件）时不必请求
             guard !AudioMetadataLoader.isCoverDirectoryAccessible(for: audioURL) else { return false }
-            // 已保存书签但尚未持有授权（如切换内容后释放）时先重新激活，避免重复打扰
+            // 已保存书签但尚未持有授权（如切换内容后释放）时先重新激活，避免重复打扰；
+            // 恢复后目录可读，调用方重读一次即可拿到同目录封面。
             if accessingSidecarDirectoryURL == nil,
                let bookmark = mediaSidecarBookmarkData,
                let sidecar = Self.restoreSidecarCoverAccess(bookmark: bookmark) {
                 if sidecar.accessed { accessingSidecarDirectoryURL = sidecar.directory }
                 if let refreshed = sidecar.refreshedBookmark { mediaSidecarBookmarkData = refreshed }
-                if AudioMetadataLoader.isCoverDirectoryAccessible(for: audioURL) { return false }
+                if AudioMetadataLoader.isCoverDirectoryAccessible(for: audioURL) { return true }
             }
             guard !Self.hasDeclinedSidecarCoverAccess(for: directory) else { return false }
 
@@ -536,6 +539,7 @@ extension AppState {
                     self.sourceFingerprint = Self.localSourceFingerprint(for: url)
                     self.extensionSession = outcome.session
                     self.extensionFallbackProviderID = outcome.failures.first?.providerID
+                    self.holdExtensionAudioFileAccess(for: outcome.session)
                     self.extensionStateReference = nil
                     self.installHiFiContainerListIfNeeded(
                         url: url,
@@ -556,6 +560,120 @@ extension AppState {
                 } catch {
                     self.isBatchUpdating = false
                     NSLog("Extension session failed: \(error.localizedDescription)")
+                }
+            }
+        }
+
+        /// 扩展音频不占用 imageURL；为当前曲目持有文件授权，否则视图的元数据/内嵌封面
+        /// 读取在重启后因沙盒不可达而失败（播放不受影响，引擎持有已打开的文件句柄）。
+        /// 调用方已在建会话前释放旧授权，此处只接管新会话首个资源的访问，不碰同目录授权。
+        func holdExtensionAudioFileAccess(for session: ContentSession) {
+            guard let resource = session.request.resources.first else { return }
+            let url: URL
+            if let bookmark = resource.securityScopedBookmark, !bookmark.isEmpty {
+                var stale = false
+                url = (try? URL(
+                    resolvingBookmarkData: bookmark,
+                    options: .withSecurityScope,
+                    bookmarkDataIsStale: &stale
+                )) ?? resource.url
+            } else {
+                url = resource.url
+            }
+            accessingVideoURL?.stopAccessingSecurityScopedResource()
+            accessingVideoURL = nil
+            if url.startAccessingSecurityScopedResource() {
+                accessingVideoURL = url
+            }
+        }
+
+        /// 视图已展示的封面落盘为历史缩略图。无 imagePath 的扩展音频不走后台索引，
+        /// 这里是它们唯一的缩略图来源；已有缩略图时不再重复写入。
+        func persistDisplayedArtworkForHistory(_ image: NSImage?) {
+            guard let image else { return }
+            let destination = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("foofoil", isDirectory: true)
+                .appendingPathComponent("Thumbnails", isDirectory: true)
+                .appendingPathComponent("\(id.uuidString).heic")
+            guard !FileManager.default.fileExists(atPath: destination.path),
+                  HistoryThumbnailGenerator.writeDisplayedArtwork(image, historyID: id) != nil else { return }
+            HistoryRepository.shared.updateThumbnailPath(id: id, path: destination.path)
+            HistoryManager.shared.refresh()
+        }
+
+        /// 历史记录中的值类型快照不代表 Runtime 会话仍存活；使用原始请求（含书签）建立新会话。
+        func rebuildExternalExtensionSession(
+            from savedSession: ContentSession,
+            stateReference: String,
+            expectedStateID: UUID
+        ) {
+            guard let sourceURL = savedSession.request.primaryFileURL else { return }
+            currentMediaRouteGeneration &+= 1
+            let routeGeneration = currentMediaRouteGeneration
+            isLoading = true
+            extensionFallbackProviderID = nil
+            let closeTask = extensionSessionCloseTask
+
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                defer {
+                    if self.currentMediaRouteGeneration == routeGeneration {
+                        self.isLoading = false
+                    }
+                }
+                do {
+                    await closeTask?.value
+                    guard self.id == expectedStateID,
+                          self.currentMediaRouteGeneration == routeGeneration else { return }
+                    await ExtensionHost.shared.releaseHiFiPCMOutputAndWait()
+                    guard self.id == expectedStateID,
+                          self.currentMediaRouteGeneration == routeGeneration else { return }
+                    let outcome = try await ExtensionHost.shared.open(request: savedSession.request)
+                    guard self.id == expectedStateID,
+                          self.currentMediaRouteGeneration == routeGeneration else {
+                        ExtensionHost.shared.closeSession(outcome.session)
+                        return
+                    }
+
+                    self.isBatchUpdating = true
+                    self.stopVideoAccess()
+                    self.imageURL = nil
+                    self.webURL = nil
+                    self.actualWebURL = nil
+                    self.textURL = nil
+                    self.text = ""
+                    self.originalImageName = sourceURL.lastPathComponent
+                    self.sourceFingerprint = self.fileList == nil
+                        ? Self.localSourceFingerprint(for: sourceURL)
+                        : nil
+                    self.extensionSession = outcome.session
+                    self.extensionFallbackProviderID = outcome.failures.first?.providerID
+                    self.holdExtensionAudioFileAccess(for: outcome.session)
+                    self.installHiFiContainerListIfNeeded(
+                        url: sourceURL,
+                        session: outcome.session,
+                        preferredItemID: self.fileList?.currentID
+                    )
+                    if let extensionID = outcome.session.extensionID {
+                        let payload = try JSONEncoder().encode(outcome.session)
+                        self.extensionStateReference = try ExtensionHost.shared.stateStore.save(
+                            extensionID: extensionID,
+                            schemaVersion: 1,
+                            payload: payload,
+                            reference: stateReference
+                        )
+                    }
+                    self.isBatchUpdating = false
+                    self.saveState()
+                } catch {
+                    guard self.id == expectedStateID,
+                          self.currentMediaRouteGeneration == routeGeneration else { return }
+                    self.isBatchUpdating = false
+                    self.extensionSession = self.unavailableExtensionSession(
+                        extensionID: savedSession.extensionID ?? "unavailable",
+                        reference: stateReference
+                    )
+                    NSLog("Extension session restore failed: \(error.localizedDescription)")
                 }
             }
         }
@@ -608,6 +726,7 @@ extension AppState {
                     self.sourceFingerprint = nil
                     self.extensionSession = outcome.session
                     self.extensionFallbackProviderID = outcome.failures.first?.providerID
+                    self.holdExtensionAudioFileAccess(for: outcome.session)
                     self.installHiFiContainerListIfNeeded(
                         url: url,
                         session: outcome.session,

@@ -168,6 +168,10 @@ final class ProviderResolver {
         preferredProviderID: String? = nil,
         negotiatedAPI: UInt32 = 1
     ) async throws -> SessionResolutionOutcome {
+        // sniff 匹配（如 SACD ISO）需读文件；历史恢复经重启后须先持书签授权再 resolve，
+        // 否则 DSF（扩展名匹配）能过而 ISO 直接 noProvider。
+        let accessScope = ExtensionResourceAccessScope(request: request)
+        defer { accessScope.stop() }
         let resolution = try resolve(request, preferredProviderID: preferredProviderID)
         let providerIDs = [resolution.selectedProviderID] + resolution.fallbackProviderIDs
         var failures: [ProviderFailure] = []
@@ -175,8 +179,6 @@ final class ProviderResolver {
         for providerID in providerIDs {
             guard let provider = providers[providerID] else { continue }
             do {
-                let accessScope = ExtensionResourceAccessScope(request: request)
-                defer { accessScope.stop() }
                 let session = try await provider.makeSession(for: request, negotiatedAPI: negotiatedAPI)
                 try NavigatorContributionValidator.validate(session)
                 try CommandContributionValidator.validate(session)
@@ -211,7 +213,9 @@ final class ProviderResolver {
 
 enum ProviderContentMatcher {
     static func match(_ request: ContentRequest, declarations: [ContentTypeDeclaration], sniff: ((URL) -> Bool)? = nil) -> ProviderMatch? {
-        guard let url = request.primaryFileURL else { return nil }
+        // 历史恢复的 request.url 可能是移动前的旧路径；sniff 必须读书签解析后的真实位置，
+        // 否则文件移动后 ISO 匹配失败而 DSF（纯扩展名）不受影响。
+        guard let url = effectiveURL(for: request) else { return nil }
         let fileExtension = url.pathExtension.lowercased()
 
         for declaration in declarations where declaration.strategy == .sniff {
@@ -240,5 +244,21 @@ enum ProviderContentMatcher {
             guard let targetType = UTType(identifier) else { return false }
             return sourceType.conforms(to: targetType)
         }
+    }
+
+    /// 书签可解析到文件移动后的新位置；无书签或解析失败时回退原始 URL。
+    private static func effectiveURL(for request: ContentRequest) -> URL? {
+        guard let resource = request.resources.first else { return request.primaryFileURL }
+        if let bookmark = resource.securityScopedBookmark, !bookmark.isEmpty {
+            var stale = false
+            if let resolved = try? URL(
+                resolvingBookmarkData: bookmark,
+                options: .withSecurityScope,
+                bookmarkDataIsStale: &stale
+            ) {
+                return resolved
+            }
+        }
+        return resource.url
     }
 }

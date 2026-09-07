@@ -35,6 +35,11 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                 // 路径当前可达（进程内仍有授权），或安全范围书签仍可解析出存在的文件，均保留
                 if let path = config.imagePath, FileManager.default.fileExists(atPath: path) { return true }
                 if let bookmark = config.videoBookmark, AppState.resolveVideoBookmark(bookmark) != nil { return true }
+                // 扩展音频不占用 imagePath/videoBookmark，以宿主列表项的存活为准；
+                // 至少一项可达即保留，全部丢失才移除。
+                if config.extensionID != nil,
+                   let list = config.fileList, list.isPresentable,
+                   list.items.contains(where: { Self.isFileListItemAlive($0) }) { return true }
                 remove(id: config.id)
                 return false
             }
@@ -50,6 +55,12 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
     public func touch(id: UUID) { try? database?.touch(id: id) }
     public func remove(id: UUID) { try? database?.remove(id: id) }
     public func updateThumbnailPath(id: UUID, path: String) { try? database?.updateThumbnailPath(id: id, path: path) }
+
+    /// 宿主列表项存活即视为来源仍在：书签可解析，或无书签但路径存在。
+    private static func isFileListItemAlive(_ item: FileListItem) -> Bool {
+        if let bookmark = item.bookmark, AppState.resolveVideoBookmark(bookmark) != nil { return true }
+        return FileManager.default.fileExists(atPath: item.path)
+    }
     public func removeAll(excluding ids: Set<UUID>) { try? database?.removeAll(excluding: ids) }
     public func rename(id: UUID, title: String) { try? database?.rename(id: id, title: title) }
     public var searchDatabaseSize: Int64 { database?.searchDatabaseSize() ?? 0 }

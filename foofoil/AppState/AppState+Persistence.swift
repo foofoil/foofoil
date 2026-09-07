@@ -26,6 +26,9 @@ extension AppState {
         }
 
         public func loadConfig(_ config: WindowConfig) {
+            // 即使连续载入同一条历史，也必须使上一轮异步恢复失效。
+            currentMediaRouteGeneration &+= 1
+            isLoading = false
             isBatchUpdating = true
             defer {
                 isBatchUpdating = false
@@ -62,8 +65,8 @@ extension AppState {
             self.isNavigatorPanelExplicitlyVisible = false
             self.activeNavigatorContributionID = nil
             self.expandedNavigatorItemIDs = []
-            restoreExtensionSession(from: config)
             restoreFileList(from: config)
+            restoreExtensionSession(from: config)
 
             // 载入历史记录时，一律尝试通知窗口控制器恢复当初保存的窗口位置与尺寸
             if let frameString = config.windowFrame {
@@ -103,6 +106,18 @@ extension AppState {
                 }
             } else {
                 self.imageURL = nil
+            }
+
+            // 扩展音频（DSF/DFF/SACD 经 Hi-Fi 播放，含目录列表）不占用 imageURL，
+            // 同目录封面书签必须独立于 imagePath 恢复，否则每次重启都会重新弹出目录授权。
+            if config.imagePath == nil, accessingSidecarDirectoryURL == nil {
+                if let bookmark = config.mediaSidecarBookmark,
+                   let sidecar = Self.restoreSidecarCoverAccess(bookmark: bookmark) {
+                    if sidecar.accessed { accessingSidecarDirectoryURL = sidecar.directory }
+                    mediaSidecarBookmarkData = sidecar.refreshedBookmark ?? bookmark
+                } else if config.mediaSidecarBookmark == nil {
+                    mediaSidecarBookmarkData = nil
+                }
             }
 
             if let webStr = config.webURLString, let url = URL(string: webStr) {
@@ -162,7 +177,9 @@ extension AppState {
                     originalImageName: originalImageName,
                     text: text,
                     isMarkdownPreview: isMarkdownPreview,
-                    textPath: textURL?.path
+                    textPath: textURL?.path,
+                    extensionID: extensionSession?.extensionID,
+                    fileList: fileList?.isPresentable == true ? fileList : nil
                 )),
                 sourceFingerprint: sourceFingerprint,
                 webZoom: webZoom,
@@ -178,7 +195,7 @@ extension AppState {
             )
         }
 
-        /// 由 Core 保存完整的值类型 Session 快照；扩展缺失或状态损坏时保留可解释的占位展示。
+        /// 由 Core 保存完整的值类型 Session 快照；外部资源恢复时用原请求重建运行时 Session。
         func restoreExtensionSession(from config: WindowConfig) {
             guard let extensionID = config.extensionID,
                   let reference = config.extensionStateReference else {
@@ -187,34 +204,42 @@ extension AppState {
             }
             do {
                 if let envelope = try ExtensionHost.shared.stateStore.load(extensionID: extensionID, reference: reference),
-                   let session = try? JSONDecoder().decode(ContentSession.self, from: envelope.payload),
-                   (try? NavigatorContributionValidator.validate(session)) != nil,
-                   ExtensionHost.shared.manager.isInstalledAndEnabled(extensionID) {
-                    extensionSession = session
+                   ExtensionHost.shared.isExtensionAvailable(extensionID) {
+                    let session = try JSONDecoder().decode(ContentSession.self, from: envelope.payload)
+                    guard session.extensionID == extensionID else {
+                        throw ExtensionStateStoreError.namespaceMismatch
+                    }
+                    try NavigatorContributionValidator.validate(session)
+                    if session.request.resources.isEmpty {
+                        extensionSession = session
+                    } else {
+                        extensionSession = nil
+                        rebuildExternalExtensionSession(
+                            from: session,
+                            stateReference: reference,
+                            expectedStateID: config.id
+                        )
+                    }
                 } else {
-                    extensionSession = ContentSession(
-                        extensionID: extensionID,
-                        providerID: "unavailable",
-                        request: .restoredSession(extensionID: extensionID, stateReference: reference),
-                        presentation: .unavailable(
-                            titleKey: "Extension Session Unavailable",
-                            messageKey: "Extension Session Restore Failed"
-                        ),
-                        stateReference: reference
-                    )
+                    extensionSession = unavailableExtensionSession(extensionID: extensionID, reference: reference)
                 }
             } catch {
-                extensionSession = ContentSession(
-                    extensionID: extensionID,
-                    providerID: "unavailable",
-                    request: .restoredSession(extensionID: extensionID, stateReference: reference),
-                    presentation: .unavailable(
-                        titleKey: "Extension Session Unavailable",
-                        messageKey: "Extension Session Restore Failed"
-                    ),
-                    stateReference: reference
-                )
+                NSLog("Extension snapshot restore failed: \(error)")
+                extensionSession = unavailableExtensionSession(extensionID: extensionID, reference: reference)
             }
+        }
+
+        func unavailableExtensionSession(extensionID: String, reference: String) -> ContentSession {
+            ContentSession(
+                extensionID: extensionID,
+                providerID: "unavailable",
+                request: .restoredSession(extensionID: extensionID, stateReference: reference),
+                presentation: .unavailable(
+                    titleKey: "Extension Session Unavailable",
+                    messageKey: "Extension Session Restore Failed"
+                ),
+                stateReference: reference
+            )
         }
 
 }

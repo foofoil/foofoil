@@ -81,6 +81,14 @@ final class ExtensionHost: ExtensionRuntimeHost {
         return !provider.descriptor.isBuiltIn
     }
 
+    /// 正式安装与 `./run` 注入的开发 Runtime 都属于可用扩展；后者不会写安装记录。
+    func isExtensionAvailable(_ extensionID: String) -> Bool {
+        manager.isInstalledAndEnabled(extensionID)
+            || resolver.allDescriptors().contains {
+                $0.extensionID == extensionID && $0.isEnabled && $0.isRuntimeAvailable
+            }
+    }
+
     /// 扩展只声明内容家族，宿主据此决定应复用哪一套列表与呈现；
     /// 是否真的由该扩展播放，仍在打开当前项目时重新执行 provider resolution。
     func canOpenAsAudio(url: URL) -> Bool {
@@ -101,7 +109,11 @@ final class ExtensionHost: ExtensionRuntimeHost {
     }
 
     func open(url: URL) async throws -> SessionResolutionOutcome {
-        let request = ContentRequest.singleFile(.sandboxed(url: url))
+        try await open(request: .singleFile(.sandboxed(url: url)))
+    }
+
+    /// 用已持久化的资源与安全范围书签重建运行时会话，而不是复用已经关闭的 Session UUID。
+    func open(request: ContentRequest) async throws -> SessionResolutionOutcome {
         let domain = resolver.candidates(for: request).compactMap(\.descriptor.enhancementDomain).first
         return try await resolver.makeSession(
             for: request,

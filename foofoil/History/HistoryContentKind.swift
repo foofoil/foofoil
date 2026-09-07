@@ -28,6 +28,9 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
     }
 
     public static func infer(from config: WindowConfig) -> Self {
+        // 宿主统一音频列表（含经扩展播放的 DSF/DFF/SACD）按列表类型归类，
+        // 否则扩展音频会因 imagePath 为空而误判为笔记。
+        if config.fileList?.isPresentable == true, config.fileList?.kind == .audio { return .audio }
         if config.extensionID != nil { return .extensionContent }
         if config.webURLString != nil { return .web }
         let name = (config.originalImageName ?? config.textPath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "").lowercased()

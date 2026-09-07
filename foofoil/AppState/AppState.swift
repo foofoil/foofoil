@@ -423,6 +423,18 @@ public class AppState: NSObject, ObservableObject, Identifiable {
             self.imageURL = nil
         }
 
+        // 扩展音频（DSF/DFF/SACD 经 Hi-Fi 播放，含目录列表）不占用 imageURL，
+        // 同目录封面书签必须独立于 imagePath 恢复，否则每次重启都会重新弹出目录授权。
+        if config.imagePath == nil, accessingSidecarDirectoryURL == nil {
+            if let bookmark = config.mediaSidecarBookmark,
+               let sidecar = Self.restoreSidecarCoverAccess(bookmark: bookmark) {
+                if sidecar.accessed { accessingSidecarDirectoryURL = sidecar.directory }
+                mediaSidecarBookmarkData = sidecar.refreshedBookmark ?? bookmark
+            } else if config.mediaSidecarBookmark == nil {
+                mediaSidecarBookmarkData = nil
+            }
+        }
+
         if let webStr = config.webURLString, let url = URL(string: webStr) {
             self.webURL = url
         } else {
@@ -435,8 +447,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
             self.actualWebURL = nil
         }
         super.init()
-        restoreExtensionSession(from: config)
         restoreFileList(from: config)
+        restoreExtensionSession(from: config)
         // 在调用 saveState 时避免触发死循环；视频经书签恢复后可能重建了书签，也需要落盘
         if let path = config.imagePath, !FileManager.default.fileExists(atPath: path) {
             if Self.findCachedImageInDirectory(for: config.id) != nil || Self.findLegacyCachedImageInDirectory() != nil {

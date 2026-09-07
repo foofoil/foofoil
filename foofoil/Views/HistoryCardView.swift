@@ -183,6 +183,15 @@ struct HistoryCardView: View {
         }
     }
 
+    /// 无 imagePath 的扩展音频也可能已有缩略图（cardImage）或应显示音视频占位；
+    /// 仅纯文本/笔记走文字卡，避免 DSF 列表显示为空白卡。
+    static func shouldShowMediaCard(config: WindowConfig, hasLoadedImage: Bool) -> Bool {
+        if config.imagePath != nil { return true }
+        if hasLoadedImage { return true }
+        let kind = config.contentKind ?? HistoryContentKind.infer(from: config)
+        return kind == .audio || kind == .video
+    }
+
     private func loadImageAsync() {
         // 优先使用已生成且单独存储的正方形 HEIC 缩略图，避免加载超大原图
         let path: String
@@ -209,7 +218,7 @@ struct HistoryCardView: View {
     @ViewBuilder
     private func historyCardContent(for config: WindowConfig) -> some View {
         Group {
-            if config.imagePath != nil {
+            if Self.shouldShowMediaCard(config: config, hasLoadedImage: cardImage != nil) {
                 if let nsImage = cardImage {
                     ZStack {
                         renderCardImage(for: nsImage)

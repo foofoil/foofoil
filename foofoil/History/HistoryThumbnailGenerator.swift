@@ -102,6 +102,34 @@ public enum HistoryThumbnailGenerator {
         return CGImageDestinationFinalize(destination)
     }
 
+    /// 将视图已展示的封面写入该窗口的历史缩略图并返回落盘路径。
+    /// 无 imagePath 的扩展音频走不到后台索引，这是它们唯一的缩略图来源。
+    public static func writeDisplayedArtwork(_ image: NSImage, historyID: UUID) -> URL? {
+        guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+              let thumbnail = cropAndResize(cgImage, to: 128) else { return nil }
+        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("foofoil", isDirectory: true)
+        let destinationURL = root.appendingPathComponent("Thumbnails")
+            .appendingPathComponent("\(historyID.uuidString).heic")
+        try? FileManager.default.createDirectory(
+            at: destinationURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        guard let destination = CGImageDestinationCreateWithURL(
+            destinationURL as CFURL,
+            "public.heic" as CFString,
+            1,
+            nil
+        ) else { return nil }
+        CGImageDestinationAddImage(
+            destination,
+            thumbnail,
+            [kCGImageDestinationLossyCompressionQuality: 0.70] as CFDictionary
+        )
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return destinationURL
+    }
+
     /// 将 CGImage 居中裁剪为正方形，并使用高插值质量缩放到 targetSize × targetSize 像素
     private static func cropAndResize(_ image: CGImage, to targetSize: Int) -> CGImage? {
         let width = image.width

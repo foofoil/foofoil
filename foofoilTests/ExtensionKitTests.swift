@@ -875,6 +875,344 @@ struct ExtensionKitTests {
         #expect(FileManager.default.fileExists(atPath: stateURL.path))
     }
 
+    @Test(arguments: [false, true])
+    func historyRebuildsExternalExtensionSessionFromSavedRequest(reusesWindow: Bool) async throws {
+        let provider = HistoryRestoreTestProvider()
+        ExtensionHost.shared.resolver.register(provider)
+        defer { ExtensionHost.shared.resolver.unregister(providerID: provider.descriptor.id) }
+
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let sourceURL = directory.appendingPathComponent("album.historydsd")
+        try Data("DSD".utf8).write(to: sourceURL)
+        let savedSession = ContentSession(
+            extensionID: provider.descriptor.extensionID,
+            providerID: provider.descriptor.id,
+            request: .singleFile(.init(url: sourceURL, securityScopedBookmark: Data([1, 2, 3]))),
+            presentation: .text(titleKey: "Test", body: sourceURL.lastPathComponent)
+        )
+        let reference = "history-\(UUID().uuidString.lowercased())"
+        try ExtensionHost.shared.stateStore.save(
+            extensionID: try #require(provider.descriptor.extensionID),
+            schemaVersion: 1,
+            payload: JSONEncoder().encode(savedSession),
+            reference: reference
+        )
+        let stateFile = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("foofoil/ExtensionState", isDirectory: true)
+            .appendingPathComponent(try #require(provider.descriptor.extensionID), isDirectory: true)
+            .appendingPathComponent(reference)
+            .appendingPathExtension("json")
+        defer { try? FileManager.default.removeItem(at: stateFile) }
+
+        let historyID = UUID()
+        let selectedItem = FileListItem(id: "dsd", path: sourceURL.path, displayName: "DSD")
+        let list = FileListState(kind: .audio, items: [
+            FileListItem(id: "pcm", path: directory.appendingPathComponent("one.mp3").path, displayName: "PCM"),
+            selectedItem
+        ], currentID: selectedItem.id, title: "Mixed audio")
+        let config = WindowConfig(
+            id: historyID,
+            originalImageName: sourceURL.lastPathComponent,
+            contentKind: .extensionContent,
+            extensionID: provider.descriptor.extensionID,
+            extensionStateReference: reference,
+            fileList: list
+        )
+        let state: AppState
+        if reusesWindow {
+            state = AppState()
+            state.loadConfig(config)
+        } else {
+            state = AppState(config: config)
+        }
+        for _ in 0..<100 where state.isLoading {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let restored = try #require(state.extensionSession)
+        #expect(!state.isLoading)
+        #expect(state.id == historyID)
+        #expect(restored.id != savedSession.id)
+        #expect(restored.providerID == provider.descriptor.id)
+        #expect(restored.request == savedSession.request)
+        #expect(state.fileList?.currentID == selectedItem.id)
+        #expect(state.fileList?.items.map(\.id) == list.items.map(\.id))
+        #expect(state.fileList?.title == list.title)
+        state.extensionSession = nil
+        HistoryManager.shared.removeFromHistory(state.toConfig())
+    }
+
+    @Test func loadingAnotherConfigInvalidatesPendingExtensionRestore() async throws {
+        let state = AppState()
+        let id = state.id
+        let saved = ContentSession(
+            extensionID: "app.foofoil.extension.history-restore-test",
+            providerID: "test.history-extension-restore",
+            request: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/album.historydsd"))),
+            presentation: .text(titleKey: "Test", body: "old")
+        )
+        state.rebuildExternalExtensionSession(from: saved, stateReference: "pending", expectedStateID: id)
+        state.loadConfig(WindowConfig(id: id, text: "replacement"))
+        // 旧任务结束不能清除后续路由的加载状态，或把新内容换成错误占位。
+        state.isLoading = true
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(state.isLoading)
+        #expect(state.extensionSession == nil)
+        #expect(state.text == "replacement")
+        HistoryManager.shared.removeFromHistory(state.toConfig())
+    }
+
+    /// SACD ISO 靠 sniff 读文件头匹配；文件移动后 request.url 是旧路径，
+    /// 必须用书签解析后的真实位置做匹配，否则历史恢复直接 noProvider。
+    @Test func sniffMatchingUsesBookmarkResolvedURLForMovedFiles() async throws {
+        let provider = SniffHistoryTestProvider()
+        ExtensionHost.shared.resolver.register(provider)
+        defer { ExtensionHost.shared.resolver.unregister(providerID: provider.descriptor.id) }
+
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let realURL = directory.appendingPathComponent("disc.isotest")
+        try Data("SACDMTOC".utf8).write(to: realURL)
+        let bookmark = try realURL.bookmarkData(
+            options: .withSecurityScope,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
+        let staleURL = directory.appendingPathComponent("moved-away.isotest")
+        let request = ContentRequest.singleFile(.init(url: staleURL, securityScopedBookmark: bookmark))
+
+        // 历史重建链路：resolve + 建会话在 stale URL 下仍须成功。
+        let outcome = try await ExtensionHost.shared.resolver.makeSession(for: request)
+        #expect(outcome.session.providerID == provider.descriptor.id)
+        #expect(outcome.session.request == request)
+
+        // 无书签时旧路径确实不存在，不应误匹配。
+        let staleOnly = ContentRequest.singleFile(.init(url: staleURL))
+        #expect(!ExtensionHost.shared.resolver.candidates(for: staleOnly).contains {
+            $0.descriptor.id == provider.descriptor.id
+        })
+    }
+
+    /// 扩展音频（DSF 目录列表）不占用 imageURL，同目录封面书签必须独立恢复，
+    /// 否则每次重启都会重新弹出目录授权。
+    @Test func extensionAudioRestoresSidecarBookmarkWithoutImagePath() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let first = directory.appendingPathComponent("one.dsf")
+        let second = directory.appendingPathComponent("two.dsf")
+        try Data("DSD1".utf8).write(to: first)
+        try Data("DSD2".utf8).write(to: second)
+        let bookmark = try directory.bookmarkData(
+            options: .withSecurityScope,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
+        let list = FileListState(kind: .audio, items: [
+            FileListItem(id: "one", path: first.path, displayName: "one.dsf"),
+            FileListItem(id: "two", path: second.path, displayName: "two.dsf")
+        ], currentID: "one", title: "DSF directory")
+        let config = WindowConfig(
+            id: UUID(),
+            originalImageName: "one.dsf",
+            contentKind: .extensionContent,
+            mediaSidecarBookmark: bookmark,
+            fileList: list
+        )
+        // 扩展音频不占用 imageURL：这正是旧逻辑跳过书签恢复的条件。
+        #expect(config.imagePath == nil)
+
+        let state = AppState(config: config)
+        #expect(state.mediaSidecarBookmarkData == bookmark)
+        // 目录已可读，loadTrackInfo 会直接返回而不再弹授权面板。
+        #expect(AudioMetadataLoader.isCoverDirectoryAccessible(for: first))
+        state.stopVideoAccess()
+        state.extensionSession = nil
+        HistoryManager.shared.removeFromHistory(state.toConfig())
+    }
+
+    /// 扩展音频不占用 imageURL，视图读元数据/内嵌封面靠建会话时接管的文件授权；
+    /// 重建后必须持有，否则重开历史只有声音没有封面。
+    @Test func extensionAudioFileAccessHeldAfterHistoryRebuild() async throws {
+        let provider = HistoryRestoreTestProvider()
+        ExtensionHost.shared.resolver.register(provider)
+        defer { ExtensionHost.shared.resolver.unregister(providerID: provider.descriptor.id) }
+
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let sourceURL = directory.appendingPathComponent("track.historydsd")
+        try Data("DSD".utf8).write(to: sourceURL)
+        let bookmark = try sourceURL.bookmarkData(
+            options: .withSecurityScope,
+            includingResourceValuesForKeys: nil,
+            relativeTo: nil
+        )
+        let savedSession = ContentSession(
+            extensionID: provider.descriptor.extensionID,
+            providerID: provider.descriptor.id,
+            request: .singleFile(.init(url: sourceURL, securityScopedBookmark: bookmark)),
+            presentation: .text(titleKey: "Test", body: sourceURL.lastPathComponent)
+        )
+        let reference = "history-access-\(UUID().uuidString.lowercased())"
+        try ExtensionHost.shared.stateStore.save(
+            extensionID: try #require(provider.descriptor.extensionID),
+            schemaVersion: 1,
+            payload: JSONEncoder().encode(savedSession),
+            reference: reference
+        )
+        let stateFile = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("foofoil/ExtensionState", isDirectory: true)
+            .appendingPathComponent(try #require(provider.descriptor.extensionID), isDirectory: true)
+            .appendingPathComponent(reference)
+            .appendingPathExtension("json")
+        defer { try? FileManager.default.removeItem(at: stateFile) }
+
+        let historyID = UUID()
+        let state = AppState(config: WindowConfig(
+            id: historyID,
+            originalImageName: sourceURL.lastPathComponent,
+            contentKind: .extensionContent,
+            extensionID: provider.descriptor.extensionID,
+            extensionStateReference: reference
+        ))
+        for _ in 0..<100 where state.isLoading {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        #expect(!state.isLoading)
+        #expect(state.accessingVideoURL?.path == sourceURL.path)
+        #expect(FileManager.default.isReadableFile(atPath: sourceURL.path))
+        state.stopVideoAccess()
+        state.extensionSession = nil
+        HistoryManager.shared.removeFromHistory(state.toConfig())
+    }
+
+    /// 宿主统一音频列表（含经扩展播放的 DSF/DFF/SACD）按列表类型归类，
+    /// 扩展单文件按扩展内容归类，不再误判为笔记。
+    @Test func contentKindInferenceCoversExtensionAudio() {
+        let items = [
+            FileListItem(id: "one", path: "/tmp/one.dsf", displayName: "one.dsf"),
+            FileListItem(id: "two", path: "/tmp/two.dsf", displayName: "two.dsf")
+        ]
+        let list = FileListState(kind: .audio, items: items, currentID: "one", title: "DSF")
+        #expect(HistoryContentKind.infer(from: WindowConfig(
+            id: UUID(), originalImageName: "one.dsf",
+            extensionID: "app.foofoil.extension.hifi", fileList: list
+        )) == .audio)
+        #expect(HistoryContentKind.infer(from: WindowConfig(
+            id: UUID(), originalImageName: "one.dsf",
+            extensionID: "app.foofoil.extension.hifi"
+        )) == .extensionContent)
+        #expect(HistoryContentKind.infer(from: WindowConfig(
+            id: UUID(), imagePath: "/tmp/one.flac", originalImageName: "one.flac"
+        )) == .audio)
+        #expect(HistoryContentKind.infer(from: WindowConfig(id: UUID(), text: "hello")) == .note)
+    }
+
+    /// kind 改为 .audio 后，剪枝必须认宿主列表项：有存活项保留，全丢才移除。
+    @Test func recentKeepsExtensionAudioListWhileAnyItemAlive() throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let live = directory.appendingPathComponent("live.dsf")
+        try Data("DSD".utf8).write(to: live)
+        let repository = HistoryRepository(databaseURL: directory.appendingPathComponent("history.sqlite3"))
+
+        let aliveID = UUID()
+        let aliveItems = [
+            FileListItem(id: "a1", path: live.path, displayName: "live.dsf"),
+            FileListItem(id: "a2", path: directory.appendingPathComponent("gone.dsf").path, displayName: "gone.dsf")
+        ]
+        repository.upsert(WindowConfig(
+            id: aliveID, originalImageName: "live.dsf",
+            extensionID: "app.foofoil.extension.hifi",
+            extensionStateReference: "ref-alive",
+            fileList: FileListState(kind: .audio, items: aliveItems, currentID: "a1")
+        ))
+        let deadID = UUID()
+        let deadItems = [
+            FileListItem(id: "d1", path: "/nonexistent/dead1.dsf", displayName: "dead1.dsf"),
+            FileListItem(id: "d2", path: "/nonexistent/dead2.dsf", displayName: "dead2.dsf")
+        ]
+        repository.upsert(WindowConfig(
+            id: deadID, originalImageName: "dead1.dsf",
+            extensionID: "app.foofoil.extension.hifi",
+            extensionStateReference: "ref-dead",
+            fileList: FileListState(kind: .audio, items: deadItems, currentID: "d1")
+        ))
+
+        let ids = Set(repository.recent(limit: 30).map(\.id))
+        #expect(ids.contains(aliveID))
+        #expect(!ids.contains(deadID))
+    }
+
+    /// 无 imagePath 的扩展音频也进媒体卡：有缩略图显示封面，否则按 kind 显示音视频占位；
+    /// 纯文本才走文字卡，避免 DSF 列表显示为空白卡。
+    @Test func historyCardShowsMediaWithoutImagePath() {
+        let items = [
+            FileListItem(id: "one", path: "/tmp/one.dsf", displayName: "one.dsf"),
+            FileListItem(id: "two", path: "/tmp/two.dsf", displayName: "two.dsf")
+        ]
+        let audioList = FileListState(kind: .audio, items: items, currentID: "one", title: "DSF")
+        let dsfConfig = WindowConfig(
+            id: UUID(), originalImageName: "one.dsf",
+            extensionID: "app.foofoil.extension.hifi", fileList: audioList
+        )
+        #expect(dsfConfig.imagePath == nil)
+        // 缩略图已就绪（无论 kind 新旧）都渲染封面。
+        #expect(HistoryCardView.shouldShowMediaCard(config: dsfConfig, hasLoadedImage: true))
+        #expect(HistoryCardView.shouldShowMediaCard(
+            config: WindowConfig(id: dsfConfig.id, originalImageName: "one.dsf"),
+            hasLoadedImage: true
+        ))
+        // 音频列表即使缩略图还没生成，也显示音频占位而不是空白卡。
+        #expect(HistoryCardView.shouldShowMediaCard(config: dsfConfig, hasLoadedImage: false))
+        // 有 imagePath 的图片不受影响；纯文本仍走文字卡。
+        #expect(HistoryCardView.shouldShowMediaCard(
+            config: WindowConfig(id: UUID(), imagePath: "/tmp/a.png", originalImageName: "a.png"),
+            hasLoadedImage: false
+        ))
+        #expect(!HistoryCardView.shouldShowMediaCard(
+            config: WindowConfig(id: UUID(), text: "hello"),
+            hasLoadedImage: false
+        ))
+    }
+
+    /// 目录本来就可读时不弹面板也不要求重读（首次读取已带授权）。
+    @Test @MainActor func sidecarRequestSkipsReloadWhenAccessible() async throws {
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let track = directory.appendingPathComponent("track.dsf")
+        try Data("DSD".utf8).write(to: track)
+        let state = AppState()
+        #expect(await state.requestSidecarCoverAccessIfNeeded(for: track) == false)
+        state.stopVideoAccess()
+        HistoryManager.shared.removeFromHistory(state.toConfig())
+    }
+
+    /// 无 imagePath 的扩展音频走不到后台索引，展示中的封面是唯一的缩略图来源。
+    @Test @MainActor func displayedArtworkPersistsAsHistoryThumbnail() throws {
+        let state = AppState()
+        let image = NSImage(size: NSSize(width: 8, height: 8))
+        image.lockFocus()
+        NSColor.white.setFill()
+        NSRect(origin: .zero, size: image.size).fill()
+        image.unlockFocus()
+
+        state.persistDisplayedArtworkForHistory(image)
+        let thumbnail = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("foofoil", isDirectory: true)
+            .appendingPathComponent("Thumbnails", isDirectory: true)
+            .appendingPathComponent("\(state.id.uuidString).heic")
+        #expect(FileManager.default.fileExists(atPath: thumbnail.path))
+        // 已有缩略图时不再重复写入。
+        state.persistDisplayedArtworkForHistory(image)
+        #expect(FileManager.default.fileExists(atPath: thumbnail.path))
+        state.stopVideoAccess()
+        state.extensionSession = nil
+        HistoryManager.shared.removeFromHistory(state.toConfig())
+        #expect(!FileManager.default.fileExists(atPath: thumbnail.path))
+    }
+
     @Test func windowConfigDecodingKeepsBackwardCompatibility() throws {
         let legacy = WindowConfig(id: UUID(), text: "legacy")
         let encoded = try JSONEncoder().encode(legacy)
@@ -970,6 +1308,71 @@ private final class ExtensionAudioListTestProvider: ContentProvider {
             providerID: descriptor.id,
             request: request,
             presentation: .text(titleKey: "Test", body: "DSD")
+        )
+    }
+}
+
+private final class HistoryRestoreTestProvider: ContentProvider {
+    let descriptor = ProviderDescriptor(
+        id: "test.history-extension-restore",
+        extensionID: "app.foofoil.extension.history-restore-test",
+        role: .primary,
+        fallbackProviderID: nil,
+        enhancementDomain: "history-test-audio",
+        contentFamily: .audio,
+        filenameExtensions: ["historydsd"],
+        isEnabled: true,
+        isRuntimeAvailable: true
+    )
+
+    func match(_ request: ContentRequest) -> ProviderMatch? {
+        guard request.primaryFileURL?.pathExtension == "historydsd" else { return nil }
+        return ProviderMatch(strength: .fileExtension, explanation: "history-extension-restore")
+    }
+
+    func makeSession(for request: ContentRequest, negotiatedAPI: UInt32) async throws -> ContentSession {
+        ContentSession(
+            extensionID: descriptor.extensionID,
+            providerID: descriptor.id,
+            request: request,
+            presentation: .text(titleKey: "Test", body: "restored")
+        )
+    }
+}
+
+/// sniff 匹配的历史恢复回归测试 Provider：与真实 ISO 一样必须读文件头，
+/// 刻意走 ProviderContentMatcher 以覆盖书签解析后的匹配路径。
+private final class SniffHistoryTestProvider: ContentProvider {
+    let descriptor = ProviderDescriptor(
+        id: "test.sniff-history-restore",
+        extensionID: "app.foofoil.extension.sniff-history-restore-test",
+        role: .primary,
+        fallbackProviderID: nil,
+        enhancementDomain: "history-test-sniff",
+        contentFamily: .audio,
+        filenameExtensions: ["isotest"],
+        isEnabled: true,
+        isRuntimeAvailable: true
+    )
+
+    func match(_ request: ContentRequest) -> ProviderMatch? {
+        ProviderContentMatcher.match(
+            request,
+            declarations: [ContentTypeDeclaration(extensions: ["isotest"], strategy: .sniff)]
+        ) { url in
+            guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
+            defer { try? handle.close() }
+            guard let data = try? handle.read(upToCount: 8), data.count == 8 else { return false }
+            return data == Data("SACDMTOC".utf8)
+        }
+    }
+
+    func makeSession(for request: ContentRequest, negotiatedAPI: UInt32) async throws -> ContentSession {
+        ContentSession(
+            extensionID: descriptor.extensionID,
+            providerID: descriptor.id,
+            request: request,
+            presentation: .text(titleKey: "Test", body: "sniff-restored")
         )
     }
 }
