@@ -1080,9 +1080,7 @@ DSD → DoP → CoreAudio HAL → USB DAC 的最小闭环，并在真实 Stereo 
 Extension API 能承载真实 Hi-Fi Pipeline，但仍是 in-process 开发样机，不代表 Hi-Fi 已可通过
 正式 Registry 安装。`hifi-ext` 不再作为长期开发入口，计划删除。
 
-尚未完成的关键发布范围包括 raw DFF / DST / SACD ISO、完整 seek、播放
-队列与 Navigator 闭环、metadata 与封面、Session 恢复、更多 DSD 速率和设备回归、进程隔离评估，
-以及独立仓库、签名、公证、安装和升级流程。
+Hi-Fi 状态更新（2026-09-07）：DSD64/128/256、raw DFF、未压缩立体声 SACD ISO，以及历史曲目/播放位置恢复已通过用户实测。多个箔争用独占设备存在问题，待定位修复；记住上次选择的 DAC 尚未完成。其他已测场景未发现问题，已有音频资源不需要补 metadata。DST、SACD 多声道和正式发布流程仍属后续范围。详细记录以 Hi-Fi 交接文档第 9 节为准。
 
 完整阶段范围：
 
