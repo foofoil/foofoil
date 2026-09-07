@@ -512,7 +512,6 @@ extension AppState {
                 defer { self.isLoading = false }
                 do {
                     await closeTask?.value
-                    await ExtensionHost.shared.releaseHiFiPCMOutputAndWait()
                     guard self.currentMediaRouteGeneration == routeGeneration else { return }
                     let outcome = try await (urls.count == 1
                         ? ExtensionHost.shared.open(url: url)
@@ -741,7 +740,6 @@ extension AppState {
                 guard let self else { return }
                 do {
                     await closeTask?.value
-                    await ExtensionHost.shared.releaseHiFiPCMOutputAndWait()
                     guard self.currentMediaRouteGeneration == routeGeneration,
                           self.fileList?.currentID == itemID else { return }
                     let outcome = try await ExtensionHost.shared.open(url: url)
@@ -862,13 +860,65 @@ extension AppState {
             syncFileListNavigator()
         }
 
+        private func pauseExtensionForExclusiveHandoff(sessionID: UUID) async {
+            guard let session = extensionSession, session.id == sessionID else { return }
+            exclusivePlaybackGeneration &+= 1
+            noteUserPausedMediaPlayback()
+            if let updated = try? await ExtensionHost.shared.perform(commandID: "hifi.pause", in: session),
+               extensionSession?.id == sessionID {
+                extensionSession = updated
+                isMediaPlaying = false
+                if let extensionID = updated.extensionID, let reference = extensionStateReference {
+                    _ = try? ExtensionHost.shared.stateStore.save(
+                        extensionID: extensionID, schemaVersion: 1,
+                        payload: JSONEncoder().encode(updated), reference: reference
+                    )
+                }
+            }
+        }
+
         func performExtensionCommand(_ commandID: String) {
+            if commandID == "hifi.pause" { exclusivePlaybackGeneration &+= 1 }
             guard let session = extensionSession else { return }
+            let commandGeneration = exclusivePlaybackGeneration
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 do {
-                    let updated = try await ExtensionHost.shared.perform(commandID: commandID, in: session)
-                    guard self.extensionSession?.id == session.id else { return }
+                    let updated: ContentSession
+                    let isStart = commandID == "hifi.play"
+                    let isDeviceChange = commandID.hasPrefix("hifi.device.") && session.mediaPlayback?.state == .playing
+                    let deviceID = isDeviceChange
+                        ? String(commandID.dropFirst("hifi.device.".count))
+                        : session.audioDeviceSelection?.selectedDeviceID
+                    if session.providerID == "audio.hifi", (isStart || isDeviceChange), let deviceID {
+                        var result = session
+                        let generation = commandGeneration
+                        try await ExclusivePlaybackCoordinator.shared.perform(
+                            deviceID: deviceID, ownerID: session.id,
+                            pause: { [weak self] in await self?.pauseExtensionForExclusiveHandoff(sessionID: session.id) },
+                            isCurrent: { [weak self] in
+                                self?.extensionSession?.id == session.id && self?.exclusivePlaybackGeneration == generation
+                            },
+                            start: { [weak self] in
+                                guard let self, self.extensionSession?.id == session.id,
+                                      self.exclusivePlaybackGeneration == generation else { throw CancellationError() }
+                                if isDeviceChange {
+                                    let paused = try await ExtensionHost.shared.perform(commandID: "hifi.pause", in: session)
+                                    ExclusivePlaybackCoordinator.shared.release(ownerID: session.id)
+                                    let selected = try await ExtensionHost.shared.perform(commandID: commandID, in: paused)
+                                    guard self.exclusivePlaybackGeneration == generation else { throw CancellationError() }
+                                    result = try await ExtensionHost.shared.perform(commandID: "hifi.play", in: selected)
+                                } else {
+                                    result = try await ExtensionHost.shared.perform(commandID: commandID, in: session)
+                                }
+                            }
+                        )
+                        updated = result
+                    } else {
+                        updated = try await ExtensionHost.shared.perform(commandID: commandID, in: session)
+                    }
+                    guard self.extensionSession?.id == session.id,
+                          self.exclusivePlaybackGeneration == commandGeneration else { return }
                     self.extensionSession = updated
                     // 进度最多每五秒保存一次扩展快照，避免每秒写盘或刷新历史排序。
                     let persistsState = commandID != "hifi.status"

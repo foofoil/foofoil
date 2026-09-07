@@ -875,6 +875,62 @@ struct ExtensionKitTests {
         #expect(FileManager.default.fileExists(atPath: stateURL.path))
     }
 
+    @Test(arguments: ["PCM→PCM", "PCM→DSD", "DSD→PCM", "DSD→DSD"])
+    func exclusiveDeviceHandoffWaitsForOldOutput(pair: String) async throws {
+        let coordinator = ExclusivePlaybackCoordinator()
+        let first = UUID(), second = UUID()
+        var events: [String] = []
+        try await coordinator.perform(deviceID: "dac", ownerID: first, pause: {
+            events.append("pause")
+            await Task.yield()
+            events.append("released")
+        }, start: { events.append(pair) })
+        try await coordinator.perform(deviceID: "dac", ownerID: second, pause: {}, start: {
+            #expect(events == [pair, "pause", "released"])
+            events.append("new playback")
+        })
+        #expect(events.last == "new playback")
+    }
+
+    @Test func exclusiveDeviceHandoffLeavesOtherDACAndReleasedSystemRouteAlone() async throws {
+        let coordinator = ExclusivePlaybackCoordinator()
+        let first = UUID(), second = UUID(), third = UUID()
+        var paused: [String] = []
+        try await coordinator.perform(deviceID: "a", ownerID: first, pause: { paused.append("a") }, start: {})
+        try await coordinator.perform(deviceID: "b", ownerID: second, pause: { paused.append("b") }, start: {})
+        #expect(paused.isEmpty)
+        // 切回系统默认后不再登记独占；随后接管该 DAC 不应暂停系统输出。
+        coordinator.release(ownerID: first)
+        try await coordinator.perform(deviceID: "a", ownerID: third, pause: {}, start: {})
+        #expect(paused.isEmpty)
+        try await coordinator.perform(deviceID: "b", ownerID: UUID(), pause: {}, start: {})
+        #expect(paused == ["b"])
+    }
+
+    @Test func exclusiveDeviceHandoffSerializesRapidClaimsAndIgnoresOldRelease() async throws {
+        let coordinator = ExclusivePlaybackCoordinator()
+        let first = UUID(), second = UUID()
+        var events: [String] = []
+        let a = Task { @MainActor in
+            try await coordinator.perform(deviceID: "dac", ownerID: first,
+                pause: { events.append("pause a") }, start: {
+                    events.append("start a")
+                    await Task.yield()
+                    events.append("ready a")
+                })
+        }
+        while events.isEmpty { await Task.yield() }
+        let b = Task { @MainActor in
+            try await coordinator.perform(deviceID: "dac", ownerID: second,
+                pause: { events.append("pause b") }, start: { events.append("start b") })
+        }
+        try await a.value
+        try await b.value
+        coordinator.release(ownerID: first)
+        try await coordinator.perform(deviceID: "dac", ownerID: UUID(), pause: {}, start: {})
+        #expect(events == ["start a", "ready a", "pause a", "start b", "pause b"])
+    }
+
     @Test(arguments: ["two", "removed"])
     func hiFiHistoryRestoresTrackThenPosition(trackID: String) async throws {
         var fresh = ContentSession(

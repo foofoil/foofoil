@@ -30,6 +30,8 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     private let playerNode = AVAudioPlayerNode()
     private let deviceServiceClientID = UUID()
     private var activeLeaseClientID: UUID?
+    private var selectedOutputDeviceID: String?
+    private var hasLoadedOutputPreference = false
     private var audioFile: AVAudioFile?
     private var startFrame: AVAudioFramePosition = 0
     private var segmentFrames: AVAudioFrameCount = 0
@@ -164,6 +166,16 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         refreshCurrentTime()
         playerNode.pause()
         isPlaying = false
+        if let clientID = activeLeaseClientID {
+            engine.stop()
+            activeLeaseClientID = nil
+            preparedDeviceID = nil
+            preparedSourceSampleRate = nil
+            ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
+            Task {
+                _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(command: .releasePCM, clientID: clientID))
+            }
+        }
         MediaRemoteCommandCoordinator.shared.update(self)
     }
 
@@ -178,7 +190,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         routeGeneration &+= 1
         let clientID = activeLeaseClientID ?? deviceServiceClientID
         activeLeaseClientID = nil
-        PCMExclusivePlaybackCoordinator.shared.release(self)
+        ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
         Task {
             _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(
                 command: .releasePCM,
@@ -188,6 +200,8 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     }
 
     func selectSystemDefaultOutput() {
+        selectedOutputDeviceID = nil
+        hasLoadedOutputPreference = true
         routeGeneration &+= 1
         let generation = routeGeneration
         Task { await applySystemDefaultRoute(generation: generation) }
@@ -196,6 +210,8 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     func selectExclusiveOutput(deviceID: String) {
         routeGeneration &+= 1
         let generation = routeGeneration
+        selectedOutputDeviceID = deviceID
+        hasLoadedOutputPreference = true
         Task { await applyExclusiveRoute(deviceID: deviceID, generation: generation, resumesPlayback: isPlaying) }
     }
 
@@ -311,10 +327,22 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             return
         }
         do {
-            deviceServiceSnapshot = try await ExtensionHost.shared.performHiFiDeviceCommand(.init(
+            var snapshot = try await ExtensionHost.shared.performHiFiDeviceCommand(.init(
                 command: .snapshot,
-                clientID: deviceServiceClientID
+                clientID: activeLeaseClientID ?? deviceServiceClientID
             ))
+            if !hasLoadedOutputPreference {
+                selectedOutputDeviceID = snapshot.selectedPCMDeviceID
+                hasLoadedOutputPreference = true
+            }
+            // 全局偏好只用于首次选择；其他箔改路由不改变本箔的系统默认/独占选择。
+            if let uid = selectedOutputDeviceID,
+               !snapshot.devices.contains(where: { $0.id == uid && $0.isConnected }) {
+                selectedOutputDeviceID = nil
+            }
+            snapshot.selectedPCMDeviceID = selectedOutputDeviceID
+            snapshot.pcmRouteMode = selectedOutputDeviceID == nil ? .systemDefault : .exclusiveDevice
+            deviceServiceSnapshot = snapshot
             deviceFailureMessage = nil
         } catch {
             deviceServiceSnapshot = nil
@@ -384,7 +412,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         preparedDeviceID = nil
         preparedSourceSampleRate = nil
         activeLeaseClientID = nil
-        PCMExclusivePlaybackCoordinator.shared.release(self)
+        ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
         rebuildEngineForSystemDefault()
         schedule(from: currentTime, play: false)
         MediaRemoteCommandCoordinator.shared.update(self)
@@ -395,14 +423,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     private func preparePreferredRouteAndPlay(generation: UInt64) async {
         if deviceServiceSnapshot == nil { await refreshDeviceService() }
         guard generation == routeGeneration else { return }
-        guard let snapshot = deviceServiceSnapshot,
-              snapshot.pcmRouteMode == .exclusiveDevice,
-              let deviceID = snapshot.selectedPCMDeviceID else {
-            startPlaybackNow()
-            return
-        }
-        if preparedDeviceID == deviceID,
-           preparedSourceSampleRate.map({ abs($0 - sampleRate) < 0.5 }) == true {
+        guard let deviceID = selectedOutputDeviceID else {
             startPlaybackNow()
             return
         }
@@ -414,10 +435,50 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         generation: UInt64,
         resumesPlayback: Bool
     ) async {
+        if !resumesPlayback {
+            await pauseForExclusiveHandoff()
+            ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
+            await refreshDeviceService()
+            return
+        }
+        do {
+            try await ExclusivePlaybackCoordinator.shared.perform(
+                deviceID: deviceID, ownerID: deviceServiceClientID,
+                pause: { [weak self] in await self?.pauseForExclusiveHandoff() },
+                isCurrent: { [weak self] in self?.routeGeneration == generation },
+                start: { [weak self] in
+                    guard let self, generation == self.routeGeneration else { throw CancellationError() }
+                    try await self.prepareExclusiveRoute(deviceID: deviceID, generation: generation, resumesPlayback: resumesPlayback)
+                    guard generation == self.routeGeneration else { throw CancellationError() }
+                }
+            )
+        } catch { }
+    }
+
+    private func pauseForExclusiveHandoff() async {
+        playbackIntentHandler?(false)
+        routeGeneration &+= 1
+        stopEngineForRouteChange()
+        let clientID = activeLeaseClientID
+        activeLeaseClientID = nil
+        preparedDeviceID = nil
+        preparedSourceSampleRate = nil
+        if let clientID {
+            _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(command: .releasePCM, clientID: clientID))
+        }
+        MediaRemoteCommandCoordinator.shared.update(self)
+    }
+
+    private func prepareExclusiveRoute(deviceID: String, generation: UInt64, resumesPlayback: Bool) async throws {
         let shouldResume = resumesPlayback
         let leaseClientID = UUID()
-        PCMExclusivePlaybackCoordinator.shared.claim(self)
         stopEngineForRouteChange()
+        ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
+        if let old = activeLeaseClientID {
+            _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(command: .releasePCM, clientID: old))
+            activeLeaseClientID = nil
+        }
+        guard generation == routeGeneration else { return }
         do {
             let snapshot = try await ExtensionHost.shared.performHiFiDeviceCommand(.init(
                 command: .prepareExclusivePCM,
@@ -431,7 +492,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                     command: .releasePCM,
                     clientID: leaseClientID
                 ))
-                PCMExclusivePlaybackCoordinator.shared.release(self)
+                ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
                 return
             }
             try routeEngine(to: deviceID)
@@ -443,9 +504,12 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             schedule(from: currentTime, play: shouldResume)
             if let refreshed = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(
                 command: .snapshot,
-                clientID: deviceServiceClientID
+                clientID: leaseClientID
             )) {
-                deviceServiceSnapshot = refreshed
+                var local = refreshed
+                local.selectedPCMDeviceID = selectedOutputDeviceID
+                local.pcmRouteMode = selectedOutputDeviceID == nil ? .systemDefault : .exclusiveDevice
+                deviceServiceSnapshot = local
             }
         } catch {
             _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(
@@ -456,32 +520,33 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             activeLeaseClientID = nil
             preparedDeviceID = nil
             preparedSourceSampleRate = nil
-            PCMExclusivePlaybackCoordinator.shared.release(self)
+            ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
             deviceFailureMessage = error.localizedDescription
             rebuildEngineForSystemDefault()
-            schedule(from: currentTime, play: shouldResume)
+            schedule(from: currentTime, play: false)
+            throw error
         }
     }
 
     private func applySystemDefaultRoute(generation: UInt64) async {
         let shouldResume = isPlaying
-        PCMExclusivePlaybackCoordinator.shared.claim(self)
+        ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
         stopEngineForRouteChange()
         do {
             let snapshot = try await ExtensionHost.shared.performHiFiDeviceCommand(.init(
                 command: .selectSystemDefault,
-                clientID: deviceServiceClientID
+                clientID: activeLeaseClientID ?? deviceServiceClientID
             ))
             guard generation == routeGeneration else { return }
             rebuildEngineForSystemDefault()
             activeLeaseClientID = nil
-            PCMExclusivePlaybackCoordinator.shared.release(self)
+            ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
             deviceServiceSnapshot = snapshot
             deviceFailureMessage = nil
             schedule(from: currentTime, play: shouldResume)
         } catch {
             guard generation == routeGeneration else { return }
-            PCMExclusivePlaybackCoordinator.shared.release(self)
+            ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
             deviceFailureMessage = error.localizedDescription
             rebuildEngineForSystemDefault()
             schedule(from: currentTime, play: shouldResume)
@@ -654,22 +719,41 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     }
 }
 
-/// Hog Mode 属于进程而不是窗口。新箔切换路由前，先同步停止仍在使用旧 lease 的 PCM 箔。
+/// 交接按设备串行，先等待旧输出暂停和释放，再启动新输出；系统默认输出不登记。
 @MainActor
-private final class PCMExclusivePlaybackCoordinator {
-    static let shared = PCMExclusivePlaybackCoordinator()
+final class ExclusivePlaybackCoordinator {
+    static let shared = ExclusivePlaybackCoordinator()
+    private struct Owner {
+        let id: UUID
+        let pause: @MainActor () async -> Void
+    }
+    private var owners: [String: Owner] = [:]
+    private var tails: [String: Task<Void, Error>] = [:]
 
-    private weak var owner: AudioPlaybackController?
-
-    func claim(_ controller: AudioPlaybackController) {
-        if let owner, owner !== controller {
-            owner.closeOutput()
+    func perform(
+        deviceID: String,
+        ownerID: UUID,
+        pause: @escaping @MainActor () async -> Void,
+        isCurrent: @escaping @MainActor () -> Bool = { true },
+        start: @escaping @MainActor () async throws -> Void
+    ) async throws {
+        let preceding = tails[deviceID]
+        let task = Task { @MainActor in
+            _ = try? await preceding?.value
+            guard isCurrent() else { throw CancellationError() }
+            if let old = self.owners[deviceID], old.id != ownerID {
+                self.owners.removeValue(forKey: deviceID)
+                await old.pause()
+            }
+            try await start()
+            self.release(ownerID: ownerID)
+            self.owners[deviceID] = Owner(id: ownerID, pause: pause)
         }
-        owner = controller
+        tails[deviceID] = task
+        try await task.value
     }
 
-    func release(_ controller: AudioPlaybackController) {
-        guard owner === controller else { return }
-        owner = nil
+    func release(ownerID: UUID) {
+        for uid in owners.keys.filter({ owners[$0]?.id == ownerID }) { owners.removeValue(forKey: uid) }
     }
 }
