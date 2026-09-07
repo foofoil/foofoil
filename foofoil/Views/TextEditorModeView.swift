@@ -11,7 +11,8 @@ struct TextEditorModeView: View {
     @ObservedObject var appState: AppState
     @ObservedObject private var historyManager = HistoryManager.shared
     @State private var textHeight: CGFloat = 40 // 动态高度
-    @State private var hoveredConfig: WindowConfig? = nil
+    @State private var hoveredHistoryID: UUID? = nil
+    @State private var isSearchCardHovered = false
     @State private var showRenameAlert = false
     @State private var newTitleText = ""
     @State private var targetRenameConfig: WindowConfig? = nil
@@ -74,6 +75,7 @@ struct TextEditorModeView: View {
                                             HistoryCardView(
                                                 config: config,
                                                 shortcutText: index < 9 && appState.isCommandKeyPressed ? "⌘\(index + 1)" : nil,
+                                                isHovered: hoveredHistoryID == config.id,
                                                 action: {
                                                     let isCurrentlyBlank = appState.imageURL == nil && appState.webURL == nil && appState.text.isEmpty
                                                     if isCurrentlyBlank {
@@ -82,13 +84,6 @@ struct TextEditorModeView: View {
                                                         }
                                                     } else {
                                                         appState.loadConfig(config)
-                                                    }
-                                                },
-                                                onHoverChanged: { hovering in
-                                                    if hovering {
-                                                        hoveredConfig = config
-                                                    } else if hoveredConfig?.id == config.id {
-                                                        hoveredConfig = nil
                                                     }
                                                 }
                                             )
@@ -118,9 +113,23 @@ struct TextEditorModeView: View {
                                                 .opacity(appState.isCommandKeyPressed ? 1 : 0)
                                                 .animation(.easeInOut(duration: 0.15), value: appState.isCommandKeyPressed)
                                         }
+                                        .contentShape(Rectangle())
+                                        .background {
+                                            HoverTrackingView { hovering in
+                                                hoveredHistoryID = HistoryItemHover.nextID(
+                                                    current: hoveredHistoryID,
+                                                    itemID: config.id,
+                                                    hovering: hovering
+                                                )
+                                            }
+                                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                        }
                                     }
                                     VStack(spacing: 4) {
-                                        SearchHistoryCard(shortcutText: appState.isCommandKeyPressed ? "⌘P" : nil) {
+                                        SearchHistoryCard(
+                                            shortcutText: appState.isCommandKeyPressed ? "⌘P" : nil,
+                                            isHovered: isSearchCardHovered
+                                        ) {
                                             HistorySearchWindowController.shared.show()
                                         }
                                         Text(NSLocalizedString("Search History", comment: ""))
@@ -131,6 +140,13 @@ struct TextEditorModeView: View {
                                             .opacity(appState.isCommandKeyPressed ? 1 : 0)
                                             .animation(.easeInOut(duration: 0.15), value: appState.isCommandKeyPressed)
                                     }
+                                    .contentShape(Rectangle())
+                                    .background {
+                                        HoverTrackingView { hovering in
+                                            isSearchCardHovered = hovering
+                                        }
+                                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    }
                                 }
                                 .padding(.horizontal, 16)
                                 .padding(.top, 8)
@@ -138,7 +154,7 @@ struct TextEditorModeView: View {
                             }
 
                             Group {
-                                if let config = hoveredConfig {
+                                if let config = historyManager.historyConfigs.prefix(30).first(where: { $0.id == hoveredHistoryID }) {
                                     let title = config.historyMenuDisplayName
                                     let url = config.actualWebURLString ?? config.webURLString
                                     HStack(spacing: 4) {
@@ -148,6 +164,11 @@ struct TextEditorModeView: View {
                                         } else {
                                             Text(title)
                                         }
+                                    }
+                                } else if isSearchCardHovered {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "magnifyingglass")
+                                        Text(NSLocalizedString("Search History", comment: ""))
                                     }
                                 } else {
                                     Text(" ")
@@ -189,14 +210,14 @@ struct TextEditorModeView: View {
 
 private struct SearchHistoryCard: View {
     let shortcutText: String?
+    var isHovered: Bool = false
     let action: () -> Void
-    @State private var hovered = false
 
     var body: some View {
         Button(action: action) {
             ZStack(alignment: .topTrailing) {
                 RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(NSColor.controlBackgroundColor).opacity(hovered ? 1 : 0.95))
+                    .fill(Color(NSColor.controlBackgroundColor).opacity(isHovered ? 1 : 0.95))
                 Image(systemName: "magnifyingglass").font(.system(size: 24)).foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 if let shortcutText {
@@ -205,7 +226,6 @@ private struct SearchHistoryCard: View {
             }.frame(width: 60, height: 60)
         }
         .buttonStyle(.plain)
-        .onHover { hovered = $0 }
         .help(NSLocalizedString("Search History", comment: ""))
     }
 }

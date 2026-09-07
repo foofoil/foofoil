@@ -108,7 +108,11 @@ public class FloatingWindow: NSWindow {
             if let controller = self.windowController as? FloatingWindowController {
                 controller.updateNavigatorEdgeHover(at: event.locationInWindow)
             }
-            if !modifiers.contains(.command), updateEdgeResizeCursor(at: event.locationInWindow) {
+            let onResizeEdge = !modifiers.contains(.command)
+                && updateEdgeResizeCursor(at: event.locationInWindow)
+            // 只拦截 cursorUpdate 以保持缩放光标。mouseEntered/Moved 必须下发：
+            // 从箔外再进入时指针必经 8pt 热区，若此处 return，窗口内 tracking area 会卡在 exited。
+            if onResizeEdge, !Self.shouldDeliverToViews(eventType: event.type, isOnResizeEdge: true) {
                 return
             }
         }
@@ -304,6 +308,12 @@ public class FloatingWindow: NSWindow {
         }
 
         super.sendEvent(event)
+    }
+
+    /// 边缘缩放只拦截 cursorUpdate。进入/移动事件交给视图，否则离开箔再进入后 hover 会失效。
+    static func shouldDeliverToViews(eventType: NSEvent.EventType, isOnResizeEdge: Bool) -> Bool {
+        if !isOnResizeEdge { return true }
+        return eventType != .cursorUpdate
     }
 
     static func resizeEdges(at point: NSPoint, in size: NSSize) -> ResizeEdges? {

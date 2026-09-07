@@ -1292,6 +1292,68 @@ struct ExtensionKitTests {
         ))
     }
 
+    @Test func historyItemHoverKeepsNewerItemWhenExitArrivesLate() {
+        let first = UUID()
+        let second = UUID()
+        let hovered = HistoryItemHover.nextID(current: nil, itemID: first, hovering: true)
+        #expect(hovered == first)
+        // 先进入第二项，再收到第一项的 exited：不得把第二项清掉。
+        let moved = HistoryItemHover.nextID(current: hovered, itemID: second, hovering: true)
+        #expect(moved == second)
+        #expect(HistoryItemHover.nextID(current: moved, itemID: first, hovering: false) == second)
+        #expect(HistoryItemHover.nextID(current: moved, itemID: second, hovering: false) == nil)
+    }
+
+    @Test func hoverTrackingNSViewPublishesOnlyStateChangesAndUsesBounds() {
+        var published: [Bool] = []
+        let view = HoverTrackingNSView(frame: NSRect(x: 0, y: 0, width: 60, height: 75))
+        view.onHoverChanged = { published.append($0) }
+
+        view.updateHoverState(isInside: true)
+        view.updateHoverState(isInside: true)
+        view.updateHoverState(isInside: false)
+        view.updateHoverState(isInside: false)
+        view.updateHoverState(isInside: true)
+        #expect(published == [true, false, true])
+
+        #expect(view.isPointInside(NSPoint(x: 30, y: 30)))
+        #expect(view.isPointInside(NSPoint(x: 0, y: 0)))
+        #expect(view.isPointInside(NSPoint(x: 59.9, y: 74.9)))
+        #expect(!view.isPointInside(NSPoint(x: -0.1, y: 30)))
+        #expect(!view.isPointInside(NSPoint(x: 60, y: 30)))
+        #expect(!view.isPointInside(NSPoint(x: 30, y: 75)))
+    }
+
+    @Test func hoverTrackingIgnoresPointerOnceItLeavesTheWindowFrame() {
+        let windowFrame = NSRect(x: 100, y: 80, width: 400, height: 300)
+        let viewBounds = NSRect(x: 0, y: 0, width: 60, height: 75)
+        #expect(
+            HoverTrackingNSView.isPointerInsideItem(
+                screenPoint: NSPoint(x: 130, y: 100),
+                windowFrame: windowFrame,
+                pointInView: NSPoint(x: 20, y: 20),
+                viewBounds: viewBounds
+            )
+        )
+        // 鼠标已离开箔边，即使换算后的视图坐标仍落在卡片上，也不再算悬停。
+        #expect(
+            !HoverTrackingNSView.isPointerInsideItem(
+                screenPoint: NSPoint(x: 90, y: 100),
+                windowFrame: windowFrame,
+                pointInView: NSPoint(x: 20, y: 20),
+                viewBounds: viewBounds
+            )
+        )
+        #expect(
+            !HoverTrackingNSView.isPointerInsideItem(
+                screenPoint: NSPoint(x: 130, y: 100),
+                windowFrame: windowFrame,
+                pointInView: NSPoint(x: -1, y: 20),
+                viewBounds: viewBounds
+            )
+        )
+    }
+
     /// 目录本来就可读时不弹面板也不要求重读（首次读取已带授权）。
     @Test @MainActor func sidecarRequestSkipsReloadWhenAccessible() async throws {
         let directory = try temporaryDirectory()

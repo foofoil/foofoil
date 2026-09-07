@@ -9,13 +9,13 @@ import SwiftUI
 import AppKit
 
 // 历史记录卡片视图，使用 DragGesture(minimumDistance: 0) 实现绝对零延迟的鼠标按下/抬起视觉反馈。
+// 悬停态由父视图传入：卡片上浮不得带动命中区，否则 tracking area 会跟着移出指针。
 struct HistoryCardView: View {
     let config: WindowConfig
     var shortcutText: String? = nil
+    var isHovered: Bool = false
     let action: () -> Void
-    var onHoverChanged: ((Bool) -> Void)? = nil
 
-    @State private var isHovered = false
     @State private var isPressed = false
     @State private var cardImage: NSImage? = nil
 
@@ -44,10 +44,8 @@ struct HistoryCardView: View {
             .offset(y: isPressed ? 0 : (isHovered ? -3 : 0))
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isHovered)
             .animation(.interactiveSpring(response: 0.12, dampingFraction: 0.8), value: isPressed)
-            .onHover { hovering in
-                isHovered = hovering
-                onHoverChanged?(hovering)
-            }
+            .frame(width: 60, height: 60)
+            .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { value in
@@ -267,5 +265,148 @@ struct HistoryCardView: View {
             }
         }
         .frame(width: 60, height: 60)
+    }
+}
+
+enum HistoryItemHover {
+    /// 离开旧项时仅在仍是该项的情况下清空，避免相邻卡片 entered/exited 顺序抖动。
+    static func nextID(current: UUID?, itemID: UUID, hovering: Bool) -> UUID? {
+        if hovering { return itemID }
+        if current == itemID { return nil }
+        return current
+    }
+}
+
+/// SwiftUI `.onHover` 的 tracking area 会随子视图增删（缩略图加载）重建，指针已在内部时不会补发 entered。
+/// 用稳定的 AppKit tracking area，并在重建后按当前指针位置同步，避免空白箔底部标题经常不出现。
+struct HoverTrackingView: NSViewRepresentable {
+    var onHoverChanged: (Bool) -> Void
+
+    func makeNSView(context: Context) -> HoverTrackingNSView {
+        let view = HoverTrackingNSView()
+        view.onHoverChanged = onHoverChanged
+        view.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        view.setContentHuggingPriority(.defaultLow, for: .vertical)
+        return view
+    }
+
+    func updateNSView(_ nsView: HoverTrackingNSView, context: Context) {
+        nsView.onHoverChanged = onHoverChanged
+    }
+}
+
+final class HoverTrackingNSView: NSView {
+    var onHoverChanged: ((Bool) -> Void)?
+    private var trackingArea: NSTrackingArea?
+    private(set) var isPointerInside = false
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let trackingArea {
+            removeTrackingArea(trackingArea)
+        }
+        let area = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .mouseMoved, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        trackingArea = area
+        syncHoverFromMouseLocation()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if window != nil {
+            HoverTrackingSync.add(self)
+        } else {
+            HoverTrackingSync.remove(self)
+            updateHoverState(isInside: false)
+            return
+        }
+        syncHoverFromMouseLocation()
+    }
+
+    deinit {
+        HoverTrackingSync.remove(self)
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        syncHoverFromMouseLocation()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        syncHoverFromMouseLocation()
+    }
+
+    override func mouseMoved(with event: NSEvent) {
+        syncHoverFromMouseLocation()
+    }
+
+    func updateHoverState(isInside: Bool) {
+        guard isPointerInside != isInside else { return }
+        isPointerInside = isInside
+        onHoverChanged?(isInside)
+    }
+
+    func isPointInside(_ pointInView: NSPoint) -> Bool {
+        bounds.contains(pointInView)
+    }
+
+    func syncHoverFromMouseLocation() {
+        guard let window, window.isVisible else {
+            updateHoverState(isInside: false)
+            return
+        }
+        let screenPoint = NSEvent.mouseLocation
+        let windowPoint = window.convertPoint(fromScreen: screenPoint)
+        let pointInView = convert(windowPoint, from: nil)
+        updateHoverState(
+            isInside: Self.isPointerInsideItem(
+                screenPoint: screenPoint,
+                windowFrame: window.frame,
+                pointInView: pointInView,
+                viewBounds: bounds
+            )
+        )
+    }
+
+    static func isPointerInsideItem(
+        screenPoint: NSPoint,
+        windowFrame: NSRect,
+        pointInView: NSPoint,
+        viewBounds: NSRect
+    ) -> Bool {
+        windowFrame.contains(screenPoint) && viewBounds.contains(pointInView)
+    }
+}
+
+/// 在 AppKit 把事件交给窗口之前按屏幕坐标同步 hover。
+/// 箔窗 sendEvent 若拦截边缘 entered/moved，tracking area 会以为指针仍在窗外。
+private enum HoverTrackingSync {
+    static let views = NSHashTable<HoverTrackingNSView>.weakObjects()
+    static var monitor: Any?
+
+    static func add(_ view: HoverTrackingNSView) {
+        views.add(view)
+        guard monitor == nil else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(
+            matching: [.mouseMoved, .mouseEntered, .mouseExited, .leftMouseDragged]
+        ) { event in
+            for tracked in views.allObjects {
+                tracked.syncHoverFromMouseLocation()
+            }
+            return event
+        }
+    }
+
+    static func remove(_ view: HoverTrackingNSView) {
+        views.remove(view)
+        guard views.count == 0, let monitor else { return }
+        NSEvent.removeMonitor(monitor)
+        self.monitor = nil
     }
 }

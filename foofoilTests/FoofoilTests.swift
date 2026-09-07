@@ -626,6 +626,15 @@ struct FoofoilTests {
         #expect(FloatingWindow.resizeEdges(at: NSPoint(x: 200, y: 301), in: size) == nil)
     }
 
+    @Test func resizeEdgeStillDeliversMouseEnteredAndMovedToViews() {
+        #expect(FloatingWindow.shouldDeliverToViews(eventType: .mouseEntered, isOnResizeEdge: true))
+        #expect(FloatingWindow.shouldDeliverToViews(eventType: .mouseMoved, isOnResizeEdge: true))
+        #expect(FloatingWindow.shouldDeliverToViews(eventType: .mouseExited, isOnResizeEdge: true))
+        #expect(!FloatingWindow.shouldDeliverToViews(eventType: .cursorUpdate, isOnResizeEdge: true))
+        #expect(FloatingWindow.shouldDeliverToViews(eventType: .cursorUpdate, isOnResizeEdge: false))
+        #expect(FloatingWindow.shouldDeliverToViews(eventType: .mouseEntered, isOnResizeEdge: false))
+    }
+
     @Test func testAudioMetadataFormatters() {
         #expect(AudioMetadataLoader.formatSampleRate(44100) == String(format: NSLocalizedString("%@ kHz", comment: ""), "44.1"))
         #expect(AudioMetadataLoader.formatSampleRate(48000) == String(format: NSLocalizedString("%@ kHz", comment: ""), "48"))
