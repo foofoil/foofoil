@@ -109,7 +109,7 @@ Hi-Fi
 ├── 增强 MP3 / AAC / ALAC / FLAC 等已有音频
 ├── 播放列表与播放队列语义（由 Core 通用导航面板呈现）
 ├── DoP
-├── DSD → PCM fallback
+├── DoP 不可用时停止并提示（不转换 PCM）
 ├── 音效 / 可视化
 ├── CoreAudio HAL
 ├── 输出设备选择
@@ -907,7 +907,7 @@ Session
 
 播放 Pipeline
 DSD → DoP
-DSD → PCM fallback
+DoP 不可用时停止并提示（不转换 PCM）
 音效处理 / 音频可视化
 
 系统能力
@@ -1080,7 +1080,7 @@ DSD → DoP → CoreAudio HAL → USB DAC 的最小闭环，并在真实 Stereo 
 Extension API 能承载真实 Hi-Fi Pipeline，但仍是 in-process 开发样机，不代表 Hi-Fi 已可通过
 正式 Registry 安装。`hifi-ext` 不再作为长期开发入口，计划删除。
 
-尚未完成的关键发布范围包括 DSD → PCM fallback、raw DFF / DST / SACD ISO、完整 seek、播放
+尚未完成的关键发布范围包括 raw DFF / DST / SACD ISO、完整 seek、播放
 队列与 Navigator 闭环、metadata 与封面、Session 恢复、更多 DSD 速率和设备回归、进程隔离评估，
 以及独立仓库、签名、公证、安装和升级流程。
 
@@ -1094,7 +1094,7 @@ Extension API 能承载真实 Hi-Fi Pipeline，但仍是 in-process 开发样机
 -   `media.playback-queue` 播放列表 / 播放队列语义及多文件授权恢复；
 -   向 Core `Navigator Panel` 提供一维播放队列投影，不实现扩展私有侧栏；
 -   DoP；
--   DSD → PCM fallback；
+-   DoP 不可用时停止并明确提示；不实现 DSD → PCM fallback（2026-09-07 产品决策），普通 PCM 设备路由不受影响；
 -   音效 / 可视化；
 -   Audio Device Selection；
 -   Exclusive / Hog；

@@ -601,6 +601,33 @@ extension AppState {
             HistoryManager.shared.refresh()
         }
 
+        /// 新会话先选容器曲目再定位；只发送不取得设备的命令，不恢复旧的播放意图。
+        static func restoreHiFiPlayback(
+            saved: ContentSession,
+            fresh: ContentSession,
+            activate: (String, ContentSession) async throws -> ContentSession,
+            seek: (ContentSession) async throws -> ContentSession
+        ) async throws -> ContentSession {
+            guard saved.providerID == "audio.hifi", fresh.providerID == saved.providerID else { return fresh }
+            var restored = fresh
+            if let trackID = saved.playbackQueue?.currentItemID {
+                // 文件可能已被替换；旧曲目不存在时不能把它的进度套到第一曲。
+                guard restored.playbackQueue?.items.contains(where: { $0.id == trackID && $0.isPlayable }) == true else {
+                    return restored
+                }
+                if restored.playbackQueue?.currentItemID != trackID {
+                    restored = try await activate(trackID, restored)
+                }
+            }
+            guard let savedPlayback = saved.mediaPlayback,
+                  savedPlayback.position.isFinite, savedPlayback.position >= 0,
+                  var playback = restored.mediaPlayback, playback.isSeekable else { return restored }
+            playback.position = min(savedPlayback.position, playback.duration ?? savedPlayback.position)
+            playback.state = .paused
+            restored.mediaPlayback = playback
+            return try await seek(restored)
+        }
+
         /// 历史记录中的值类型快照不代表 Runtime 会话仍存活；使用原始请求（含书签）建立新会话。
         func rebuildExternalExtensionSession(
             from savedSession: ContentSession,
@@ -625,10 +652,27 @@ extension AppState {
                     await closeTask?.value
                     guard self.id == expectedStateID,
                           self.currentMediaRouteGeneration == routeGeneration else { return }
-                    await ExtensionHost.shared.releaseHiFiPCMOutputAndWait()
-                    guard self.id == expectedStateID,
-                          self.currentMediaRouteGeneration == routeGeneration else { return }
                     let outcome = try await ExtensionHost.shared.open(request: savedSession.request)
+                    var restoredSession = outcome.session
+                    do {
+                        restoredSession = try await Self.restoreHiFiPlayback(
+                            saved: savedSession,
+                            fresh: outcome.session,
+                            activate: { trackID, session in
+                                try await ExtensionHost.shared.perform(
+                                    navigatorAction: NavigatorAction(
+                                        contributionID: "hifi.playback-queue", kind: .activate, itemIDs: [trackID]
+                                    ), in: session
+                                )
+                            },
+                            seek: { session in
+                                try await ExtensionHost.shared.perform(commandID: "hifi.seek", in: session)
+                            }
+                        )
+                    } catch {
+                        await ExtensionHost.shared.closeSessionAndWait(outcome.session)
+                        throw error
+                    }
                     guard self.id == expectedStateID,
                           self.currentMediaRouteGeneration == routeGeneration else {
                         ExtensionHost.shared.closeSession(outcome.session)
@@ -646,16 +690,17 @@ extension AppState {
                     self.sourceFingerprint = self.fileList == nil
                         ? Self.localSourceFingerprint(for: sourceURL)
                         : nil
-                    self.extensionSession = outcome.session
+                    self.noteUserPausedMediaPlayback()
+                    self.extensionSession = restoredSession
                     self.extensionFallbackProviderID = outcome.failures.first?.providerID
-                    self.holdExtensionAudioFileAccess(for: outcome.session)
+                    self.holdExtensionAudioFileAccess(for: restoredSession)
                     self.installHiFiContainerListIfNeeded(
                         url: sourceURL,
-                        session: outcome.session,
+                        session: restoredSession,
                         preferredItemID: self.fileList?.currentID
                     )
-                    if let extensionID = outcome.session.extensionID {
-                        let payload = try JSONEncoder().encode(outcome.session)
+                    if let extensionID = restoredSession.extensionID {
+                        let payload = try JSONEncoder().encode(restoredSession)
                         self.extensionStateReference = try ExtensionHost.shared.stateStore.save(
                             extensionID: extensionID,
                             schemaVersion: 1,
@@ -825,9 +870,10 @@ extension AppState {
                     let updated = try await ExtensionHost.shared.perform(commandID: commandID, in: session)
                     guard self.extensionSession?.id == session.id else { return }
                     self.extensionSession = updated
-                    // 播放进度轮询是瞬时状态，不应每秒写扩展状态和窗口历史。
+                    // 进度最多每五秒保存一次扩展快照，避免每秒写盘或刷新历史排序。
                     let persistsState = commandID != "hifi.status"
-                    if persistsState,
+                    let checkpointsPlayback = Date().timeIntervalSince(self.lastExtensionPlaybackCheckpoint) >= 5
+                    if persistsState || checkpointsPlayback,
                        let extensionID = updated.extensionID,
                        let reference = self.extensionStateReference {
                         let payload = try JSONEncoder().encode(updated)
@@ -837,6 +883,9 @@ extension AppState {
                             payload: payload,
                             reference: reference
                         )
+                    }
+                    if persistsState || checkpointsPlayback {
+                        self.lastExtensionPlaybackCheckpoint = Date()
                     }
                     if persistsState { self.saveState() }
                 } catch {

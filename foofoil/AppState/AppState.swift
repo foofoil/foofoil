@@ -73,6 +73,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     }
     @Published var extensionFallbackProviderID: String?
     var extensionStateReference: String?
+    var lastExtensionPlaybackCheckpoint = Date.distantPast
 
     /// Built-in 与扩展统一投影到同一宿主导航模型；同一窗口只会有一个主内容来源。
     @Published var builtInNavigatorContributions: [NavigatorContribution] = []

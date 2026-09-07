@@ -875,6 +875,64 @@ struct ExtensionKitTests {
         #expect(FileManager.default.fileExists(atPath: stateURL.path))
     }
 
+    @Test(arguments: ["two", "removed"])
+    func hiFiHistoryRestoresTrackThenPosition(trackID: String) async throws {
+        var fresh = ContentSession(
+            extensionID: "app.foofoil.extension.hifi",
+            providerID: "audio.hifi",
+            request: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/disc.iso"))),
+            presentation: .text(titleKey: "Test", body: "DSD")
+        )
+        fresh.mediaPlayback = MediaPlaybackSnapshot(duration: 100, isSeekable: true)
+        fresh.playbackQueue = MediaPlaybackQueueSnapshot(
+            items: [.init(id: "one", title: "One"), .init(id: "two", title: "Two")], currentItemID: "one"
+        )
+        var saved = fresh
+        saved.playbackQueue?.currentItemID = trackID
+        saved.mediaPlayback?.state = .playing
+        saved.mediaPlayback?.position = 135
+        var actions: [String] = []
+        let restored = try await AppState.restoreHiFiPlayback(saved: saved, fresh: fresh) { id, session in
+            actions.append("activate")
+            var updated = session
+            updated.playbackQueue?.currentItemID = id
+            updated.mediaPlayback?.duration = 120
+            return updated
+        } seek: { session in
+            actions.append("seek")
+            #expect(session.playbackQueue?.currentItemID == "two")
+            #expect(session.mediaPlayback?.position == 120)
+            #expect(session.mediaPlayback?.state == .paused)
+            return session
+        }
+        #expect(actions == (trackID == "two" ? ["activate", "seek"] : []))
+        #expect(restored.mediaPlayback?.position == (trackID == "two" ? 120 : 0))
+        #expect(restored.id == fresh.id)
+    }
+
+    @Test(arguments: [Double.nan, Double.infinity, -1, 42])
+    func hiFiHistoryValidatesSingleFilePosition(position: Double) async throws {
+        var fresh = ContentSession(
+            extensionID: "app.foofoil.extension.hifi",
+            providerID: "audio.hifi",
+            request: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/track.dsf"))),
+            presentation: .text(titleKey: "Test", body: "DSD")
+        )
+        fresh.mediaPlayback = MediaPlaybackSnapshot(duration: 100, isSeekable: true)
+        var saved = fresh
+        saved.mediaPlayback?.position = position
+        var didSeek = false
+        let restored = try await AppState.restoreHiFiPlayback(saved: saved, fresh: fresh) { _, session in
+            Issue.record("Unexpected track activation")
+            return session
+        } seek: { session in
+            didSeek = true
+            return session
+        }
+        #expect(didSeek == (position == 42))
+        #expect(restored.mediaPlayback?.position == (position == 42 ? 42 : 0))
+    }
+
     @Test(arguments: [false, true])
     func historyRebuildsExternalExtensionSessionFromSavedRequest(reusesWindow: Bool) async throws {
         let provider = HistoryRestoreTestProvider()
@@ -932,6 +990,7 @@ struct ExtensionKitTests {
 
         let restored = try #require(state.extensionSession)
         #expect(!state.isLoading)
+        #expect(!state.resumesMediaPlaybackOnActivation)
         #expect(state.id == historyID)
         #expect(restored.id != savedSession.id)
         #expect(restored.providerID == provider.descriptor.id)
