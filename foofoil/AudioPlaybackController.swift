@@ -46,6 +46,12 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     private var scheduleGeneration: UInt64 = 0
     /// 播放卡住看门狗的代次；暂停/重排后旧检查自动失效，只重试一次。
     private var stallWatchdogGeneration: UInt64 = 0
+    /// 独占设备心跳监听：DAC 重枚举会杀死 ioProc，抖动后只重建 ioProc，不碰 hog 与格式。
+    private var exclusiveDeviceListener: AudioObjectPropertyListenerBlock?
+    private var exclusiveObservedDeviceID: AudioDeviceID = AudioDeviceID(kAudioObjectUnknown)
+    private var exclusiveIORefreshGeneration: UInt64 = 0
+    /// 同控制器发往设备服务的命令尾链，保证暂停释放先于获取到达扩展侧。
+    private var deviceCommandTail: Task<Void, Never>?
     private var progressTimer: Timer?
     private var observers: [NSObjectProtocol] = []
     private var systemDevicesListener: AudioObjectPropertyListenerBlock?
@@ -93,6 +99,31 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         progressTimer?.invalidate()
         observers.forEach(NotificationCenter.default.removeObserver)
         // deinit 为非隔离上下文，不能调用 MainActor 方法；此处内联移除监听。
+        if let exclusiveListener = exclusiveDeviceListener,
+           exclusiveObservedDeviceID != kAudioObjectUnknown {
+            var aliveAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyDeviceIsAlive,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            AudioObjectRemovePropertyListenerBlock(
+                exclusiveObservedDeviceID,
+                &aliveAddress,
+                DispatchQueue.main,
+                exclusiveListener
+            )
+            var rateAddress = AudioObjectPropertyAddress(
+                mSelector: kAudioDevicePropertyNominalSampleRate,
+                mScope: kAudioObjectPropertyScopeGlobal,
+                mElement: kAudioObjectPropertyElementMain
+            )
+            AudioObjectRemovePropertyListenerBlock(
+                exclusiveObservedDeviceID,
+                &rateAddress,
+                DispatchQueue.main,
+                exclusiveListener
+            )
+        }
         if let devicesListener = systemDevicesListener {
             var devicesAddress = AudioObjectPropertyAddress(
                 mSelector: kAudioHardwarePropertyDevices,
@@ -132,6 +163,11 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     func play() {
         playbackIntentHandler?(true)
         guard audioFile != nil, segmentFrames > 0 else { return }
+        NSLog(
+            "AudioPlaybackController play resumed=%d selected=%@ lease=%@ sr=%.0f",
+            isPlaying, selectedOutputDeviceID ?? "-",
+            activeLeaseClientID?.uuidString ?? "-", sampleRate
+        )
         if ExtensionHost.shared.isHiFiDeviceServiceAvailable {
             routeGeneration &+= 1
             let generation = routeGeneration
@@ -164,14 +200,35 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     }
 
     /// 暂停或自然播完时停排播，不改写用户的播放/暂停意图。
-    /// 独占租约（hog+设备格式）刻意保留到关闭/切设备/切速率：每次暂停都释放重建会
-    /// 让 DAC 格式来回切换，系统默认恰好是该设备时还会触发默认输出故障转移，
-    /// 把引擎拖到别的设备上（进度走但无声）。暂停只做 playerNode.pause()，
-    /// 引擎空转保持钉住，不碰 HAL，继续播零抖动。
-    func stopOutput() {
+    /// 暂停完全释放独占租约：hog 归还系统，DAC 格式恢复原值（切换格式可能让设备
+    /// 短暂重枚举，恢复播放时的重启/重钉/心跳逻辑会接住）。自然播完连播时保留租约，
+    /// 同速率无需任何 HAL 操作。独占下连引擎一起停掉，恢复时重建 ioProc。
+    func stopOutput(releaseLease: Bool = true) {
         refreshCurrentTime()
         playerNode.pause()
         isPlaying = false
+        if activeLeaseClientID != nil {
+            engine.stop()
+        }
+        if releaseLease, let clientID = activeLeaseClientID {
+            NSLog("AudioPlaybackController pause releasing lease")
+            // 同步先清本地状态，并发再播走全新获取；尾链保证释放先于获取到达扩展侧。
+            activeLeaseClientID = nil
+            preparedDeviceID = nil
+            preparedSourceSampleRate = nil
+            stopExclusiveDeviceObservation()
+            let generation = scheduleGeneration
+            let tail = deviceCommandTail
+            deviceCommandTail = Task { [weak self] in
+                _ = await tail?.value
+                guard let self,
+                      generation == self.scheduleGeneration else { return }
+                _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(
+                    command: .releasePCM,
+                    clientID: clientID
+                ))
+            }
+        }
         MediaRemoteCommandCoordinator.shared.update(self)
     }
 
@@ -181,6 +238,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         playerNode.stop()
         engine.stop()
         isPlaying = false
+        stopExclusiveDeviceObservation()
         preparedDeviceID = nil
         preparedSourceSampleRate = nil
         routeGeneration &+= 1
@@ -410,6 +468,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         playerNode.stop()
         engine.stop()
         isPlaying = false
+        stopExclusiveDeviceObservation()
         preparedDeviceID = nil
         preparedSourceSampleRate = nil
         activeLeaseClientID = nil
@@ -447,25 +506,8 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             await refreshDeviceService()
             return
         }
-        if isLeaseReusable(deviceID: deviceID) {
-            // 暂停只是停了排播，hog+格式+钉住都在：直接重排继续播，不碰 HAL。
-            // 这是暂停/播放零抖动的关键；仲裁仍走 coordinator，避免与别的箔抢设备。
-            do {
-                try await ExclusivePlaybackCoordinator.shared.perform(
-                    deviceID: deviceID, ownerID: deviceServiceClientID,
-                    pause: { [weak self] in await self?.pauseForExclusiveHandoff() },
-                    isCurrent: { [weak self] in self?.routeGeneration == generation },
-                    start: { [weak self] in
-                        guard let self, generation == self.routeGeneration else { throw CancellationError() }
-                        guard self.isLeaseReusable(deviceID: deviceID) else { throw CancellationError() }
-                        self.schedule(from: self.currentTime, play: true)
-                        guard generation == self.routeGeneration else { throw CancellationError() }
-                        self.ensurePinnedToExclusive(deviceID: deviceID, generation: generation)
-                    }
-                )
-            } catch { }
-            return
-        }
+        // 租约复用与全新获取都走 prepareExclusiveRoute（内部按租约状态分支），
+        // 仲裁统一走 coordinator，避免与别的箔抢设备。
         do {
             try await ExclusivePlaybackCoordinator.shared.perform(
                 deviceID: deviceID, ownerID: deviceServiceClientID,
@@ -492,6 +534,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         playbackIntentHandler?(false)
         routeGeneration &+= 1
         stopEngineForRouteChange()
+        stopExclusiveDeviceObservation()
         let clientID = activeLeaseClientID
         activeLeaseClientID = nil
         preparedDeviceID = nil
@@ -504,13 +547,27 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
 
     private func prepareExclusiveRoute(deviceID: String, generation: UInt64, resumesPlayback: Bool) async throws {
         let shouldResume = resumesPlayback
-        let leaseClientID = UUID()
-        stopEngineForRouteChange()
-        ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
-        if let old = activeLeaseClientID {
-            _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(command: .releasePCM, clientID: old))
-            activeLeaseClientID = nil
+        // 租约仍在（自然播完连播等）：沿用原 clientID，扩展侧直接复用，不碰 HAL；
+        // 全新获取才停引擎、清旧租约。
+        let reusingLease = isLeaseReusable(deviceID: deviceID)
+        let leaseClientID = activeLeaseClientID ?? UUID()
+        NSLog(
+            "AudioPlaybackController prepare reuse=%d uid=%@",
+            reusingLease, deviceID
+        )
+        if !reusingLease {
+            stopEngineForRouteChange()
+            ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
+            if let old = activeLeaseClientID {
+                _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(command: .releasePCM, clientID: old))
+                activeLeaseClientID = nil
+            }
         }
+        guard generation == routeGeneration else { return }
+        // 自己的格式设置会触发旧监听：先摘掉，成功后再挂新实例。
+        stopExclusiveDeviceObservation()
+        // 等待同控制器的释放先到达扩展侧，再获取，避免交错。
+        await deviceCommandTail?.value
         guard generation == routeGeneration else { return }
         do {
             let snapshot = try await ExtensionHost.shared.performHiFiDeviceCommand(.init(
@@ -528,12 +585,16 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
                 return
             }
-            try routeEngine(to: deviceID)
+            // 复用租约时引擎钉住还在，无需重钉；后续 ensurePinnedToExclusive 会校验。
+            if !reusingLease {
+                try routeEngine(to: deviceID)
+            }
             activeLeaseClientID = leaseClientID
             preparedDeviceID = deviceID
             preparedSourceSampleRate = sampleRate
             deviceServiceSnapshot = snapshot
             deviceFailureMessage = nil
+            startExclusiveDeviceObservation(deviceUID: deviceID)
             NSLog(
                 "AudioPlaybackController exclusive prepared uid=%@ resolved=%u pinned=%@ sr=%.0f ch=%d frames=%u",
                 deviceID, (try? Self.resolveDeviceID(uid: deviceID)) ?? 0,
@@ -558,6 +619,8 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 clientID: leaseClientID
             ))
             guard generation == routeGeneration else { return }
+            NSLog("AudioPlaybackController exclusive prepare failed: \(error.localizedDescription)")
+            stopExclusiveDeviceObservation()
             activeLeaseClientID = nil
             preparedDeviceID = nil
             preparedSourceSampleRate = nil
@@ -572,6 +635,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     private func applySystemDefaultRoute(generation: UInt64) async {
         let shouldResume = isPlaying
         ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
+        stopExclusiveDeviceObservation()
         stopEngineForRouteChange()
         do {
             let snapshot = try await ExtensionHost.shared.performHiFiDeviceCommand(.init(
@@ -669,6 +733,86 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         preparedDeviceID = nil
         preparedSourceSampleRate = nil
         if let format = audioFile?.processingFormat { reconnect(format: format) }
+    }
+
+    /// 监听独占设备的心跳与采样率：DAC 重枚举/外部改格式会杀死 ioProc，
+    /// 此时只重建 ioProc，不碰 hog 与设备格式。
+    private func startExclusiveDeviceObservation(deviceUID: String) {
+        stopExclusiveDeviceObservation()
+        guard let deviceID = try? Self.resolveDeviceID(uid: deviceUID) else { return }
+        var aliveAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsAlive,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var rateAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyNominalSampleRate,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        let listener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
+            Task { @MainActor [weak self] in await self?.handleExclusiveDeviceChanged() }
+        }
+        guard AudioObjectAddPropertyListenerBlock(deviceID, &aliveAddress, DispatchQueue.main, listener) == noErr,
+              AudioObjectAddPropertyListenerBlock(deviceID, &rateAddress, DispatchQueue.main, listener) == noErr else {
+            NSLog("AudioPlaybackController cannot observe exclusive device")
+            return
+        }
+        exclusiveDeviceListener = listener
+        exclusiveObservedDeviceID = deviceID
+    }
+
+    private func stopExclusiveDeviceObservation() {
+        exclusiveIORefreshGeneration &+= 1
+        guard let listener = exclusiveDeviceListener,
+              exclusiveObservedDeviceID != kAudioObjectUnknown else {
+            exclusiveDeviceListener = nil
+            return
+        }
+        let deviceID = exclusiveObservedDeviceID
+        exclusiveDeviceListener = nil
+        exclusiveObservedDeviceID = AudioDeviceID(kAudioObjectUnknown)
+        var aliveAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyDeviceIsAlive,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        AudioObjectRemovePropertyListenerBlock(deviceID, &aliveAddress, DispatchQueue.main, listener)
+        var rateAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyNominalSampleRate,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        AudioObjectRemovePropertyListenerBlock(deviceID, &rateAddress, DispatchQueue.main, listener)
+    }
+
+    /// 设备抖动后防抖重建 ioProc；暂停态只更新观察的实例，不重排。
+    private func handleExclusiveDeviceChanged() async {
+        exclusiveIORefreshGeneration &+= 1
+        let generation = exclusiveIORefreshGeneration
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        guard generation == exclusiveIORefreshGeneration,
+              let uid = preparedDeviceID,
+              activeLeaseClientID != nil else { return }
+        // 重枚举可能换实例：跟到新实例上；设备消失则摘掉监听，等显式播放时如实报错。
+        guard let currentID = try? Self.resolveDeviceID(uid: uid) else {
+            stopExclusiveDeviceObservation()
+            return
+        }
+        if currentID != exclusiveObservedDeviceID {
+            startExclusiveDeviceObservation(deviceUID: uid)
+            // 实例换了：重钉到新实例再重建 ioProc。
+            try? routeEngine(to: uid)
+        }
+        let wasPlaying = isPlaying
+        guard wasPlaying else { return }
+        NSLog("AudioPlaybackController exclusive device disturbed, rebuilding ioProc")
+        refreshCurrentTime()
+        // 旧段完成回调失效，避免误判自然播完。
+        scheduleGeneration &+= 1
+        playerNode.stop()
+        engine.stop()
+        schedule(from: currentTime, play: true)
     }
 
     private static func resolveDeviceID(uid: String) throws -> AudioDeviceID {
@@ -786,7 +930,8 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             schedule(from: 0, play: true)
             return
         }
-        stopOutput()
+        // 自然播完保留租约：自动切歌同速率可零 HAL 操作直接续播。
+        stopOutput(releaseLease: false)
         currentTime = duration
         NotificationCenter.default.post(
             name: .mediaPlaybackDidFinish,
