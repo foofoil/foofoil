@@ -89,7 +89,13 @@ extension AppState {
             if clearsFileList {
                 resetFileList()
             }
-            stopVideoAccess()
+            // 同一 FLAC 上切 CUE 曲目时文件仍在播放；撤掉沙盒访问会让无缝衔接读盘失败。
+            let isSameMediaFile = imageURL.map {
+                $0.standardizedFileURL.path == url.standardizedFileURL.path
+            } ?? false
+            if !isSameMediaFile {
+                stopVideoAccess()
+            }
             if let item = fileList?.currentItem, item.cue != nil {
                 beginCueRelatedAccess(for: item)
             }
@@ -112,10 +118,12 @@ extension AppState {
             self.webURL = nil
             self.actualWebURL = nil
             // 窗口打开期间保持沙盒访问，同目录封面才能作为关联项读取
-            if holdsSecurityAccess {
-                accessingVideoURL = url
-            } else if url.startAccessingSecurityScopedResource() {
-                accessingVideoURL = url
+            if !isSameMediaFile || accessingVideoURL == nil {
+                if holdsSecurityAccess {
+                    accessingVideoURL = url
+                } else if url.startAccessingSecurityScopedResource() {
+                    accessingVideoURL = url
+                }
             }
             // 创建安全范围书签，保证 app 重启后仍能访问原始文件
             self.videoBookmarkData = Self.makeSecurityScopedBookmark(for: url)

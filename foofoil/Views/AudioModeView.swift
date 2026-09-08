@@ -29,6 +29,7 @@ struct AudioModeView: View {
             range: appState.currentPlaybackRange,
             previousItemAction: { appState.activateMediaListItem(delta: -1) },
             nextItemAction: { appState.activateMediaListItem(delta: 1) },
+            nextGaplessItemProvider: { appState.peekNextPlaybackItem() },
             playbackIntentHandler: { playing in
                 if playing {
                     appState.noteUserStartedMediaPlayback()

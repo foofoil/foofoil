@@ -2191,12 +2191,23 @@ struct FoofoilTests {
         state.presentFileListItem(id: thirdID, rotatesIdentity: false)
         state.advanceFileListAfterPlayback()
         #expect(state.fileList?.currentID == thirdID)
+        #expect(state.peekNextPlaybackItem() == nil)
         state.presentFileListItem(id: firstID, rotatesIdentity: false)
         state.advanceFileListAfterPlayback()
         #expect(state.fileList?.currentID == secondID)
+        let peeked = try #require(state.peekNextPlaybackItem())
+        #expect(peeked.url.path == third.path)
+        #expect(peeked.range == nil)
 
+        state.mediaPlaybackMode = .sequentialLoop
+        state.presentFileListItem(id: thirdID, rotatesIdentity: false)
+        let wrapped = try #require(state.peekNextPlaybackItem())
+        #expect(wrapped.url.path == first.path)
+
+        state.presentFileListItem(id: secondID, rotatesIdentity: false)
         state.mediaPlaybackMode = .singleLoop
         #expect(state.shouldLoopCurrentItem)
+        #expect(state.peekNextPlaybackItem() == nil)
         state.advanceFileListAfterPlayback()
         #expect(state.fileList?.currentID == secondID)
 

@@ -47,10 +47,16 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     private var selectedOutputDeviceID: String?
     private var hasLoadedOutputPreference = false
     private var audioFile: AVAudioFile?
+    private var currentFileURL: URL?
+    private var loadedContentIdentity: PlaybackContentIdentity?
     private var startFrame: AVAudioFramePosition = 0
     private var segmentFrames: AVAudioFrameCount = 0
     private var sampleRate: Double = 44100
     private var sourceChannelCount = 2
+    /// 无缝衔接时 playerTime 不会因 stop 归零，用原点把下一曲进度从 0 算起。
+    private var playerTimeOrigin: Double = 0
+    private var scheduledRemainingFrames: AVAudioFrameCount = 0
+    private var queuedSuccessor: QueuedSuccessor?
     private var preparedDeviceID: String?
     /// 引擎输出 AudioUnit 是否被钉到独占设备；租约释放后钉住仍在，重建后才清除。
     private var enginePinnedToExclusiveDevice = false
@@ -73,6 +79,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     private var mediaTitle: String
     private let previousItemAction: @MainActor () -> Bool
     private let nextItemAction: @MainActor () -> Bool
+    private let nextGaplessItemProvider: @MainActor () -> (URL, MediaPlaybackRange?)?
     private let playbackIntentHandler: (@MainActor (Bool) -> Void)?
 
     init(
@@ -82,6 +89,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         range: MediaPlaybackRange? = nil,
         previousItemAction: @escaping @MainActor () -> Bool = { false },
         nextItemAction: @escaping @MainActor () -> Bool = { false },
+        nextGaplessItemProvider: @escaping @MainActor () -> (URL, MediaPlaybackRange?)? = { nil },
         playbackIntentHandler: (@MainActor (Bool) -> Void)? = nil
     ) {
         self.appStateID = appStateID
@@ -89,6 +97,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         self.mediaTitle = url.deletingPathExtension().lastPathComponent
         self.previousItemAction = previousItemAction
         self.nextItemAction = nextItemAction
+        self.nextGaplessItemProvider = nextGaplessItemProvider
         self.playbackIntentHandler = playbackIntentHandler
         _ = engine
         observers.append(
@@ -223,6 +232,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         // stop/reset 会触发旧段完成回调，必须先失效，避免暂停被误判为播完并自动切歌。
         scheduleGeneration &+= 1
         stallWatchdogGeneration &+= 1
+        queuedSuccessor = nil
         playerNode.pause()
         isPlaying = false
         if releaseLease, enginePinnedToExclusiveDevice {
@@ -265,6 +275,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     func closeOutput() {
         refreshCurrentTime()
         scheduleGeneration &+= 1
+        queuedSuccessor = nil
         playerNode.stop()
         engineStorage?.stop()
         isPlaying = false
@@ -346,30 +357,47 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
 
     func load(url: URL, range: MediaPlaybackRange? = nil, autoplay: Bool = false) {
         mediaTitle = url.deletingPathExtension().lastPathComponent
+        let identity = PlaybackContentIdentity(url: url, range: range)
+        // 无缝衔接已把下一曲排进节点：列表切项到来时不要停引擎，否则 DAC 采样率会闪、曲间会留缝。
+        if loadedContentIdentity == identity, isPlaying || queuedSuccessor != nil {
+            MediaRemoteCommandCoordinator.shared.activate(self, title: mediaTitle)
+            return
+        }
         scheduleGeneration &+= 1
+        queuedSuccessor = nil
         playerNode.stop()
-        engineStorage?.stop()
         isPlaying = false
         do {
             let file = try AVAudioFile(forReading: url)
             guard Self.isPlayable(format: file.processingFormat) else {
                 NSLog("AudioPlaybackController rejected invalid format for \(url.path): \(file.processingFormat)")
                 audioFile = nil
+                currentFileURL = nil
+                loadedContentIdentity = nil
                 duration = 0
                 currentTime = 0
                 return
             }
-            audioFile = file
-            sampleRate = file.processingFormat.sampleRate > 0
+            let nextRate = file.processingFormat.sampleRate > 0
                 ? file.processingFormat.sampleRate
                 : file.fileFormat.sampleRate
-            sourceChannelCount = Int(file.processingFormat.channelCount)
-            // 切歌后仍要能复用独占租约：仅在采样率相对上次成功准备发生变化时才作废。
-            // 每次 load 都清空会迫使再次 hog/改格式，界面出现数秒转圈且可能启动失败。
-            if let prepared = preparedSourceSampleRate, abs(prepared - sampleRate) > 0.5 {
+            let nextChannels = Int(file.processingFormat.channelCount)
+            let formatChanged = abs(nextRate - sampleRate) > 0.5 || nextChannels != sourceChannelCount
+            audioFile = file
+            currentFileURL = url
+            loadedContentIdentity = identity
+            sampleRate = nextRate
+            sourceChannelCount = nextChannels
+            // 切歌后仍要能复用独占租约：仅在采样率或声道变化时才作废。
+            if formatChanged {
                 preparedSourceSampleRate = nil
             }
-            if engineStorage != nil {
+            if formatChanged {
+                engineStorage?.stop()
+                if engineStorage != nil {
+                    reconnect(format: file.processingFormat)
+                }
+            } else if engineStorage != nil, playerNode.engine == nil {
                 reconnect(format: file.processingFormat)
             }
 
@@ -708,6 +736,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         refreshCurrentTime()
         // stop() 可能触发旧 scheduleSegment 的完成回调；先使它失效，避免把切换误判为自然播完。
         scheduleGeneration &+= 1
+        queuedSuccessor = nil
         playerNode.stop()
         engineStorage?.stop()
         isPlaying = false
@@ -936,28 +965,21 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     private func schedule(from displayTime: Double, play: Bool, watchdogAttempt: Int = 0) {
         guard let file = audioFile, segmentFrames > 0, sampleRate > 0 else { return }
         scheduleGeneration &+= 1
+        queuedSuccessor = nil
         let generation = scheduleGeneration
         let offset = AVAudioFramePosition((max(0, displayTime) * sampleRate).rounded())
         let localStart = min(max(0, offset), AVAudioFramePosition(segmentFrames))
         let remaining = AVAudioFrameCount(max(0, AVAudioFramePosition(segmentFrames) - localStart))
         playerNode.stop()
+        playerTimeOrigin = 0
+        scheduledRemainingFrames = remaining
         scheduledDisplayStart = Double(localStart) / sampleRate
         currentTime = scheduledDisplayStart
         guard remaining > 0 else {
             handleSegmentEnd()
             return
         }
-        playerNode.scheduleSegment(
-            file,
-            startingFrame: startFrame + localStart,
-            frameCount: remaining,
-            at: nil
-        ) { [weak self] in
-            DispatchQueue.main.async {
-                guard let self, self.scheduleGeneration == generation else { return }
-                self.handleSegmentEnd()
-            }
-        }
+        enqueueSegment(file, startingFrame: startFrame + localStart, frameCount: remaining, generation: generation)
         if play {
             if !ensureEngineRunning(), activeLeaseClientID == nil {
                 // 引擎启动偶发失败（如独占交接后设备忙）：系统默认路由下重建一次再试，
@@ -975,7 +997,130 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             isPlaying = true
             MediaRemoteCommandCoordinator.shared.update(self)
             armStallWatchdog(attempt: watchdogAttempt)
+            enqueueGaplessSuccessor(generation: generation)
         }
+    }
+
+    private func enqueueSegment(
+        _ file: AVAudioFile,
+        startingFrame: AVAudioFramePosition,
+        frameCount: AVAudioFrameCount,
+        generation: UInt64
+    ) {
+        playerNode.scheduleSegment(
+            file,
+            startingFrame: startingFrame,
+            frameCount: frameCount,
+            at: nil
+        ) { [weak self] in
+            DispatchQueue.main.async {
+                guard let self, self.scheduleGeneration == generation else { return }
+                self.handleSegmentEnd()
+            }
+        }
+    }
+
+    /// 当前段还在播时就把下一首排进同一节点；同格式则引擎与 DAC 都不动。
+    private func enqueueGaplessSuccessor(generation: UInt64) {
+        guard generation == scheduleGeneration, !isLooping, queuedSuccessor == nil else { return }
+        guard let next = nextGaplessItemProvider(),
+              let prepared = prepareSuccessor(url: next.0, range: next.1),
+              canContinue(with: prepared) else { return }
+        let origin = playerTimeOrigin + Double(scheduledRemainingFrames) / sampleRate
+        enqueueSegment(
+            prepared.file,
+            startingFrame: prepared.startFrame,
+            frameCount: prepared.segmentFrames,
+            generation: generation
+        )
+        queuedSuccessor = QueuedSuccessor(
+            file: prepared.file,
+            url: prepared.url,
+            identity: prepared.identity,
+            startFrame: prepared.startFrame,
+            segmentFrames: prepared.segmentFrames,
+            sampleRate: prepared.sampleRate,
+            channelCount: prepared.channelCount,
+            playerTimeOrigin: origin
+        )
+        NSLog(
+            "AudioPlaybackController queued gapless successor %@ frames=%u",
+            prepared.url.lastPathComponent, prepared.segmentFrames
+        )
+    }
+
+    private func prepareSuccessor(url: URL, range: MediaPlaybackRange?) -> PreparedSuccessor? {
+        let identity = PlaybackContentIdentity(url: url, range: range)
+        let file: AVAudioFile
+        if let current = audioFile, currentFileURL?.standardizedFileURL.path == url.standardizedFileURL.path {
+            file = current
+        } else {
+            guard let opened = try? AVAudioFile(forReading: url),
+                  Self.isPlayable(format: opened.processingFormat) else { return nil }
+            file = opened
+        }
+        let rate = file.processingFormat.sampleRate > 0
+            ? file.processingFormat.sampleRate
+            : file.fileFormat.sampleRate
+        guard rate > 0 else { return nil }
+        let total = file.length
+        let start = range.map { CueTime.sampleFrame(cueFrames: $0.startCueFrames, sampleRate: rate) } ?? 0
+        let end: Int64
+        if let endFrames = range?.endCueFrames {
+            end = CueTime.sampleFrame(cueFrames: endFrames, sampleRate: rate)
+        } else {
+            end = total
+        }
+        let startFrame = max(0, min(start, total))
+        let last = max(startFrame, min(end, total))
+        let frames = AVAudioFrameCount(max(0, last - startFrame))
+        guard frames > 0 else { return nil }
+        return PreparedSuccessor(
+            file: file,
+            url: url,
+            identity: identity,
+            startFrame: startFrame,
+            segmentFrames: frames,
+            sampleRate: rate,
+            channelCount: Int(file.processingFormat.channelCount)
+        )
+    }
+
+    private func canContinue(with successor: PreparedSuccessor) -> Bool {
+        abs(successor.sampleRate - sampleRate) < 0.5 && successor.channelCount == sourceChannelCount
+    }
+
+    private func adoptQueuedSuccessor(_ successor: QueuedSuccessor) {
+        adoptPreparedSuccessor(
+            PreparedSuccessor(
+                file: successor.file,
+                url: successor.url,
+                identity: successor.identity,
+                startFrame: successor.startFrame,
+                segmentFrames: successor.segmentFrames,
+                sampleRate: successor.sampleRate,
+                channelCount: successor.channelCount
+            ),
+            playerTimeOrigin: successor.playerTimeOrigin
+        )
+    }
+
+    private func adoptPreparedSuccessor(_ successor: PreparedSuccessor, playerTimeOrigin: Double) {
+        audioFile = successor.file
+        currentFileURL = successor.url
+        loadedContentIdentity = successor.identity
+        startFrame = successor.startFrame
+        segmentFrames = successor.segmentFrames
+        sampleRate = successor.sampleRate
+        sourceChannelCount = successor.channelCount
+        scheduledRemainingFrames = successor.segmentFrames
+        self.playerTimeOrigin = playerTimeOrigin
+        scheduledDisplayStart = 0
+        currentTime = 0
+        duration = sampleRate > 0 ? Double(segmentFrames) / sampleRate : 0
+        mediaTitle = successor.url.deletingPathExtension().lastPathComponent
+        stallWatchdogGeneration &+= 1
+        MediaRemoteCommandCoordinator.shared.activate(self, title: mediaTitle)
     }
 
     /// 播放后 1 秒仍无进度则判定卡住，重排一次；超过一次仍卡住就停下，避免无限重启引擎。
@@ -1015,9 +1160,40 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             schedule(from: 0, play: true)
             return
         }
+        let generation = scheduleGeneration
+        if let successor = queuedSuccessor {
+            queuedSuccessor = nil
+            adoptQueuedSuccessor(successor)
+            notifyPlaybackFinished()
+            enqueueGaplessSuccessor(generation: generation)
+            return
+        }
+        // 预排失败时仍保持引擎运转，避免同速率切歌让 DAC 掉锁闪采样率。
+        if let next = nextGaplessItemProvider(),
+           let prepared = prepareSuccessor(url: next.0, range: next.1),
+           canContinue(with: prepared) {
+            adoptPreparedSuccessor(prepared, playerTimeOrigin: playerTimeOrigin + Double(scheduledRemainingFrames) / sampleRate)
+            enqueueSegment(
+                prepared.file,
+                startingFrame: prepared.startFrame,
+                frameCount: prepared.segmentFrames,
+                generation: generation
+            )
+            if ensureEngineRunning() {
+                playerNode.play()
+                isPlaying = true
+            }
+            notifyPlaybackFinished()
+            enqueueGaplessSuccessor(generation: generation)
+            return
+        }
         // 自然播完保留租约：自动切歌同速率可零 HAL 操作直接续播。
         stopOutput(releaseLease: false)
         currentTime = duration
+        notifyPlaybackFinished()
+    }
+
+    private func notifyPlaybackFinished() {
         NotificationCenter.default.post(
             name: .mediaPlaybackDidFinish,
             object: nil,
@@ -1067,9 +1243,42 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         guard isPlaying, sampleRate > 0 else { return }
         guard let nodeTime = playerNode.lastRenderTime,
               let playerTime = playerNode.playerTime(forNodeTime: nodeTime) else { return }
-        let elapsed = Double(playerTime.sampleTime) / sampleRate
+        let elapsed = Double(playerTime.sampleTime) / sampleRate - playerTimeOrigin
         currentTime = min(duration, max(0, scheduledDisplayStart + elapsed))
     }
+}
+
+private struct PlaybackContentIdentity: Equatable {
+    let path: String
+    let startCueFrames: Int64
+    let endCueFrames: Int64?
+
+    init(url: URL, range: MediaPlaybackRange?) {
+        path = url.standardizedFileURL.path
+        startCueFrames = range?.startCueFrames ?? 0
+        endCueFrames = range?.endCueFrames
+    }
+}
+
+private struct PreparedSuccessor {
+    let file: AVAudioFile
+    let url: URL
+    let identity: PlaybackContentIdentity
+    let startFrame: AVAudioFramePosition
+    let segmentFrames: AVAudioFrameCount
+    let sampleRate: Double
+    let channelCount: Int
+}
+
+private struct QueuedSuccessor {
+    let file: AVAudioFile
+    let url: URL
+    let identity: PlaybackContentIdentity
+    let startFrame: AVAudioFramePosition
+    let segmentFrames: AVAudioFrameCount
+    let sampleRate: Double
+    let channelCount: Int
+    let playerTimeOrigin: Double
 }
 
 /// 交接按设备串行，先等待旧输出暂停和释放，再启动新输出；系统默认输出不登记。

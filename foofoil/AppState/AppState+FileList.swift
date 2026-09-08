@@ -412,6 +412,25 @@ extension AppState {
         }
     }
 
+    /// 顺序连播要提前排上下一首；随机模式下一首未定，不预取。
+    func peekNextPlaybackItem() -> (url: URL, range: MediaPlaybackRange?)? {
+        guard !shouldLoopCurrentItem, let list = fileList, list.isPresentable,
+              let index = list.items.firstIndex(where: { $0.id == list.currentID }) else { return nil }
+        let nextIndex: Int
+        switch mediaPlaybackMode {
+        case .singleLoop, .shuffle:
+            return nil
+        case .sequential:
+            nextIndex = index + 1
+            guard list.items.indices.contains(nextIndex) else { return nil }
+        case .sequentialLoop:
+            nextIndex = (index + 1) % list.items.count
+        }
+        let item = list.items[nextIndex]
+        guard let url = resolvedURL(for: item) else { return nil }
+        return (url, item.cue?.playbackRange)
+    }
+
     /// 系统上一首/下一首媒体键仅切换当前音视频列表；单文件时报告命令不可用。
     @discardableResult
     func activateMediaListItem(delta: Int) -> Bool {

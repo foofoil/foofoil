@@ -476,6 +476,52 @@ struct CueSheetTests {
         #expect(!controller.isPlaying)
     }
 
+    @Test func sequentialSameRateTracksContinueWithoutStoppingPlayback() async throws {
+        let first = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-gapless-a-\(UUID().uuidString).wav")
+        let second = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-gapless-b-\(UUID().uuidString).wav")
+        defer {
+            try? FileManager.default.removeItem(at: first)
+            try? FileManager.default.removeItem(at: second)
+        }
+        try writePCMWav(url: first, sampleRate: 44100, seconds: 0.4)
+        try writePCMWav(url: second, sampleRate: 44100, seconds: 0.4)
+
+        let appStateID = UUID()
+        let controller = AudioPlaybackController(
+            appStateID: appStateID,
+            url: first,
+            isLooping: false,
+            nextGaplessItemProvider: { (second, nil) }
+        )
+        defer { controller.closeOutput() }
+        controller.selectSystemDefaultOutput()
+
+        var finished = 0
+        let observer = NotificationCenter.default.addObserver(
+            forName: .mediaPlaybackDidFinish,
+            object: nil,
+            queue: .main
+        ) { notification in
+            guard let id = notification.userInfo?["id"] as? UUID, id == appStateID else { return }
+            finished += 1
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        controller.play()
+        var crossed = false
+        for _ in 0..<80 {
+            if finished > 0, controller.isPlaying { crossed = true; break }
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        #expect(finished >= 1)
+        #expect(crossed)
+        #expect(controller.isPlaying)
+        #expect(controller.duration == 0.4)
+        #expect(controller.currentTime < 0.4)
+    }
+
     @Test func sacdQueueInstallsCueLikeNavigator() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("foofoil-sacd-list-\(UUID().uuidString)", isDirectory: true)
