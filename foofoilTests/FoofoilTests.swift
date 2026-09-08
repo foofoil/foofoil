@@ -2305,3 +2305,47 @@ struct FoofoilTests {
         return url
     }
 }
+
+@MainActor
+@Suite(.serialized)
+struct AudioTerminationTests {
+    @Test func queuedLeaseReleaseSurvivesCloseAndControllerDisposal() async {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("missing-\(UUID()).wav")
+        var controller: AudioPlaybackController? = AudioPlaybackController(
+            appStateID: UUID(), url: url, isLooping: false
+        )
+        let (gate, continuation) = AsyncStream<Void>.makeStream()
+        let firstID = UUID()
+        let secondID = UUID()
+        var released: [UUID] = []
+        controller!.enqueuePCMRelease(clientID: firstID) { id in
+            for await _ in gate { break }
+            released.append(id)
+        }
+        let pending = controller!.enqueuePCMRelease(clientID: secondID) { id in
+            released.append(id)
+        }
+        // 关闭会改变播放代次并清理控制器；已排队的硬件释放仍须按序执行。
+        controller!.closeOutput()
+        controller = nil
+        #expect(released.isEmpty)
+        continuation.yield(())
+        continuation.finish()
+        await pending.value
+        #expect(released == [firstID, secondID])
+    }
+
+    @Test func terminationStopsEveryLivePCMController() {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("missing-\(UUID()).wav")
+        let controllers = (0..<2).map { _ in
+            AudioPlaybackController(appStateID: UUID(), url: url, isLooping: false)
+        }
+        for controller in controllers { controller.isPlaying = true }
+
+        AudioPlaybackController.stopAllOutputsForTermination()
+        #expect(controllers.allSatisfy { !$0.isPlaying })
+        // 重复退出请求不能重新启动输出或重复持有本地租约。
+        AudioPlaybackController.stopAllOutputsForTermination()
+        #expect(controllers.allSatisfy { !$0.isPlaying })
+    }
+}

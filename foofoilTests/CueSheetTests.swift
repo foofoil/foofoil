@@ -415,6 +415,49 @@ struct CueSheetTests {
         #expect(abs(duration - 2.0) < 0.02)
     }
 
+    // 显式指定 DAC UID 才运行实机测试，常规单测不触碰用户音频设备。
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["FOOFOIL_TEST_DAC_UID"] != nil))
+    func exclusivePlaybackSurvivesTrackChangesAndPause() async throws {
+        let uid = try #require(ProcessInfo.processInfo.environment["FOOFOIL_TEST_DAC_UID"])
+        try #require(ExtensionHost.shared.isHiFiDeviceServiceAvailable)
+        var urls: [URL] = []
+        defer { for url in urls { try? FileManager.default.removeItem(at: url) } }
+        for rate in [44100, 44100, 96000, 192000] {
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("foofoil-route-\(UUID()).wav")
+            try writePCMWav(url: url, sampleRate: rate, seconds: 10)
+            urls.append(url)
+        }
+        let controller = AudioPlaybackController(appStateID: UUID(), url: urls[0], isLooping: false)
+        defer { controller.closeOutput() }
+        controller.selectExclusiveOutput(deviceID: uid)
+        // 等待初始化快照完成，避免保存的设备偏好覆盖本次测试显式选择。
+        for _ in 0..<100 where controller.deviceServiceSnapshot == nil {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        controller.selectExclusiveOutput(deviceID: uid)
+        try await Task.sleep(for: .milliseconds(100))
+        for url in urls {
+            controller.load(url: url)
+            for attempt in 0..<2 {
+                let startTime = controller.currentTime
+                controller.play()
+                for _ in 0..<200 {
+                    if controller.isPlaying, controller.currentTime - startTime > 0.1 { break }
+                    try await Task.sleep(for: .milliseconds(25))
+                }
+                try #require(controller.deviceFailureMessage == nil)
+                try #require(controller.isPlaying)
+                try #require(controller.currentTime - startTime > 0.1)
+                if attempt == 0 {
+                    controller.pause()
+                    #expect(!controller.isPlaying)
+                }
+                // 第二次播放保持运行，让下一轮覆盖播放中切换同速率/不同速率曲目。
+            }
+        }
+        controller.pause()
+    }
+
     @Test func audioControllerPreparesCueSegmentWithoutStartingDuringViewConstruction() throws {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("foofoil-cue-prepare-\(UUID().uuidString).wav")

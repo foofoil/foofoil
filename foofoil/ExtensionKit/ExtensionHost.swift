@@ -71,6 +71,13 @@ final class ExtensionHost: ExtensionRuntimeHost {
         ))
     }
 
+    func shutdownAndWait() async {
+        let runtimes = Array(inProcessRuntimes.values)
+        await Task.detached(priority: .userInitiated) {
+            for runtime in runtimes { runtime.shutdown() }
+        }.value
+    }
+
     func canOpen(url: URL) -> Bool {
         let request = ContentRequest.singleFile(.init(url: url))
         let candidates = resolver.candidates(for: request)

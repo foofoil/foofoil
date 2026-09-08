@@ -15,6 +15,12 @@ import FoofoilExtensionKit
 /// 音频按采样点播一段：CUE+FLAC 不能靠 AVPlayer seek，要用 scheduleSegment。
 @MainActor
 final class AudioPlaybackController: ObservableObject, MediaTransportControlling {
+    private static let liveControllers = NSHashTable<AudioPlaybackController>.weakObjects()
+
+    static func stopAllOutputsForTermination() {
+        for controller in liveControllers.allObjects { controller.closeOutput() }
+    }
+
     @Published var isPlaying = false
     @Published var currentTime: Double = 0
     @Published var duration: Double = 0
@@ -26,7 +32,15 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     var isLooping: Bool
 
     private let appStateID: UUID
-    private var engine = AVAudioEngine()
+    private var engineStorage: AVAudioEngine?
+    private var engine: AVAudioEngine {
+        if let engineStorage { return engineStorage }
+        let created = AVAudioEngine()
+        created.attach(playerNode)
+        engineStorage = created
+        return created
+    }
+    private var engineStartError: Error?
     private let playerNode = AVAudioPlayerNode()
     private let deviceServiceClientID = UUID()
     private var activeLeaseClientID: UUID?
@@ -76,7 +90,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         self.previousItemAction = previousItemAction
         self.nextItemAction = nextItemAction
         self.playbackIntentHandler = playbackIntentHandler
-        engine.attach(playerNode)
+        _ = engine
         observers.append(
             NotificationCenter.default.addObserver(
                 forName: .shouldToggleVideoPlayback,
@@ -89,6 +103,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 }
             }
         )
+        Self.liveControllers.add(self)
         load(url: url, range: range)
         startProgressTimer()
         Task { await refreshDeviceService() }
@@ -150,7 +165,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 defaultListener
             )
         }
-        engine.stop()
+        engineStorage?.stop()
         let clientID = activeLeaseClientID ?? deviceServiceClientID
         Task {
             _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(
@@ -205,9 +220,15 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     /// 同速率无需任何 HAL 操作。独占下连引擎一起停掉，恢复时重建 ioProc。
     func stopOutput(releaseLease: Bool = true) {
         refreshCurrentTime()
+        // stop/reset 会触发旧段完成回调，必须先失效，避免暂停被误判为播完并自动切歌。
+        scheduleGeneration &+= 1
+        stallWatchdogGeneration &+= 1
         playerNode.pause()
         isPlaying = false
-        if activeLeaseClientID != nil {
+        if releaseLease, enginePinnedToExclusiveDevice {
+            // 仅 stop 仍保留绑定 DAC 的 AUHAL；先销毁旧引擎，再允许扩展改回设备格式。
+            discardOutputEngine()
+        } else if activeLeaseClientID != nil {
             engine.stop()
         }
         if releaseLease, let clientID = activeLeaseClientID {
@@ -217,27 +238,37 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             preparedDeviceID = nil
             preparedSourceSampleRate = nil
             stopExclusiveDeviceObservation()
-            let generation = scheduleGeneration
-            let tail = deviceCommandTail
-            deviceCommandTail = Task { [weak self] in
-                _ = await tail?.value
-                guard let self,
-                      generation == self.scheduleGeneration else { return }
-                _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(
-                    command: .releasePCM,
-                    clientID: clientID
-                ))
-            }
+            enqueuePCMRelease(clientID: clientID)
         }
         MediaRemoteCommandCoordinator.shared.update(self)
+    }
+
+    /// 已交出的租约必须完成释放，不依赖控制器存活或播放代次；新的获取等待同一尾链。
+    @discardableResult
+    func enqueuePCMRelease(
+        clientID: UUID,
+        release: @escaping @MainActor (UUID) async -> Void = { clientID in
+            _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(
+                command: .releasePCM, clientID: clientID
+            ))
+        }
+    ) -> Task<Void, Never> {
+        let tail = deviceCommandTail
+        let task = Task {
+            await tail?.value
+            await release(clientID)
+        }
+        deviceCommandTail = task
+        return task
     }
 
     func closeOutput() {
         refreshCurrentTime()
         scheduleGeneration &+= 1
         playerNode.stop()
-        engine.stop()
+        engineStorage?.stop()
         isPlaying = false
+        if enginePinnedToExclusiveDevice { discardOutputEngine() }
         stopExclusiveDeviceObservation()
         preparedDeviceID = nil
         preparedSourceSampleRate = nil
@@ -245,12 +276,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         let clientID = activeLeaseClientID ?? deviceServiceClientID
         activeLeaseClientID = nil
         ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
-        Task {
-            _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(
-                command: .releasePCM,
-                clientID: clientID
-            ))
-        }
+        enqueuePCMRelease(clientID: clientID)
     }
 
     func selectSystemDefaultOutput() {
@@ -322,7 +348,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         mediaTitle = url.deletingPathExtension().lastPathComponent
         scheduleGeneration &+= 1
         playerNode.stop()
-        engine.stop()
+        engineStorage?.stop()
         isPlaying = false
         do {
             let file = try AVAudioFile(forReading: url)
@@ -338,8 +364,14 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 ? file.processingFormat.sampleRate
                 : file.fileFormat.sampleRate
             sourceChannelCount = Int(file.processingFormat.channelCount)
-            preparedSourceSampleRate = nil
-            reconnect(format: file.processingFormat)
+            // 切歌后仍要能复用独占租约：仅在采样率相对上次成功准备发生变化时才作废。
+            // 每次 load 都清空会迫使再次 hog/改格式，界面出现数秒转圈且可能启动失败。
+            if let prepared = preparedSourceSampleRate, abs(prepared - sampleRate) > 0.5 {
+                preparedSourceSampleRate = nil
+            }
+            if engineStorage != nil {
+                reconnect(format: file.processingFormat)
+            }
 
             let total = file.length
             let start = range.map { CueTime.sampleFrame(cueFrames: $0.startCueFrames, sampleRate: sampleRate) } ?? 0
@@ -466,7 +498,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         refreshCurrentTime()
         scheduleGeneration &+= 1
         playerNode.stop()
-        engine.stop()
+        engineStorage?.stop()
         isPlaying = false
         stopExclusiveDeviceObservation()
         preparedDeviceID = nil
@@ -534,6 +566,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         playbackIntentHandler?(false)
         routeGeneration &+= 1
         stopEngineForRouteChange()
+        if enginePinnedToExclusiveDevice { discardOutputEngine() }
         stopExclusiveDeviceObservation()
         let clientID = activeLeaseClientID
         activeLeaseClientID = nil
@@ -557,6 +590,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         )
         if !reusingLease {
             stopEngineForRouteChange()
+            discardOutputEngine()
             ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
             if let old = activeLeaseClientID {
                 _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(command: .releasePCM, clientID: old))
@@ -585,15 +619,21 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
                 return
             }
-            // 复用租约时引擎钉住还在，无需重钉；后续 ensurePinnedToExclusive 会校验。
-            if !reusingLease {
-                try routeEngine(to: deviceID)
-            }
+            // hog/格式切换会使已有 AUHAL 连接失效；必须在设备准备完成后新建引擎，
+            // 不能复用暂停或切歌期间按旧设备状态创建的图。租约未变时才允许沿用。
             activeLeaseClientID = leaseClientID
             preparedDeviceID = deviceID
             preparedSourceSampleRate = sampleRate
             deviceServiceSnapshot = snapshot
             deviceFailureMessage = nil
+            if !reusingLease || engineStorage == nil {
+                try await startExclusiveEngine(deviceUID: deviceID, generation: generation, play: shouldResume)
+            } else {
+                schedule(from: currentTime, play: shouldResume)
+            }
+            if shouldResume, !isPlaying {
+                throw engineStartError ?? NSError(domain: NSOSStatusErrorDomain, code: Int(kAudio_ParamError))
+            }
             startExclusiveDeviceObservation(deviceUID: deviceID)
             NSLog(
                 "AudioPlaybackController exclusive prepared uid=%@ resolved=%u pinned=%@ sr=%.0f ch=%d frames=%u",
@@ -601,9 +641,13 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 String(describing: currentEngineDeviceID()),
                 sampleRate, sourceChannelCount, segmentFrames
             )
-            schedule(from: currentTime, play: shouldResume)
             // 引擎启动时可能跟随系统默认漂走：回读钉住的设备，对不上就重钉一次。
-            if shouldResume { ensurePinnedToExclusive(deviceID: deviceID, generation: generation) }
+            if shouldResume {
+                ensurePinnedToExclusive(deviceID: deviceID, generation: generation)
+                if !isPlaying {
+                    throw engineStartError ?? NSError(domain: NSOSStatusErrorDomain, code: Int(kAudio_ParamError))
+                }
+            }
             if let refreshed = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(
                 command: .snapshot,
                 clientID: leaseClientID
@@ -614,10 +658,14 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 deviceServiceSnapshot = local
             }
         } catch {
-            _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(
-                command: .releasePCM,
-                clientID: leaseClientID
-            ))
+            // 启动失败也必须先拆除输出，再恢复格式/归还 hog，避免留下“暂停但仍独占”。
+            if generation == routeGeneration {
+                stopEngineForRouteChange()
+                stopExclusiveDeviceObservation()
+                activeLeaseClientID = nil
+                discardOutputEngine()
+            }
+            await enqueuePCMRelease(clientID: leaseClientID).value
             guard generation == routeGeneration else { return }
             NSLog("AudioPlaybackController exclusive prepare failed: \(error.localizedDescription)")
             stopExclusiveDeviceObservation()
@@ -626,8 +674,6 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             preparedSourceSampleRate = nil
             ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
             deviceFailureMessage = error.localizedDescription
-            rebuildEngineForSystemDefault()
-            schedule(from: currentTime, play: false)
             throw error
         }
     }
@@ -663,11 +709,36 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         // stop() 可能触发旧 scheduleSegment 的完成回调；先使它失效，避免把切换误判为自然播完。
         scheduleGeneration &+= 1
         playerNode.stop()
-        engine.stop()
+        engineStorage?.stop()
         isPlaying = false
     }
 
-    private func routeEngine(to deviceUID: String) throws {        let deviceID = try Self.resolveDeviceID(uid: deviceUID)
+    /// 格式刚切完时 AUHAL 启动常返回忙；先不归还 hog，拆掉引擎等设备稳定后再建。
+    private func startExclusiveEngine(deviceUID: String, generation: UInt64, play: Bool) async throws {
+        var lastError: Error?
+        for attempt in 0..<3 {
+            guard generation == routeGeneration else { throw CancellationError() }
+            tearDownOutputEngine()
+            do {
+                try routeEngine(to: deviceUID)
+                schedule(from: currentTime, play: play)
+                if !play || isPlaying { return }
+                lastError = engineStartError ?? NSError(domain: NSOSStatusErrorDomain, code: Int(kAudio_ParamError))
+            } catch {
+                lastError = error
+            }
+            NSLog(
+                "AudioPlaybackController exclusive engine start retry %d: %@",
+                attempt + 1, lastError?.localizedDescription ?? "-"
+            )
+            tearDownOutputEngine()
+            try await Task.sleep(nanoseconds: 250_000_000)
+        }
+        throw lastError ?? NSError(domain: NSOSStatusErrorDomain, code: Int(kAudio_ParamError))
+    }
+
+    private func routeEngine(to deviceUID: String) throws {
+        let deviceID = try Self.resolveDeviceID(uid: deviceUID)
         guard let audioUnit = engine.outputNode.audioUnit else {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(kAudio_ParamError))
         }
@@ -723,15 +794,29 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         schedule(from: currentTime, play: true)
     }
 
-    private func rebuildEngineForSystemDefault() {
-        playerNode.stop()
-        engine.stop()
-        engine.detach(playerNode)
-        engine = AVAudioEngine()
-        engine.attach(playerNode)
+    /// 格式/hog 切换期间不保留 AUHAL；下一次实际路由时才惰性创建引擎。
+    private func discardOutputEngine() {
+        tearDownOutputEngine()
         enginePinnedToExclusiveDevice = false
         preparedDeviceID = nil
         preparedSourceSampleRate = nil
+    }
+
+    private func tearDownOutputEngine() {
+        playerNode.stop()
+        engineStorage?.stop()
+        if let audioUnit = engineStorage?.outputNode.audioUnit {
+            AudioOutputUnitStop(audioUnit)
+            AudioUnitUninitialize(audioUnit)
+        }
+        engineStorage?.reset()
+        engineStorage?.detach(playerNode)
+        engineStorage = nil
+        enginePinnedToExclusiveDevice = false
+    }
+
+    private func rebuildEngineForSystemDefault() {
+        discardOutputEngine()
         if let format = audioFile?.processingFormat { reconnect(format: format) }
     }
 
@@ -942,6 +1027,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
 
     @discardableResult
     private func ensureEngineRunning() -> Bool {
+        engineStartError = nil
         guard !engine.isRunning else { return true }
         let outputFormat = engine.outputNode.inputFormat(forBus: 0)
         guard Self.isPlayable(format: outputFormat) else {
@@ -953,6 +1039,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             try engine.start()
             return true
         } catch {
+            engineStartError = error
             NSLog("AudioPlaybackController engine start failed: \(error.localizedDescription)")
             return false
         }

@@ -203,7 +203,8 @@ final class InProcessExtensionInterface: @unchecked Sendable {
 
     nonisolated(unsafe) private let imageHandle: UnsafeMutableRawPointer
     private let callLock = NSLock()
-    nonisolated(unsafe) let interface: UnsafePointer<FoofoilExtensionInterfaceV1>
+    nonisolated(unsafe) private let interface: FoofoilExtensionInterfaceV1
+    nonisolated(unsafe) private var isShutdown = false
 
     init(executableURL: URL, negotiatedAPI: UInt32) throws {
         guard let imageHandle = dlopen(executableURL.path, RTLD_NOW | RTLD_LOCAL) else {
@@ -224,21 +225,36 @@ final class InProcessExtensionInterface: @unchecked Sendable {
             throw ExtensionLoaderError.invalidInterface
         }
         self.imageHandle = imageHandle
-        self.interface = interface
+        // 复制已声明的 ABI 前缀，兼容尚未提供尾部可选字段的旧扩展。
+        var copiedInterface = FoofoilExtensionInterfaceV1()
+        withUnsafeMutableBytes(of: &copiedInterface) { destination in
+            _ = memcpy(destination.baseAddress!, interface,
+                       min(Int(interface.pointee.struct_size), destination.count))
+        }
+        self.interface = copiedInterface
     }
 
     deinit {
-        interface.pointee.destroy?(interface.pointee.context)
+        shutdown()
         _ = imageHandle
+    }
+
+    /// 退出前等待在途 ABI 调用，再销毁运行时；后续命令不得重新获取设备。
+    nonisolated func shutdown() {
+        callLock.lock()
+        defer { callLock.unlock() }
+        guard !isShutdown else { return }
+        isShutdown = true
+        interface.destroy?(interface.context)
     }
 
     nonisolated func createSession(for request: ContentRequest) throws -> ContentSession {
         let requestData = try JSONEncoder().encode(request)
-        return try call(interface.pointee.create_session, input: requestData)
+        return try call(interface.create_session, input: requestData)
     }
 
     nonisolated func perform(commandID: String, session: ContentSession) throws -> ContentSession {
-        guard let performCommand = interface.pointee.perform_command else { return session }
+        guard let performCommand = interface.perform_command else { return session }
         let message = ExtensionCommandMessage(commandID: commandID, session: session)
         return try call(performCommand, input: JSONEncoder().encode(message))
     }
@@ -250,8 +266,8 @@ final class InProcessExtensionInterface: @unchecked Sendable {
             of: \FoofoilExtensionInterfaceV1.perform_application_command
         ) ?? MemoryLayout<FoofoilExtensionInterfaceV1>.size
         let fieldEnd = fieldOffset + MemoryLayout<UnsafeRawPointer?>.size
-        guard interface.pointee.struct_size >= fieldEnd,
-              let command = interface.pointee.perform_application_command else {
+        guard interface.struct_size >= fieldEnd,
+              let command = interface.perform_application_command else {
             throw ExtensionLoaderError.invalidInterface
         }
         return try call(command, input: JSONEncoder().encode(request))
@@ -265,11 +281,12 @@ final class InProcessExtensionInterface: @unchecked Sendable {
         // ABI v1 不要求插件可重入；宿主按 runtime 串行调用，避免多窗口并发破坏插件状态。
         callLock.lock()
         defer { callLock.unlock() }
+        guard !isShutdown else { throw ExtensionLoaderError.invalidInterface }
         var output: UnsafeMutablePointer<UInt8>?
         var outputLength = 0
         let status = input.withUnsafeBytes { bytes in
             function(
-                interface.pointee.context,
+                interface.context,
                 bytes.bindMemory(to: UInt8.self).baseAddress,
                 bytes.count,
                 &output,
@@ -278,7 +295,7 @@ final class InProcessExtensionInterface: @unchecked Sendable {
         }
         guard status == 0 else { throw ExtensionLoaderError.runtimeCallFailed(status) }
         guard let output, outputLength > 0 else { throw ExtensionLoaderError.invalidRuntimeResponse }
-        defer { interface.pointee.release_bytes?(interface.pointee.context, output, outputLength) }
+        defer { interface.release_bytes?(interface.context, output, outputLength) }
         return try JSONDecoder().decode(Response.self, from: Data(bytes: output, count: outputLength))
     }
 }

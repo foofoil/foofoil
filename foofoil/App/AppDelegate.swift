@@ -24,6 +24,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     var windowMenu: NSMenu?
     var contentModeCancellables = Set<AnyCancellable>()
     var didOpenFiles = false
+    private var isTerminating = false
     weak var lastActiveWindowController: FloatingWindowController?
 
     // 获取当前活跃（Key）窗口对应的 AppState
@@ -123,6 +124,18 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
         }
+    }
+
+    public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard !isTerminating else { return .terminateLater }
+        isTerminating = true
+        // 进程退出只会自动归还 hog，不会恢复采样率；先停 PCM 引擎，再等待扩展恢复设备。
+        AudioPlaybackController.stopAllOutputsForTermination()
+        Task { @MainActor in
+            await ExtensionHost.shared.shutdownAndWait()
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
     }
 
     public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
