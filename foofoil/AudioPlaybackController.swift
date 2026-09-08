@@ -38,10 +38,14 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     private var sampleRate: Double = 44100
     private var sourceChannelCount = 2
     private var preparedDeviceID: String?
+    /// 引擎输出 AudioUnit 是否被钉到独占设备；租约释放后钉住仍在，重建后才清除。
+    private var enginePinnedToExclusiveDevice = false
     private var preparedSourceSampleRate: Double?
     private var routeGeneration: UInt64 = 0
     private var scheduledDisplayStart: Double = 0
     private var scheduleGeneration: UInt64 = 0
+    /// 播放卡住看门狗的代次；暂停/重排后旧检查自动失效，只重试一次。
+    private var stallWatchdogGeneration: UInt64 = 0
     private var progressTimer: Timer?
     private var observers: [NSObjectProtocol] = []
     private var systemDevicesListener: AudioObjectPropertyListenerBlock?
@@ -143,16 +147,14 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             schedule(from: 0, play: true)
             return
         }
-        if !playerNode.isPlaying {
-            if currentTime > 0 {
-                schedule(from: currentTime, play: true)
-            } else {
-                guard ensureEngineRunning() else { return }
-                playerNode.play()
-                isPlaying = true
-                MediaRemoteCommandCoordinator.shared.update(self)
-            }
+        // 系统默认路由下引擎仍钉在已释放的独占设备时，先重建为跟随系统默认；
+        // 否则渲染继续送往旧设备，表现为进度走但无声。
+        if activeLeaseClientID == nil, enginePinnedToExclusiveDevice {
+            rebuildEngineForSystemDefault()
         }
+        // 每次播放都按当前位置重排段，不依赖 load 时预排的队列；
+        // 预排队列可能已被路由切换的 stop 清空，空队列 play 会表现为开始后进度不动。
+        schedule(from: currentTime, play: true)
     }
 
     func pause() {
@@ -161,21 +163,15 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         stopOutput()
     }
 
-    /// 视图卸载或自然播完时停输出，不改写用户的播放/暂停意图。
+    /// 暂停或自然播完时停排播，不改写用户的播放/暂停意图。
+    /// 独占租约（hog+设备格式）刻意保留到关闭/切设备/切速率：每次暂停都释放重建会
+    /// 让 DAC 格式来回切换，系统默认恰好是该设备时还会触发默认输出故障转移，
+    /// 把引擎拖到别的设备上（进度走但无声）。暂停只做 playerNode.pause()，
+    /// 引擎空转保持钉住，不碰 HAL，继续播零抖动。
     func stopOutput() {
         refreshCurrentTime()
         playerNode.pause()
         isPlaying = false
-        if let clientID = activeLeaseClientID {
-            engine.stop()
-            activeLeaseClientID = nil
-            preparedDeviceID = nil
-            preparedSourceSampleRate = nil
-            ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
-            Task {
-                _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(command: .releasePCM, clientID: clientID))
-            }
-        }
         MediaRemoteCommandCoordinator.shared.update(self)
     }
 
@@ -300,6 +296,11 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             segmentFrames = AVAudioFrameCount(max(0, last - startFrame))
             duration = sampleRate > 0 ? Double(segmentFrames) / sampleRate : 0
             currentTime = 0
+            NSLog(
+                "AudioPlaybackController loaded %@ sr=%.0f ch=%d length=%lld start=%lld frames=%u",
+                url.lastPathComponent, sampleRate, sourceChannelCount,
+                file.length, startFrame, segmentFrames
+            )
             MediaRemoteCommandCoordinator.shared.activate(self, title: mediaTitle)
             schedule(from: 0, play: false)
             if autoplay { play() }
@@ -436,9 +437,33 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         resumesPlayback: Bool
     ) async {
         if !resumesPlayback {
+            if isLeaseReusable(deviceID: deviceID) {
+                // 同设备复选且租约仍在：只刷新展示，不碰 HAL 与排播。
+                await refreshDeviceService()
+                return
+            }
             await pauseForExclusiveHandoff()
             ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
             await refreshDeviceService()
+            return
+        }
+        if isLeaseReusable(deviceID: deviceID) {
+            // 暂停只是停了排播，hog+格式+钉住都在：直接重排继续播，不碰 HAL。
+            // 这是暂停/播放零抖动的关键；仲裁仍走 coordinator，避免与别的箔抢设备。
+            do {
+                try await ExclusivePlaybackCoordinator.shared.perform(
+                    deviceID: deviceID, ownerID: deviceServiceClientID,
+                    pause: { [weak self] in await self?.pauseForExclusiveHandoff() },
+                    isCurrent: { [weak self] in self?.routeGeneration == generation },
+                    start: { [weak self] in
+                        guard let self, generation == self.routeGeneration else { throw CancellationError() }
+                        guard self.isLeaseReusable(deviceID: deviceID) else { throw CancellationError() }
+                        self.schedule(from: self.currentTime, play: true)
+                        guard generation == self.routeGeneration else { throw CancellationError() }
+                        self.ensurePinnedToExclusive(deviceID: deviceID, generation: generation)
+                    }
+                )
+            } catch { }
             return
         }
         do {
@@ -453,6 +478,14 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 }
             )
         } catch { }
+    }
+
+    /// 暂停保留的租约可直接复用：同设备、同源采样率且租约未交出去。
+    /// 离线/被抢走时会经 pauseForExclusiveHandoff 或设备变化路径清空 activeLease，不会误复用。
+    private func isLeaseReusable(deviceID: String) -> Bool {
+        activeLeaseClientID != nil
+            && preparedDeviceID == deviceID
+            && preparedSourceSampleRate == sampleRate
     }
 
     private func pauseForExclusiveHandoff() async {
@@ -501,7 +534,15 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             preparedSourceSampleRate = sampleRate
             deviceServiceSnapshot = snapshot
             deviceFailureMessage = nil
+            NSLog(
+                "AudioPlaybackController exclusive prepared uid=%@ resolved=%u pinned=%@ sr=%.0f ch=%d frames=%u",
+                deviceID, (try? Self.resolveDeviceID(uid: deviceID)) ?? 0,
+                String(describing: currentEngineDeviceID()),
+                sampleRate, sourceChannelCount, segmentFrames
+            )
             schedule(from: currentTime, play: shouldResume)
+            // 引擎启动时可能跟随系统默认漂走：回读钉住的设备，对不上就重钉一次。
+            if shouldResume { ensurePinnedToExclusive(deviceID: deviceID, generation: generation) }
             if let refreshed = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(
                 command: .snapshot,
                 clientID: leaseClientID
@@ -562,8 +603,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         isPlaying = false
     }
 
-    private func routeEngine(to deviceUID: String) throws {
-        let deviceID = try Self.resolveDeviceID(uid: deviceUID)
+    private func routeEngine(to deviceUID: String) throws {        let deviceID = try Self.resolveDeviceID(uid: deviceUID)
         guard let audioUnit = engine.outputNode.audioUnit else {
             throw NSError(domain: NSOSStatusErrorDomain, code: Int(kAudio_ParamError))
         }
@@ -577,7 +617,46 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             UInt32(MemoryLayout<AudioDeviceID>.size)
         )
         guard result == noErr else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(result)) }
+        enginePinnedToExclusiveDevice = true
         if let format = audioFile?.processingFormat { reconnect(format: format) }
+    }
+
+    /// 回读引擎实际绑定的输出设备；跟丢时返回 nil。
+    private func currentEngineDeviceID() -> AudioDeviceID? {
+        guard let audioUnit = engine.outputNode.audioUnit else { return nil }
+        var deviceID = AudioDeviceID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        let result = AudioUnitGetProperty(
+            audioUnit,
+            kAudioOutputUnitProperty_CurrentDevice,
+            kAudioUnitScope_Global,
+            0,
+            &deviceID,
+            &size
+        )
+        guard result == noErr, deviceID != kAudioObjectUnknown else { return nil }
+        return deviceID
+    }
+
+    /// 启动后确认还在独占设备上；被系统默认漂移带走时重钉并重排，避免进度走但无声。
+    private func ensurePinnedToExclusive(deviceID: String, generation: UInt64) {
+        guard generation == routeGeneration,
+              let expected = try? Self.resolveDeviceID(uid: deviceID) else { return }
+        guard currentEngineDeviceID() != expected else { return }
+        NSLog(
+            "AudioPlaybackController engine drifted from %u, re-pinning",
+            expected
+        )
+        engine.stop()
+        do {
+            try routeEngine(to: deviceID)
+        } catch {
+            NSLog("AudioPlaybackController re-pin failed: \(error.localizedDescription)")
+            isPlaying = false
+            return
+        }
+        guard generation == routeGeneration else { return }
+        schedule(from: currentTime, play: true)
     }
 
     private func rebuildEngineForSystemDefault() {
@@ -586,6 +665,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         engine.detach(playerNode)
         engine = AVAudioEngine()
         engine.attach(playerNode)
+        enginePinnedToExclusiveDevice = false
         preparedDeviceID = nil
         preparedSourceSampleRate = nil
         if let format = audioFile?.processingFormat { reconnect(format: format) }
@@ -624,7 +704,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         return deviceID
     }
 
-    private func schedule(from displayTime: Double, play: Bool) {
+    private func schedule(from displayTime: Double, play: Bool, watchdogAttempt: Int = 0) {
         guard let file = audioFile, segmentFrames > 0, sampleRate > 0 else { return }
         scheduleGeneration &+= 1
         let generation = scheduleGeneration
@@ -650,14 +730,55 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             }
         }
         if play {
-            guard ensureEngineRunning() else {
+            if !ensureEngineRunning(), activeLeaseClientID == nil {
+                // 引擎启动偶发失败（如独占交接后设备忙）：系统默认路由下重建一次再试，
+                // 独占路由的重建由 prepareExclusiveRoute 的失败路径负责，这里不碰钉住的设备。
+                rebuildEngineForSystemDefault()
+                guard ensureEngineRunning() else {
+                    isPlaying = false
+                    return
+                }
+            } else if !engine.isRunning {
                 isPlaying = false
                 return
             }
             playerNode.play()
             isPlaying = true
             MediaRemoteCommandCoordinator.shared.update(self)
+            armStallWatchdog(attempt: watchdogAttempt)
         }
+    }
+
+    /// 播放后 1 秒仍无进度则判定卡住，重排一次；超过一次仍卡住就停下，避免无限重启引擎。
+    private func armStallWatchdog(attempt: Int) {
+        stallWatchdogGeneration &+= 1
+        let generation = stallWatchdogGeneration
+        let scheduled = scheduleGeneration
+        let startTime = currentTime
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            self?.handleStallCheck(generation: generation, scheduled: scheduled, startTime: startTime, attempt: attempt)
+        }
+    }
+
+    private func handleStallCheck(generation: UInt64, scheduled: UInt64, startTime: Double, attempt: Int) {
+        guard generation == stallWatchdogGeneration,
+              scheduled == scheduleGeneration,
+              isPlaying, duration > 0,
+              currentTime < duration - 0.05 else { return }
+        refreshCurrentTime()
+        guard currentTime < duration - 0.05, currentTime - startTime < 0.25 else { return }
+        if attempt >= 1 {
+            // 重试后依然无渲染：如实停下，不再假装播放。
+            NSLog("AudioPlaybackController stalled twice, giving up")
+            stopOutput()
+            return
+        }
+        NSLog("AudioPlaybackController detected stalled playback, retrying")
+        if activeLeaseClientID == nil {
+            rebuildEngineForSystemDefault()
+        }
+        schedule(from: currentTime, play: true, watchdogAttempt: attempt + 1)
     }
 
     private func handleSegmentEnd() {
