@@ -319,8 +319,10 @@ struct ExtensionAudioModeView: View {
                         }
                     } label: {
                         Label(status, systemImage: "hifispeaker.2")
+                            .foregroundStyle(Color.white)
                     }
                     .menuStyle(.borderlessButton)
+                    .tint(Color.white)
                     .fixedSize()
                 }
                 if session.mediaPlayback?.state == .failed {
@@ -331,12 +333,12 @@ struct ExtensionAudioModeView: View {
                         ),
                         systemImage: "exclamationmark.triangle"
                     )
-                    .foregroundStyle(.red)
+                        .foregroundStyle(.red)
                 }
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
-            .shadow(color: .black.opacity(0.45), radius: 3, y: 1)
+            .foregroundStyle(Color.white)
+            .shadow(color: .black.opacity(0.9), radius: 2)
             .padding(14)
         }
     }

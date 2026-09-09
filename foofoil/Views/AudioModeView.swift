@@ -105,8 +105,10 @@ struct AudioModeView: View {
                     }
                 } label: {
                     Label(pcmOutputStatus(snapshot), systemImage: "hifispeaker.2")
+                        .foregroundStyle(Color.white)
                 }
                 .menuStyle(.borderlessButton)
+                .tint(Color.white)
                 .fixedSize()
 
                 if let failure = controller.deviceFailureMessage, !failure.isEmpty {
@@ -115,8 +117,8 @@ struct AudioModeView: View {
                 }
             }
             .font(.caption)
-            .foregroundStyle(.secondary)
-            .shadow(color: .black.opacity(0.45), radius: 3, y: 1)
+            .foregroundStyle(Color.white)
+            .shadow(color: .black, radius: 2)
             .padding(14)
         }
     }
