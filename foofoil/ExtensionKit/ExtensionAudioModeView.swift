@@ -235,8 +235,10 @@ struct ExtensionAudioModeView: View {
         self.shouldHideBorder = shouldHideBorder
         _controller = StateObject(wrappedValue: ExtensionAudioPlaybackController(appState: appState, session: session))
         let url = Self.currentURL(in: session)
+        var fallback = AudioTrackInfo.fallback(fileName: url?.lastPathComponent ?? "")
+        fallback.artwork = appState.customCoverImage
         _info = State(initialValue: AudioModeView.overlay(
-            AudioTrackInfo.fallback(fileName: url?.lastPathComponent ?? ""),
+            fallback,
             with: appState.fileList?.currentItem?.cue
         ))
     }
@@ -349,7 +351,8 @@ struct ExtensionAudioModeView: View {
 
     private var presentationID: String {
         guard let session = appState.extensionSession else { return "" }
-        return "\(session.id.uuidString)|\(session.playbackQueue?.currentItemID ?? "")"
+        let cover = appState.customCoverURL?.path ?? ""
+        return "\(session.id.uuidString)|\(session.playbackQueue?.currentItemID ?? "")|\(cover)"
     }
 
     private func loadTrackInfo() async -> AudioTrackInfo {
@@ -358,11 +361,14 @@ struct ExtensionAudioModeView: View {
             return AudioTrackInfo.fallback(fileName: "")
         }
         var loaded = await AudioMetadataLoader.load(from: url)
-        if loaded.artwork == nil, await appState.requestSidecarCoverAccessIfNeeded(for: url) {
-            loaded = await AudioMetadataLoader.load(from: url)
-            if loaded.artwork != nil { appState.sidecarCoverDidBecomeAvailable() }
+        if appState.customCoverImage == nil {
+            if loaded.artwork == nil, await appState.requestSidecarCoverAccessIfNeeded(for: url) {
+                loaded = await AudioMetadataLoader.load(from: url)
+                if loaded.artwork != nil { appState.sidecarCoverDidBecomeAvailable() }
+            }
+            if loaded.sidecarCoverURL != nil { appState.recordSidecarCoverAccess(for: url) }
         }
-        if loaded.sidecarCoverURL != nil { appState.recordSidecarCoverAccess(for: url) }
+        loaded = appState.overlayCustomCover(loaded)
         appState.persistDisplayedArtworkForHistory(loaded.artwork)
         return AudioModeView.overlay(loaded, with: appState.fileList?.currentItem?.cue)
     }

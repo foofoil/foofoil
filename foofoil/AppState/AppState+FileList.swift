@@ -130,6 +130,7 @@ extension AppState {
         if !preservesIdentity, hasOpenedContent {
             id = UUID()
         }
+        clearCustomCover()
         let items = unique.map(makeFileListItem)
         fileList = FileListState(kind: kind, items: items, currentID: items[0].id, title: title)
         sourceFingerprint = nil

@@ -60,11 +60,17 @@ extension AppState {
         private func processDroppedFileURLs(_ fileURLs: [URL], fileListTitle: String? = nil) -> Bool {
             guard !fileURLs.isEmpty else { return false }
 
-            if listableKind != nil {
-                return appendMatchingDroppedFiles(urls: fileURLs)
+            let remaining = consumeDroppedImagesAsAudioCover(from: fileURLs)
+            let consumedCover = remaining.count < fileURLs.count
+            if remaining.isEmpty {
+                return consumedCover
             }
 
-            let openable = matchingDroppedFiles(urls: fileURLs)
+            if listableKind != nil {
+                return appendMatchingDroppedFiles(urls: remaining) || consumedCover
+            }
+
+            let openable = matchingDroppedFiles(urls: remaining)
             guard !openable.isEmpty else { return false }
 
             if currentDroppedFileKind != nil {
@@ -106,11 +112,17 @@ extension AppState {
                         completion(false)
                         return
                     }
-                    if self.listableKind != nil {
-                        completion(self.appendMatchingDroppedFiles(urls: urls))
+                    let remaining = self.consumeDroppedImagesAsAudioCover(from: urls)
+                    let consumedCover = remaining.count < urls.count
+                    if remaining.isEmpty {
+                        completion(consumedCover)
                         return
                     }
-                    let openable = self.matchingDroppedFiles(urls: urls)
+                    if self.listableKind != nil {
+                        completion(self.appendMatchingDroppedFiles(urls: remaining) || consumedCover)
+                        return
+                    }
+                    let openable = self.matchingDroppedFiles(urls: remaining)
                     if appendToFileList, !openable.isEmpty {
                         self.postGroupedFileOpen(urls: openable, append: true)
                         completion(true)
@@ -121,6 +133,8 @@ extension AppState {
                         completion(true)
                     } else if let url = openable.first {
                         self.openDroppedURL(url, generation: generation, completion: completion)
+                    } else if consumedCover {
+                        completion(true)
                     } else if self.currentDroppedFileKind != nil {
                         completion(false)
                     } else {

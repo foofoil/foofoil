@@ -2641,6 +2641,57 @@
         }
       }
     },
+    "Replace Audio Cover Message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This audio already has a cover. Replace it with the dropped image?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前音频已有封面，是否用拖入的图片替换？"
+          }
+        }
+      }
+    },
+    "Replace Audio Cover Title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace Cover?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "替换封面？"
+          }
+        }
+      }
+    },
+    "Replace Cover" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Replace"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "替换"
+          }
+        }
+      }
+    },
     "Repeat One" : {
       "extractionState" : "manual",
       "localizations" : {

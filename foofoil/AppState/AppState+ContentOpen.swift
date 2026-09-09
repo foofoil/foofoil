@@ -37,6 +37,7 @@ extension AppState {
             }
             if clearsFileList {
                 resetFileList()
+                clearCustomCover()
             }
             self.originalImageName = originalName
             self.sourceFingerprint = fileList == nil ? Self.localSourceFingerprint(for: url) : nil
@@ -88,6 +89,7 @@ extension AppState {
             }
             if clearsFileList {
                 resetFileList()
+                clearCustomCover()
             }
             // 同一 FLAC 上切 CUE 曲目时文件仍在播放；撤掉沙盒访问会让无缝衔接读盘失败。
             let isSameMediaFile = imageURL.map {
@@ -265,12 +267,139 @@ extension AppState {
 
         /// 音频封面经用户授权后变为可用：通知窗口按封面重新适配尺寸，并强制重建历史缩略图。
         func sidecarCoverDidBecomeAvailable() {
+            refreshAudioCoverPresentation()
+        }
+
+        /// 当前箔片是否已有可展示的封面（用户替换的封面或视图已读到的封面）。
+        var hasDisplayedAudioCover: Bool {
+            customCoverImage != nil || displayedArtwork != nil
+        }
+
+        /// 用户拖入替换后缓存的封面图；文件缺失时视为没有自定义封面。
+        var customCoverImage: NSImage? {
+            guard let url = customCoverURL, FileManager.default.fileExists(atPath: url.path),
+                  let image = NSImage(contentsOf: url), image.size.width > 0, image.size.height > 0 else {
+                return nil
+            }
+            return image
+        }
+
+        func restoreCustomCover(from config: WindowConfig) {
+            guard let path = config.customCoverPath, FileManager.default.fileExists(atPath: path) else {
+                customCoverURL = nil
+                displayedArtwork = nil
+                return
+            }
+            let url = URL(fileURLWithPath: path)
+            customCoverURL = url
+            displayedArtwork = NSImage(contentsOf: url)
+        }
+
+        func clearCustomCover() {
+            customCoverURL = nil
+            displayedArtwork = nil
+        }
+
+        /// 元数据封面之上叠加用户拖入的封面，并记下当前展示图供下次拖入时判断是否询问替换。
+        func overlayCustomCover(_ info: AudioTrackInfo) -> AudioTrackInfo {
+            var result = info
+            if let image = customCoverImage {
+                result.artwork = image
+                result.sidecarCoverURL = nil
+            }
+            displayedArtwork = result.artwork
+            return result
+        }
+
+        /// 将图片文件作为当前音频箔的封面。已有封面时默认询问是否替换；测试可传入 `replacingExisting` 跳过对话框。
+        @discardableResult
+        func applyAudioCover(from url: URL, replacingExisting: Bool? = nil) -> Bool {
+            guard isAudioDocument else { return false }
+            guard FileListGrouper.classify(url: url) == .listable(.image) else { return false }
+            if hasDisplayedAudioCover {
+                let shouldReplace = replacingExisting ?? confirmReplaceAudioCover()
+                guard shouldReplace else { return false }
+            }
+            return installCustomCover(from: url)
+        }
+
+        /// 音频箔收到拖入文件时，把其中的图片当作封面并从未处理列表中去掉。
+        func consumeDroppedImagesAsAudioCover(from urls: [URL]) -> [URL] {
+            guard isAudioDocument else { return urls }
+            let images = urls.filter { FileListGrouper.classify(url: $0) == .listable(.image) }
+            guard let image = images.first else { return urls }
+            _ = applyAudioCover(from: image)
+            let imagePaths = Set(images.map { $0.resolvingSymlinksInPath().standardizedFileURL.path })
+            return urls.filter {
+                !imagePaths.contains($0.resolvingSymlinksInPath().standardizedFileURL.path)
+            }
+        }
+
+        private func installCustomCover(from sourceURL: URL) -> Bool {
+            let accessed = sourceURL.startAccessingSecurityScopedResource()
+            defer { if accessed { sourceURL.stopAccessingSecurityScopedResource() } }
+            removeCachedCoverFiles(for: id)
+            let ext = sourceURL.pathExtension.isEmpty ? "png" : sourceURL.pathExtension
+            guard let destination = getCachedContentURL(kind: "cover", extension: ext) else { return false }
+            do {
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    try FileManager.default.removeItem(at: destination)
+                }
+                try FileManager.default.copyItem(at: sourceURL, to: destination)
+            } catch {
+                return false
+            }
+            guard let image = NSImage(contentsOf: destination),
+                  image.size.width > 0, image.size.height > 0 else { return false }
+            customCoverURL = destination
+            displayedArtwork = image
+            persistDisplayedArtworkForHistory(image, force: true)
+            saveState()
+            let size = AudioMetadataLoader.layoutSize(image) ?? image.size
+            refreshAudioCoverPresentation(contentSize: size, preserveDisplayArea: true)
+            return true
+        }
+
+        private func confirmReplaceAudioCover() -> Bool {
+            let alert = NSAlert()
+            alert.messageText = NSLocalizedString("Replace Audio Cover Title", comment: "")
+            alert.informativeText = NSLocalizedString("Replace Audio Cover Message", comment: "")
+            alert.addButton(withTitle: NSLocalizedString("Replace Cover", comment: ""))
+            alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
+            alert.alertStyle = .informational
+            NSApp.activate(ignoringOtherApps: true)
+            return alert.runModal() == .alertFirstButtonReturn
+        }
+
+        private func refreshAudioCoverPresentation(
+            contentSize: NSSize? = nil,
+            preserveDisplayArea: Bool = false
+        ) {
+            var userInfo: [AnyHashable: Any] = ["id": id]
+            if let contentSize, contentSize.width > 0, contentSize.height > 0 {
+                userInfo["size"] = contentSize
+            }
+            if preserveDisplayArea {
+                userInfo["preserveDisplayArea"] = true
+            }
             NotificationCenter.default.post(
                 name: .mediaPresentationSizeDidChange,
                 object: nil,
-                userInfo: ["id": id]
+                userInfo: userInfo
             )
             ContentIndexCoordinator.shared.schedule(config: toConfig(), force: true)
+        }
+
+        private func removeCachedCoverFiles(for windowId: UUID) {
+            guard let directory = AppState.getFoofoilDirectoryURL() else { return }
+            let prefix = "cached_cover_\(windowId.uuidString)"
+            guard let files = try? FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: nil
+            ) else { return }
+            for file in files where file.lastPathComponent.hasPrefix(prefix) {
+                try? FileManager.default.removeItem(at: file)
+            }
         }
 
         private static func hostWindow(for state: AppState) -> NSWindow? {
@@ -599,15 +728,18 @@ extension AppState {
         }
 
         /// 视图已展示的封面落盘为历史缩略图。无 imagePath 的扩展音频不走后台索引，
-        /// 这里是它们唯一的缩略图来源；已有缩略图时不再重复写入。
-        func persistDisplayedArtworkForHistory(_ image: NSImage?) {
+        /// 这里是它们唯一的缩略图来源；已有缩略图时不再重复写入，除非强制覆盖。
+        func persistDisplayedArtworkForHistory(_ image: NSImage?, force: Bool = false) {
             guard let image else { return }
             let destination = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent("foofoil", isDirectory: true)
                 .appendingPathComponent("Thumbnails", isDirectory: true)
                 .appendingPathComponent("\(id.uuidString).heic")
-            guard !FileManager.default.fileExists(atPath: destination.path),
-                  HistoryThumbnailGenerator.writeDisplayedArtwork(image, historyID: id) != nil else { return }
+            if FileManager.default.fileExists(atPath: destination.path) {
+                guard force else { return }
+                try? FileManager.default.removeItem(at: destination)
+            }
+            guard HistoryThumbnailGenerator.writeDisplayedArtwork(image, historyID: id) != nil else { return }
             HistoryRepository.shared.updateThumbnailPath(id: id, path: destination.path)
             HistoryManager.shared.refresh()
         }

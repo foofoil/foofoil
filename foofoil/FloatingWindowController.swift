@@ -451,7 +451,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
-        // 音频封面经用户授权后才可读：按封面重新适配窗口尺寸并刷新缓存的展示尺寸。
+        // 音频封面变化（同目录授权、用户拖入替换）后按新封面比例重算窗口。
         NotificationCenter.default.publisher(for: .mediaPresentationSizeDidChange)
             .sink { [weak self] notification in
                 guard let self = self,
@@ -460,13 +460,14 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                       self.appState.isAudioDocument,
                       let url = self.appState.currentAudioPresentationURL else { return }
 
+                let preserveDisplayArea = notification.userInfo?["preserveDisplayArea"] as? Bool == true
                 if let size = notification.userInfo?["size"] as? NSSize {
-                    self.applyMediaPresentationSize(size, animated: true)
+                    self.applyAudioCoverPresentationSize(size, preserveDisplayArea: preserveDisplayArea)
                     return
                 }
                 self.fetchMediaPresentationSize(for: url) { size in
                     guard self.appState.currentAudioPresentationURL == url, let size else { return }
-                    self.applyMediaPresentationSize(size, animated: true)
+                    self.applyAudioCoverPresentationSize(size, preserveDisplayArea: preserveDisplayArea)
                 }
             }
             .store(in: &cancellables)
@@ -1222,13 +1223,27 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         return size
     }
 
-    /// 异步读取媒体展示尺寸：视频用画面尺寸，音频用封面或默认卡片尺寸。
+    /// 用户拖入的封面优先于音频内嵌/同目录封面，保证窗口比例跟正在展示的图一致。
+    private func audioPresentationSize(overlaying info: AudioTrackInfo) -> NSSize {
+        if let image = appState.customCoverImage,
+           let size = AudioMetadataLoader.layoutSize(image) {
+            return size
+        }
+        return AudioMetadataLoader.presentationSize(for: info)
+    }
+
+    /// 异步读取媒体展示尺寸：视频用画面尺寸，音频用用户替换封面、内嵌/同目录封面或默认卡片尺寸。
     private func fetchMediaPresentationSize(for url: URL, completion: @escaping (NSSize?) -> Void) {
         if appState.isAudioDocument {
-            Task {
+            Task { [weak self] in
                 let info = await AudioMetadataLoader.load(from: url)
-                let size = AudioMetadataLoader.presentationSize(for: info)
-                await MainActor.run { completion(size) }
+                await MainActor.run {
+                    guard let self else {
+                        completion(nil)
+                        return
+                    }
+                    completion(self.audioPresentationSize(overlaying: info))
+                }
             }
             return
         }
@@ -1750,6 +1765,19 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         return contentSize
     }
 
+    /// 用户拖入替换封面时带上新图尺寸：已有窗口则保持显示面积、只改比例。
+    private func applyAudioCoverPresentationSize(_ size: NSSize, preserveDisplayArea: Bool) {
+        guard size.width > 0, size.height > 0 else { return }
+        if preserveDisplayArea, currentMediaSize != nil,
+           !isLiveResizing, !isRestoringFrame, !pendingSavedFrameRestore,
+           !appState.isFullScreen, !isTransitioningFullScreen {
+            currentMediaSize = size
+            applyImageListSuccessorLayout(imageSize: size, animated: true)
+            return
+        }
+        applyMediaPresentationSize(size, animated: true)
+    }
+
     /// 把已读取的媒体尺寸套到当前窗口：恢复历史时保留已保存大小，新打开则按初始规则适配。
     /// 音乐列表内切曲（含 Hi-Fi 扩展切歌、同目录封面授权后补读）与图片列表切图一致，
     /// 保持上一首的显示面积，按新封面比例缩放。
@@ -1765,7 +1793,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             restoreSavedMediaFrameIfNeeded(contentSize: size)
             return
         }
-        if hadPreviousMediaSize, shouldPreserveAudioListDisplayArea {
+        if hadPreviousMediaSize, appState.isAudioDocument {
             applyImageListSuccessorLayout(imageSize: size, animated: animated)
             return
         }

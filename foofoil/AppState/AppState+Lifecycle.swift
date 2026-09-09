@@ -39,6 +39,7 @@ extension AppState {
             self.mediaPlaybackMode = .sequentialLoop
             self.videoBookmarkData = nil
             self.mediaSidecarBookmarkData = nil
+            self.clearCustomCover()
             self.extensionSession = nil
             self.extensionFallbackProviderID = nil
             self.extensionStateReference = nil

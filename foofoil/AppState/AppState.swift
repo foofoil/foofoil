@@ -350,6 +350,10 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     var mediaSidecarBookmarkData: Data?
     /// 当前持有访问授权的封面所在文件夹 URL，切换内容或销毁时需停止访问。
     var accessingSidecarDirectoryURL: URL?
+    /// 用户拖入替换的音频封面缓存文件；重开历史时优先使用。
+    @Published var customCoverURL: URL?
+    /// 当前箔片正在展示的封面，用于拖入图片时判断是否需要询问替换。
+    var displayedArtwork: NSImage?
 
     var renderTask: Task<Void, Never>?
 
@@ -462,6 +466,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         super.init()
         restoreFileList(from: config)
         restoreExtensionSession(from: config)
+        restoreCustomCover(from: config)
         // 在调用 saveState 时避免触发死循环；视频经书签恢复后可能重建了书签，也需要落盘
         if let path = config.imagePath, !FileManager.default.fileExists(atPath: path) {
             if Self.findCachedImageInDirectory(for: config.id) != nil || Self.findLegacyCachedImageInDirectory() != nil {

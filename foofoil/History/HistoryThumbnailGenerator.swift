@@ -20,7 +20,12 @@ public enum HistoryThumbnailGenerator {
     ///   - kind: 历史内容类型
     ///   - destinationURL: 缩略图保存的目标 HEIC 路径
     /// - Returns: 生成并保存成功返回 true，否则返回 false
-    public static func generateThumbnail(for url: URL, kind: HistoryContentKind, destinationURL: URL) -> Bool {
+    public static func generateThumbnail(
+        for url: URL,
+        kind: HistoryContentKind,
+        destinationURL: URL,
+        customCoverURL: URL? = nil
+    ) -> Bool {
         var finalImage: CGImage? = nil
 
         switch kind {
@@ -71,11 +76,18 @@ public enum HistoryThumbnailGenerator {
             }
 
         case .audio:
-            // 音频缩略图优先使用内嵌封面，其次同目录匹配的封面图
-            let info = AudioMetadataLoader.loadSynchronously(from: url)
-            if let artwork = info.artwork,
+            // 用户拖入替换的封面优先于内嵌/同目录封面
+            if let customCoverURL,
+               FileManager.default.fileExists(atPath: customCoverURL.path),
+               let artwork = NSImage(contentsOf: customCoverURL),
                let cgImage = artwork.cgImage(forProposedRect: nil, context: nil, hints: nil) {
                 finalImage = cropAndResize(cgImage, to: 128)
+            } else {
+                let info = AudioMetadataLoader.loadSynchronously(from: url)
+                if let artwork = info.artwork,
+                   let cgImage = artwork.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+                    finalImage = cropAndResize(cgImage, to: 128)
+                }
             }
 
         default:

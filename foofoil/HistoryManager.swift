@@ -95,7 +95,7 @@ public final class HistoryManager: ObservableObject {
     }
 
     private func cachePaths(for config: WindowConfig) -> [String] {
-        var paths = [config.imagePath, config.textPath].compactMap { $0 }
+        var paths = [config.imagePath, config.textPath, config.customCoverPath].compactMap { $0 }
         if let value = config.webURLString, let url = URL(string: value), url.isFileURL { paths.append(url.path) }
         return paths
     }

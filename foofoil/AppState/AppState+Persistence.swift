@@ -67,6 +67,7 @@ extension AppState {
             self.expandedNavigatorItemIDs = []
             restoreFileList(from: config)
             restoreExtensionSession(from: config)
+            restoreCustomCover(from: config)
 
             // 载入历史记录时，一律尝试通知窗口控制器恢复当初保存的窗口位置与尺寸
             if let frameString = config.windowFrame {
@@ -186,6 +187,7 @@ extension AppState {
                 mediaPlaybackMode: mediaPlaybackMode,
                 videoBookmark: videoBookmarkData,
                 mediaSidecarBookmark: mediaSidecarBookmarkData,
+                customCoverPath: customCoverURL?.path,
                 extensionID: extensionSession?.extensionID,
                 extensionStateReference: extensionStateReference,
                 navigatorPanelSide: navigatorPanelSide,

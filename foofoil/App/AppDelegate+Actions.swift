@@ -435,7 +435,15 @@ extension AppDelegate {
         }
 
         if target.listableKind != nil {
-            guard target.appendMatchingDroppedFiles(urls: urls) else { return }
+            let remaining = target.consumeDroppedImagesAsAudioCover(from: urls)
+            let consumedCover = remaining.count < urls.count
+            if remaining.isEmpty {
+                if consumedCover, let controller = windowControllers.first(where: { $0.appState === target }) {
+                    activateWindow(controller)
+                }
+                return
+            }
+            guard target.appendMatchingDroppedFiles(urls: remaining) || consumedCover else { return }
         } else {
             let matching = target.matchingDroppedFiles(urls: urls)
             guard !matching.isEmpty else { return }

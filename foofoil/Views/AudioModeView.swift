@@ -38,7 +38,9 @@ struct AudioModeView: View {
                 }
             }
         ))
-        _info = State(initialValue: Self.overlay(AudioTrackInfo.fallback(fileName: url.lastPathComponent), with: appState.fileList?.currentItem?.cue))
+        var fallback = AudioTrackInfo.fallback(fileName: url.lastPathComponent)
+        fallback.artwork = appState.customCoverImage
+        _info = State(initialValue: Self.overlay(fallback, with: appState.fileList?.currentItem?.cue))
     }
 
     var body: some View {
@@ -71,7 +73,17 @@ struct AudioModeView: View {
             controller.isLooping = appState.shouldLoopCurrentItem
         }
         .task(id: presentationID) {
-            info = await loadTrackInfo()
+            let loaded = await loadTrackInfo()
+            guard !Task.isCancelled else { return }
+            info = loaded
+            NotificationCenter.default.post(
+                name: .mediaPresentationSizeDidChange,
+                object: nil,
+                userInfo: [
+                    "id": appState.id,
+                    "size": AudioMetadataLoader.presentationSize(for: loaded)
+                ]
+            )
         }
     }
 
@@ -145,7 +157,8 @@ struct AudioModeView: View {
     private var presentationID: String {
         let track = appState.fileList?.currentID ?? ""
         let start = appState.currentPlaybackRange?.startCueFrames ?? 0
-        return "\(url.path)|\(track)|\(start)"
+        let cover = appState.customCoverURL?.path ?? ""
+        return "\(url.path)|\(track)|\(start)|\(cover)"
     }
 
     private func applyCurrentTrack() {
@@ -155,10 +168,9 @@ struct AudioModeView: View {
             range: appState.currentPlaybackRange,
             autoplay: appState.resumesMediaPlaybackOnActivation
         )
-        info = Self.overlay(
-            AudioTrackInfo.fallback(fileName: url.lastPathComponent),
-            with: appState.fileList?.currentItem?.cue
-        )
+        var fallback = AudioTrackInfo.fallback(fileName: url.lastPathComponent)
+        fallback.artwork = appState.customCoverImage
+        info = Self.overlay(fallback, with: appState.fileList?.currentItem?.cue)
         Task { info = await loadTrackInfo() }
     }
 
@@ -166,16 +178,19 @@ struct AudioModeView: View {
     /// 成功读取同目录封面则保存文件夹书签，保证重启后仍能显示。
     private func loadTrackInfo() async -> AudioTrackInfo {
         var loaded = await AudioMetadataLoader.load(from: url)
-        if loaded.artwork == nil, await appState.requestSidecarCoverAccessIfNeeded(for: url) {
-            loaded = await AudioMetadataLoader.load(from: url)
-            // 授权后封面才可读：补做窗口尺寸适配与历史缩略图重建
-            if loaded.artwork != nil {
-                appState.sidecarCoverDidBecomeAvailable()
+        if appState.customCoverImage == nil {
+            if loaded.artwork == nil, await appState.requestSidecarCoverAccessIfNeeded(for: url) {
+                loaded = await AudioMetadataLoader.load(from: url)
+                // 授权后封面才可读：补做窗口尺寸适配与历史缩略图重建
+                if loaded.artwork != nil {
+                    appState.sidecarCoverDidBecomeAvailable()
+                }
+            }
+            if loaded.sidecarCoverURL != nil {
+                appState.recordSidecarCoverAccess(for: url)
             }
         }
-        if loaded.sidecarCoverURL != nil {
-            appState.recordSidecarCoverAccess(for: url)
-        }
+        loaded = appState.overlayCustomCover(loaded)
         appState.persistDisplayedArtworkForHistory(loaded.artwork)
         return Self.overlay(loaded, with: appState.fileList?.currentItem?.cue)
     }

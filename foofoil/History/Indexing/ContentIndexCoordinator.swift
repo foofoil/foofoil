@@ -36,7 +36,12 @@ public final class ContentIndexCoordinator: @unchecked Sendable {
                     .appendingPathComponent("foofoil", isDirectory: true)
                 let thumbnailURL = root.appendingPathComponent("Thumbnails").appendingPathComponent("\(config.id.uuidString).heic")
                 
-                if HistoryThumbnailGenerator.generateThumbnail(for: URL(fileURLWithPath: path), kind: kind, destinationURL: thumbnailURL) {
+                if HistoryThumbnailGenerator.generateThumbnail(
+                    for: URL(fileURLWithPath: path),
+                    kind: kind,
+                    destinationURL: thumbnailURL,
+                    customCoverURL: config.customCoverPath.map { URL(fileURLWithPath: $0) }
+                ) {
                     HistoryRepository.shared.updateThumbnailPath(id: config.id, path: thumbnailURL.path)
                     HistoryManager.shared.refresh()
                 }

@@ -68,12 +68,13 @@ extension AppState {
             let name = url.lastPathComponent
             return name.hasPrefix("cached_image") ||
                 name.hasPrefix("cached_text_") ||
-                name.hasPrefix("cached_web_")
+                name.hasPrefix("cached_web_") ||
+                name.hasPrefix("cached_cover_")
         }
 
         /// 当前窗口正在使用的本地缓存路径。
         public var cachedContentPaths: Set<String> {
-            [imageURL, textURL, webURL]
+            [imageURL, textURL, webURL, customCoverURL]
                 .compactMap { $0 }
                 .filter { $0.isFileURL && Self.isManagedCacheURL($0) }
                 .map(\.path)

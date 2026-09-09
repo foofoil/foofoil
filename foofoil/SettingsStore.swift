@@ -131,6 +131,8 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     public var videoBookmark: Data?
     /// 音频同目录封面所在文件夹的安全范围书签；重启后恢复访问以保证封面可再次读取。
     public var mediaSidecarBookmark: Data?
+    /// 用户拖入替换的音频封面缓存路径；重开历史时优先使用这份封面。
+    public var customCoverPath: String?
     /// 扩展状态仅保存 namespace 与引用；实际 payload 由 ExtensionStateStore 原子管理。
     public var extensionID: String?
     public var extensionStateReference: String?
@@ -170,6 +172,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         isVideoLooping: Bool? = nil,
         videoBookmark: Data? = nil,
         mediaSidecarBookmark: Data? = nil,
+        customCoverPath: String? = nil,
         extensionID: String? = nil,
         extensionStateReference: String? = nil,
         navigatorPanelSide: NavigatorPanelSide = .left,
@@ -204,6 +207,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.isVideoLooping = isVideoLooping ?? (mediaPlaybackMode == .singleLoop)
         self.videoBookmark = videoBookmark
         self.mediaSidecarBookmark = mediaSidecarBookmark
+        self.customCoverPath = customCoverPath
         self.extensionID = extensionID
         self.extensionStateReference = extensionStateReference
         self.navigatorPanelSide = navigatorPanelSide
@@ -213,7 +217,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textPath, contentKind, sourceFingerprint, storedDisplayTitle, thumbnailPath, webZoom, mediaPlaybackMode, isVideoLooping, videoBookmark, mediaSidecarBookmark, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList
+        case id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textPath, contentKind, sourceFingerprint, storedDisplayTitle, thumbnailPath, webZoom, mediaPlaybackMode, isVideoLooping, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList
     }
 
     public init(from decoder: Decoder) throws {
@@ -243,6 +247,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         webZoom = try container.decodeIfPresent(Double.self, forKey: .webZoom) ?? 1.0
         videoBookmark = try container.decodeIfPresent(Data.self, forKey: .videoBookmark)
         mediaSidecarBookmark = try container.decodeIfPresent(Data.self, forKey: .mediaSidecarBookmark)
+        customCoverPath = try container.decodeIfPresent(String.self, forKey: .customCoverPath)
         extensionID = try container.decodeIfPresent(String.self, forKey: .extensionID)
         extensionStateReference = try container.decodeIfPresent(String.self, forKey: .extensionStateReference)
         navigatorPanelSide = try container.decodeIfPresent(NavigatorPanelSide.self, forKey: .navigatorPanelSide) ?? .right

@@ -389,6 +389,157 @@ struct FoofoilTests {
         #expect(decoded.mediaSidecarBookmark == bookmark)
     }
 
+    @Test func droppedImageBecomesAudioCoverAndRestoresFromHistory() throws {
+        let audioURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-audio-cover-drop-\(UUID().uuidString).mp3")
+        try Data("fake audio".utf8).write(to: audioURL)
+        let cover = try writeTestPNG(name: "audio-cover.png")
+        let replacement = try writeTestPNG(name: "audio-cover-replacement.png")
+        defer {
+            try? FileManager.default.removeItem(at: audioURL)
+            try? FileManager.default.removeItem(at: cover)
+            try? FileManager.default.removeItem(at: replacement)
+        }
+
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.openAudio(url: audioURL)
+        #expect(!state.hasDisplayedAudioCover)
+        #expect(state.handleDroppedFileURLs([cover]))
+        #expect(state.isAudioDocument)
+        #expect(state.imageURL == audioURL)
+        let firstCover = try #require(state.customCoverURL)
+        #expect(firstCover.lastPathComponent.hasPrefix("cached_cover_"))
+        #expect(state.customCoverImage != nil)
+        #expect(state.hasDisplayedAudioCover)
+        #expect(state.toConfig().customCoverPath == firstCover.path)
+
+        #expect(!state.applyAudioCover(from: replacement, replacingExisting: false))
+        #expect(state.customCoverURL == firstCover)
+
+        #expect(state.applyAudioCover(from: replacement, replacingExisting: true))
+        let replacedCover = try #require(state.customCoverURL)
+        #expect(replacedCover.lastPathComponent.hasPrefix("cached_cover_"))
+        #expect(state.toConfig().customCoverPath == replacedCover.path)
+        #expect(state.customCoverImage != nil)
+
+        let saved = state.toConfig()
+        state.openAudio(url: audioURL)
+        #expect(state.customCoverURL == nil)
+
+        let restored = AppState(config: saved)
+        defer {
+            restored.stopVideoAccess()
+            HistoryManager.shared.removeFromHistory(restored.toConfig())
+        }
+        #expect(restored.customCoverURL == replacedCover)
+        #expect(restored.customCoverImage != nil)
+        #expect(restored.isAudioDocument)
+    }
+
+    @Test func replacingAudioCoverPostsNewArtworkAspect() throws {
+        let audioURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-cover-aspect-\(UUID().uuidString).mp3")
+        try Data("fake audio".utf8).write(to: audioURL)
+        let cover = try writeTestPNG(name: "wide-cover.png", size: NSSize(width: 90, height: 50))
+        defer {
+            try? FileManager.default.removeItem(at: audioURL)
+            try? FileManager.default.removeItem(at: cover)
+        }
+
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.openAudio(url: audioURL)
+
+        var receivedSize: NSSize?
+        var preserveDisplayArea = false
+        let observer = NotificationCenter.default.addObserver(
+            forName: .mediaPresentationSizeDidChange,
+            object: nil,
+            queue: nil
+        ) { notification in
+            guard let id = notification.userInfo?["id"] as? UUID, id == state.id else { return }
+            receivedSize = notification.userInfo?["size"] as? NSSize
+            preserveDisplayArea = notification.userInfo?["preserveDisplayArea"] as? Bool == true
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        #expect(state.applyAudioCover(from: cover))
+        let size = try #require(receivedSize)
+        #expect(abs(size.width / size.height - 90.0 / 50.0) < 0.001)
+        #expect(preserveDisplayArea)
+        let artwork = try #require(state.customCoverImage)
+        let artworkSize = try #require(AudioMetadataLoader.layoutSize(artwork))
+        #expect(abs(artworkSize.width / artworkSize.height - 90.0 / 50.0) < 0.001)
+        let presented = AudioMetadataLoader.presentationSize(for: state.overlayCustomCover(AudioTrackInfo.fallback(fileName: "song.mp3")))
+        #expect(abs(presented.width / presented.height - 90.0 / 50.0) < 0.001)
+    }
+
+    @Test func audioListDropUsesImageAsCoverAndKeepsTracks() throws {
+        let firstAudio = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-audio-list-cover-a-\(UUID().uuidString).mp3")
+        let secondAudio = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-audio-list-cover-b-\(UUID().uuidString).mp3")
+        try Data("a".utf8).write(to: firstAudio)
+        try Data("b".utf8).write(to: secondAudio)
+        let cover = try writeTestPNG(name: "list-cover.png")
+        defer {
+            try? FileManager.default.removeItem(at: firstAudio)
+            try? FileManager.default.removeItem(at: secondAudio)
+            try? FileManager.default.removeItem(at: cover)
+        }
+
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.openAudio(url: firstAudio)
+        #expect(state.handleDroppedFileURLs([cover, secondAudio]))
+        #expect(state.fileList?.items.count == 2)
+        #expect(state.fileList?.items.contains(where: { $0.path == cover.path }) == false)
+        let coverURL = try #require(state.customCoverURL)
+
+        let secondID = try #require(state.fileList?.items.last?.id)
+        state.presentFileListItem(id: secondID, rotatesIdentity: false)
+        #expect(state.customCoverURL == coverURL)
+        #expect(state.imageURL == secondAudio)
+    }
+
+    @Test func blankDropStillOpensImageInsteadOfAudioCover() throws {
+        let image = try writeTestPNG(name: "blank-image.png")
+        defer { try? FileManager.default.removeItem(at: image) }
+
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        #expect(state.handleDroppedFileURLs([image]))
+        #expect(!state.isAudioDocument)
+        #expect(state.customCoverURL == nil)
+        #expect(state.imageURL != nil)
+    }
+
+    @Test func customCoverPathRoundTripsThroughHistoryDatabase() throws {
+        let databaseDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-custom-cover-db-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: databaseDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: databaseDirectory) }
+        let repository = HistoryRepository(databaseURL: databaseDirectory.appendingPathComponent("history.sqlite3"))
+
+        let coverPath = databaseDirectory.appendingPathComponent("cached_cover.png").path
+        let id = UUID()
+        #expect(repository.upsert(WindowConfig(
+            id: id,
+            imagePath: databaseDirectory.appendingPathComponent("song.mp3").path,
+            originalImageName: "song.mp3",
+            contentKind: .audio,
+            customCoverPath: coverPath
+        )))
+
+        let stored = try #require(repository.config(id: id))
+        #expect(stored.customCoverPath == coverPath)
+
+        let legacy = WindowConfig(id: UUID(), originalImageName: "song.mp3")
+        let data = try JSONEncoder().encode(legacy)
+        #expect(try JSONDecoder().decode(WindowConfig.self, from: data).customCoverPath == nil)
+    }
+
     @Test func testCanOpenFileAcceptsAudioCandidates() throws {
         let audioURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("foofoil-canopen-\(UUID().uuidString).mp3")
@@ -2296,9 +2447,9 @@ struct FoofoilTests {
         }
     }
 
-    private func writeTestPNG(name: String) throws -> URL {
+    private func writeTestPNG(name: String, size: NSSize = NSSize(width: 2, height: 2)) throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("foofoil-\(UUID().uuidString)-\(name)")
-        let image = NSImage(size: NSSize(width: 2, height: 2))
+        let image = NSImage(size: size)
         image.lockFocus()
         NSColor.red.setFill()
         NSRect(origin: .zero, size: image.size).fill()
