@@ -303,28 +303,20 @@ struct ExtensionAudioModeView: View {
                 if let selection = session.audioDeviceSelection,
                    let status = selection.statusDescription,
                    !status.isEmpty {
-                    Menu {
-                        ForEach(selection.devices) { device in
-                            Button {
+                    AppKitPopupMenuButton(
+                        title: status,
+                        symbolName: "hifispeaker.2",
+                        items: selection.devices.map { device in
+                            .command(
+                                id: device.id,
+                                title: device.displayName,
+                                selected: selection.selectedDeviceID == device.id,
+                                enabled: device.isConnected && isDSDDeviceEnabled(device.id, in: session)
+                            ) {
                                 appState.performExtensionCommand("hifi.device.\(device.id)")
-                            } label: {
-                                if selection.selectedDeviceID == device.id {
-                                    Label(device.displayName, systemImage: "checkmark")
-                                } else {
-                                    Text(device.displayName)
-                                }
                             }
-                            .disabled(
-                                !device.isConnected
-                                    || !isDSDDeviceEnabled(device.id, in: session)
-                            )
                         }
-                    } label: {
-                        Label(status, systemImage: "hifispeaker.2")
-                            .foregroundStyle(Color.white)
-                    }
-                    .menuStyle(.borderlessButton)
-                    .tint(Color.white)
+                    )
                     .fixedSize()
                 }
                 if session.mediaPlayback?.state == .failed {

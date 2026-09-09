@@ -64,6 +64,12 @@ public class FloatingWindow: NSWindow {
         return true
     }
 
+    /// 子窗口被 addChildWindow 后宿主 canHide 也可能被锁死；⌘H 必须仍能收起箔。
+    public override var canHide: Bool {
+        get { true }
+        set { super.canHide = true }
+    }
+
     public override func mouseEntered(with event: NSEvent) {
         (windowController as? FloatingWindowController)?.updateNavigatorEdgeHover(at: event.locationInWindow)
         super.mouseEntered(with: event)

@@ -6,6 +6,7 @@
 import AppKit
 import CoreGraphics
 import Foundation
+import SwiftUI
 import Testing
 @testable import foofoil
 import FoofoilExtensionKit
@@ -572,6 +573,34 @@ struct ExtensionKitTests {
         #expect(!NavigatorPanelMetrics.containsWidthResizeHandle(x: 40, width: width, draggingLeftEdge: false))
     }
 
+    @Test func navigatorCompanionWindowKeepsCanHideEnabled() {
+        let panel = NavigatorPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 200, height: 200),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isReleasedWhenClosed = false
+        defer { panel.close() }
+        panel.canHide = true
+        #expect(panel.canHide)
+        panel.animationBehavior = .utilityWindow
+        #expect(panel.canHide)
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        #expect(panel.canHide)
+        let parent = NSWindow(
+            contentRect: NSRect(x: 80, y: 80, width: 400, height: 300),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        parent.isReleasedWhenClosed = false
+        defer { parent.close() }
+        parent.addChildWindow(panel, ordered: .above)
+        #expect(panel.canHide)
+        #expect(parent.canHide)
+    }
+
     @Test func navigatorPanelUsesCompanionWindowWithoutChangingFoilFrame() throws {
         let state = AppState()
         state.builtInNavigatorContributions = [
@@ -593,11 +622,38 @@ struct ExtensionKitTests {
 
         #expect(controller.isNavigatorPanelVisible)
         #expect(controller.owns(panel))
+        #expect(panel.canHide)
         #expect(abs(panel.frame.width - 300) < 0.5)
         #expect(abs(panel.frame.minX - foilWindow.frame.maxX - NavigatorPanelMetrics.attachmentGap) < 0.5)
         #expect(foilWindow.frame == originalFrame)
 
         controller.close()
+    }
+
+    @Test func preparingApplicationHideOrdersOutAudioNavigatorCompanion() throws {
+        let state = AppState()
+        state.originalImageName = "hide-test.mp3"
+        state.imageURL = URL(fileURLWithPath: "/tmp/hide-test.mp3")
+        state.builtInNavigatorContributions = [
+            NavigatorContribution(
+                id: "builtin.hide-test",
+                titleLocalizationKey: "Navigator",
+                style: .flat,
+                items: [NavigatorItem(id: "one", title: "One")]
+            )
+        ]
+        state.navigatorPanelVisibilityMode = .always
+        let controller = FloatingWindowController(appState: state)
+        defer { controller.close() }
+        let foilWindow = try #require(controller.window)
+        foilWindow.orderFront(nil)
+        let panel = try #require(foilWindow.childWindows?.first)
+        #expect(panel.isVisible)
+
+        controller.prepareForApplicationHide()
+        #expect(!panel.isVisible)
+        #expect(panel.parent == nil)
+        #expect((foilWindow.childWindows ?? []).isEmpty)
     }
 
     @Test func navigatorPanelAppearsWhenPointerIsInsideWindowOnHover() throws {
@@ -831,6 +887,82 @@ struct ExtensionKitTests {
         #expect(state.isMediaPlaybackControlsVisible)
 
         controller.close()
+    }
+
+    @Test func audioOutputMenuLeavesHostWindowHideable() async throws {
+        struct MenuHost: View {
+            var body: some View {
+                AppKitPopupMenuButton(
+                    title: "Output",
+                    symbolName: "hifispeaker.2",
+                    items: [
+                        .command(id: "system", title: "System Default") {},
+                        .command(id: "dac", title: "DAC") {}
+                    ]
+                )
+                .frame(width: 240, height: 160)
+            }
+        }
+
+        let menuWindow = FloatingWindow(
+            contentRect: NSRect(x: 240, y: 240, width: 280, height: 200),
+            defer: false
+        )
+        menuWindow.isReleasedWhenClosed = false
+        menuWindow.contentView = NSHostingView(rootView: MenuHost())
+        menuWindow.orderFront(nil)
+        try await Task.sleep(for: .milliseconds(200))
+        defer { menuWindow.close() }
+
+        #expect(menuWindow.canHide)
+        #expect(menuWindow.level == .normal)
+        #expect((menuWindow.childWindows ?? []).isEmpty)
+    }
+
+    @Test func reshowingVisibleNavigatorKeepsCompanionHideable() throws {
+        let parent = FloatingWindow(
+            contentRect: NSRect(x: 120, y: 120, width: 400, height: 300),
+            defer: false
+        )
+        parent.isReleasedWhenClosed = false
+        parent.orderFront(nil)
+        let controller = NavigatorPanelController(appState: AppState())
+        defer {
+            controller.detachAndClose()
+            parent.close()
+        }
+        controller.show(attachedTo: parent)
+        let panel = try #require(controller.window)
+        #expect(panel.canHide)
+        #expect(panel.parent === parent)
+
+        controller.show(attachedTo: parent)
+        #expect(panel.canHide)
+        #expect(panel.parent === parent)
+        #expect(parent.canHide)
+    }
+
+    @Test func applicationHideDetachesNavigatorSoHostCanHide() throws {
+        let parent = FloatingWindow(
+            contentRect: NSRect(x: 120, y: 120, width: 400, height: 300),
+            defer: false
+        )
+        parent.isReleasedWhenClosed = false
+        parent.orderFront(nil)
+        let controller = NavigatorPanelController(appState: AppState())
+        defer {
+            controller.detachAndClose()
+            parent.close()
+        }
+        controller.show(attachedTo: parent)
+        let panel = try #require(controller.window)
+        #expect(panel.isVisible)
+        #expect(panel.parent === parent)
+
+        controller.detachForApplicationHide()
+        #expect(!panel.isVisible)
+        #expect(panel.parent == nil)
+        #expect(parent.canHide)
     }
 
     @Test func mediaControlsAutoHideIntervalIsClamped() {

@@ -8,7 +8,8 @@ import QuartzCore
 import SwiftUI
 import FoofoilExtensionKit
 
-final class NavigatorPanel: NSPanel {
+/// 伴随窗口用 NSWindow 而不是 NSPanel：NSPanel 默认 canHide=false，作子窗口会阻止宿主箔 ⌘H 隐藏，并挡住后续新建的箔。
+final class NavigatorPanel: NSWindow {
     var onDeleteSelected: (() -> Void)?
     var handleKeyDown: ((NSEvent) -> Bool)?
     /// 与导航栏宽度手柄同侧：左挂为左缘，右挂为右缘。
@@ -16,6 +17,11 @@ final class NavigatorPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+    /// addChildWindow 会把子窗口 canHide 锁成 false；强制可隐藏，否则 ⌘H 会留下宿主箔。
+    override var canHide: Bool {
+        get { true }
+        set { super.canHide = true }
+    }
 
     override func sendEvent(_ event: NSEvent) {
         if event.type == .scrollWheel,
@@ -118,6 +124,8 @@ final class NavigatorPanelController: NSWindowController {
         panel.isReleasedWhenClosed = false
         panel.isMovableByWindowBackground = true
         panel.hidesOnDeactivate = false
+        panel.canHide = true
+        panel.level = .normal
         panel.animationBehavior = .utilityWindow
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         let hostingView = NSHostingView(rootView: NavigatorPanelView(appState: appState))
@@ -160,7 +168,7 @@ final class NavigatorPanelController: NSWindowController {
     }
 
     func show(attachedTo parent: NSWindow) {
-        guard let panel = window else { return }
+        guard !NSApp.isHidden, let panel = window else { return }
         let needsReveal = !isVisible
         let wasOrderedOut = !panel.isVisible
         pendingHide?.cancel()
@@ -172,7 +180,10 @@ final class NavigatorPanelController: NSWindowController {
         }
         synchronizeAppearance(with: parent)
         updateFrame(relativeTo: parent)
-        panel.orderFront(nil)
+        // 已显示时不要再 orderFront：音频箔的 hover 监听会反复 show，否则会把旧箔抬到新建箔上面。
+        if wasOrderedOut {
+            panel.orderFront(nil)
+        }
         if needsReveal {
             animateSlide(hidden: false, startingHidden: wasOrderedOut)
         }
@@ -224,13 +235,27 @@ final class NavigatorPanelController: NSWindowController {
         guard let panel = window else { return }
         hide()
         panel.parent?.removeChildWindow(panel)
+        panel.orderOut(nil)
         panel.close()
+    }
+
+    /// ⌘H 前先拆掉子窗口关系并 orderOut。addChildWindow 会把 canHide 锁成 false，
+    /// hide: 读的是 ivar 不是 getter，不拆开会把宿主箔留在桌面上。
+    func detachForApplicationHide() {
+        guard let panel = window else { return }
+        pendingHide?.cancel()
+        pendingHide = nil
+        isHiding = false
+        panel.contentView?.layer?.removeAnimation(forKey: "navigatorSlide")
+        panel.parent?.removeChildWindow(panel)
+        panel.orderOut(nil)
     }
 
     func synchronizeAppearance(with parent: NSWindow) {
         guard let panel = window else { return }
         panel.level = parent.level
         panel.alphaValue = parent.alphaValue
+        panel.canHide = true
     }
 
     func updateFrame(relativeTo parent: NSWindow) {

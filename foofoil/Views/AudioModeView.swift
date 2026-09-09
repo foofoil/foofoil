@@ -91,36 +91,11 @@ struct AudioModeView: View {
     private var outputDeviceOverlay: some View {
         if let snapshot = controller.deviceServiceSnapshot {
             VStack(alignment: .trailing, spacing: 6) {
-                Menu {
-                    Button {
-                        controller.selectSystemDefaultOutput()
-                    } label: {
-                        if snapshot.pcmRouteMode == .systemDefault {
-                            Label(NSLocalizedString("System Default Output", comment: ""), systemImage: "checkmark")
-                        } else {
-                            Text(NSLocalizedString("System Default Output", comment: ""))
-                        }
-                    }
-                    Divider()
-                    ForEach(snapshot.devices) { device in
-                        Button {
-                            controller.selectExclusiveOutput(deviceID: device.id)
-                        } label: {
-                            if snapshot.pcmRouteMode == .exclusiveDevice,
-                               snapshot.selectedPCMDeviceID == device.id {
-                                Label(device.displayName, systemImage: "checkmark")
-                            } else {
-                                Text(device.displayName)
-                            }
-                        }
-                        .disabled(!device.isConnected || !device.supportsExclusiveMode)
-                    }
-                } label: {
-                    Label(pcmOutputStatus(snapshot), systemImage: "hifispeaker.2")
-                        .foregroundStyle(Color.white)
-                }
-                .menuStyle(.borderlessButton)
-                .tint(Color.white)
+                AppKitPopupMenuButton(
+                    title: pcmOutputStatus(snapshot),
+                    symbolName: "hifispeaker.2",
+                    items: pcmOutputMenuItems(snapshot)
+                )
                 .fixedSize()
 
                 if let failure = controller.deviceFailureMessage, !failure.isEmpty {
@@ -133,6 +108,31 @@ struct AudioModeView: View {
             .shadow(color: .black, radius: 2)
             .padding(14)
         }
+    }
+
+    private func pcmOutputMenuItems(_ snapshot: AudioDeviceServiceSnapshot) -> [AppKitPopupMenuButton.Item] {
+        var items: [AppKitPopupMenuButton.Item] = [
+            .command(
+                id: "system-default",
+                title: NSLocalizedString("System Default Output", comment: ""),
+                selected: snapshot.pcmRouteMode == .systemDefault
+            ) { [controller] in
+                controller.selectSystemDefaultOutput()
+            },
+            .separator()
+        ]
+        items += snapshot.devices.map { device in
+            .command(
+                id: device.id,
+                title: device.displayName,
+                selected: snapshot.pcmRouteMode == .exclusiveDevice
+                    && snapshot.selectedPCMDeviceID == device.id,
+                enabled: device.isConnected && device.supportsExclusiveMode
+            ) { [controller] in
+                controller.selectExclusiveOutput(deviceID: device.id)
+            }
+        }
+        return items
     }
 
     private func pcmOutputStatus(_ snapshot: AudioDeviceServiceSnapshot) -> String {

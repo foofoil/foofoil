@@ -25,6 +25,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     var contentModeCancellables = Set<AnyCancellable>()
     var didOpenFiles = false
     private var isTerminating = false
+    /// hide: 漏掉的箔窗，在 didHide 里补 orderOut，unhide 时再还原。
+    private var windowsLeftVisibleAfterHide: [NSWindow] = []
     weak var lastActiveWindowController: FloatingWindowController?
 
     // 获取当前活跃（Key）窗口对应的 AppState
@@ -141,6 +143,31 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         // 最后一个窗口关闭后，不要退出应用，保持无窗口活动状态
         return false
+    }
+
+    /// hide: 不会收起 canHide ivar 为 false 的子窗口；音频箔的 hover 监听还可能在隐藏后把箔再 orderFront 回来。
+    public func applicationWillHide(_ notification: Notification) {
+        for controller in windowControllers {
+            controller.prepareForApplicationHide()
+        }
+    }
+
+    public func applicationDidHide(_ notification: Notification) {
+        windowsLeftVisibleAfterHide = NSApp.windows.filter(\.isVisible)
+        for window in windowsLeftVisibleAfterHide {
+            window.orderOut(nil)
+        }
+    }
+
+    public func applicationDidUnhide(_ notification: Notification) {
+        let extra = windowsLeftVisibleAfterHide
+        windowsLeftVisibleAfterHide.removeAll()
+        for window in extra where !window.isVisible {
+            window.orderFront(nil)
+        }
+        for controller in windowControllers {
+            controller.restoreAfterApplicationUnhide()
+        }
     }
 
     public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {

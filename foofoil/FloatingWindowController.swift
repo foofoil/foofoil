@@ -201,7 +201,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     private var isTransitioningFullScreen = false
     private var windowedFrameDescriptorBeforeFullScreen: String?
     /// 置顶切换光晕的临时面板；仅在做提示动画时存在。
-    private var pinGlowPanel: NSPanel?
+    private var pinGlowPanel: NSWindow?
     /// 是否已收到过 isPinned 的首次发射，用于跳过订阅初始值。
     private var hasReceivedPinStateUpdate = false
     private static let pinGlowColor = NSColor.systemRed
@@ -279,6 +279,24 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    public override func close() {
+        navigatorPanelController.detachAndClose()
+        super.close()
+    }
+
+    /// ⌘H 前停掉 hover 监听并拆掉目录伴随窗口，避免隐藏后再被 orderFront 拉回来。
+    func prepareForApplicationHide() {
+        pendingNavigatorPanelHide?.cancel()
+        pendingNavigatorPanelHide = nil
+        removePinGlowPanel()
+        removeNavigatorHoverMonitors()
+        navigatorPanelController.detachForApplicationHide()
+    }
+
+    func restoreAfterApplicationUnhide() {
+        updateNavigatorPanelVisibility()
     }
 
     private func setupBindings() {
@@ -638,9 +656,9 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
         let padding = PinGlowView.panelPadding
         let panelFrame = window.frame.insetBy(dx: -padding, dy: -padding)
-        let panel = NSPanel(
+        let panel = NSWindow(
             contentRect: panelFrame,
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
@@ -650,6 +668,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         // 光晕纯为视觉提示：不拦截鼠标、不抢焦点，层级跟随箔窗。
         panel.ignoresMouseEvents = true
         panel.isReleasedWhenClosed = false
+        panel.canHide = true
         panel.level = window.level
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
@@ -669,7 +688,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         panel.contentView = container
 
         window.addChildWindow(panel, ordered: .below)
-        panel.orderFrontRegardless()
+        panel.orderFront(nil)
         pinGlowPanel = panel
 
         glowView.startFlash(duration: Self.pinGlowFlashDuration) { [weak self] in
@@ -804,7 +823,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func updateNavigatorPanelVisibility() {
-        guard let window else { return }
+        guard let window, !NSApp.isHidden else { return }
         if appState.isFullScreen || isTransitioningFullScreen {
             pendingNavigatorPanelHide?.cancel()
             pendingNavigatorPanelHide = nil
@@ -841,6 +860,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func refreshNavigatorHoverFromPointer(windowPoint: NSPoint? = nil, screenPoint: NSPoint? = nil) {
+        guard !NSApp.isHidden else { return }
         refreshWindowHoverFromPointer(windowPoint: windowPoint, screenPoint: screenPoint)
         guard let window, !appState.navigatorContributions.isEmpty else {
             if appState.isNavigatorEdgeHovered || appState.isNavigatorPanelHovered {
@@ -996,6 +1016,10 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func updateNavigatorHoverMonitors() {
+        if NSApp.isHidden {
+            removeNavigatorHoverMonitors()
+            return
+        }
         // 音频播放时目录面板的进出不经过箔窗事件，需要全局监听维持控制条 hover 推导。
         let needsNavigatorHoverMonitor = !appState.navigatorContributions.isEmpty
             && appState.navigatorPanelVisibilityMode == .onHover
