@@ -2,6 +2,20 @@ import Foundation
 import FoofoilExtensionKit
 
 extension HiFiLegacyAdapter {
+    static func restorePlayback(
+        saved: ContentSession, fresh: ContentSession, provider: any ContentProvider
+    ) async throws -> ContentSession {
+        try await restorePlayback(saved: saved, fresh: fresh) { trackID, session in
+            try await provider.performValidated(
+                navigatorAction: NavigatorAction(
+                    contributionID: playbackQueueID, kind: .activate, itemIDs: [trackID]
+                ), session: session
+            )
+        } seek: { session in
+            try await provider.performValidated(commandID: Command.seek.rawValue, session: session)
+        }
+    }
+
     /// 新会话先选容器曲目再定位；只发送不取得设备的命令，不恢复旧的播放意图。
     static func restorePlayback(
         saved: ContentSession,

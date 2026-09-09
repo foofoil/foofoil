@@ -1823,11 +1823,8 @@ private final class DelayedCloseTestProvider: ContentProvider {
         )
     }
 
-    func perform(commandID: String, session: ContentSession) async throws -> ContentSession {
-        if commandID == "hifi.close" {
-            try await Task.sleep(for: .milliseconds(20))
-            didClose = true
-        }
-        return session
+    func closeSession(_ session: ContentSession) async throws {
+        try await Task.sleep(for: .milliseconds(20))
+        didClose = true
     }
 }

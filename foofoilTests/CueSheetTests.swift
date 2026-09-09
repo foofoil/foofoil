@@ -419,7 +419,7 @@ struct CueSheetTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["FOOFOIL_TEST_DAC_UID"] != nil))
     func exclusivePlaybackSurvivesTrackChangesAndPause() async throws {
         let uid = try #require(ProcessInfo.processInfo.environment["FOOFOIL_TEST_DAC_UID"])
-        try #require(ExtensionHost.shared.isHiFiDeviceServiceAvailable)
+        try #require(ExtensionHost.shared.isAudioDeviceServiceAvailable)
         var urls: [URL] = []
         defer { for url in urls { try? FileManager.default.removeItem(at: url) } }
         for rate in [44100, 44100, 96000, 192000] {

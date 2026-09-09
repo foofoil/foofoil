@@ -771,19 +771,8 @@ extension AppState {
                     let outcome = try await ExtensionHost.shared.open(request: savedSession.request)
                     var restoredSession = outcome.session
                     do {
-                        restoredSession = try await HiFiLegacyAdapter.restorePlayback(
-                            saved: savedSession,
-                            fresh: outcome.session,
-                            activate: { trackID, session in
-                                try await ExtensionHost.shared.perform(
-                                    navigatorAction: NavigatorAction(
-                                        contributionID: HiFiLegacyAdapter.playbackQueueID, kind: .activate, itemIDs: [trackID]
-                                    ), in: session
-                                )
-                            },
-                            seek: { session in
-                                try await ExtensionHost.shared.perform(commandID: HiFiLegacyAdapter.Command.seek.rawValue, in: session)
-                            }
+                        restoredSession = try await ExtensionHost.shared.restorePlayback(
+                            from: savedSession, in: outcome.session
                         )
                     } catch {
                         await ExtensionHost.shared.closeSessionAndWait(outcome.session)

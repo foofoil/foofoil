@@ -177,7 +177,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         engineStorage?.stop()
         let clientID = activeLeaseClientID ?? deviceServiceClientID
         Task {
-            _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(
+            _ = try? await ExtensionHost.shared.performAudioDeviceCommand(.init(
                 command: .releasePCM,
                 clientID: clientID
             ))
@@ -192,7 +192,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             isPlaying, selectedOutputDeviceID ?? "-",
             activeLeaseClientID?.uuidString ?? "-", sampleRate
         )
-        if ExtensionHost.shared.isHiFiDeviceServiceAvailable {
+        if ExtensionHost.shared.isAudioDeviceServiceAvailable {
             routeGeneration &+= 1
             let generation = routeGeneration
             Task { await preparePreferredRouteAndPlay(generation: generation) }
@@ -258,7 +258,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     func enqueuePCMRelease(
         clientID: UUID,
         release: @escaping @MainActor (UUID) async -> Void = { clientID in
-            _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(
+            _ = try? await ExtensionHost.shared.performAudioDeviceCommand(.init(
                 command: .releasePCM, clientID: clientID
             ))
         }
@@ -441,12 +441,12 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     }
 
     private func refreshDeviceService() async {
-        guard ExtensionHost.shared.isHiFiDeviceServiceAvailable else {
+        guard ExtensionHost.shared.isAudioDeviceServiceAvailable else {
             deviceServiceSnapshot = nil
             return
         }
         do {
-            var snapshot = try await ExtensionHost.shared.performHiFiDeviceCommand(.init(
+            var snapshot = try await ExtensionHost.shared.performAudioDeviceCommand(.init(
                 command: .snapshot,
                 clientID: activeLeaseClientID ?? deviceServiceClientID
             ))
@@ -504,7 +504,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     }
 
     private func handleSystemDevicesChanged() async {
-        guard ExtensionHost.shared.isHiFiDeviceServiceAvailable else { return }
+        guard ExtensionHost.shared.isAudioDeviceServiceAvailable else { return }
         let previousMode = deviceServiceSnapshot?.pcmRouteMode
         let previousPrepared = preparedDeviceID
         let previousSelected = deviceServiceSnapshot?.selectedPCMDeviceID
@@ -601,7 +601,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         preparedDeviceID = nil
         preparedSourceSampleRate = nil
         if let clientID {
-            _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(command: .releasePCM, clientID: clientID))
+            _ = try? await ExtensionHost.shared.performAudioDeviceCommand(.init(command: .releasePCM, clientID: clientID))
         }
         MediaRemoteCommandCoordinator.shared.update(self)
     }
@@ -621,7 +621,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             discardOutputEngine()
             ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
             if let old = activeLeaseClientID {
-                _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(command: .releasePCM, clientID: old))
+                _ = try? await ExtensionHost.shared.performAudioDeviceCommand(.init(command: .releasePCM, clientID: old))
                 activeLeaseClientID = nil
             }
         }
@@ -632,7 +632,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         await deviceCommandTail?.value
         guard generation == routeGeneration else { return }
         do {
-            let snapshot = try await ExtensionHost.shared.performHiFiDeviceCommand(.init(
+            let snapshot = try await ExtensionHost.shared.performAudioDeviceCommand(.init(
                 command: .prepareExclusivePCM,
                 clientID: leaseClientID,
                 selectedDeviceID: deviceID,
@@ -640,7 +640,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 channelCount: sourceChannelCount
             ))
             guard generation == routeGeneration else {
-                _ = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(
+                _ = try? await ExtensionHost.shared.performAudioDeviceCommand(.init(
                     command: .releasePCM,
                     clientID: leaseClientID
                 ))
@@ -676,7 +676,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                     throw engineStartError ?? NSError(domain: NSOSStatusErrorDomain, code: Int(kAudio_ParamError))
                 }
             }
-            if let refreshed = try? await ExtensionHost.shared.performHiFiDeviceCommand(.init(
+            if let refreshed = try? await ExtensionHost.shared.performAudioDeviceCommand(.init(
                 command: .snapshot,
                 clientID: leaseClientID
             )) {
@@ -712,7 +712,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         stopExclusiveDeviceObservation()
         stopEngineForRouteChange()
         do {
-            let snapshot = try await ExtensionHost.shared.performHiFiDeviceCommand(.init(
+            let snapshot = try await ExtensionHost.shared.performAudioDeviceCommand(.init(
                 command: .selectSystemDefault,
                 clientID: activeLeaseClientID ?? deviceServiceClientID
             ))

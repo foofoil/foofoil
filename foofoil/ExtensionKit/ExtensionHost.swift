@@ -9,7 +9,6 @@ import UniformTypeIdentifiers
 
 final class ExtensionHost: ExtensionRuntimeHost {
     static let shared = ExtensionHost()
-    static let hiFiExtensionID = HiFiLegacyAdapter.extensionID
 
     let resolver: ProviderResolver
     let stateStore: ExtensionStateStore
@@ -48,27 +47,19 @@ final class ExtensionHost: ExtensionRuntimeHost {
         preferredProvidersByDomain[domain]
     }
 
-    var isHiFiDeviceServiceAvailable: Bool {
-        inProcessRuntimes[Self.hiFiExtensionID] != nil
+    private var audioDeviceService: (any ExtensionAudioDeviceServicing)? {
+        HiFiLegacyAdapter.audioDeviceService(in: inProcessRuntimes)
     }
 
-    func performHiFiDeviceCommand(
+    var isAudioDeviceServiceAvailable: Bool { audioDeviceService != nil }
+
+    func performAudioDeviceCommand(
         _ request: AudioDeviceServiceRequest
     ) async throws -> AudioDeviceServiceSnapshot {
-        guard let runtime = inProcessRuntimes[Self.hiFiExtensionID] else {
-            throw ContentProviderError.unavailable(Self.hiFiExtensionID)
+        guard let service = audioDeviceService else {
+            throw ContentProviderError.unsupportedRequest
         }
-        return try await Task.detached(priority: .userInitiated) {
-            try runtime.performApplicationCommand(request)
-        }.value
-    }
-
-    func releaseHiFiPCMOutputAndWait() async {
-        guard isHiFiDeviceServiceAvailable else { return }
-        _ = try? await performHiFiDeviceCommand(.init(
-            command: .releaseAllPCM,
-            clientID: UUID()
-        ))
+        return try await service.perform(request)
     }
 
     func shutdownAndWait() async {
@@ -141,39 +132,41 @@ final class ExtensionHost: ExtensionRuntimeHost {
         guard let provider = resolver.provider(id: session.providerID) else {
             throw ContentProviderError.unavailable(session.providerID)
         }
-        let updated = try await provider.perform(commandID: commandID, session: session)
-        try NavigatorContributionValidator.validate(updated)
-        try CommandContributionValidator.validate(updated)
-        try MediaSessionContractValidator.validate(updated)
-        return updated
+        return try await provider.performValidated(commandID: commandID, session: session)
     }
 
-    /// 通知扩展释放会话持有的文件访问与独占音频设备；普通扩展可忽略此命令。
+    /// 通知 Provider 释放会话资源；具体实现决定是否需要向扩展发送关闭消息。
     func closeSession(_ session: ContentSession) {
         Task { @MainActor in
             await closeSessionAndWait(session)
         }
     }
 
-    /// 需要紧接着接管同一硬件资源时使用。返回前扩展已完成 stop、格式恢复与 hog mode 释放。
+    /// 需要紧接着接管同一硬件资源时使用。等待 Provider 关闭完成；失败记录日志。
     func closeSessionAndWait(_ session: ContentSession) async {
         guard let provider = resolver.provider(id: session.providerID) else { return }
-        _ = try? await provider.perform(commandID: HiFiLegacyAdapter.Command.close.rawValue, session: session)
+        do {
+            try await provider.closeSession(session)
+        } catch {
+            NSLog("Extension session close failed: \(error.localizedDescription)")
+        }
     }
 
     func perform(navigatorAction: NavigatorAction, in session: ContentSession) async throws -> ContentSession {
-        guard let contribution = session.navigatorContributions.first(where: { $0.id == navigatorAction.contributionID }) else {
-            throw NavigatorContributionError.invalidAction(navigatorAction.contributionID)
-        }
-        try NavigatorContributionValidator.validate(navigatorAction, in: contribution)
         guard let provider = resolver.provider(id: session.providerID) else {
             throw ContentProviderError.unavailable(session.providerID)
         }
-        let updated = try await provider.perform(navigatorAction: navigatorAction, session: session)
-        try NavigatorContributionValidator.validate(updated)
-        try CommandContributionValidator.validate(updated)
-        try MediaSessionContractValidator.validate(updated)
-        return updated
+        return try await provider.performValidated(navigatorAction: navigatorAction, session: session)
+    }
+
+    /// 宿主只路由恢复请求；各 Provider 解释自己的状态，切换 Provider 时不重放旧状态。
+    func restorePlayback(from saved: ContentSession, in fresh: ContentSession) async throws -> ContentSession {
+        guard saved.providerID == fresh.providerID else { return fresh }
+        guard let provider = resolver.provider(id: fresh.providerID) else {
+            throw ContentProviderError.unavailable(fresh.providerID)
+        }
+        let restored = try await provider.restorePlayback(from: saved, in: fresh)
+        return try type(of: provider).validateSession(restored)
     }
 
     func setTestAudioEnhancerFailure(_ shouldFail: Bool) {

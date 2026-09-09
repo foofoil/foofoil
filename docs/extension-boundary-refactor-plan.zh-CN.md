@@ -71,7 +71,7 @@
 
 - [ ] 在宿主建立临时 `ExtensionSupport/Compatibility/HiFiLegacyAdapter.swift`，集中旧命令映射、旧 provider 判断和旧历史转换。按实际职责拆分必要文件，避免再形成巨型控制器。
 - [ ] 从 AppState、导航视图和音频视图移出上述专用判断；宿主层仍掌握窗口、权限和用户意图。
-- [ ] 为通用关闭、导航和可选设备服务建立窄的宿主内部入口，先委托兼容适配执行。
+- [x] 为通用关闭、导航和可选设备服务建立窄的宿主内部入口，先委托兼容适配执行。
 - [x] 临时隔离 Provider 内的 SACD 探测；不因为移动目录就认定格式识别已经下沉。
 
 验收：播放及恢复行为保持一致；旧命令不再散落于通用 UI/AppState。此阶段允许适配层仍有专用知识，但必须标注阶段 3–5 的替代路径。
@@ -213,3 +213,26 @@ xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platfor
 - 无新增源码编译警告；日志中的 Selector/未使用变量警告及 AppIntents 元数据提示在基线中已存在。
 - `./run` 成功构建、注入并签名 Hi-Fi 开发插件后启动应用；本批未执行真实 DAC 听音、设备切换或 UI 手动回归，不将启动成功视为硬件验证。
 - 本地日志：`/tmp/foofoil-extension-baseline.log`、`/tmp/foofoil-extension-refactor-tests.log`、`/tmp/foofoil-extension-refactor-run.log`，均未纳入仓库。
+
+## 9. 实施记录：2026-09-09，关闭、恢复与设备服务入口
+
+基于 foofoil `c494c12` 继续实施。本批仍只修改宿主内部接口，未修改 extension-kit、hifi、公开 ABI、JSON 格式或历史存储。
+
+本批变更：
+
+- `ContentProvider` 增加 `closeSession` 和 `restorePlayback`。默认关闭为空操作，默认恢复保留新会话；通用 Host 不再向所有 Provider 发送 `hifi.close`。进程内 Hi-Fi Provider 委托兼容层发送原关闭消息并等待完成，其他 Provider 不会误收 Hi-Fi 私有关闭命令。Host 继续等待异步关闭，对失败记录日志；本批未将其改为向上抛错的 API。
+- `ExtensionHost.restorePlayback` 按新会话 Provider 路由恢复，Provider 改变时跳过旧状态；AppState 保留授权、生命周期、过期结果保护、失败关闭和存储职责，不再拼装恢复曲目与定位命令。
+- 将命令及导航的校验入口收拢到 `ContentProvider` 的宿主扩展中。Hi-Fi 恢复的每个中间快照仍执行原有校验，恢复结果也由 Host 校验，避免抽取调用链时丢失校验。
+- 新增 `ExtensionAudioDeviceServicing` 内部接口和 `HiFiLegacyAudioDeviceService` 适配。普通 PCM 控制器改为调用 `isAudioDeviceServiceAvailable` / `performAudioDeviceCommand`。固定 Hi-Fi Runtime 的选择和离开主线程的调用保留在兼容层，请求、返回快照及 Runtime 错误原样传递。
+- 删除无调用者的 `releaseHiFiPCMOutputAndWait`；实际退出仍走既有 Runtime shutdown。设备服务缺失时通用入口返回已有的 `unsupportedRequest` 错误，不再暴露固定 Hi-Fi ID；普通 PCM 的可用性检查和系统输出路径保留。
+
+本批新增回归覆盖：默认 Provider 无私有关闭命令、非 Hi-Fi Provider 的自定义恢复、切换 Provider 跳过恢复、无效恢复结果拒绝、旧 Hi-Fi 关闭完成等待、激活结果无效时不继续 seek，以及设备服务的参数、线程和错误传递。原有延迟关闭测试改为实现 Provider 的关闭入口，继续验证宿主的等待顺序。
+
+阶段边界：这是宿主内部适配收拢，不代表已经实现公共关闭/恢复消息或按能力发现多个设备服务。下一步进入阶段 2 的最小契约设计与 fixture，随后让 hifi 接收通用消息；独占交接、部分 AppState/导航兼容判断、容器展开仍待迁移。
+
+本批验证：
+
+- `xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platform=macOS' -only-testing:foofoilTests` 通过；xcresult 汇总 202 项通过、1 项硬件测试跳过、0 项失败，展开参数化测试后为 215 次通过。
+- `./run` 成功构建、注入并签名 Hi-Fi 开发插件，应用进程已启动。未进行真实 DAC 播放、切换设备或听音回归。
+- `git diff --check` 通过；未引入新的编译警告。未修改 hifi 或 extension-kit，因此未重复运行两者的独立测试。
+- 本地日志：`/tmp/foofoil-extension-lifecycle-tests.log`、`/tmp/foofoil-extension-lifecycle-run.log`，未纳入仓库。

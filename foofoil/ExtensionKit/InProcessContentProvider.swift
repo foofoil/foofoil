@@ -55,6 +55,14 @@ final class InProcessContentProvider: ContentProvider {
         }.value
     }
 
+    func restorePlayback(from saved: ContentSession, in fresh: ContentSession) async throws -> ContentSession {
+        try await HiFiLegacyAdapter.restorePlayback(saved: saved, fresh: fresh, provider: self)
+    }
+
+    func closeSession(_ session: ContentSession) async throws {
+        try await HiFiLegacyAdapter.closeSession(session, provider: self)
+    }
+
     func perform(navigatorAction: NavigatorAction, session: ContentSession) async throws -> ContentSession {
         guard let request = HiFiLegacyAdapter.navigatorRequest(action: navigatorAction, session: session) else {
             return session
