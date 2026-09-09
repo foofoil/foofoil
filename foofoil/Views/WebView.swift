@@ -478,7 +478,7 @@ struct WebContainerView: View {
             }
 
         }
-        .onChange(of: url) { newValue in
+        .onChange(of: url) {
             // 当 URL 切换时，立刻重置所有加载状态，实现瞬间遮挡并清除旧网页痕迹
             isLoading = true
             progress = 0.0

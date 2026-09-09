@@ -71,13 +71,13 @@ struct HistoryCardView: View {
             .onAppear {
                 loadImageAsync()
             }
-            .onChange(of: config.imagePath) { _ in
+            .onChange(of: config.imagePath) {
                 loadImageAsync()
             }
-            .onChange(of: config.thumbnailPath) { _ in
+            .onChange(of: config.thumbnailPath) {
                 loadImageAsync()
             }
-            .onChange(of: config.fileList?.items.count) { _ in
+            .onChange(of: config.fileList?.items.count) {
                 loadImageAsync()
             }
     }

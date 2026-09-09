@@ -9,7 +9,7 @@ import AppKit
 import SwiftUI
 
 extension NSColor {
-    convenience init?(hex: String) {
+    nonisolated convenience init?(hex: String) {
         var hexSanitized = hex.trimmingCharacters(in: .whitespacesAndNewlines)
         hexSanitized = hexSanitized.replacingOccurrences(of: "#", with: "")
 

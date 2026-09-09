@@ -437,7 +437,7 @@ nonisolated enum CueSheetLoader {
 }
 
 /// 将同目录音频声明为用户所选 CUE 的关联项，以便沙盒允许读取。
-final class CueRelatedFilePresenter: NSObject, NSFilePresenter {
+nonisolated final class CueRelatedFilePresenter: NSObject, NSFilePresenter {
     let primaryPresentedItemURL: URL?
     let presentedItemURL: URL?
     let presentedItemOperationQueue: OperationQueue

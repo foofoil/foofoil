@@ -531,19 +531,19 @@ extension AppState {
 
         // MARK: - Markdown 表格支持（GFM）
 
-        enum MarkdownTableAlignment {
+        nonisolated enum MarkdownTableAlignment {
             case none
             case left
             case center
             case right
         }
 
-        enum MarkdownSegment {
+        nonisolated enum MarkdownSegment {
             case text(String)
             case table(String)
         }
 
-        public static func cmarkToHTML(_ text: String) -> String {
+        nonisolated public static func cmarkToHTML(_ text: String) -> String {
             // 若不含表格特征，直接走 cmark 原路径以保持原有性能与行为
             let segments = parseMarkdownSegmentsWithTables(text)
             // 仅有一段普通文本时，保持单次 cmark 调用
@@ -563,7 +563,7 @@ extension AppState {
         }
 
         /// 纯 cmark 调用（不含表格预处理），用于文本段与单元格 inline 渲染
-        static func cmarkHTML(_ markdown: String) -> String {
+        nonisolated static func cmarkHTML(_ markdown: String) -> String {
             // 空段直接返回，避免产生空 <p>
             if markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "" }
             guard let cString = cmark_markdown_to_html(markdown, markdown.utf8.count, 0) else {
@@ -575,7 +575,7 @@ extension AppState {
         }
 
         /// 将单元格内的 inline Markdown 转为 HTML 片段（去除外层 <p> 包裹）
-        static func inlineMarkdownToHTML(_ text: String) -> String {
+        nonisolated static func inlineMarkdownToHTML(_ text: String) -> String {
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.isEmpty { return "" }
             let html = cmarkHTML(trimmed).trimmingCharacters(in: .whitespacesAndNewlines)
@@ -607,7 +607,7 @@ extension AppState {
         }
 
         // 解析 Markdown 文本，将 GFM 表格块抽出为独立段，其余文本保持为普通段
-        static func parseMarkdownSegmentsWithTables(_ text: String) -> [MarkdownSegment] {
+        nonisolated static func parseMarkdownSegmentsWithTables(_ text: String) -> [MarkdownSegment] {
             // 快速路径：不含表格关键字符时无需扫描
             guard text.contains("|") else { return [.text(text)] }
 
@@ -697,13 +697,13 @@ extension AppState {
             return segments
         }
 
-        static func isPotentialTableRow(_ line: String) -> Bool {
+        nonisolated static func isPotentialTableRow(_ line: String) -> Bool {
             // 包含 | 且非空即视为潜在表格行
             if line.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return false }
             return line.contains("|")
         }
 
-        static func splitTableRow(_ line: String) -> [String] {
+        nonisolated static func splitTableRow(_ line: String) -> [String] {
             var trimmed = line.trimmingCharacters(in: .whitespaces)
             // 移除首尾的管道符（GFM 允许省略）
             if trimmed.hasPrefix("|") { trimmed.removeFirst() }
@@ -717,7 +717,7 @@ extension AppState {
             }
         }
 
-        static func parseTableDelimiterLine(_ line: String) -> [MarkdownTableAlignment]? {
+        nonisolated static func parseTableDelimiterLine(_ line: String) -> [MarkdownTableAlignment]? {
             var trimmed = line.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty { return nil }
             if trimmed.hasPrefix("|") { trimmed.removeFirst() }
@@ -756,7 +756,7 @@ extension AppState {
             return alignments
         }
 
-        static func buildTableHTML(headerCells: [String], alignments: [MarkdownTableAlignment], bodyRows: [[String]], columnCount: Int) -> String {
+        nonisolated static func buildTableHTML(headerCells: [String], alignments: [MarkdownTableAlignment], bodyRows: [[String]], columnCount: Int) -> String {
             func alignAttribute(_ align: MarkdownTableAlignment) -> String {
                 switch align {
                 case .left: return " align=\"left\""

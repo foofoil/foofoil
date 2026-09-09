@@ -113,7 +113,7 @@ extension AppState {
 
         /// 解析视频安全范围书签并校验文件仍存在；返回解析后的 URL（文件移动后可解析到新路径）。
         /// 仅在内部临时持有访问授权完成存在性检查，不会长期占用授权。
-        public static func resolveVideoBookmark(_ bookmark: Data) -> URL? {
+        nonisolated public static func resolveVideoBookmark(_ bookmark: Data) -> URL? {
             var isStale = false
             guard let url = try? URL(
                 resolvingBookmarkData: bookmark,
