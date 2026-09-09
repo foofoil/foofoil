@@ -37,7 +37,7 @@ final class InProcessContentProvider: ContentProvider {
         ProviderContentMatcher.match(
             request,
             declarations: declaration.contentTypes,
-            sniff: sniffSACDISOMagic
+            sniff: HiFiLegacyAdapter.sniffSACDISOMagic
         )
     }
 
@@ -56,72 +56,14 @@ final class InProcessContentProvider: ContentProvider {
     }
 
     func perform(navigatorAction: NavigatorAction, session: ContentSession) async throws -> ContentSession {
-        guard let index = session.navigatorContributions.firstIndex(where: {
-            $0.id == navigatorAction.contributionID
-        }) else {
+        guard let request = HiFiLegacyAdapter.navigatorRequest(action: navigatorAction, session: session) else {
             return session
         }
-        var requested = session
-        let commandID: String
-        switch navigatorAction.kind {
-        case .activate:
-            guard let selectedID = navigatorAction.itemIDs.first else { return session }
-            requested.navigatorContributions[index].selectedItemIDs = [selectedID]
-            commandID = "hifi.navigator.activate"
-        case .move:
-            requested.navigatorContributions[index].items = Self.movingItems(
-                requested.navigatorContributions[index].items,
-                action: navigatorAction
-            )
-            commandID = "hifi.navigator.move"
-        case .remove:
-            return session
-        }
+        let commandID = request.commandID
+        let requested = request.session
         let runtime = runtime
         return try await Task.detached(priority: .userInitiated) {
             try runtime.perform(commandID: commandID, session: requested)
         }.value
-    }
-
-    private static func movingItems(
-        _ items: [NavigatorItem],
-        action: NavigatorAction
-    ) -> [NavigatorItem] {
-        guard let position = action.movePosition else { return items }
-        let movingIDs = Set(action.itemIDs)
-        let moving = items.filter { movingIDs.contains($0.id) }
-        guard moving.count == movingIDs.count else { return items }
-        var remaining = items.filter { !movingIDs.contains($0.id) }
-        let insertionIndex: Int
-        switch position {
-        case .end:
-            insertionIndex = remaining.endIndex
-        case .before, .after:
-            guard let destinationID = action.destinationItemID,
-                  let destinationIndex = remaining.firstIndex(where: { $0.id == destinationID }) else {
-                return items
-            }
-            insertionIndex = position == .before
-                ? destinationIndex
-                : remaining.index(after: destinationIndex)
-        }
-        remaining.insert(contentsOf: moving, at: insertionIndex)
-        return remaining
-    }
-}
-
-/// 只认 Scarlet Book 主 TOC 魔数，避免把普通磁盘 ISO 收进 Hi-Fi。
-nonisolated private func sniffSACDISOMagic(_ url: URL) -> Bool {
-    guard url.pathExtension.lowercased() == "iso" else { return false }
-    guard let handle = try? FileHandle(forReadingFrom: url) else { return false }
-    defer { try? handle.close() }
-    let offset = UInt64(510) * 2048
-    guard let size = try? handle.seekToEnd(), size >= offset + 8 else { return false }
-    do {
-        try handle.seek(toOffset: offset)
-        guard let data = try handle.read(upToCount: 8), data.count == 8 else { return false }
-        return data == Data("SACDMTOC".utf8)
-    } catch {
-        return false
     }
 }

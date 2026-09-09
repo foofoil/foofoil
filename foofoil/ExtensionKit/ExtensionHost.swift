@@ -9,7 +9,7 @@ import UniformTypeIdentifiers
 
 final class ExtensionHost: ExtensionRuntimeHost {
     static let shared = ExtensionHost()
-    static let hiFiExtensionID = "app.foofoil.extension.hifi"
+    static let hiFiExtensionID = HiFiLegacyAdapter.extensionID
 
     let resolver: ProviderResolver
     let stateStore: ExtensionStateStore
@@ -158,7 +158,7 @@ final class ExtensionHost: ExtensionRuntimeHost {
     /// 需要紧接着接管同一硬件资源时使用。返回前扩展已完成 stop、格式恢复与 hog mode 释放。
     func closeSessionAndWait(_ session: ContentSession) async {
         guard let provider = resolver.provider(id: session.providerID) else { return }
-        _ = try? await provider.perform(commandID: "hifi.close", session: session)
+        _ = try? await provider.perform(commandID: HiFiLegacyAdapter.Command.close.rawValue, session: session)
     }
 
     func perform(navigatorAction: NavigatorAction, in session: ContentSession) async throws -> ContentSession {

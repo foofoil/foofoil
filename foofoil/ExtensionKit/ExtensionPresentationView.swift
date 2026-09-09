@@ -13,7 +13,7 @@ struct ExtensionPresentationView: View {
     var body: some View {
         Group {
             if let session = appState.extensionSession {
-                if session.providerID == "audio.hifi", session.mediaPlayback != nil {
+                if HiFiLegacyAdapter.supports(session), session.mediaPlayback != nil {
                     ExtensionAudioModeView(
                         appState: appState,
                         session: session,
@@ -80,14 +80,14 @@ struct ExtensionPresentationView: View {
         let isPlaying = playback.state == .playing
         HStack(spacing: 12) {
             if hasQueue {
-                Button { appState.performExtensionCommand("hifi.previous") } label: {
+                Button { appState.performExtensionMediaAction(.previous) } label: {
                     Image(systemName: "backward.fill")
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(NSLocalizedString("Previous", comment: ""))
             }
             Button {
-                appState.performExtensionCommand(isPlaying ? "hifi.pause" : "hifi.play")
+                appState.performExtensionMediaAction(isPlaying ? .pause : .play)
             } label: {
                 Image(systemName: isPlaying ? "pause.fill" : "play.fill")
                     .frame(width: 18, height: 18)
@@ -96,7 +96,7 @@ struct ExtensionPresentationView: View {
             .accessibilityLabel(NSLocalizedString(isPlaying ? "Pause" : "Play", comment: ""))
 
             if hasQueue {
-                Button { appState.performExtensionCommand("hifi.next") } label: {
+                Button { appState.performExtensionMediaAction(.next) } label: {
                     Image(systemName: "forward.fill")
                 }
                 .buttonStyle(.plain)

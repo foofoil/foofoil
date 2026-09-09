@@ -16,7 +16,7 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
     let supportsPlaybackModeControl = true
 
     private let appStateID: UUID
-    private let command: @MainActor (String) -> Void
+    private let command: @MainActor (ExtensionMediaAction) -> Void
     private let seekAction: @MainActor (TimeInterval) -> Void
     private let hasPreviousOrNext: @MainActor () -> Bool
     private let navigateHostList: @MainActor (Int) -> Bool
@@ -29,7 +29,7 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
 
     init(appState: AppState, session: ContentSession) {
         appStateID = appState.id
-        command = { appState.performExtensionCommand($0) }
+        command = { appState.performExtensionMediaAction($0) }
         seekAction = { appState.seekExtensionPlayback(to: $0) }
         notePlaybackIntent = { playing in
             if playing {
@@ -45,7 +45,7 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
         navigateHostList = { appState.activateMediaListItem(delta: $0) }
         handlePlaybackCompletion = {
             if appState.shouldLoopCurrentItem {
-                appState.performExtensionCommand("hifi.play")
+                appState.performExtensionMediaAction(.play)
             } else {
                 appState.advanceFileListAfterPlayback()
             }
@@ -133,7 +133,7 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
     private func requestDeviceRefresh() {
         // 运行时侧会在每次命令前刷新设备列表并在独占设备离线时自动暂停回退；
         // 这里无论是否正在播放都要触发一次 status，确保菜单立刻刷新且播放状态不卡死。
-        command("hifi.status")
+        command(.refresh)
     }
 
     var volumeIconName: String { "speaker.wave.3.fill" }
@@ -171,13 +171,13 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
 
     /// 视图卸载或自然播完时停输出，不改写用户的播放/暂停意图。
     func stopOutput() {
-        command("hifi.pause")
+        command(.pause)
         isPlaying = false
         MediaRemoteCommandCoordinator.shared.update(self)
     }
 
     private func startPlayback() {
-        command("hifi.play")
+        command(.play)
         isPlaying = true
         activateRemoteCommands()
     }
@@ -202,14 +202,14 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
     func playPreviousItem() -> Bool {
         guard hasPreviousOrNext() else { return false }
         if navigateHostList(-1) { return true }
-        command("hifi.previous")
+        command(.previous)
         return true
     }
 
     func playNextItem() -> Bool {
         guard hasPreviousOrNext() else { return false }
         if navigateHostList(1) { return true }
-        command("hifi.next")
+        command(.next)
         return true
     }
 
@@ -234,7 +234,7 @@ struct ExtensionAudioModeView: View {
         self.appState = appState
         self.shouldHideBorder = shouldHideBorder
         _controller = StateObject(wrappedValue: ExtensionAudioPlaybackController(appState: appState, session: session))
-        let url = Self.currentURL(in: session)
+        let url = HiFiLegacyAdapter.currentURL(in: session)
         var fallback = AudioTrackInfo.fallback(fileName: url?.lastPathComponent ?? "")
         fallback.artwork = appState.customCoverImage
         _info = State(initialValue: AudioModeView.overlay(
@@ -267,7 +267,7 @@ struct ExtensionAudioModeView: View {
             appState.isMediaPlaying = false
         }
         .onReceive(appState.$extensionSession.compactMap { $0 }) { session in
-            guard session.providerID == "audio.hifi" else { return }
+            guard HiFiLegacyAdapter.supports(session) else { return }
             controller.apply(session: session)
         }
         .onReceive(controller.$isPlaying) { appState.isMediaPlaying = $0 }
@@ -291,7 +291,7 @@ struct ExtensionAudioModeView: View {
             while controller.isPlaying, !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
                 guard !Task.isCancelled else { return }
-                appState.performExtensionCommand("hifi.status")
+                appState.performExtensionMediaAction(.refresh)
             }
         }
     }
@@ -313,7 +313,7 @@ struct ExtensionAudioModeView: View {
                                 selected: selection.selectedDeviceID == device.id,
                                 enabled: device.isConnected && isDSDDeviceEnabled(device.id, in: session)
                             ) {
-                                appState.performExtensionCommand("hifi.device.\(device.id)")
+                                appState.performExtensionMediaAction(.selectDevice(device.id))
                             }
                         }
                     )
@@ -338,7 +338,7 @@ struct ExtensionAudioModeView: View {
     }
 
     private func isDSDDeviceEnabled(_ deviceID: String, in session: ContentSession) -> Bool {
-        session.commands.first(where: { $0.id == "hifi.device.\(deviceID)" })?.isEnabled == true
+        HiFiLegacyAdapter.isDeviceEnabled(deviceID, in: session)
     }
 
     private var presentationID: String {
@@ -349,7 +349,7 @@ struct ExtensionAudioModeView: View {
 
     private func loadTrackInfo() async -> AudioTrackInfo {
         guard let session = appState.extensionSession,
-              let url = Self.currentURL(in: session) else {
+              let url = HiFiLegacyAdapter.currentURL(in: session) else {
             return AudioTrackInfo.fallback(fileName: "")
         }
         var loaded = await AudioMetadataLoader.load(from: url)
@@ -363,21 +363,5 @@ struct ExtensionAudioModeView: View {
         loaded = appState.overlayCustomCover(loaded)
         appState.persistDisplayedArtworkForHistory(loaded.artwork)
         return AudioModeView.overlay(loaded, with: appState.fileList?.currentItem?.cue)
-    }
-
-    private static func currentURL(in session: ContentSession) -> URL? {
-        let resources = session.request.resources
-        guard let queue = session.playbackQueue,
-              let currentID = queue.currentItemID else {
-            return session.request.primaryFileURL
-        }
-        let sourceIndex = currentID.hasPrefix("file:")
-            ? Int(currentID.dropFirst("file:".count))
-            : queue.items.firstIndex(where: { $0.id == currentID })
-        guard let index = sourceIndex,
-              resources.indices.contains(index) else {
-            return session.request.primaryFileURL
-        }
-        return resources[index].url
     }
 }

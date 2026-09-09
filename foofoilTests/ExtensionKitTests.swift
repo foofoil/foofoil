@@ -1192,7 +1192,7 @@ struct ExtensionKitTests {
         saved.mediaPlayback?.state = .playing
         saved.mediaPlayback?.position = 135
         var actions: [String] = []
-        let restored = try await AppState.restoreHiFiPlayback(saved: saved, fresh: fresh) { id, session in
+        let restored = try await HiFiLegacyAdapter.restorePlayback(saved: saved, fresh: fresh) { id, session in
             actions.append("activate")
             var updated = session
             updated.playbackQueue?.currentItemID = id
@@ -1222,7 +1222,7 @@ struct ExtensionKitTests {
         var saved = fresh
         saved.mediaPlayback?.position = position
         var didSeek = false
-        let restored = try await AppState.restoreHiFiPlayback(saved: saved, fresh: fresh) { _, session in
+        let restored = try await HiFiLegacyAdapter.restorePlayback(saved: saved, fresh: fresh) { _, session in
             Issue.record("Unexpected track activation")
             return session
         } seek: { session in

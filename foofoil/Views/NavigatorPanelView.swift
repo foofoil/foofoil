@@ -495,8 +495,8 @@ struct NavigatorPanelView: View {
 
     /// 内置音视频与 Hi-Fi 播放队列的当前项共用“正在播放”波形图标。
     private func showsPlaybackIndicator(for contribution: NavigatorContribution) -> Bool {
-        if contribution.id == "hifi.playback-queue" {
-            return appState.extensionSession?.providerID == "audio.hifi"
+        if contribution.id == HiFiLegacyAdapter.playbackQueueID {
+            return HiFiLegacyAdapter.supports(appState.extensionSession)
                 && appState.extensionSession?.mediaPlayback != nil
         }
         guard contribution.id == AppState.fileListNavigatorID,

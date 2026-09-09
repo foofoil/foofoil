@@ -200,7 +200,7 @@ extension AppState {
                 do {
                     let outcome = try await ExtensionHost.shared.open(url: url)
                     let session = outcome.session
-                    let queue = session.providerID == "audio.hifi" ? session.playbackQueue : nil
+                    let queue = HiFiLegacyAdapter.supports(session) ? session.playbackQueue : nil
                     let bookmark = session.request.resources.first?.securityScopedBookmark
                         ?? Self.makeSecurityScopedBookmark(for: url)
                     await ExtensionHost.shared.closeSessionAndWait(session)
@@ -796,53 +796,6 @@ extension AppState {
         case .other:
             openFile(url: url)
         }
-    }
-
-    /// 同一 SACD ISO 会话内切歌，不重建 Session、不重配 HAL。
-    /// 自然播完后由 Hi-Fi Runtime 在 activate 时继续播放下一曲；此处只切换队列项。
-    @discardableResult
-    func activateExistingHiFiContainerTrack(_ item: FileListItem) -> Bool {
-        guard let session = extensionSession,
-              session.providerID == "audio.hifi",
-              let queue = session.playbackQueue,
-              let containerTrackID = containerTrackID(for: item, in: queue) else {
-            return false
-        }
-        let sessionURL = session.request.primaryFileURL
-        let itemURL = resolvedURL(for: item) ?? item.url
-        if let sessionURL {
-            let same = sessionURL.resolvingSymlinksInPath().standardizedFileURL.path
-                == itemURL.resolvingSymlinksInPath().standardizedFileURL.path
-            guard same else { return false }
-        }
-        if queue.currentItemID != containerTrackID {
-            performNavigatorAction(
-                NavigatorAction(
-                    contributionID: "hifi.playback-queue",
-                    kind: .activate,
-                    itemIDs: [containerTrackID]
-                )
-            )
-        }
-        return true
-    }
-
-    /// 新列表显式保存容器内部 ID；旧版持久化数据则按原 ID 或曲目序号兼容恢复。
-    func containerTrackID(for item: FileListItem, in queue: MediaPlaybackQueueSnapshot) -> String? {
-        if let id = item.cue?.containerTrackID,
-           queue.items.contains(where: { $0.id == id }) {
-            return id
-        }
-        if queue.items.contains(where: { $0.id == item.id }) {
-            return item.id
-        }
-        if let number = item.cue?.trackNumber.flatMap(Int.init) {
-            let index = number - 1
-            if queue.items.indices.contains(index) {
-                return queue.items[index].id
-            }
-        }
-        return nil
     }
 
     func installContainerAudioList(
