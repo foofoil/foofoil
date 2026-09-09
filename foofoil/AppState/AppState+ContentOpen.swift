@@ -573,9 +573,13 @@ extension AppState {
 
         /// 扩展音频不占用 imageURL；为当前曲目持有文件授权，否则视图的元数据/内嵌封面
         /// 读取在重启后因沙盒不可达而失败（播放不受影响，引擎持有已打开的文件句柄）。
-        /// 调用方已在建会话前释放旧授权，此处只接管新会话首个资源的访问，不碰同目录授权。
+        /// 跟随实际播出的队列项切换授权，不碰同目录授权。
         func holdExtensionAudioFileAccess(for session: ContentSession) {
-            guard let resource = session.request.resources.first else { return }
+            let resources = session.request.resources
+            let currentID = session.playbackQueue?.currentItemID ?? ""
+            let index = currentID.hasPrefix("file:") ? Int(currentID.dropFirst(5)) ?? 0 : 0
+            guard resources.indices.contains(index) else { return }
+            let resource = resources[index]
             let url: URL
             if let bookmark = resource.securityScopedBookmark, !bookmark.isEmpty {
                 var stale = false
@@ -730,7 +734,65 @@ extension AppState {
             }
         }
 
-        /// 统一音频列表只归宿主持有；扩展会话仅播放当前项目，不复制列表、排序或循环状态。
+        func hiFiSequenceURLs(startingAt itemID: String) -> [URL] {
+            guard let list = fileList, let index = list.items.firstIndex(where: { $0.id == itemID }),
+                  mediaPlaybackMode == .sequential || mediaPlaybackMode == .sequentialLoop else { return [] }
+            var urls: [URL] = []
+            for item in list.items.dropFirst(index) {
+                guard item.cue == nil, ["dsf", "dff"].contains(item.url.pathExtension.lowercased()),
+                      let url = resolvedURL(for: item) else { break }
+                urls.append(url)
+            }
+            return urls
+        }
+
+        private func hiFiItemID(_ item: FileListItem, session: ContentSession) -> String? {
+            if let id = item.cue?.containerTrackID {
+                guard session.request.primaryFileURL?.standardizedFileURL == item.url.standardizedFileURL else { return nil }
+                return id
+            }
+            guard item.cue == nil,
+                  let index = session.request.resources.firstIndex(where: {
+                      $0.url.standardizedFileURL == item.url.standardizedFileURL
+                  }) else { return nil }
+            return "file:\(index)"
+        }
+
+        /// 每次命令携带宿主允许的顺序；移除、排序或切换模式后废弃旧的预读后继。
+        func hiFiSessionWithSequence(_ original: ContentSession) -> ContentSession {
+            guard original.providerID == "audio.hifi", var queue = original.playbackQueue,
+                  let list = fileList else { return original }
+            var session = original
+            let currentID = queue.currentItemID
+            var ids: [String] = []
+            if let index = list.items.firstIndex(where: { hiFiItemID($0, session: original) == currentID }) {
+                for item in list.items.dropFirst(index) {
+                    guard let id = hiFiItemID(item, session: original), queue.items.contains(where: { $0.id == id }) else { break }
+                    ids.append(id)
+                    if mediaPlaybackMode != .sequential && mediaPlaybackMode != .sequentialLoop { break }
+                }
+            }
+            let byID = Dictionary(uniqueKeysWithValues: queue.items.map { ($0.id, $0) })
+            queue.items = ids.compactMap { byID[$0] }
+            // 当前曲已从宿主列表移除时仍允许其收尾，但不能续播旧列表。
+            if queue.items.isEmpty, let currentID, let item = byID[currentID] { queue.items = [item] }
+            session.playbackQueue = queue
+            return session
+        }
+
+        func synchronizeHiFiListSelection(_ session: ContentSession) {
+            guard session.providerID == "audio.hifi", let currentID = session.playbackQueue?.currentItemID,
+                  var list = fileList,
+                  let item = list.items.first(where: { hiFiItemID($0, session: session) == currentID }),
+                  list.currentID != item.id else { return }
+            list.currentID = item.id
+            fileList = list
+            originalImageName = item.displayName
+            holdExtensionAudioFileAccess(for: session)
+            syncFileListNavigator()
+        }
+
+        /// 宿主持有列表与播放模式；连续 DSD 文件共享扩展会话以提前填充 DoP。
         func openFileListAudioUsingExtension(url: URL, itemID: String) {
             currentMediaRouteGeneration &+= 1
             let routeGeneration = currentMediaRouteGeneration
@@ -750,7 +812,18 @@ extension AppState {
                     await closeTask?.value
                     guard self.currentMediaRouteGeneration == routeGeneration,
                           self.fileList?.currentID == itemID else { return }
-                    let outcome = try await ExtensionHost.shared.open(url: url)
+                    let urls = self.hiFiSequenceURLs(startingAt: itemID)
+                    let outcome: SessionResolutionOutcome
+                    if urls.count > 1, let sequence = try? await ExtensionHost.shared.open(urls: urls) {
+                        if sequence.session.providerID == "audio.hifi" {
+                            outcome = sequence
+                        } else {
+                            await ExtensionHost.shared.closeSessionAndWait(sequence.session)
+                            outcome = try await ExtensionHost.shared.open(url: url)
+                        }
+                    } else {
+                        outcome = try await ExtensionHost.shared.open(url: url)
+                    }
                     guard self.currentMediaRouteGeneration == routeGeneration,
                           self.fileList?.currentID == itemID else {
                         ExtensionHost.shared.closeSession(outcome.session)
@@ -837,6 +910,7 @@ extension AppState {
             preferredItemID: String?
         ) {
             guard session.providerID == "audio.hifi",
+                  url.pathExtension.lowercased() == "iso",
                   let queue = session.playbackQueue,
                   queue.items.count >= 2 else { return }
             let normalizedPath = url.resolvingSymlinksInPath().standardizedFileURL.path
@@ -887,7 +961,8 @@ extension AppState {
 
         func performExtensionCommand(_ commandID: String) {
             if commandID == "hifi.pause" { exclusivePlaybackGeneration &+= 1 }
-            guard let session = extensionSession else { return }
+            guard let currentSession = extensionSession else { return }
+            let session = hiFiSessionWithSequence(currentSession)
             let commandGeneration = exclusivePlaybackGeneration
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -915,7 +990,7 @@ extension AppState {
                                     ExclusivePlaybackCoordinator.shared.release(ownerID: session.id)
                                     let selected = try await ExtensionHost.shared.perform(commandID: commandID, in: paused)
                                     guard self.exclusivePlaybackGeneration == generation else { throw CancellationError() }
-                                    result = try await ExtensionHost.shared.perform(commandID: "hifi.play", in: selected)
+                                    result = try await ExtensionHost.shared.perform(commandID: "hifi.play", in: self.hiFiSessionWithSequence(selected))
                                 } else {
                                     result = try await ExtensionHost.shared.perform(commandID: commandID, in: session)
                                 }
@@ -928,6 +1003,7 @@ extension AppState {
                     guard self.extensionSession?.id == session.id,
                           self.exclusivePlaybackGeneration == commandGeneration else { return }
                     self.extensionSession = updated
+                    self.synchronizeHiFiListSelection(updated)
                     // 进度最多每五秒保存一次扩展快照，避免每秒写盘或刷新历史排序。
                     let persistsState = commandID != "hifi.status"
                     let checkpointsPlayback = Date().timeIntervalSince(self.lastExtensionPlaybackCheckpoint) >= 5
@@ -980,7 +1056,7 @@ extension AppState {
                     do {
                         let updated = try await ExtensionHost.shared.perform(
                             navigatorAction: action,
-                            in: session
+                            in: self.hiFiSessionWithSequence(session)
                         )
                         guard self.extensionSession?.id == session.id else { return }
                         self.extensionSession = updated

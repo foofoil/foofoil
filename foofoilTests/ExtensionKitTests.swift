@@ -468,6 +468,39 @@ struct ExtensionKitTests {
         #expect(state.currentAudioPresentationURL == second)
     }
 
+    @Test func hiFiGaplessSequenceFollowsHostOrderAndPlaybackMode() throws {
+        let state = AppState()
+        let items = ["a.dsf", "b.dsf", "c.dsf"].enumerated().map {
+            FileListItem(id: "host:\($0.offset)", path: "/tmp/\($0.element)", bookmark: nil, displayName: $0.element)
+        }
+        state.fileList = FileListState(kind: .audio, items: items, currentID: items[0].id)
+        state.mediaPlaybackMode = .sequential
+        let session = ContentSession(
+            extensionID: nil, providerID: "audio.hifi",
+            request: .fileCollection(items.map { .init(url: $0.url) }),
+            presentation: .text(titleKey: "Hi-Fi", body: ""),
+            playbackQueue: .init(items: items.indices.map { .init(id: "file:\($0)", title: "track") }, currentItemID: "file:0")
+        )
+        #expect(state.hiFiSessionWithSequence(session).playbackQueue?.items.map(\.id) == ["file:0", "file:1", "file:2"])
+        state.fileList?.items = [items[0], items[2], items[1]]
+        #expect(state.hiFiSessionWithSequence(session).playbackQueue?.items.map(\.id) == ["file:0", "file:2", "file:1"])
+        state.mediaPlaybackMode = .shuffle
+        #expect(state.hiFiSessionWithSequence(session).playbackQueue?.items.map(\.id) == ["file:0"])
+        state.mediaPlaybackMode = .singleLoop
+        #expect(state.hiFiSessionWithSequence(session).playbackQueue?.items.map(\.id) == ["file:0"])
+        state.mediaPlaybackMode = .sequential
+        let pcm = FileListItem(id: "pcm", path: "/tmp/new.wav", bookmark: nil, displayName: "new")
+        state.fileList?.items = [items[0], pcm, items[1]]
+        #expect(state.hiFiSessionWithSequence(session).playbackQueue?.items.map(\.id) == ["file:0"])
+        var advanced = session
+        advanced.playbackQueue?.currentItemID = "file:1"
+        state.synchronizeHiFiListSelection(advanced)
+        #expect(state.fileList?.currentID == items[1].id)
+        // 普通文件集合不能被错误展开为 SACD 容器列表。
+        state.installHiFiContainerListIfNeeded(url: items[0].url, session: session, preferredItemID: nil)
+        #expect(state.fileList?.items.map(\.id) == [items[0].id, pcm.id, items[1].id])
+    }
+
     @Test func hierarchicalCommandsAcceptDynamicDeviceNamesAndRejectCycles() throws {
         let session = ContentSession(
             extensionID: "app.foofoil.extension.hifi",
