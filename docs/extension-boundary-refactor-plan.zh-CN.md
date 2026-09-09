@@ -1,7 +1,8 @@
 # foofoil 扩展职责收敛与主项目减负计划
 
 日期：2026-09-09  
-状态：实施中；阶段 0/1 的首批改动已落地，后续公共契约与跨仓库迁移尚未完成。  
+状态：实施中；宿主适配层已收拢，阶段 2/3 的关闭与恢复公共契约已接通；其余操作与设备服务迁移尚未完成。
+
 范围：兄弟仓库 `foofoil`、`extension-kit`、`hifi`。本文中的源码路径均相对各自仓库根目录。
 
 ## 1. 问题与目标
@@ -236,3 +237,31 @@ xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platfor
 - `./run` 成功构建、注入并签名 Hi-Fi 开发插件，应用进程已启动。未进行真实 DAC 播放、切换设备或听音回归。
 - `git diff --check` 通过；未引入新的编译警告。未修改 hifi 或 extension-kit，因此未重复运行两者的独立测试。
 - 本地日志：`/tmp/foofoil-extension-lifecycle-tests.log`、`/tmp/foofoil-extension-lifecycle-run.log`，未纳入仓库。
+
+## 10. 实施记录：2026-09-09，首个跨仓库生命周期契约
+
+本批基于 foofoil `8fe1541`、extension-kit `d8b134c`、hifi `af107d5`，打通 `close` / `restore`，未将播放操作、导航操作和设备服务一次性改写。
+
+### 已实现
+
+- extension-kit 新增 `session.lifecycle` v1 能力、`SessionLifecycleRequest`、`PlaybackRestorationState`、验证与共享 JSON fixture。消息复用 `perform_command`，不扩展 C ABI 函数表，也不改变原会话快照和历史存储格式。
+- hifi 声明并激活该能力，接受通用关闭/恢复消息。恢复的曲目 ID 解释、暂停、选曲和位置限制在 Runtime 内执行，宿主不再为新插件逐步发送 Hi-Fi 激活与 seek 命令。
+- 新宿主按新会话能力选择协议；无能力声明或版本不支持时保留旧 Hi-Fi 适配。旧命令入口仍保留，新插件可继续接受旧宿主的原命令。
+- 通用关闭可重复调用；关闭成功后运行时记录已移除。释放失败会返回错误并保留可重试记录，不再先删除记录后忽略 stop 错误。宿主关闭失败目前仍记录日志，自动重试和向上抛错不在本批范围。
+- 正常恢复保持暂停，不获取输出设备；正在播放的会话拒绝恢复。旧曲目消失时不套用其位置；合法位置按新曲目长度及 DSD 定位粒度限制。损坏的历史位置由宿主省略，在线非法消息仍拒绝。
+
+完整协议说明在兄弟仓库 `extension-kit/docs/session-lifecycle-v1.zh-CN.md`。`stateReference` 的含义保留；本版只传通用曲目 ID 和位置，不定义私有恢复 blob。
+
+### 验证与兼容范围
+
+- extension-kit `swift test`：13 项测试通过，覆盖共享 fixture、版本/能力状态、非法参数、未知字段及未知操作。
+- hifi `swift test`：36 项测试通过。
+- hifi `swift run hifi-runtime-smoke --self-test ../extension-kit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json`：使用同一 fixture 经真实 C ABI 验证新协议，同时执行旧导航/定位命令；覆盖恢复位置、缺失曲目、时长限制、非法消息拒绝、重复关闭及运行时记录释放。测试不播放合成 DSF。
+- 宿主单元测试：205 项通过、1 项硬件测试跳过、0 项失败；展开参数化测试后为 220 次通过。新增通用 Provider ID、旧插件能力缺失、未知契约版本、新会话 UUID 和损坏历史位置的请求构造回归。
+- 这些测试证明消息格式互通和旧命令继续可用，不等同于所有已发布宿主/插件二进制组合的完整验证。完整版本矩阵仍是阶段 0 的后续事项。
+- `./run` 已成功重建应用和新版 Hi-Fi 插件、签名注入并启动应用。仓库内未找到真实 DSF/DFF 听音文件，本批未执行真实 DAC 回归；合成 fixture 不能替代听音验证。
+- 无新增编译警告；三仓库 `git diff --check` 通过。日志分别为 `/tmp/foofoil-kit-lifecycle-contract.log`、`/tmp/foofoil-hifi-lifecycle-contract.log`、`/tmp/foofoil-hifi-lifecycle-abi.log`、`/tmp/foofoil-host-lifecycle-contract.log`、`/tmp/foofoil-session-lifecycle-run.log`。
+
+### 剩余工作
+
+下一批优先迁移通用媒体控制与导航请求，移除宿主命令路径对 Hi-Fi 播放/暂停/设备命令的解释；随后迁移内容探测、可选设备服务能力发现与目录清理。当前兼容层仍须保留，新生命周期契约并不意味着整个阶段 2/3 已完成。

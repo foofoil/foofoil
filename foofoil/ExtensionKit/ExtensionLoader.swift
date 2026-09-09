@@ -259,6 +259,11 @@ final class InProcessExtensionInterface: @unchecked Sendable {
         return try call(performCommand, input: JSONEncoder().encode(message))
     }
 
+    nonisolated func perform(lifecycle request: SessionLifecycleRequest) throws -> ContentSession {
+        try request.validate()
+        return try call(interface.perform_command, input: JSONEncoder().encode(request))
+    }
+
     nonisolated func performApplicationCommand(
         _ request: AudioDeviceServiceRequest
     ) throws -> AudioDeviceServiceSnapshot {

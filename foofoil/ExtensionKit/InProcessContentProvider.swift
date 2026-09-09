@@ -56,11 +56,25 @@ final class InProcessContentProvider: ContentProvider {
     }
 
     func restorePlayback(from saved: ContentSession, in fresh: ContentSession) async throws -> ContentSession {
-        try await HiFiLegacyAdapter.restorePlayback(saved: saved, fresh: fresh, provider: self)
+        if let request = ExtensionSessionLifecycle.restorationRequest(from: saved, in: fresh) {
+            return try await performLifecycle(request)
+        }
+        return try await HiFiLegacyAdapter.restorePlayback(saved: saved, fresh: fresh, provider: self)
     }
 
     func closeSession(_ session: ContentSession) async throws {
+        if SessionLifecycleRequest.isSupported(by: session) {
+            _ = try await performLifecycle(.init(operation: .close, session: session))
+            return
+        }
         try await HiFiLegacyAdapter.closeSession(session, provider: self)
+    }
+
+    private func performLifecycle(_ request: SessionLifecycleRequest) async throws -> ContentSession {
+        let runtime = runtime
+        return try await Task.detached(priority: .userInitiated) {
+            try runtime.perform(lifecycle: request)
+        }.value
     }
 
     func perform(navigatorAction: NavigatorAction, session: ContentSession) async throws -> ContentSession {
