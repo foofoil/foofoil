@@ -30,6 +30,7 @@ enum HiFiLegacyAdapter {
         case .previous: Command.previous.rawValue
         case .next: Command.next.rawValue
         case .refresh: Command.status.rawValue
+        case .seek: Command.seek.rawValue
         case .selectDevice(let id): deviceCommand(id)
         }
     }

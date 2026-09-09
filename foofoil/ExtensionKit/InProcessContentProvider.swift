@@ -55,6 +55,17 @@ final class InProcessContentProvider: ContentProvider {
         }.value
     }
 
+    func perform(mediaAction: MediaPlaybackAction, session: ContentSession) async throws -> ContentSession {
+        guard MediaPlaybackRequest.isSupported(by: session) else {
+            return try await HiFiLegacyAdapter.perform(mediaAction: mediaAction, session: session, provider: self)
+        }
+        let runtime = runtime
+        let request = MediaPlaybackRequest(action: mediaAction, session: session)
+        return try await Task.detached(priority: .userInitiated) {
+            try runtime.perform(media: request)
+        }.value
+    }
+
     func restorePlayback(from saved: ContentSession, in fresh: ContentSession) async throws -> ContentSession {
         if let request = ExtensionSessionLifecycle.restorationRequest(from: saved, in: fresh) {
             return try await performLifecycle(request)
@@ -78,6 +89,13 @@ final class InProcessContentProvider: ContentProvider {
     }
 
     func perform(navigatorAction: NavigatorAction, session: ContentSession) async throws -> ContentSession {
+        if NavigatorActionRequest.isSupported(by: session) {
+            let runtime = runtime
+            let request = NavigatorActionRequest(action: navigatorAction, session: session)
+            return try await Task.detached(priority: .userInitiated) {
+                try runtime.perform(navigation: request)
+            }.value
+        }
         guard let request = HiFiLegacyAdapter.navigatorRequest(action: navigatorAction, session: session) else {
             return session
         }

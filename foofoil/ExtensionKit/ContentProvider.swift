@@ -12,12 +12,16 @@ protocol ContentProvider: AnyObject {
     func match(_ request: ContentRequest) -> ProviderMatch?
     func makeSession(for request: ContentRequest, negotiatedAPI: UInt32) async throws -> ContentSession
     func perform(commandID: String, session: ContentSession) async throws -> ContentSession
+    func perform(mediaAction: MediaPlaybackAction, session: ContentSession) async throws -> ContentSession
     func perform(navigatorAction: NavigatorAction, session: ContentSession) async throws -> ContentSession
     func restorePlayback(from saved: ContentSession, in fresh: ContentSession) async throws -> ContentSession
     func closeSession(_ session: ContentSession) async throws
 }
 
 extension ContentProvider {
+    func perform(mediaAction: MediaPlaybackAction, session: ContentSession) async throws -> ContentSession {
+        try await HiFiLegacyAdapter.perform(mediaAction: mediaAction, session: session, provider: self)
+    }
     func perform(commandID: String, session: ContentSession) async throws -> ContentSession {
         session
     }

@@ -264,6 +264,16 @@ final class InProcessExtensionInterface: @unchecked Sendable {
         return try call(interface.perform_command, input: JSONEncoder().encode(request))
     }
 
+    nonisolated func perform(media request: MediaPlaybackRequest) throws -> ContentSession {
+        try request.validate()
+        return try call(interface.perform_command, input: JSONEncoder().encode(request))
+    }
+
+    nonisolated func perform(navigation request: NavigatorActionRequest) throws -> ContentSession {
+        try request.validate()
+        return try call(interface.perform_command, input: JSONEncoder().encode(request))
+    }
+
     nonisolated func performApplicationCommand(
         _ request: AudioDeviceServiceRequest
     ) throws -> AudioDeviceServiceSnapshot {

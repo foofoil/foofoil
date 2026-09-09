@@ -135,6 +135,15 @@ final class ExtensionHost: ExtensionRuntimeHost {
         return try await provider.performValidated(commandID: commandID, session: session)
     }
 
+    func perform(mediaAction: MediaPlaybackAction, in session: ContentSession) async throws -> ContentSession {
+        try mediaAction.validate()
+        guard let provider = resolver.provider(id: session.providerID) else {
+            throw ContentProviderError.unavailable(session.providerID)
+        }
+        let updated = try await provider.perform(mediaAction: mediaAction, session: session)
+        return try type(of: provider).validateSession(updated)
+    }
+
     /// 通知 Provider 释放会话资源；具体实现决定是否需要向扩展发送关闭消息。
     func closeSession(_ session: ContentSession) {
         Task { @MainActor in

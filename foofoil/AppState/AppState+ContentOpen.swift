@@ -944,7 +944,7 @@ extension AppState {
             guard let session = extensionSession, session.id == sessionID else { return }
             exclusivePlaybackGeneration &+= 1
             noteUserPausedMediaPlayback()
-            if let updated = try? await ExtensionHost.shared.perform(commandID: HiFiLegacyAdapter.Command.pause.rawValue, in: session),
+            if let updated = try? await ExtensionHost.shared.perform(mediaAction: .pause, in: session),
                extensionSession?.id == sessionID {
                 extensionSession = updated
                 isMediaPlaying = false
@@ -958,7 +958,24 @@ extension AppState {
         }
 
         func performExtensionCommand(_ commandID: String) {
-            if commandID == HiFiLegacyAdapter.Command.pause.rawValue { exclusivePlaybackGeneration &+= 1 }
+            if let session = extensionSession,
+               let action = HiFiLegacyAdapter.mediaAction(for: commandID, in: session) {
+                performExtensionMediaAction(action)
+            } else {
+                performExtensionOperation(.command(commandID))
+            }
+        }
+
+        func performExtensionMediaAction(_ action: ExtensionMediaAction) {
+            performExtensionOperation(.media(action))
+        }
+
+        private func performExtensionOperation(_ operation: ExtensionSessionOperation) {
+            do { try operation.mediaAction?.validate() } catch {
+                NSLog("Extension media action rejected: \(error.localizedDescription)")
+                return
+            }
+            if operation.mediaAction == .pause { exclusivePlaybackGeneration &+= 1 }
             guard let currentSession = extensionSession else { return }
             let session = hiFiSessionWithSequence(currentSession)
             let commandGeneration = exclusivePlaybackGeneration
@@ -966,10 +983,10 @@ extension AppState {
                 guard let self else { return }
                 do {
                     let updated: ContentSession
-                    let isStart = commandID == HiFiLegacyAdapter.Command.play.rawValue
-                    let isDeviceChange = HiFiLegacyAdapter.deviceID(in: commandID) != nil && session.mediaPlayback?.state == .playing
+                    let isStart = operation.mediaAction == .play
+                    let isDeviceChange = operation.selectedDeviceID != nil && session.mediaPlayback?.state == .playing
                     let deviceID = isDeviceChange
-                        ? HiFiLegacyAdapter.deviceID(in: commandID)
+                        ? operation.selectedDeviceID
                         : session.audioDeviceSelection?.selectedDeviceID
                     if HiFiLegacyAdapter.supports(session), (isStart || isDeviceChange), let deviceID {
                         var result = session
@@ -984,26 +1001,26 @@ extension AppState {
                                 guard let self, self.extensionSession?.id == session.id,
                                       self.exclusivePlaybackGeneration == generation else { throw CancellationError() }
                                 if isDeviceChange {
-                                    let paused = try await ExtensionHost.shared.perform(commandID: HiFiLegacyAdapter.Command.pause.rawValue, in: session)
+                                    let paused = try await ExtensionHost.shared.perform(mediaAction: .pause, in: session)
                                     ExclusivePlaybackCoordinator.shared.release(ownerID: session.id)
-                                    let selected = try await ExtensionHost.shared.perform(commandID: commandID, in: paused)
+                                    let selected = try await operation.perform(in: paused)
                                     guard self.exclusivePlaybackGeneration == generation else { throw CancellationError() }
-                                    result = try await ExtensionHost.shared.perform(commandID: HiFiLegacyAdapter.Command.play.rawValue, in: self.hiFiSessionWithSequence(selected))
+                                    result = try await ExtensionHost.shared.perform(mediaAction: .play, in: self.hiFiSessionWithSequence(selected))
                                 } else {
-                                    result = try await ExtensionHost.shared.perform(commandID: commandID, in: session)
+                                    result = try await operation.perform(in: session)
                                 }
                             }
                         )
                         updated = result
                     } else {
-                        updated = try await ExtensionHost.shared.perform(commandID: commandID, in: session)
+                        updated = try await operation.perform(in: session)
                     }
                     guard self.extensionSession?.id == session.id,
                           self.exclusivePlaybackGeneration == commandGeneration else { return }
                     self.extensionSession = updated
                     self.synchronizeHiFiListSelection(updated)
                     // 进度最多每五秒保存一次扩展快照，避免每秒写盘或刷新历史排序。
-                    let persistsState = commandID != HiFiLegacyAdapter.Command.status.rawValue
+                    let persistsState = operation.mediaAction != .refresh
                     let checkpointsPlayback = Date().timeIntervalSince(self.lastExtensionPlaybackCheckpoint) >= 5
                     if persistsState || checkpointsPlayback,
                        let extensionID = updated.extensionID,
@@ -1027,13 +1044,14 @@ extension AppState {
         }
 
         func seekExtensionPlayback(to position: TimeInterval) {
-            guard var session = extensionSession,
+            guard position.isFinite, position >= 0,
+                  var session = extensionSession,
                   var playback = session.mediaPlayback,
                   playback.isSeekable else { return }
             playback.position = position
             session.mediaPlayback = playback
             extensionSession = session
-            performExtensionCommand(HiFiLegacyAdapter.Command.seek.rawValue)
+            performExtensionMediaAction(.seek(position))
         }
 
         func performNavigatorAction(_ action: NavigatorAction) {
