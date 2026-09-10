@@ -1,7 +1,7 @@
 # 扩展边界重构收尾 checklist
 
 日期：2026-09-10  
-状态：收尾阶段 0、1 已完成，阶段 2 尚未开始；阶段 0 定位的宿主测试 abort 已修复，宿主单元测试全绿  
+状态：收尾阶段 0、1、2 已完成，阶段 3 尚未开始；宿主单元测试全绿  
 依据：[评审终稿](extension-boundary-refactor-review-final.zh-CN.md)
 
 本清单是评审后的新增收尾工作，阶段编号不替代原重构计划的阶段 0–6。任务路径按对应仓库根目录理解。
@@ -51,14 +51,14 @@
 
 对应评审 §4.4、§5.6，依赖阶段 0 的语义决策。
 
-- [ ] 落实 ID 生命周期；必要时将临时外部文件 ID 改为内存态，新会话重新映射，容器列表按新快照重新投影。
-- [ ] 当前版本重启/会话重建能恢复曲目和位置；临时 ID 改变、资源失效时有明确行为。
-- [ ] 映射失败且无删除意图时不裁剪扩展队列。
-- [ ] 用户删除当前曲或后继时按编辑意图更新序列，不因映射失败而继续已删除后继。
-- [ ] 单资源容器不受外部文件队列裁剪；宿主内部表达“不变/有效序列/无法映射”和必要删除意图，不为实现细节扩充公共契约。
-- [ ] 六类队列测试通过：映射失败、删除当前曲、删除后继、重排、多文件连续播放、单资源容器。
-- [ ] 验证实际 Runtime 消费队列后 `sequenceIDs` / `successors` 符合编辑结果；补齐当前版本恢复及资源替换测试。
-- [ ] **验收：** 宿主投影与 Runtime 后继一致，ID 生命周期与恢复测试通过；相关跨仓库检查及 `./run` 成功。
+- [x] 落实 ID 生命周期；必要时将临时外部文件 ID 改为内存态，新会话重新映射，容器列表按新快照重新投影。
+- [x] 当前版本重启/会话重建能恢复曲目和位置；临时 ID 改变、资源失效时有明确行为。
+- [x] 映射失败且无删除意图时不裁剪扩展队列。
+- [x] 用户删除当前曲或后继时按编辑意图更新序列，不因映射失败而继续已删除后继。
+- [x] 单资源容器不受外部文件队列裁剪；宿主内部表达“不变/有效序列/无法映射”和必要删除意图，不为实现细节扩充公共契约。
+- [x] 六类队列测试通过：映射失败、删除当前曲、删除后继、重排、多文件连续播放、单资源容器。
+- [x] 验证实际 Runtime 消费队列后 `sequenceIDs` / `successors` 符合编辑结果；补齐当前版本恢复及资源替换测试。
+- [x] **验收：** 宿主投影与 Runtime 后继一致，ID 生命周期与恢复测试通过；相关跨仓库检查及 `./run` 成功。
 
 ## 收尾阶段 3：关闭与独占交接失败
 
@@ -158,3 +158,18 @@
 - 未验证范围 / 风险 / 阻塞：旧 Hi-Fi 兼容层仍在（阶段 4 删除），`usesHostAudioChrome` 对已协商的旧 Hi-Fi Provider 仍放行；未做真机导航/seek 手测。测试共享单例污染风险仍在，阶段 5 处理。
 - 验收是否通过及证据：通过。三仓库相关测试全绿、宿主 0 失败、`./run` 成功；无能力路径不发请求且不改权威 `extensionSession`。
 - 下一阶段（仅在本阶段验收通过后）：收尾阶段 2（ID 映射、恢复与队列所有权），依赖阶段 0 的语义决策。
+
+## 收尾阶段 2 执行记录（2026-09-10）
+
+- 执行者：当前任务 agent。仅 foofoil 有源码/测试改动；extension-kit、hifi 无改动、工作区干净。基线：foofoil 阶段 1 提交 `fc9e69c`（阶段 2 改动尚未提交）、extension-kit `6a617c2`、hifi `334d71d`。
+- 完成任务与关键行为变化：
+  - ID 生命周期：`FileListItem.extensionItemID` 改为会话内状态，不再写入/读取持久化；`containerTrackID` 仍按阶段 0 决策持久化用于恢复。`stampHostListWithExtensionQueueIDs` 先清除旧盖章再按新快照重新映射，避免“旧值恰好存在”被判为跨会话稳定。
+  - 队列投影：新增 `HostPlaybackSequenceProjection`（`unchanged` / `sequence([String])` / `currentOnly(String)`），`sessionByApplyingHostPlaybackSequence` 不再把映射失败当成单曲裁剪；单资源容器恒为 `unchanged`，队列归扩展所有。
+  - 显式删除：`AppState.extensionRemovedItemIDs` 记录当前会话内被删除的扩展项目 ID，只有它能触发 `currentOnly`；删除全部项目时关闭扩展会话并清空队列呈现；会话 ID 变化时清除删除意图。
+- 测试：新增 `foofoilTests/ExtensionQueueProjectionTests.swift`：ID 编解码（extensionItemID 不持久化、containerTrackID 往返）、跨会话重新盖章、删除意图记录、六类队列场景、稳定 ID 恢复位置、ID 改变恢复、保存曲目缺失降级共 13 项。
+- 测试命令 / 结果 / 失败与跳过：extension-kit `swift test` 26 项通过；hifi `swift test` 43 项通过；hifi 公共 lifecycle/media-navigation fixture ABI smoke 退出 0；foofoil `xcodebuild test ... -only-testing:foofoilTests` 通过，xcresult 汇总 243 项、242 通过、0 失败、1 硬件跳过（`CueSheetTests/exclusivePlaybackSurvivesTrackChangesAndPause()`）。
+- 构建、ABI smoke、`./run`：`xcodebuild build` 与应用 `./run` 均 `BUILD SUCCEEDED`，Hi-Fi Debug 插件注入并启动成功；未发现新增编译警告（仅既有 AppIntents 元数据提示）。
+- 实机设备 / 文件类型与采样率 / 操作 / 结果来源：本阶段无硬件相关改动，未做新听音。宿主投影与 Runtime 后继一致性来自单元测试与合成 fixture smoke，不冒充真机听音。
+- 未验证范围 / 风险 / 阻塞：未实现按文件大小/修改时间的内容指纹比较；同一路径内容被替换且 fresh 仍含同 ID 时，恢复仍可能套用旧位置。当前只通过“fresh 队列不含保存 ID/临时 ID 改变”测试锁定可观察的降级行为，内容替换检测留待后续或阶段 6 评估。真机删除/重排续播、容器激活仍待最终手动回归。
+- 验收是否通过及证据：通过本阶段的可自动化部分。宿主投影与 Runtime 后继在测试与 smoke 中一致，ID 生命周期与恢复测试通过，三仓库相关测试与 `./run` 成功；内容指纹检测缺口已如实登记。
+- 下一阶段（仅在本阶段验收通过后）：收尾阶段 3（关闭与独占交接失败），依赖当前会话/队列语义。
