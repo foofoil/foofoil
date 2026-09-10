@@ -1,7 +1,7 @@
 # 扩展边界重构评审终稿
 
 日期：2026-09-10  
-状态：收尾阶段 0 已完成，阶段 1 尚未开始；进度见[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)
+状态：收尾阶段 0、1 已完成，阶段 2 尚未开始；进度见[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)
 评审范围：`foofoil`、`extension-kit`、`hifi` 当前 `ext` / `ext-fix` 实现相对各仓库 `main` 的职责与行为变化
 
 ## 1. 评审前提
@@ -27,6 +27,8 @@
 
 当前未发现会使唯一现有 hifi 主流程必然无法工作的致命缺陷，但仍有五项应作为合并阻塞问题处理：私有导航命令可能泄漏给其他 Provider、音频控件缺少完整能力门控、seek 乐观更新可造成状态不一致、队列映射失败可能破坏后继序列，以及关闭/设备交接错误不能完整传播（§4.6）。内容探测的同步 I/O 与授权范围也应在合并前至少完成低成本修复和验证。
 
+收尾阶段 1 已关闭其中三项：导航泄漏、能力门控与 seek 状态一致性（§4.1–4.3）。队列映射（§4.4）、关闭/设备交接（§4.6）与连续扫描（§4.5）仍未处理。
+
 此外，P0 兼容协议没有发布服务对象，支持窗口已关闭，应按依赖顺序落实删除。但当前新宿主与新 hifi 仍通过扩展菜单实际使用部分 `hifi.*` 命令映射，因此不能直接把整个兼容目录当作死代码删除；应先迁移菜单贡献和 hifi Runtime 内部 dispatch，再完成清理。
 
 ## 3. 已核对通过的部分
@@ -41,6 +43,8 @@
 ## 4. 合并阻塞问题
 
 ### 4.1 未协商导航动作时可能向任意扩展发送 Hi-Fi 私有命令
+
+收尾阶段 1 已按分步清理路径处理：`HiFiLegacyAdapter.navigatorRequest` 内部统一执行 `supports(session)` 校验，`InProcessContentProvider` 也仅在 `supports(session)` 为真时才走兼容层，无 `ui.navigator-actions` 的通用 Provider 不再收到任何私有导航命令。P0 导航入口的彻底删除仍留待阶段 4。下文为原始问题描述。
 
 位置：
 
@@ -58,6 +62,8 @@
 - 增加非 Hi-Fi Provider 测试：提供导航 contribution、不声明 `ui.navigator-actions`，执行 activate 和 move，断言 Runtime 不收到 `hifi.*`。
 
 ### 4.2 音频 UI 与通用呈现都缺少完整能力门控
+
+收尾阶段 1 已处理：专用音频界面固定为播放快照、音频家族与已协商 `media.transport` 三者同时满足；通用呈现按 `MediaPlaybackRequest.isSupported(by:)` 门控，可交互媒体控件在有快照但无 transport 时退化为只读状态。旧 Hi-Fi 兼容期仍额外放行已协商的 hifi Provider，待阶段 4 删除。下文为原始问题描述。
 
 位置：
 
@@ -77,6 +83,8 @@
 - 修改现有测试，使会话保留播放快照但关闭 `media.transport`，分别验证专用音频界面与通用呈现。
 
 ### 4.3 seek 乐观更新绕过显式动作禁用
+
+收尾阶段 1 已处理：`seekExtensionPlayback(to:)` 发送前校验 `media.transport` 能力、`isSeekable` 与 `isActionAvailable(.seek, in:)`，不再乐观写回 `extensionSession`，拖动值只保留在 Slider 交互状态；`AppState.extensionPlaybackOperationVersion` 在非 refresh 媒体动作时递增，完成回包校验会话 ID、`exclusivePlaybackGeneration` 与序号，过期回包直接丢弃。并发连续 seek 与显式禁用 seek 已有测试锁定。下文为原始问题描述。
 
 位置：
 

@@ -1,7 +1,7 @@
 # 扩展边界重构收尾 checklist
 
 日期：2026-09-10  
-状态：收尾阶段 0 已完成；阶段 1 尚未开始，宿主测试基线有待定位的 abort
+状态：收尾阶段 0、1 已完成，阶段 2 尚未开始；阶段 0 定位的宿主测试 abort 已修复，宿主单元测试全绿  
 依据：[评审终稿](extension-boundary-refactor-review-final.zh-CN.md)
 
 本清单是评审后的新增收尾工作，阶段编号不替代原重构计划的阶段 0–6。任务路径按对应仓库根目录理解。
@@ -39,13 +39,13 @@
 
 对应评审 §4.1–4.3。
 
-- [ ] 阻止无 `ui.navigator-actions` 的非 Hi-Fi Provider 接收私有导航命令；分步清理时临时适配内部也校验 Provider。
-- [ ] 专用音频 UI 同时要求播放快照、音频家族及已协商 `media.transport`。
-- [ ] 通用呈现无 transport 时只读或隐藏媒体区，不能显示可交互媒体控件。
-- [ ] seek 发送前检查能力与动作可用性；拖动值优先留在交互状态，成功后更新快照。
-- [ ] 过期回包丢弃；任何回滚/失败刷新均验证会话与操作版本，不能覆盖后来的 seek、暂停或新会话。
-- [ ] 测试无导航能力的 activate/move、保留播放快照但无 transport、显式禁用 seek、连续 seek 与取消/过期结果。
-- [ ] **验收：** 无能力时不发请求、不修改权威快照；相关测试和宿主构建通过，源码修改后 `./run` 成功。
+- [x] 阻止无 `ui.navigator-actions` 的非 Hi-Fi Provider 接收私有导航命令；分步清理时临时适配内部也校验 Provider。
+- [x] 专用音频 UI 同时要求播放快照、音频家族及已协商 `media.transport`。
+- [x] 通用呈现无 transport 时只读或隐藏媒体区，不能显示可交互媒体控件。
+- [x] seek 发送前检查能力与动作可用性；拖动值优先留在交互状态，成功后更新快照。
+- [x] 过期回包丢弃；任何回滚/失败刷新均验证会话与操作版本，不能覆盖后来的 seek、暂停或新会话。
+- [x] 测试无导航能力的 activate/move、保留播放快照但无 transport、显式禁用 seek、连续 seek 与取消/过期结果。
+- [x] **验收：** 无能力时不发请求、不修改权威快照；相关测试和宿主构建通过，源码修改后 `./run` 成功。
 
 ## 收尾阶段 2：ID 映射、恢复与队列所有权
 
@@ -142,3 +142,19 @@
 - 验证：kit 26 项、hifi 43 项及 ABI smoke 通过；宿主 xcresult 为 219 通过、3 abort 失败、1 硬件跳过，完整命令/结果包/失败名称见决策记录 §6。
 - 未运行 ./run 或新增实机听音：无源码/运行时改动。此前用户反馈保留为硬件基线，不替代本次测试结果。
 - 阶段 0 验收通过：基线及语义已明确，失败如实登记；没有实施阶段 1。后续须复现/归因宿主 abort，不能把本记录理解为测试全绿。
+
+## 收尾阶段 1 执行记录（2026-09-10）
+
+- 执行者：当前任务 agent。仅 foofoil 有源码改动；extension-kit、hifi 保持 `ext-fix` 与进入时相同提交，工作区干净。基线：foofoil `fe320f2cfd1587a7e9348d72cf762ad5ac7cf74b`（阶段 1 改动尚未提交）、extension-kit `6a617c244bb00a7ade80cb7873eb759cc10eaf17`、hifi `334d71d03779f5bcf002984a3966b4b3c82a52d8`。
+- 完成任务与关键行为变化：
+  - 导航泄漏：`HiFiLegacyAdapter.navigatorRequest` 内部统一执行 `supports(session)` 校验；`InProcessContentProvider.perform(navigatorAction:)` 仅在 `HiFiLegacyAdapter.supports(session)` 为真时才走兼容层，通用 Provider 不再收到 `hifi.navigator.*`。
+  - 音频 UI 门控：`ExtensionPlaybackSupport.usesHostAudioChrome` 现要求播放快照、内容家族为音频且已协商 `media.transport`（兼容期额外放行已协商的旧 Hi-Fi，避免破坏当前 hifi Runtime），新增 `showsInteractiveMediaControls` 判定通用呈现。
+  - 通用呈现：`ExtensionPresentationView` 只在 `showsInteractiveMediaControls` 为真时显示可交互控件；否则显示只读进度，不提供播放区。
+  - seek：`seekExtensionPlayback` 发送前检查 `MediaPlaybackRequest.isSupported`、`isSeekable` 与 `isActionAvailable(.seek)`，删除乐观写回；`AppState.extensionPlaybackOperationVersion` 在非 refresh 媒体动作时递增，完成回包校验会话 ID、`exclusivePlaybackGeneration` 与序号，过期/pause/新会话回包被丢弃。
+- 测试：新增/调整 `HiFiLegacyAdapterTests`、`ExtensionPlaybackSupportTests`、`GenericAudioContractTests` 共 4 组断言（无导航能力 activate/move、音频家族无 transport、显式禁用 seek 不发送且不改快照、连续 seek 旧回包不覆盖新位置）。
+- 测试命令 / 结果 / 失败与跳过：extension-kit `swift test` 26 项通过；hifi `swift test` 43 项通过；foofoil `xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platform=macOS' -only-testing:foofoilTests` 通过，xcresult 汇总 230 项、229 通过、0 失败、1 硬件跳过（`CueSheetTests/exclusivePlaybackSurvivesTrackChangesAndPause()`）。阶段 0 的 3 个 abort 已由 `fe320f2` 修复，本次未复现。
+- 构建、ABI smoke、`./run`：`xcodebuild build` 与应用 `./run` 均 `BUILD SUCCEEDED`，Hi-Fi Debug 插件注入并启动成功；未发现新增编译警告。本阶段未改 extension-kit/hifi 契约，未重跑 ABI smoke（其结果不受影响，最终阶段仍需完整 smoke）。
+- 实机设备 / 文件类型与采样率 / 操作 / 结果来源：本阶段无硬件相关改动，未做新听音；PCM/CUE 用户复验保留为基线，不代表收尾改动已实机验证。
+- 未验证范围 / 风险 / 阻塞：旧 Hi-Fi 兼容层仍在（阶段 4 删除），`usesHostAudioChrome` 对已协商的旧 Hi-Fi Provider 仍放行；未做真机导航/seek 手测。测试共享单例污染风险仍在，阶段 5 处理。
+- 验收是否通过及证据：通过。三仓库相关测试全绿、宿主 0 失败、`./run` 成功；无能力路径不发请求且不改权威 `extensionSession`。
+- 下一阶段（仅在本阶段验收通过后）：收尾阶段 2（ID 映射、恢复与队列所有权），依赖阶段 0 的语义决策。
