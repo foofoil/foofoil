@@ -476,50 +476,62 @@ struct CueSheetTests {
         #expect(!controller.isPlaying)
     }
 
-    @Test func sequentialSameRateTracksContinueWithoutStoppingPlayback() async throws {
-        let first = FileManager.default.temporaryDirectory
-            .appendingPathComponent("foofoil-gapless-a-\(UUID().uuidString).wav")
-        let second = FileManager.default.temporaryDirectory
-            .appendingPathComponent("foofoil-gapless-b-\(UUID().uuidString).wav")
-        defer {
-            try? FileManager.default.removeItem(at: first)
-            try? FileManager.default.removeItem(at: second)
+    @Test(arguments: [false, true], [1, 2])
+    func sequentialSameRateTracksFinishAtPlaybackBoundaries(cue: Bool, channels: Int) async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-gapless-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let urls = (0..<3).map { directory.appendingPathComponent("track-\($0).wav") }
+        for url in urls { try writePCMWav(url: url, sampleRate: 44100, seconds: cue ? 1.2 : 0.4, channels: channels) }
+        var items: [(URL, MediaPlaybackRange?)] = []
+        for index in 0..<3 {
+            let url = cue ? urls[0] : urls[index]
+            let range: MediaPlaybackRange? = cue ? MediaPlaybackRange(
+                startCueFrames: Int64(index * 30), endCueFrames: Int64((index + 1) * 30)
+            ) : nil
+            items.append((url, range))
         }
-        try writePCMWav(url: first, sampleRate: 44100, seconds: 0.4)
-        try writePCMWav(url: second, sampleRate: 44100, seconds: 0.4)
-
         let appStateID = UUID()
+        var current = 0
         let controller = AudioPlaybackController(
-            appStateID: appStateID,
-            url: first,
-            isLooping: false,
-            nextGaplessItemProvider: { (second, nil) }
+            appStateID: appStateID, url: items[0].0, isLooping: false, range: items[0].1,
+            nextGaplessItemProvider: { current + 1 < items.count ? items[current + 1] : nil }
         )
         defer { controller.closeOutput() }
-        controller.selectSystemDefaultOutput()
-
-        var finished = 0
+        // 不先 selectSystemDefaultOutput：重建路由会掩盖首次引擎创建时未接通节点的问题。
+        let clock = ContinuousClock()
+        let started = clock.now
+        var boundaries: [Duration] = []
+        var continued: [Bool] = []
         let observer = NotificationCenter.default.addObserver(
-            forName: .mediaPlaybackDidFinish,
-            object: nil,
-            queue: .main
+            forName: .mediaPlaybackDidFinish, object: nil, queue: .main
         ) { notification in
-            guard let id = notification.userInfo?["id"] as? UUID, id == appStateID else { return }
-            finished += 1
+            guard notification.userInfo?["id"] as? UUID == appStateID else { return }
+            MainActor.assumeIsolated {
+                boundaries.append(started.duration(to: clock.now))
+                current += 1
+                if current < items.count {
+                    // 模拟列表推进后视图回传 load，不得重排已预排的下一曲。
+                    controller.load(url: items[current].0, range: items[current].1, autoplay: true)
+                    continued.append(controller.isPlaying)
+                }
+            }
         }
         defer { NotificationCenter.default.removeObserver(observer) }
-
         controller.play()
-        var crossed = false
-        for _ in 0..<80 {
-            if finished > 0, controller.isPlaying { crossed = true; break }
+        for _ in 0..<160 {
+            if boundaries.count >= 3 { break }
             try await Task.sleep(for: .milliseconds(25))
         }
-        #expect(finished >= 1)
-        #expect(crossed)
-        #expect(controller.isPlaying)
-        #expect(controller.duration == 0.4)
-        #expect(controller.currentTime < 0.4)
+        #expect(boundaries.count == 3)
+        #expect(continued == [true, true])
+        // consumed 回调可能数十毫秒就触发；必须等实际播放边界，尾曲也不能被截掉。
+        for (index, boundary) in boundaries.enumerated() {
+            #expect(boundary >= .milliseconds((index + 1) * 400 - 80))
+        }
+        #expect(!controller.isPlaying)
+        #expect(controller.currentTime == controller.duration)
     }
 
     @Test func sacdQueueInstallsCueLikeNavigator() throws {
@@ -725,9 +737,9 @@ struct CueSheetTests {
         )
     }
 
-    private func writePCMWav(url: URL, sampleRate: Int, seconds: Double) throws {
+    private func writePCMWav(url: URL, sampleRate: Int, seconds: Double, channels: Int = 1) throws {
         let frames = Int((Double(sampleRate) * seconds).rounded())
-        let dataSize = frames * 2
+        let dataSize = frames * channels * 2
         var data = Data()
         func ascii(_ text: String) { data.append(contentsOf: text.utf8) }
         func u32(_ value: UInt32) {
@@ -744,10 +756,10 @@ struct CueSheetTests {
         ascii("fmt ")
         u32(16)
         u16(1)
-        u16(1)
+        u16(UInt16(channels))
         u32(UInt32(sampleRate))
-        u32(UInt32(sampleRate * 2))
-        u16(2)
+        u32(UInt32(sampleRate * channels * 2))
+        u16(UInt16(channels * 2))
         u16(16)
         ascii("data")
         u32(UInt32(dataSize))

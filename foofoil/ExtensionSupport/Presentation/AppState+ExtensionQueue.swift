@@ -107,8 +107,7 @@ extension AppState {
         syncFileListNavigator()
     }
 
-    /// 同一 SACD ISO 会话内切歌，不重建 Session、不重配 HAL。
-    /// 自然播完后由 Hi-Fi Runtime 在 activate 时继续播放下一曲；此处只切换队列项。
+    /// 同一容器会话内切歌，不重建 Session；扩展负责后续播放，此处只切换队列项。
     @discardableResult
     func activateExistingContainerTrack(_ item: FileListItem) -> Bool {
         guard let session = extensionSession,

@@ -54,14 +54,14 @@ final class ExtensionHost: ExtensionRuntimeHost {
         }
         let preferredProviderID = preferredProvidersByDomain["audio"]
         let preferredExtensionID = preferredProviderID.flatMap { resolver.provider(id: $0)?.descriptor.extensionID }
-        if let extensionID = ExtensionAudioDeviceDiscovery.extensionID(
+        guard let extensionID = ExtensionAudioDeviceDiscovery.extensionID(
             amongCapable: capableIDs, preferredExtensionID: preferredExtensionID
-        ), let runtime = inProcessRuntimes[extensionID] {
-            return HiFiLegacyAudioDeviceService { request in
-                try runtime.performApplicationCommand(request)
-            }
+        ), let runtime = inProcessRuntimes[extensionID] else {
+            return nil
         }
-        return HiFiLegacyAdapter.audioDeviceService(in: inProcessRuntimes)
+        return InProcessAudioDeviceService { request in
+            try runtime.performApplicationCommand(request)
+        }
     }
 
     var isAudioDeviceServiceAvailable: Bool { audioDeviceService != nil }

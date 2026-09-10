@@ -1,6 +1,11 @@
 import Foundation
 
 extension HiFiLegacyAdapter {
+    static func matchesLegacyContent(_ url: URL, providerID: String) -> Bool {
+        guard providerID == Self.providerID else { return false }
+        return sniffSACDISOMagic(url)
+    }
+
     /// 仅给未声明 `content.probe` 的旧 Hi-Fi 做 P0 回退；新 Runtime 由扩展嗅探。
     nonisolated static func sniffSACDISOMagic(_ url: URL) -> Bool {
         guard url.pathExtension.lowercased() == "iso" else { return false }

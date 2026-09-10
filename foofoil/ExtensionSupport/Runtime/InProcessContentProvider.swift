@@ -141,7 +141,6 @@ enum ExtensionContentMatching {
         if ContentProbeRequest.isDeclared(in: capabilities) {
             return probe?(url)?.disposition == .matched
         }
-        guard providerID == HiFiLegacyAdapter.providerID else { return false }
-        return HiFiLegacyAdapter.sniffSACDISOMagic(url)
+        return HiFiLegacyAdapter.matchesLegacyContent(url, providerID: providerID)
     }
 }

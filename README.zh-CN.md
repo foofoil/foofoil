@@ -46,6 +46,8 @@ foofoil/
   hifi/
 ```
 
+宿主扩展实现位于 `foofoil/ExtensionSupport/`，分为 Runtime、Management、Presentation、Compatibility。音频 UI 和播放适配器留在宿主；公共契约属于 `extension-kit`，格式与设备引擎属于 `hifi`。`foofoil/Extensions/` 仍用于 Swift/系统类型扩展。职责、旧版支持范围和验证方式见[开发说明](docs/extension-support.zh-CN.md)。
+
 ## 快速开始
 
 启动浮箔后，可以通过以下任一方式添加内容：

@@ -3,7 +3,6 @@ import FoofoilExtensionKit
 
 /// 旧版 Hi-Fi JSON 协议的宿主适配。通用契约上线后逐项删除，不作为新的公共 API。
 enum HiFiLegacyAdapter {
-    static let extensionID = "app.foofoil.extension.hifi"
     static let providerID = "audio.hifi"
     static let playbackQueueID = "hifi.playback-queue"
 

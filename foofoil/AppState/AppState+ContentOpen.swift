@@ -990,7 +990,6 @@ extension AppState {
                     let deviceID = isDeviceChange
                         ? operation.selectedDeviceID
                         : session.audioDeviceSelection?.selectedDeviceID
-                    // 阶段 5：按已协商设备服务决定是否独占，不把所有媒体动作纳入抢占。
                     if ExtensionPlaybackSupport.requiresExclusiveHandoff(session), (isStart || isDeviceChange), let deviceID {
                         var result = session
                         let generation = commandGeneration

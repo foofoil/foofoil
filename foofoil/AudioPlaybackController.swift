@@ -38,6 +38,11 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         let created = AVAudioEngine()
         created.attach(playerNode)
         engineStorage = created
+        // 首次播放也必须接通节点；仅 attach 不会建立到输出的连接。
+        if let format = audioFile?.processingFormat {
+            created.connect(playerNode, to: created.mainMixerNode, format: format)
+            applyVolume()
+        }
         return created
     }
     private var engineStartError: Error?
@@ -47,6 +52,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     private var selectedOutputDeviceID: String?
     private var hasLoadedOutputPreference = false
     private var audioFile: AVAudioFile?
+    private var currentFileAccess: PlaybackFileAccess?
     private var currentFileURL: URL?
     private var loadedContentIdentity: PlaybackContentIdentity?
     private var startFrame: AVAudioFramePosition = 0
@@ -368,6 +374,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         playerNode.stop()
         isPlaying = false
         do {
+            let access = PlaybackFileAccess(url: url)
             let file = try AVAudioFile(forReading: url)
             guard Self.isPlayable(format: file.processingFormat) else {
                 NSLog("AudioPlaybackController rejected invalid format for \(url.path): \(file.processingFormat)")
@@ -384,6 +391,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             let nextChannels = Int(file.processingFormat.channelCount)
             let formatChanged = abs(nextRate - sampleRate) > 0.5 || nextChannels != sourceChannelCount
             audioFile = file
+            currentFileAccess = access
             currentFileURL = url
             loadedContentIdentity = identity
             sampleRate = nextRate
@@ -397,7 +405,10 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 if engineStorage != nil {
                     reconnect(format: file.processingFormat)
                 }
-            } else if engineStorage != nil, playerNode.engine == nil {
+            } else if let existing = engineStorage,
+                      existing.outputConnectionPoints(for: playerNode, outputBus: 0).isEmpty {
+                // attach 后 engine 非 nil，但可能还未连 mixer；首曲为默认 44.1kHz/双声道时
+                // formatChanged 为 false，必须按实际连线判断，不能用节点是否已 attach 代替。
                 reconnect(format: file.processingFormat)
             }
 
@@ -1011,8 +1022,10 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             file,
             startingFrame: startingFrame,
             frameCount: frameCount,
-            at: nil
-        ) { [weak self] in
+            at: nil,
+            // consumed 可能在实际出声前触发，不能用来推进列表或停止尾曲。
+            completionCallbackType: .dataPlayedBack
+        ) { [weak self] _ in
             DispatchQueue.main.async {
                 guard let self, self.scheduleGeneration == generation else { return }
                 self.handleSegmentEnd()
@@ -1035,6 +1048,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         )
         queuedSuccessor = QueuedSuccessor(
             file: prepared.file,
+            access: prepared.access,
             url: prepared.url,
             identity: prepared.identity,
             startFrame: prepared.startFrame,
@@ -1051,6 +1065,8 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
 
     private func prepareSuccessor(url: URL, range: MediaPlaybackRange?) -> PreparedSuccessor? {
         let identity = PlaybackContentIdentity(url: url, range: range)
+        // 下一文件尚未成为当前列表项，预排时自行持有书签 URL 的访问权。
+        let access = PlaybackFileAccess(url: url)
         let file: AVAudioFile
         if let current = audioFile, currentFileURL?.standardizedFileURL.path == url.standardizedFileURL.path {
             file = current
@@ -1077,6 +1093,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         guard frames > 0 else { return nil }
         return PreparedSuccessor(
             file: file,
+            access: access,
             url: url,
             identity: identity,
             startFrame: startFrame,
@@ -1094,6 +1111,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         adoptPreparedSuccessor(
             PreparedSuccessor(
                 file: successor.file,
+                access: successor.access,
                 url: successor.url,
                 identity: successor.identity,
                 startFrame: successor.startFrame,
@@ -1107,6 +1125,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
 
     private func adoptPreparedSuccessor(_ successor: PreparedSuccessor, playerTimeOrigin: Double) {
         audioFile = successor.file
+        currentFileAccess = successor.access
         currentFileURL = successor.url
         loadedContentIdentity = successor.identity
         startFrame = successor.startFrame
@@ -1260,8 +1279,24 @@ private struct PlaybackContentIdentity: Equatable {
     }
 }
 
+/// 访问权与预排文件共同存活；取消预排、替换文件或控制器销毁时配对释放。
+private final class PlaybackFileAccess {
+    private let url: URL
+    private let accessed: Bool
+
+    init(url: URL) {
+        self.url = url
+        accessed = url.startAccessingSecurityScopedResource()
+    }
+
+    deinit {
+        if accessed { url.stopAccessingSecurityScopedResource() }
+    }
+}
+
 private struct PreparedSuccessor {
     let file: AVAudioFile
+    let access: PlaybackFileAccess
     let url: URL
     let identity: PlaybackContentIdentity
     let startFrame: AVAudioFramePosition
@@ -1272,6 +1307,7 @@ private struct PreparedSuccessor {
 
 private struct QueuedSuccessor {
     let file: AVAudioFile
+    let access: PlaybackFileAccess
     let url: URL
     let identity: PlaybackContentIdentity
     let startFrame: AVAudioFramePosition

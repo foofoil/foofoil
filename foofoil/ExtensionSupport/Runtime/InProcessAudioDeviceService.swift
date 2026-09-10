@@ -1,18 +1,7 @@
 import FoofoilExtensionKit
 
-/// 固定选择旧 Hi-Fi Runtime 的规则只保留在兼容层。
-extension HiFiLegacyAdapter {
-    static func audioDeviceService(
-        in runtimes: [String: InProcessExtensionInterface]
-    ) -> (any ExtensionAudioDeviceServicing)? {
-        guard let runtime = runtimes[extensionID] else { return nil }
-        return HiFiLegacyAudioDeviceService { request in
-            try runtime.performApplicationCommand(request)
-        }
-    }
-}
-
-struct HiFiLegacyAudioDeviceService: ExtensionAudioDeviceServicing {
+/// 按已协商能力选中的应用级 Runtime 设备服务。
+struct InProcessAudioDeviceService: ExtensionAudioDeviceServicing {
     private let performCommand: @Sendable (AudioDeviceServiceRequest) throws -> AudioDeviceServiceSnapshot
 
     init(performCommand: @escaping @Sendable (AudioDeviceServiceRequest) throws -> AudioDeviceServiceSnapshot) {

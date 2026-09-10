@@ -2,7 +2,7 @@ import Foundation
 import FoofoilExtensionKit
 
 /// 宿主内部播放呈现、队列投影与独占交接入口。
-/// 阶段 5 按已协商设备服务决定独占，不把所有 `media.transport` 纳入抢占。
+/// 独占交接按已协商设备服务，不把所有 `media.transport` 纳入抢占。
 enum ExtensionPlaybackSupport {
     /// 有播放快照且内容家族为音频（或已协商 `media.transport` / 旧 Hi-Fi）时复用宿主音频 UI。
     static func usesHostAudioChrome(_ session: ContentSession) -> Bool {
@@ -111,8 +111,14 @@ enum ExtensionPlaybackSupport {
         return queue
     }
 
+    /// 已协商 `audio.device-selection` 或会话带设备快照时，跨窗口 PCM/DSD 才走独占交接。
+    static func usesDeviceService(_ session: ContentSession) -> Bool {
+        AudioDeviceServiceRequest.isDeclared(in: session.capabilities.map(\.declaration))
+            || session.audioDeviceSelection != nil
+    }
+
     static func requiresExclusiveHandoff(_ session: ContentSession) -> Bool {
-        HiFiLegacyAdapter.supports(session)
+        usesHostAudioChrome(session) && usesDeviceService(session)
     }
 
     static func legacyMediaAction(for commandID: String, in session: ContentSession) -> MediaPlaybackAction? {

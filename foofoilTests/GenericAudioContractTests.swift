@@ -129,6 +129,19 @@ struct GenericAudioContractTests {
             amongCapable: ["app.foofoil.extension.other", "app.foofoil.extension.hifi"],
             preferredExtensionID: nil
         ) == nil)
+        #expect(ExtensionAudioDeviceDiscovery.extensionID(
+            amongCapable: [],
+            preferredExtensionID: "app.foofoil.extension.hifi"
+        ) == nil)
+        #expect(!ExtensionPlaybackSupport.usesDeviceService(ContentSession(
+            extensionID: nil, providerID: "test.generic-audio",
+            request: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/generic.gaud"))),
+            presentation: .text(titleKey: "Generic Audio", body: "generic.gaud"),
+            capabilities: [
+                .init(declaration: .init(id: ExtensionCapabilityIdentifier.mediaTransport, scope: .session), state: .active)
+            ],
+            mediaPlayback: .init(state: .paused, position: 0, duration: 10, isSeekable: true)
+        )))
         #expect(ContentProbeRequest.isDeclared(in: [
             .init(id: ExtensionCapabilityIdentifier.contentProbe, scope: .application)
         ]))

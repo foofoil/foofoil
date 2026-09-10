@@ -44,6 +44,8 @@ foofoil/
   hifi/
 ```
 
+Host implementation lives in `foofoil/ExtensionSupport/`, divided into Runtime, Management, Presentation, and Compatibility. Audio UI and playback adapters stay in the host; public contracts stay in `extension-kit`, and format/device engines stay in `hifi`. `foofoil/Extensions/` is reserved for Swift/system type extensions. See the [development guide](docs/extension-support.zh-CN.md) for ownership, legacy support, and verification.
+
 ## Quick Start
 
 Launch foofoil and then use any of these methods:

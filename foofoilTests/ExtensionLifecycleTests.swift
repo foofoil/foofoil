@@ -102,12 +102,12 @@ extension ExtensionKitTests {
         }
     }
 
-    @Test func legacyDeviceServicePreservesRequestAndRunsOffMainThread() async throws {
+    @Test func inProcessDeviceServicePreservesRequestAndRunsOffMainThread() async throws {
         let request = AudioDeviceServiceRequest(
             command: .releasePCM, clientID: UUID(), selectedDeviceID: "test-dac",
             sourceSampleRate: 96000, channelCount: 2
         )
-        let service = HiFiLegacyAudioDeviceService { received in
+        let service = InProcessAudioDeviceService { received in
             #expect(!Thread.isMainThread)
             #expect(received == request)
             return AudioDeviceServiceSnapshot(devices: [], activeClientID: received.clientID)
@@ -116,14 +116,13 @@ extension ExtensionKitTests {
         #expect(result.activeClientID == request.clientID)
     }
 
-    @Test func legacyDeviceServicePropagatesRuntimeFailure() async throws {
-        let service = HiFiLegacyAudioDeviceService { _ in
+    @Test func inProcessDeviceServicePropagatesRuntimeFailure() async throws {
+        let service = InProcessAudioDeviceService { _ in
             throw ContentProviderError.unsupportedRequest
         }
         await #expect(throws: ContentProviderError.unsupportedRequest) {
             try await service.perform(.init(command: .snapshot, clientID: UUID()))
         }
-        #expect(HiFiLegacyAdapter.audioDeviceService(in: [:]) == nil)
     }
 
     private var lifecycleRequest: ContentRequest {

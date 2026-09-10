@@ -15,6 +15,19 @@ struct ExtensionPlaybackSupportTests {
     ) -> ContentSession {
         let queueContributionID = contributionID
             ?? (providerID == "audio.hifi" ? "hifi.playback-queue" : "generic.playback-queue")
+        var capabilities: [NegotiatedCapability] = []
+        if transportCapability && mediaPlayback {
+            capabilities.append(.init(
+                declaration: .init(id: ExtensionCapabilityIdentifier.mediaTransport, scope: .session),
+                state: .active
+            ))
+        }
+        if providerID == "audio.hifi" {
+            capabilities.append(.init(
+                declaration: .init(id: ExtensionCapabilityIdentifier.deviceSelector, scope: .application),
+                state: .active
+            ))
+        }
         return ContentSession(
             extensionID: nil,
             providerID: providerID,
@@ -23,9 +36,7 @@ struct ExtensionPlaybackSupportTests {
                 .init(url: URL(fileURLWithPath: "/tmp/second.dsf"))
             ]),
             presentation: .text(titleKey: "Test", body: "Fixture"),
-            capabilities: transportCapability && mediaPlayback ? [
-                .init(declaration: .init(id: ExtensionCapabilityIdentifier.mediaTransport, scope: .session), state: .active)
-            ] : [],
+            capabilities: capabilities,
             commands: [
                 .init(id: "hifi.device.test-dac-uid", titleLocalizationKey: "Output", isEnabled: false)
             ],
@@ -48,6 +59,7 @@ struct ExtensionPlaybackSupportTests {
         #expect(ExtensionPlaybackSupport.usesHostAudioChrome(generic))
         #expect(ExtensionPlaybackSupport.presentationURL(in: generic)?.lastPathComponent == "second.dsf")
         #expect(!ExtensionPlaybackSupport.requiresExclusiveHandoff(generic))
+        #expect(!ExtensionPlaybackSupport.usesDeviceService(generic))
         #expect(ExtensionPlaybackSupport.acceptsGaplessCollection(generic))
         #expect(ExtensionPlaybackSupport.containerPlaybackQueue(from: generic) == nil)
         #expect(ExtensionPlaybackSupport.legacyMediaAction(for: "hifi.play", in: generic) == nil)
@@ -87,6 +99,7 @@ struct ExtensionPlaybackSupportTests {
         #expect(ExtensionPlaybackSupport.usesHostAudioChrome(hifi))
         #expect(ExtensionPlaybackSupport.presentationURL(in: hifi)?.lastPathComponent == "second.dsf")
         #expect(ExtensionPlaybackSupport.requiresExclusiveHandoff(hifi))
+        #expect(ExtensionPlaybackSupport.usesDeviceService(hifi))
         #expect(ExtensionPlaybackSupport.acceptsGaplessCollection(hifi))
         #expect(ExtensionPlaybackSupport.containerPlaybackQueue(from: hifi) == nil)
         #expect(ExtensionPlaybackSupport.legacyMediaAction(for: "hifi.pause", in: hifi) == .pause)
@@ -109,6 +122,16 @@ struct ExtensionPlaybackSupportTests {
         state.extensionSession = hifi
         #expect(state.isAudioDocument)
         #expect(state.currentAudioPresentationURL?.lastPathComponent == "second.dsf")
+    }
+
+    @Test func deviceSnapshotEnablesExclusiveHandoffWithoutHiFiProviderID() {
+        var generic = session(providerID: "test.generic-audio")
+        #expect(!ExtensionPlaybackSupport.requiresExclusiveHandoff(generic))
+        generic.audioDeviceSelection = .init(devices: [
+            .init(id: "dac", displayName: "DAC")
+        ])
+        #expect(ExtensionPlaybackSupport.usesDeviceService(generic))
+        #expect(ExtensionPlaybackSupport.requiresExclusiveHandoff(generic))
     }
 
     @Test func genericContainerQueueInstallsWithoutHiFiProviderID() {

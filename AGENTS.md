@@ -8,6 +8,10 @@ The app is written in Swift and uses SwiftUI for most interface code, with AppKi
 
 Reusable Extension API contracts live in the sibling `extension-kit` repository; this app links it as a local Swift package at `../extension-kit`. Capability extensions such as Hi-Fi live in their own sibling repositories and are not part of the Core app target. Host loading, the Extension Manager, Registry client, and UI stay in this repository.
 
+Host extension code lives in `foofoil/ExtensionSupport/`: `Runtime` owns providers, loading, sessions and optional device services; `Management` owns installation, compatibility negotiation and Registry; `Presentation` owns host UI, playback adapters and host queue projection; `Compatibility` contains only explicitly supported legacy Hi-Fi fallbacks. Keep playback controllers separate from views. `foofoil/Extensions/` remains Swift/system type extensions, not plugins. Xcode uses a filesystem-synchronized source group, so moves within the source root need no per-file project entries.
+
+Prefer negotiated capabilities and opaque IDs. Never add Hi-Fi identifiers or command parsing to generic host paths. The P0 support window remains open: retain legacy session/media/navigation/restore and content-probe fallbacks until the exit conditions in `docs/extension-boundary-refactor-plan.zh-CN.md` §12.2 are met. Device services have no fixed Hi-Fi ID fallback. See `docs/extension-support.zh-CN.md` for current ownership and verification.
+
 When editing the app together with `extension-kit` or `hifi`, open `foofoil.xcworkspace` rather than `foofoil.xcodeproj`. Command-line builds can keep using `foofoil.xcodeproj`.
 
 ## Core Product Principles
