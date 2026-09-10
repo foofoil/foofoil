@@ -119,6 +119,64 @@ struct GenericAudioContractTests {
         #expect(provider.mediaActions.isEmpty)
     }
 
+    /// 显式禁用 seek 时不能发送请求，也不能修改权威会话位置。
+    @Test func seekIsNotSentWhenActionIsUnavailable() async throws {
+        let provider = GenericAudioTestProvider()
+        let host = ExtensionHost.shared
+        host.resolver.register(provider)
+        defer { host.resolver.unregister(providerID: provider.descriptor.id) }
+        var session = try await provider.makeSession(
+            for: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/generic.gaud"))), negotiatedAPI: 1
+        )
+        session.mediaPlayback?.availableActions = [.play, .pause, .refresh]
+
+        let state = AppState()
+        defer {
+            state.extensionSession = nil
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        state.extensionSession = session
+        let before = state.extensionSession?.mediaPlayback?.position
+        state.seekExtensionPlayback(to: 7)
+        for _ in 0..<50 { await Task.yield() }
+        #expect(provider.mediaActions.isEmpty)
+        #expect(state.extensionSession?.mediaPlayback?.position == before)
+    }
+
+    /// 连续 seek 时旧回包必须被丢弃，不能覆盖后发 seek 的结果。
+    @Test func staleSeekResultDoesNotOverwriteNewerSeek() async throws {
+        let provider = GatedSeekTestProvider()
+        let host = ExtensionHost.shared
+        host.resolver.register(provider)
+        defer { host.resolver.unregister(providerID: provider.descriptor.id) }
+        let session = try await provider.makeSession(
+            for: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/gated.gaud"))), negotiatedAPI: 1
+        )
+
+        let state = AppState()
+        defer {
+            state.extensionSession = nil
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        state.extensionSession = session
+
+        state.seekExtensionPlayback(to: 3)
+        state.seekExtensionPlayback(to: 9)
+        for _ in 0..<200 where provider.mediaActions.count < 2 { await Task.yield() }
+        #expect(provider.mediaActions.count == 2)
+
+        // 先放行旧 seek（目标 3），它必须被序号校验丢弃，不能覆盖尚未回包的权威位置。
+        await provider.releaseSeek(toPosition: 3)
+        try? await Task.sleep(for: .milliseconds(100))
+        #expect(state.extensionSession?.mediaPlayback?.position == 0)
+
+        // 再放行新 seek（目标 9），它才应更新会话快照。
+        await provider.releaseSeek(toPosition: 9)
+        for _ in 0..<200 where state.extensionSession?.mediaPlayback?.position != 9 { await Task.yield() }
+        #expect(state.extensionSession?.mediaPlayback?.position == 9)
+        #expect(state.extensionSession?.id == session.id)
+    }
+
     @Test func deviceServiceDiscoveryPrefersUniqueOrPreferredExtension() {
         #expect(ExtensionAudioDeviceDiscovery.extensionID(amongCapable: ["app.foofoil.extension.hifi"], preferredExtensionID: nil) == "app.foofoil.extension.hifi")
         #expect(ExtensionAudioDeviceDiscovery.extensionID(
@@ -306,5 +364,50 @@ private final class GateableAudioTestProvider: ContentProvider {
     func releaseGate() {
         gate?.resume()
         gate = nil
+    }
+}
+
+/// 允许多个 seek 同时在途并按目标位置放行，用于验证过期回包不会覆盖新状态。
+@MainActor
+private final class GatedSeekTestProvider: ContentProvider {
+    let descriptor = ProviderDescriptor(
+        id: "test.gated-seek", extensionID: "app.foofoil.extension.test-gated-seek",
+        role: .primary, fallbackProviderID: nil, enhancementDomain: "audio", contentFamily: .audio,
+        filenameExtensions: ["gaud"], isEnabled: true, isRuntimeAvailable: true
+    )
+    var mediaActions: [MediaPlaybackAction] = []
+    private var pending: [(action: MediaPlaybackAction, session: ContentSession, continuation: CheckedContinuation<ContentSession, Never>)] = []
+
+    func match(_ request: ContentRequest) -> ProviderMatch? { nil }
+
+    func makeSession(for request: ContentRequest, negotiatedAPI: UInt32) async throws -> ContentSession {
+        ContentSession(
+            extensionID: descriptor.extensionID, providerID: descriptor.id, request: request,
+            presentation: .text(titleKey: "Generic Audio", body: request.primaryFileURL?.lastPathComponent ?? ""),
+            capabilities: [
+                .init(declaration: .init(id: ExtensionCapabilityIdentifier.mediaTransport, scope: .session), state: .active),
+                .init(declaration: .init(id: ExtensionCapabilityIdentifier.seekable, scope: .session), state: .active)
+            ],
+            mediaPlayback: .init(state: .paused, position: 0, duration: 100, isSeekable: true)
+        )
+    }
+
+    func perform(mediaAction: MediaPlaybackAction, session: ContentSession) async throws -> ContentSession {
+        mediaActions.append(mediaAction)
+        return await withCheckedContinuation { continuation in
+            pending.append((mediaAction, session, continuation))
+        }
+    }
+
+    /// 按 seek 目标位置放行，避免依赖并发任务的入队顺序。
+    func releaseSeek(toPosition position: Double) async {
+        guard let index = pending.firstIndex(where: {
+            if case .seek(let value) = $0.action { return value == position }
+            return false
+        }) else { return }
+        let item = pending.remove(at: index)
+        var updated = item.session
+        updated.mediaPlayback?.position = position
+        item.continuation.resume(returning: updated)
     }
 }

@@ -75,6 +75,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     var extensionStateReference: String?
     var lastExtensionPlaybackCheckpoint = Date.distantPast
     var exclusivePlaybackGeneration: UInt64 = 0
+    /// 媒体操作序号：每个会改变状态的媒体动作递增，用于丢弃过期回包，避免旧 seek/暂停覆盖新状态。
+    var extensionPlaybackOperationVersion: UInt64 = 0
 
     /// Built-in 与扩展统一投影到同一宿主导航模型；同一窗口只会有一个主内容来源。
     @Published var builtInNavigatorContributions: [NavigatorContribution] = []

@@ -978,6 +978,9 @@ extension AppState {
                 return
             }
             if operation.mediaAction == .pause { exclusivePlaybackGeneration &+= 1 }
+            // refresh 是只读同步，不推进序号；其它动作递增序号，使过期回包在完成时被丢弃。
+            if operation.mediaAction != .refresh { extensionPlaybackOperationVersion &+= 1 }
+            let operationVersion = extensionPlaybackOperationVersion
             guard let currentSession = extensionSession else { return }
             let session = sessionByApplyingHostPlaybackSequence(currentSession)
             let commandGeneration = exclusivePlaybackGeneration
@@ -1018,7 +1021,8 @@ extension AppState {
                         updated = try await operation.perform(in: session)
                     }
                     guard self.extensionSession?.id == session.id,
-                          self.exclusivePlaybackGeneration == commandGeneration else { return }
+                          self.exclusivePlaybackGeneration == commandGeneration,
+                          self.extensionPlaybackOperationVersion == operationVersion else { return }
                     self.extensionSession = updated
                     self.synchronizeFileListWithExtensionQueue(updated)
                     // 进度最多每五秒保存一次扩展快照，避免每秒写盘或刷新历史排序。
@@ -1046,13 +1050,12 @@ extension AppState {
         }
 
         func seekExtensionPlayback(to position: TimeInterval) {
+            // 只在能力与动作都可用时发送；拖动值由 Slider 交互状态承载，成功回包后再更新会话快照。
             guard position.isFinite, position >= 0,
-                  var session = extensionSession,
-                  var playback = session.mediaPlayback,
-                  playback.isSeekable else { return }
-            playback.position = position
-            session.mediaPlayback = playback
-            extensionSession = session
+                  let session = extensionSession,
+                  MediaPlaybackRequest.isSupported(by: session),
+                  session.mediaPlayback?.isSeekable == true,
+                  ExtensionPlaybackSupport.isActionAvailable(.seek, in: session) else { return }
             performExtensionMediaAction(.seek(position))
         }
 
