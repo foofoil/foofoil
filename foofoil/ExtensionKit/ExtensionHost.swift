@@ -18,6 +18,7 @@ final class ExtensionHost: ExtensionRuntimeHost {
     private var sessionCounts: [String: Int] = [:]
     private var loadedInProcess: Set<String> = []
     private var inProcessRuntimes: [String: InProcessExtensionInterface] = [:]
+    private var inProcessManifests: [String: ExtensionManifest] = [:]
     private let sessionLock = NSLock()
 
     init(
@@ -48,7 +49,19 @@ final class ExtensionHost: ExtensionRuntimeHost {
     }
 
     private var audioDeviceService: (any ExtensionAudioDeviceServicing)? {
-        HiFiLegacyAdapter.audioDeviceService(in: inProcessRuntimes)
+        let capableIDs = inProcessManifests.compactMap { id, manifest in
+            AudioDeviceServiceRequest.isDeclared(in: manifest.capabilities) ? id : nil
+        }
+        let preferredProviderID = preferredProvidersByDomain["audio"]
+        let preferredExtensionID = preferredProviderID.flatMap { resolver.provider(id: $0)?.descriptor.extensionID }
+        if let extensionID = ExtensionAudioDeviceDiscovery.extensionID(
+            amongCapable: capableIDs, preferredExtensionID: preferredExtensionID
+        ), let runtime = inProcessRuntimes[extensionID] {
+            return HiFiLegacyAudioDeviceService { request in
+                try runtime.performApplicationCommand(request)
+            }
+        }
+        return HiFiLegacyAdapter.audioDeviceService(in: inProcessRuntimes)
     }
 
     var isAudioDeviceServiceAvailable: Bool { audioDeviceService != nil }
@@ -216,6 +229,7 @@ final class ExtensionHost: ExtensionRuntimeHost {
                     ))
                 }
                 inProcessRuntimes[loaded.manifest.id] = runtime
+                inProcessManifests[loaded.manifest.id] = loaded.manifest
             } catch {
                 NSLog("Extension runtime activation failed: \(error.localizedDescription)")
                 return
@@ -227,6 +241,7 @@ final class ExtensionHost: ExtensionRuntimeHost {
     func deactivateRuntime(extensionID: String) {
         resolver.unregisterProviders(extensionID: extensionID)
         inProcessRuntimes.removeValue(forKey: extensionID)
+        inProcessManifests.removeValue(forKey: extensionID)
         if extensionID == LocalTestExtension.identifier {
             audioEnhancer = nil
         }

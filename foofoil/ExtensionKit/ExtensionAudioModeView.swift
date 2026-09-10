@@ -19,6 +19,10 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
     private let command: @MainActor (ExtensionMediaAction) -> Void
     private let seekAction: @MainActor (TimeInterval) -> Void
     private let hasPreviousOrNext: @MainActor () -> Bool
+    private var availablePrevious: Bool
+    private var availableNext: Bool
+    private var availablePlay: Bool
+    private var availablePause: Bool
     private let navigateHostList: @MainActor (Int) -> Bool
     private let handlePlaybackCompletion: @MainActor () -> Void
     private let notePlaybackIntent: @MainActor (Bool) -> Void
@@ -50,6 +54,10 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
                 appState.advanceFileListAfterPlayback()
             }
         }
+        availablePrevious = true
+        availableNext = true
+        availablePlay = true
+        availablePause = false
         mediaTitle = Self.title(for: session)
         apply(session: session)
         observer = NotificationCenter.default.addObserver(
@@ -141,6 +149,13 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
     func apply(session: ContentSession) {
         let wasPlaying = isPlaying
         mediaTitle = Self.title(for: session)
+        let queueCount = session.playbackQueue?.items.count ?? 0
+        availablePlay = session.mediaPlayback?.allows(.play, queueItemCount: queueCount) ?? false
+        availablePause = session.mediaPlayback?.allows(.pause, queueItemCount: queueCount) ?? false
+        availablePrevious = session.mediaPlayback?.allows(.previous, queueItemCount: queueCount)
+            ?? (queueCount > 1)
+        availableNext = session.mediaPlayback?.allows(.next, queueItemCount: queueCount)
+            ?? (queueCount > 1)
         guard let playback = session.mediaPlayback else { return }
         isPlaying = playback.state == .playing
         currentTime = playback.position
@@ -161,11 +176,16 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
 
     func play() {
         notePlaybackIntent(true)
+        guard availablePlay else { return }
         startPlayback()
     }
 
     func pause() {
         notePlaybackIntent(false)
+        guard availablePause else {
+            isPlaying = false
+            return
+        }
         stopOutput()
     }
 
@@ -200,15 +220,17 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
     }
 
     func playPreviousItem() -> Bool {
-        guard hasPreviousOrNext() else { return false }
         if navigateHostList(-1) { return true }
+        guard availablePrevious || hasPreviousOrNext() else { return false }
+        guard availablePrevious else { return false }
         command(.previous)
         return true
     }
 
     func playNextItem() -> Bool {
-        guard hasPreviousOrNext() else { return false }
         if navigateHostList(1) { return true }
+        guard availableNext || hasPreviousOrNext() else { return false }
+        guard availableNext else { return false }
         command(.next)
         return true
     }
@@ -223,7 +245,7 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
     }
 }
 
-/// Hi-Fi 扩展仅负责播放；视觉、交互、封面与快捷键全部复用宿主音频模式。
+/// 扩展音频复用宿主音频模式；视觉、交互、封面与快捷键不进入插件。
 struct ExtensionAudioModeView: View {
     @ObservedObject var appState: AppState
     let shouldHideBorder: Bool
@@ -234,7 +256,7 @@ struct ExtensionAudioModeView: View {
         self.appState = appState
         self.shouldHideBorder = shouldHideBorder
         _controller = StateObject(wrappedValue: ExtensionAudioPlaybackController(appState: appState, session: session))
-        let url = HiFiLegacyAdapter.currentURL(in: session)
+        let url = ExtensionPlaybackSupport.presentationURL(in: session)
         var fallback = AudioTrackInfo.fallback(fileName: url?.lastPathComponent ?? "")
         fallback.artwork = appState.customCoverImage
         _info = State(initialValue: AudioModeView.overlay(
@@ -267,7 +289,7 @@ struct ExtensionAudioModeView: View {
             appState.isMediaPlaying = false
         }
         .onReceive(appState.$extensionSession.compactMap { $0 }) { session in
-            guard HiFiLegacyAdapter.supports(session) else { return }
+            guard ExtensionPlaybackSupport.usesHostAudioChrome(session) else { return }
             controller.apply(session: session)
         }
         .onReceive(controller.$isPlaying) { appState.isMediaPlaying = $0 }
@@ -338,7 +360,7 @@ struct ExtensionAudioModeView: View {
     }
 
     private func isDSDDeviceEnabled(_ deviceID: String, in session: ContentSession) -> Bool {
-        HiFiLegacyAdapter.isDeviceEnabled(deviceID, in: session)
+        ExtensionPlaybackSupport.isOutputDeviceEnabled(deviceID, in: session)
     }
 
     private var presentationID: String {
@@ -349,7 +371,7 @@ struct ExtensionAudioModeView: View {
 
     private func loadTrackInfo() async -> AudioTrackInfo {
         guard let session = appState.extensionSession,
-              let url = HiFiLegacyAdapter.currentURL(in: session) else {
+              let url = ExtensionPlaybackSupport.presentationURL(in: session) else {
             return AudioTrackInfo.fallback(fileName: "")
         }
         var loaded = await AudioMetadataLoader.load(from: url)

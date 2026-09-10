@@ -482,23 +482,23 @@ struct ExtensionKitTests {
             presentation: .text(titleKey: "Hi-Fi", body: ""),
             playbackQueue: .init(items: items.indices.map { .init(id: "file:\($0)", title: "track") }, currentItemID: "file:0")
         )
-        #expect(state.hiFiSessionWithSequence(session).playbackQueue?.items.map(\.id) == ["file:0", "file:1", "file:2"])
+        #expect(state.sessionByApplyingHostPlaybackSequence(session).playbackQueue?.items.map(\.id) == ["file:0", "file:1", "file:2"])
         state.fileList?.items = [items[0], items[2], items[1]]
-        #expect(state.hiFiSessionWithSequence(session).playbackQueue?.items.map(\.id) == ["file:0", "file:2", "file:1"])
+        #expect(state.sessionByApplyingHostPlaybackSequence(session).playbackQueue?.items.map(\.id) == ["file:0", "file:2", "file:1"])
         state.mediaPlaybackMode = .shuffle
-        #expect(state.hiFiSessionWithSequence(session).playbackQueue?.items.map(\.id) == ["file:0"])
+        #expect(state.sessionByApplyingHostPlaybackSequence(session).playbackQueue?.items.map(\.id) == ["file:0"])
         state.mediaPlaybackMode = .singleLoop
-        #expect(state.hiFiSessionWithSequence(session).playbackQueue?.items.map(\.id) == ["file:0"])
+        #expect(state.sessionByApplyingHostPlaybackSequence(session).playbackQueue?.items.map(\.id) == ["file:0"])
         state.mediaPlaybackMode = .sequential
         let pcm = FileListItem(id: "pcm", path: "/tmp/new.wav", bookmark: nil, displayName: "new")
         state.fileList?.items = [items[0], pcm, items[1]]
-        #expect(state.hiFiSessionWithSequence(session).playbackQueue?.items.map(\.id) == ["file:0"])
+        #expect(state.sessionByApplyingHostPlaybackSequence(session).playbackQueue?.items.map(\.id) == ["file:0"])
         var advanced = session
         advanced.playbackQueue?.currentItemID = "file:1"
-        state.synchronizeHiFiListSelection(advanced)
+        state.synchronizeFileListWithExtensionQueue(advanced)
         #expect(state.fileList?.currentID == items[1].id)
         // 普通文件集合不能被错误展开为 SACD 容器列表。
-        state.installHiFiContainerListIfNeeded(url: items[0].url, session: session, preferredItemID: nil)
+        state.installExtensionContainerListIfNeeded(url: items[0].url, session: session, preferredItemID: nil)
         #expect(state.fileList?.items.map(\.id) == [items[0].id, pcm.id, items[1].id])
     }
 

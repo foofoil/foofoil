@@ -37,7 +37,9 @@ final class InProcessContentProvider: ContentProvider {
         ProviderContentMatcher.match(
             request,
             declarations: declaration.contentTypes,
-            sniff: HiFiLegacyAdapter.sniffSACDISOMagic
+            sniff: declaration.id == HiFiLegacyAdapter.providerID
+                ? HiFiLegacyAdapter.sniffSACDISOMagic
+                : { _ in false }
         )
     }
 

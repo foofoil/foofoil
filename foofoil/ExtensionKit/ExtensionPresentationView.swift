@@ -13,7 +13,7 @@ struct ExtensionPresentationView: View {
     var body: some View {
         Group {
             if let session = appState.extensionSession {
-                if HiFiLegacyAdapter.supports(session), session.mediaPlayback != nil {
+                if ExtensionPlaybackSupport.usesHostAudioChrome(session) {
                     ExtensionAudioModeView(
                         appState: appState,
                         session: session,
@@ -78,12 +78,14 @@ struct ExtensionPresentationView: View {
     @ViewBuilder
     private func playbackControls(_ playback: MediaPlaybackSnapshot, hasQueue: Bool) -> some View {
         let isPlaying = playback.state == .playing
+        let queueCount = appState.extensionSession?.playbackQueue?.items.count ?? (hasQueue ? 2 : 0)
         HStack(spacing: 12) {
             if hasQueue {
                 Button { appState.performExtensionMediaAction(.previous) } label: {
                     Image(systemName: "backward.fill")
                 }
                 .buttonStyle(.plain)
+                .disabled(!playback.allows(.previous, queueItemCount: queueCount))
                 .accessibilityLabel(NSLocalizedString("Previous", comment: ""))
             }
             Button {
@@ -93,6 +95,7 @@ struct ExtensionPresentationView: View {
                     .frame(width: 18, height: 18)
             }
             .buttonStyle(.borderedProminent)
+            .disabled(!playback.allows(isPlaying ? .pause : .play, queueItemCount: queueCount))
             .accessibilityLabel(NSLocalizedString(isPlaying ? "Pause" : "Play", comment: ""))
 
             if hasQueue {
@@ -100,10 +103,11 @@ struct ExtensionPresentationView: View {
                     Image(systemName: "forward.fill")
                 }
                 .buttonStyle(.plain)
+                .disabled(!playback.allows(.next, queueItemCount: queueCount))
                 .accessibilityLabel(NSLocalizedString("Next", comment: ""))
             }
 
-            if playback.isSeekable, let duration = playback.duration {
+            if playback.allows(.seek), let duration = playback.duration {
                 ExtensionPlaybackSlider(
                     position: playback.position,
                     duration: duration,

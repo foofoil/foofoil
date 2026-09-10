@@ -1,9 +1,11 @@
 import Foundation
 import FoofoilExtensionKit
 
-/// 旧 Hi-Fi 队列与宿主文件列表之间的过渡桥接；公共导航契约上线后迁移。
+/// 旧 Hi-Fi 队列与宿主文件列表之间的过渡桥接。
+/// 阶段 3 下沉容器曲目与私有 ID；阶段 4 按通用贡献 ID 传递操作，不再在此解释 `file:` 前缀。
 extension AppState {
-    func hiFiSequenceURLs(startingAt itemID: String) -> [URL] {
+    /// 连续 DSF/DFF 可共享会话。阶段 3 改为由扩展声明可衔接的格式，而不是宿主写死后缀。
+    func contiguousExtensionAudioURLs(startingAt itemID: String) -> [URL] {
         guard let list = fileList, let index = list.items.firstIndex(where: { $0.id == itemID }),
               mediaPlaybackMode == .sequential || mediaPlaybackMode == .sequentialLoop else { return [] }
         var urls: [URL] = []
@@ -15,28 +17,17 @@ extension AppState {
         return urls
     }
 
-    private func hiFiItemID(_ item: FileListItem, session: ContentSession) -> String? {
-        if let id = item.cue?.containerTrackID {
-            guard session.request.primaryFileURL?.standardizedFileURL == item.url.standardizedFileURL else { return nil }
-            return id
-        }
-        guard item.cue == nil,
-              let index = session.request.resources.firstIndex(where: {
-                  $0.url.standardizedFileURL == item.url.standardizedFileURL
-              }) else { return nil }
-        return "file:\(index)"
-    }
-
     /// 每次命令携带宿主允许的顺序；移除、排序或切换模式后废弃旧的预读后继。
-    func hiFiSessionWithSequence(_ original: ContentSession) -> ContentSession {
-        guard HiFiLegacyAdapter.supports(original), var queue = original.playbackQueue,
+    func sessionByApplyingHostPlaybackSequence(_ original: ContentSession) -> ContentSession {
+        guard original.playbackQueue != nil, var queue = original.playbackQueue,
               let list = fileList else { return original }
         var session = original
         let currentID = queue.currentItemID
         var ids: [String] = []
-        if let index = list.items.firstIndex(where: { hiFiItemID($0, session: original) == currentID }) {
+        if let index = list.items.firstIndex(where: { ExtensionPlaybackSupport.queueItemID(for: $0, in: original) == currentID }) {
             for item in list.items.dropFirst(index) {
-                guard let id = hiFiItemID(item, session: original), queue.items.contains(where: { $0.id == id }) else { break }
+                guard let id = ExtensionPlaybackSupport.queueItemID(for: item, in: original),
+                      queue.items.contains(where: { $0.id == id }) else { break }
                 ids.append(id)
                 if mediaPlaybackMode != .sequential && mediaPlaybackMode != .sequentialLoop { break }
             }
@@ -49,10 +40,10 @@ extension AppState {
         return session
     }
 
-    func synchronizeHiFiListSelection(_ session: ContentSession) {
-        guard HiFiLegacyAdapter.supports(session), let currentID = session.playbackQueue?.currentItemID,
+    func synchronizeFileListWithExtensionQueue(_ session: ContentSession) {
+        guard let currentID = session.playbackQueue?.currentItemID,
               var list = fileList,
-              let item = list.items.first(where: { hiFiItemID($0, session: session) == currentID }),
+              let item = list.items.first(where: { ExtensionPlaybackSupport.queueItemID(for: $0, in: session) == currentID }),
               list.currentID != item.id else { return }
         list.currentID = item.id
         fileList = list
@@ -61,15 +52,12 @@ extension AppState {
         syncFileListNavigator()
     }
 
-    func installHiFiContainerListIfNeeded(
+    func installExtensionContainerListIfNeeded(
         url: URL,
         session: ContentSession,
         preferredItemID: String?
     ) {
-        guard HiFiLegacyAdapter.supports(session),
-              url.pathExtension.lowercased() == "iso",
-              let queue = session.playbackQueue,
-              queue.items.count >= 2 else { return }
+        guard let queue = ExtensionPlaybackSupport.containerPlaybackQueue(from: session) else { return }
         let normalizedPath = url.resolvingSymlinksInPath().standardizedFileURL.path
         let alreadyInstalled = fileList?.items.contains(where: { item in
             item.cue != nil
@@ -87,13 +75,15 @@ extension AppState {
             list.currentID = preferredItemID
             fileList = list
             if containerTrackID != queue.currentItemID {
-                performNavigatorAction(
-                    NavigatorAction(
-                        contributionID: HiFiLegacyAdapter.playbackQueueID,
-                        kind: .activate,
-                        itemIDs: [containerTrackID]
+                if let contributionID = ExtensionPlaybackSupport.playbackContributionID(in: session) {
+                    performNavigatorAction(
+                        NavigatorAction(
+                            contributionID: contributionID,
+                            kind: .activate,
+                            itemIDs: [containerTrackID]
+                        )
                     )
-                )
+                }
             }
         }
         syncFileListNavigator()
@@ -102,11 +92,11 @@ extension AppState {
     /// 同一 SACD ISO 会话内切歌，不重建 Session、不重配 HAL。
     /// 自然播完后由 Hi-Fi Runtime 在 activate 时继续播放下一曲；此处只切换队列项。
     @discardableResult
-    func activateExistingHiFiContainerTrack(_ item: FileListItem) -> Bool {
+    func activateExistingContainerTrack(_ item: FileListItem) -> Bool {
         guard let session = extensionSession,
-              HiFiLegacyAdapter.supports(session),
               let queue = session.playbackQueue,
-              let containerTrackID = containerTrackID(for: item, in: queue) else {
+              let containerTrackID = containerTrackID(for: item, in: queue),
+              let contributionID = ExtensionPlaybackSupport.playbackContributionID(in: session) else {
             return false
         }
         let sessionURL = session.request.primaryFileURL
@@ -119,7 +109,7 @@ extension AppState {
         if queue.currentItemID != containerTrackID {
             performNavigatorAction(
                 NavigatorAction(
-                    contributionID: HiFiLegacyAdapter.playbackQueueID,
+                    contributionID: contributionID,
                     kind: .activate,
                     itemIDs: [containerTrackID]
                 )

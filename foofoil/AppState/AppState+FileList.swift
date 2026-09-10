@@ -192,7 +192,7 @@ extension AppState {
         return leftover
     }
 
-    /// 已有列表接收 SACD ISO 后，用一个不启动播放的临时 Hi-Fi 会话解析曲目，再原位展开为子目录。
+    /// 已有列表接收容器 ISO 后，用临时会话读取曲目队列再展开。阶段 3 改为扩展探测，不再为此开完整播放会话。
     func expandAppendedSACDContainers(urls: [URL]) {
         for url in urls {
             Task { @MainActor [weak self] in
@@ -200,7 +200,7 @@ extension AppState {
                 do {
                     let outcome = try await ExtensionHost.shared.open(url: url)
                     let session = outcome.session
-                    let queue = HiFiLegacyAdapter.supports(session) ? session.playbackQueue : nil
+                    let queue = ExtensionPlaybackSupport.containerPlaybackQueue(from: session)
                     let bookmark = session.request.resources.first?.securityScopedBookmark
                         ?? Self.makeSecurityScopedBookmark(for: url)
                     await ExtensionHost.shared.closeSessionAndWait(session)
@@ -272,7 +272,7 @@ extension AppState {
                 cacheToken: item.id
             )
         case .audio where ExtensionHost.shared.canOpen(url: url):
-            if activateExistingHiFiContainerTrack(item) {
+            if activateExistingContainerTrack(item) {
                 syncFileListNavigator()
                 saveState()
                 return

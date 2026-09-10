@@ -677,7 +677,7 @@ extension AppState {
                     self.extensionFallbackProviderID = outcome.failures.first?.providerID
                     self.holdExtensionAudioFileAccess(for: outcome.session)
                     self.extensionStateReference = nil
-                    self.installHiFiContainerListIfNeeded(
+                    self.installExtensionContainerListIfNeeded(
                         url: url,
                         session: outcome.session,
                         preferredItemID: nil
@@ -704,11 +704,7 @@ extension AppState {
         /// 读取在重启后因沙盒不可达而失败（播放不受影响，引擎持有已打开的文件句柄）。
         /// 跟随实际播出的队列项切换授权，不碰同目录授权。
         func holdExtensionAudioFileAccess(for session: ContentSession) {
-            let resources = session.request.resources
-            let currentID = session.playbackQueue?.currentItemID ?? ""
-            let index = currentID.hasPrefix("file:") ? Int(currentID.dropFirst(5)) ?? 0 : 0
-            guard resources.indices.contains(index) else { return }
-            let resource = resources[index]
+            guard let resource = ExtensionPlaybackSupport.authorizedResource(in: session) else { return }
             let url: URL
             if let bookmark = resource.securityScopedBookmark, !bookmark.isEmpty {
                 var stale = false
@@ -799,7 +795,7 @@ extension AppState {
                     self.extensionSession = restoredSession
                     self.extensionFallbackProviderID = outcome.failures.first?.providerID
                     self.holdExtensionAudioFileAccess(for: restoredSession)
-                    self.installHiFiContainerListIfNeeded(
+                    self.installExtensionContainerListIfNeeded(
                         url: sourceURL,
                         session: restoredSession,
                         preferredItemID: self.fileList?.currentID
@@ -848,10 +844,10 @@ extension AppState {
                     await closeTask?.value
                     guard self.currentMediaRouteGeneration == routeGeneration,
                           self.fileList?.currentID == itemID else { return }
-                    let urls = self.hiFiSequenceURLs(startingAt: itemID)
+                    let urls = self.contiguousExtensionAudioURLs(startingAt: itemID)
                     let outcome: SessionResolutionOutcome
                     if urls.count > 1, let sequence = try? await ExtensionHost.shared.open(urls: urls) {
-                        if HiFiLegacyAdapter.supports(sequence.session) {
+                        if ExtensionPlaybackSupport.acceptsGaplessCollection(sequence.session) {
                             outcome = sequence
                         } else {
                             await ExtensionHost.shared.closeSessionAndWait(sequence.session)
@@ -887,7 +883,7 @@ extension AppState {
                     self.extensionSession = outcome.session
                     self.extensionFallbackProviderID = outcome.failures.first?.providerID
                     self.holdExtensionAudioFileAccess(for: outcome.session)
-                    self.installHiFiContainerListIfNeeded(
+                    self.installExtensionContainerListIfNeeded(
                         url: url,
                         session: outcome.session,
                         preferredItemID: itemID
@@ -959,7 +955,7 @@ extension AppState {
 
         func performExtensionCommand(_ commandID: String) {
             if let session = extensionSession,
-               let action = HiFiLegacyAdapter.mediaAction(for: commandID, in: session) {
+               let action = ExtensionPlaybackSupport.legacyMediaAction(for: commandID, in: session) {
                 performExtensionMediaAction(action)
             } else {
                 performExtensionOperation(.command(commandID))
@@ -977,7 +973,7 @@ extension AppState {
             }
             if operation.mediaAction == .pause { exclusivePlaybackGeneration &+= 1 }
             guard let currentSession = extensionSession else { return }
-            let session = hiFiSessionWithSequence(currentSession)
+            let session = sessionByApplyingHostPlaybackSequence(currentSession)
             let commandGeneration = exclusivePlaybackGeneration
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -988,7 +984,8 @@ extension AppState {
                     let deviceID = isDeviceChange
                         ? operation.selectedDeviceID
                         : session.audioDeviceSelection?.selectedDeviceID
-                    if HiFiLegacyAdapter.supports(session), (isStart || isDeviceChange), let deviceID {
+                    // 阶段 5：按已协商设备服务决定是否独占，不把所有媒体动作纳入抢占。
+                    if ExtensionPlaybackSupport.requiresExclusiveHandoff(session), (isStart || isDeviceChange), let deviceID {
                         var result = session
                         let generation = commandGeneration
                         try await ExclusivePlaybackCoordinator.shared.perform(
@@ -1005,7 +1002,7 @@ extension AppState {
                                     ExclusivePlaybackCoordinator.shared.release(ownerID: session.id)
                                     let selected = try await operation.perform(in: paused)
                                     guard self.exclusivePlaybackGeneration == generation else { throw CancellationError() }
-                                    result = try await ExtensionHost.shared.perform(mediaAction: .play, in: self.hiFiSessionWithSequence(selected))
+                                    result = try await ExtensionHost.shared.perform(mediaAction: .play, in: self.sessionByApplyingHostPlaybackSequence(selected))
                                 } else {
                                     result = try await operation.perform(in: session)
                                 }
@@ -1018,7 +1015,7 @@ extension AppState {
                     guard self.extensionSession?.id == session.id,
                           self.exclusivePlaybackGeneration == commandGeneration else { return }
                     self.extensionSession = updated
-                    self.synchronizeHiFiListSelection(updated)
+                    self.synchronizeFileListWithExtensionQueue(updated)
                     // 进度最多每五秒保存一次扩展快照，避免每秒写盘或刷新历史排序。
                     let persistsState = operation.mediaAction != .refresh
                     let checkpointsPlayback = Date().timeIntervalSince(self.lastExtensionPlaybackCheckpoint) >= 5
@@ -1072,7 +1069,7 @@ extension AppState {
                     do {
                         let updated = try await ExtensionHost.shared.perform(
                             navigatorAction: action,
-                            in: self.hiFiSessionWithSequence(session)
+                            in: self.sessionByApplyingHostPlaybackSequence(session)
                         )
                         guard self.extensionSession?.id == session.id else { return }
                         self.extensionSession = updated

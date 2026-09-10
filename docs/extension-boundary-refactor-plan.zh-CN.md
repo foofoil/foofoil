@@ -1,7 +1,7 @@
 # foofoil 扩展职责收敛与主项目减负计划
 
 日期：2026-09-09  
-状态：实施中；阶段 0 基线已建立。关闭、恢复、媒体控制和导航动作公共契约已接通；设备服务、内容探测与呈现层的剩余解耦尚未完成。
+状态：实施中；阶段 0–2 已完成。最小通用契约已补齐；内容探测尚未迁入 hifi，呈现与独占交接仍待按能力切换。
 
 范围：兄弟仓库 `foofoil`、`extension-kit`、`hifi`。本文中的源码路径均相对各自仓库根目录。
 
@@ -58,7 +58,7 @@
 
 ## 4. 分阶段实施
 
-勾选表示整条任务已完成；部分完成项保留未勾选并注明剩余工作。依据第 8–12 节实施记录核对，阶段验收与真实硬件验证单独判断。
+勾选表示整条任务已完成；部分完成项保留未勾选并注明剩余工作。依据第 8–14 节实施记录核对，阶段验收与真实硬件验证单独判断。
 
 ### 阶段 0：建立行为和兼容基线
 
@@ -73,7 +73,7 @@
 ### 阶段 1：收拢 Hi-Fi 适配，保持现有行为
 
 - [x] 在宿主建立临时 `ExtensionSupport/Compatibility/HiFiLegacyAdapter.swift`，集中旧命令映射、旧 provider 判断和旧历史转换。按实际职责拆分必要文件，避免再形成巨型控制器。
-- [ ] 从 AppState、导航视图和音频视图移出上述专用判断；宿主层仍掌握窗口、权限和用户意图。（部分完成：已收拢旧命令和恢复适配；呈现、队列与独占仲裁仍有 Hi-Fi 判断。）
+- [x] 从 AppState、导航视图和音频视图移出上述专用判断；宿主层仍掌握窗口、权限和用户意图。
 - [x] 为通用关闭、导航和可选设备服务建立窄的宿主内部入口，先委托兼容适配执行。
 - [x] 临时隔离 Provider 内的 SACD 探测；不因为移动目录就认定格式识别已经下沉。
 
@@ -84,10 +84,10 @@
 优先复用 `ContentRequest`、`ContentSession`、`NavigatorAction`、播放快照与现有设备服务类型。检查 `stateReference` 的当前语义后再决定如何承载恢复状态，不直接改变其既有含义。
 
 - [x] 定义播放操作的稳定语义：播放、暂停、定位、上一项、下一项、状态读取、设备选择与关闭。字段名和消息封装在此阶段确定，不直接把 `hifi.` 改成另一个字符串前缀。
-- [ ] 明确操作支持情况、禁用状态、错误结果、异步完成与关闭幂等性；关闭完成应表示文件/设备资源已经释放。（部分完成：已实现能力版本校验、错误返回、完成语义和关闭幂等；通用媒体禁用状态尚未完全接入。）
-- [ ] 直接传递 `NavigatorAction`，明确列表所有权、稳定项目 ID、选择与排序反馈，避免宿主和扩展各维护一套互相冲突的队列。（部分完成：已实现通用导航请求和 Runtime 校验；宿主专用队列映射仍待清理。）
-- [ ] 定义版本化恢复请求：宿主持久化资源、授权和不透明扩展状态；扩展解释自己的曲目、位置等状态。（部分完成：已实现 session.lifecycle v1，覆盖不透明曲目 ID 与位置；更完整的不透明扩展状态尚未定义，stateReference 语义保持不变。）
-- [ ] 定义可选内容探测和设备服务的能力发现方式；复用现有协商机制，不增加无实际用途的注册框架。
+- [x] 明确操作支持情况、禁用状态、错误结果、异步完成与关闭幂等性；关闭完成应表示文件/设备资源已经释放。
+- [x] 直接传递 `NavigatorAction`，明确列表所有权、稳定项目 ID、选择与排序反馈，避免宿主和扩展各维护一套互相冲突的队列。
+- [x] 定义版本化恢复请求：宿主持久化资源、授权和不透明扩展状态；扩展解释自己的曲目、位置等状态。
+- [x] 定义可选内容探测和设备服务的能力发现方式；复用现有协商机制，不增加无实际用途的注册框架。
 - [x] 明确状态刷新生命周期，优先沿用低频请求机制；不为消除 `hifi.status` 而引入新的常驻服务或全套事件总线。
 - [x] 增加契约、未知可选字段、缺失字段、能力缺失、版本不支持和消息校验测试。
 
@@ -187,7 +187,7 @@ xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platfor
 
 最大的风险是队列所有权、恢复兼容和设备释放时序。阶段 2 先用消息示例固定语义，再改调用链；阶段 3–5 分开推进，避免恢复、呈现和硬件仲裁同时重写。
 
-阶段 0 已确定实际旧版支持范围与兼容适配退出条件（第 12.2 节）。仍待阶段 2 确定：`stateReference` 是否继续只作存储键、内容探测消息形态、多个设备服务的选择规则。遵循现有能力协商和偏好解析机制，只扩展当前需求确实缺失的部分。
+阶段 0 已确定实际旧版支持范围与兼容适配退出条件（第 12.2 节）。阶段 2 已确定：`stateReference` 继续只作存储键；内容探测为 `content.probe` v1 application 能力；多个设备服务按 audio 域偏好，否则唯一候选，否则不用。遵循现有能力协商和偏好解析机制，只扩展当前需求确实缺失的部分。
 
 本轮聚焦扩展边界。`FloatingWindowController` 等大型文件可能仍有独立维护问题，应另行评估；完成本计划不等于主项目所有复杂度都已消除。
 
@@ -418,12 +418,70 @@ xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platfor
 
 ### 12.6 剩余事项
 
-阶段 0 验收已满足。后续阶段按计划推进，不跳过。已提前完成的 P1 契约与兼容层继续复用。
-
-阶段 1 剩余：呈现、队列、独占仲裁中的 Hi-Fi 判断移出 AppState/视图。
-
-阶段 2 剩余：媒体禁用状态、宿主专用队列映射、更完整不透明恢复状态、内容探测与设备服务能力发现。
+阶段 0 验收已满足。阶段 1 见第 13 节。阶段 2 见第 14 节。
 
 阶段 3–6：见第 4 节未勾选项。硬件回归未通过前，阶段 5 不得标完成。
 
-阻塞：无。阶段 6 删除旧适配前需按 12.2 确认支持窗口；那是后续决策点，不阻碍进入阶段 1。
+阻塞：无。阶段 6 删除旧适配前需按 12.2 确认支持窗口。
+
+## 13. 实施记录：2026-09-10，阶段 1 从通用层移出 Hi-Fi 判断
+
+本批基于 foofoil `0dd13c7`。只改宿主；复用第 8–11 节的兼容层与公共契约，不改 ABI、JSON、历史格式或 hifi 引擎。
+
+### 已实现
+
+新增宿主内部入口 `ExtensionPlaybackSupport`。通用 AppState / 导航 / 音频视图不再调用 `HiFiLegacyAdapter` 或解析 `hifi.*` / `file:`。兼容层仍掌握旧 provider、队列 ID 和命令映射，并标注阶段 3–5 替代路径：
+
+- 阶段 4：呈现改为内容家族与已协商媒体能力，不再认 `audio.hifi`。
+- 阶段 3：容器探测、私有曲目 ID 与可衔接格式由扩展解释。
+- 阶段 5：独占交接按已协商设备服务决定，不把所有 `media.transport` 纳入抢占。
+
+通用层改为：
+
+- `ExtensionPresentationView` / `ExtensionAudioModeView` / `AppState+MediaType` 走 `usesHostAudioChrome` 与 `presentationURL`。
+- `NavigatorPanelView` 走 `showsPlaybackIndicator`。
+- 列表展开、无缝序列、容器安装、独占交接和旧菜单命令走 `containerPlaybackQueue` / `acceptsGaplessCollection` / `requiresExclusiveHandoff` / `legacyMediaAction`。
+- `holdExtensionAudioFileAccess` 不再在 AppState 里解析 `file:` 前缀。
+- 兼容队列方法改名为宿主语义（`contiguousExtensionAudioURLs`、`sessionByApplyingHostPlaybackSequence` 等）；实现仍只对旧 Hi-Fi 生效。
+- 进程内 Provider 的 SACD 魔数 sniff 仅绑到 `audio.hifi`，其他 in-process 扩展不再共用该探测。
+
+行为保持：通用测试 Provider 即使带 `mediaPlayback` 和队列，也不会进入宿主音频 chrome、容器展开或独占交接。
+
+### 验证
+
+- `xcodebuild test ... -only-testing:foofoilTests`：211 项通过、1 项硬件测试跳过、0 失败；展开参数化测试后 226 次通过。跳过仍为 `CueSheetTests/exclusivePlaybackSurvivesTrackChangesAndPause()`。
+- 新增 `ExtensionPlaybackSupportTests`：通用 Provider 不接管呈现/队列/交接；Hi-Fi 仍走旧 chrome 与 `file:` 资源定位；通用队列不会被安装成宿主容器。
+- `./run` 构建、注入并签名 Hi-Fi 开发插件后启动应用。未做真实 DAC 听音或设备切换。
+- `git diff --check` 通过；无新增源码编译警告。未改 extension-kit 或 hifi，未重复跑两者测试。
+
+### 剩余事项
+
+阶段 1 验收已满足。适配层仍有专用知识，这是本阶段允许的。
+
+阶段 3 起：将 SACD 探测迁入 hifi、解释私有 ID、按内容家族呈现、完成设备独占交接。设备服务已能按能力发现，无声明时仍回退 Hi-Fi 扩展 ID。
+
+## 14. 实施记录：2026-09-10，阶段 2 最小通用契约
+
+本批修改 extension-kit 与 foofoil；hifi 引擎与 ABI 未改。复用已有 `media.transport`、`session.lifecycle`、`ui.navigator-actions` 和 `AudioDeviceServiceRequest`。
+
+### 已实现
+
+- `MediaPlaybackSnapshot.availableActions`：显式禁用列表；缺省由状态、`isSeekable` 和队列长度推导。显式列表外的动作在进扩展前返回 `actionUnavailable`。通用呈现控件与扩展播放控制器接入该禁用状态。
+- 列表所有权写入契约：宿主拥有外部文件顺序；扩展拥有容器曲目；项目 ID 不透明。导航动作使用会话贡献 ID，不再写死 `hifi.playback-queue`。`file:` 前缀只留在兼容层。单资源且队列 ≥2 视为容器投影，通用 Provider 也可展开。
+- `stateReference` 继续只作 `ExtensionStateStore` 键。不透明状态即已持久化的 `ContentSession` payload；恢复请求仍只传曲目 ID 与位置，不新增 blob。
+- 新增 `content.probe` v1（application）。请求走 `perform_application_command` 的 `commandID`，与设备服务的 `command` 字段并存。I/O 预算默认 2 MiB。本批未把 SACD 嗅探迁出宿主兼容层。
+- 设备服务按 Manifest 协商 `audio.device-selection`：audio 域偏好优先，否则唯一候选，否则不用并保留系统输出。未声明能力的旧 Hi-Fi 仍按扩展 ID 回退。
+
+最小非 Hi-Fi Provider `test.generic-audio` 用 `item-a` / `item-b` 完成播放、导航、恢复、幂等关闭，不含 `hifi.*`。
+
+### 验证
+
+- extension-kit `swift test`：26 项通过。
+- hifi `swift test`：40 项通过（未改 Runtime）。
+- 宿主：214 项通过、1 项硬件跳过、0 失败；展开 229 次。跳过仍为 `CueSheetTests/exclusivePlaybackSurvivesTrackChangesAndPause()`。
+- `./run` 构建、注入并签名 Hi-Fi 开发插件后启动。未做 DAC 听音。
+- 两仓库 `git diff --check` 通过。
+
+### 剩余事项
+
+阶段 2 验收已满足。阶段 3：探测下沉 hifi、私有 ID 与资源失效。阶段 4：按内容家族呈现。阶段 5：独占交接与去掉 Hi-Fi ID 回退。硬件回归未通过前阶段 5 不得标完成。

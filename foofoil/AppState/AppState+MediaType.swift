@@ -34,8 +34,9 @@ extension AppState {
 
         /// 当前内容是否为音频文档（复用图片内容通道，但不经缓存）。
         public var isAudioDocument: Bool {
-            if HiFiLegacyAdapter.supports(extensionSession),
-               extensionSession?.mediaPlayback != nil { return true }
+            if let session = extensionSession, ExtensionPlaybackSupport.usesHostAudioChrome(session) {
+                return true
+            }
             if fileList?.kind == .audio { return true }
             if let url = imageURL, Self.isAudioFileName(url.lastPathComponent) { return true }
             guard let name = originalImageName else { return false }
@@ -57,10 +58,10 @@ extension AppState {
             if fileList?.kind == .audio, let item = fileList?.currentItem {
                 return resolvedURL(for: item) ?? item.url
             }
-            guard let session = extensionSession, HiFiLegacyAdapter.supports(session) else {
-                return isAudioDocument ? imageURL : nil
+            if let session = extensionSession, let url = ExtensionPlaybackSupport.presentationURL(in: session) {
+                return url
             }
-            return HiFiLegacyAdapter.currentURL(in: session)
+            return isAudioDocument ? imageURL : nil
         }
 
         /// 按扩展名判断是否属于视频类型；仅作快速预筛，实际能否播放需在打开时验证。
