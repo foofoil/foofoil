@@ -81,6 +81,11 @@ struct CustomTextEditor: NSViewRepresentable {
         }
     }
 
+    static func dismantleNSView(_ nsView: NSScrollView, coordinator: Coordinator) {
+        coordinator.dismantle()
+        (nsView.documentView as? NSTextView)?.delegate = nil
+    }
+
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
@@ -89,6 +94,8 @@ struct CustomTextEditor: NSViewRepresentable {
         var parent: CustomTextEditor
         private weak var observedWindow: NSWindow?
         private var windowDidBecomeKeyObserver: NSObjectProtocol?
+        private var isDismantled = false
+        private var focusGeneration: UInt64 = 0
 
         init(_ parent: CustomTextEditor) {
             self.parent = parent
@@ -100,32 +107,54 @@ struct CustomTextEditor: NSViewRepresentable {
             }
         }
 
-        // 空白窗口重新成为活动窗口时，恢复输入焦点以便直接输入。
-        func configureFocus(for textView: NSTextView) {
-            if let window = textView.window, window !== observedWindow {
-                if let windowDidBecomeKeyObserver {
-                    NotificationCenter.default.removeObserver(windowDidBecomeKeyObserver)
-                }
-
-                observedWindow = window
-                windowDidBecomeKeyObserver = NotificationCenter.default.addObserver(
-                    forName: NSWindow.didBecomeKeyNotification,
-                    object: window,
-                    queue: .main
-                ) { [weak self, weak textView] _ in
-                    guard let self, let textView else { return }
-                    self.focusIfNeeded(textView)
-                }
+        func dismantle() {
+            isDismantled = true
+            focusGeneration &+= 1
+            if let windowDidBecomeKeyObserver {
+                NotificationCenter.default.removeObserver(windowDidBecomeKeyObserver)
+                self.windowDidBecomeKeyObserver = nil
             }
+            observedWindow = nil
+        }
 
+        // SwiftUI 可能在 NSWindow.dealloc 的视图解绑回调中更新编辑器。
+        // 此时不能读取并弱引用 textView.window；等解绑完成后再获取当前窗口。
+        func configureFocus(for textView: NSTextView) {
+            guard !isDismantled else { return }
+            focusGeneration &+= 1
+            let generation = focusGeneration
             DispatchQueue.main.async { [weak self, weak textView] in
-                guard let self, let textView else { return }
-                self.focusIfNeeded(textView)
+                guard let self, !self.isDismantled, self.focusGeneration == generation,
+                      let textView else { return }
+                self.observeWindowAndFocus(textView)
             }
         }
 
+        // 空白窗口重新成为活动窗口时，恢复输入焦点以便直接输入。
+        private func observeWindowAndFocus(_ textView: NSTextView) {
+            let window = textView.window
+            if window !== observedWindow {
+                if let windowDidBecomeKeyObserver {
+                    NotificationCenter.default.removeObserver(windowDidBecomeKeyObserver)
+                    self.windowDidBecomeKeyObserver = nil
+                }
+                observedWindow = window
+                if let window {
+                    windowDidBecomeKeyObserver = NotificationCenter.default.addObserver(
+                        forName: NSWindow.didBecomeKeyNotification,
+                        object: window,
+                        queue: .main
+                    ) { [weak self, weak textView] _ in
+                        guard let self, let textView else { return }
+                        self.configureFocus(for: textView)
+                    }
+                }
+            }
+            focusIfNeeded(textView)
+        }
+
         private func focusIfNeeded(_ textView: NSTextView) {
-            guard parent.shouldMaintainFocus, let window = textView.window, window.isKeyWindow else { return }
+            guard !isDismantled, parent.shouldMaintainFocus, let window = textView.window, window.isKeyWindow else { return }
             window.makeFirstResponder(textView)
         }
 
@@ -151,7 +180,8 @@ struct CustomTextEditor: NSViewRepresentable {
             let neededHeight = max(usedRect.height, lineHeight, CustomTextEditor.minimumEditorHeight)
             textView.frame.size.height = neededHeight
 
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, !self.isDismantled else { return }
                 if self.parent.calculatedHeight != neededHeight {
                     self.parent.calculatedHeight = neededHeight
                 }

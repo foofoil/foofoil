@@ -1,7 +1,7 @@
 # 扩展边界重构评审终稿
 
 日期：2026-09-10  
-状态：待实施；已复核并补齐执行约束，进度见[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)
+状态：收尾阶段 0 已完成，阶段 1 尚未开始；进度见[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)
 评审范围：`foofoil`、`extension-kit`、`hifi` 当前 `ext` / `ext-fix` 实现相对各仓库 `main` 的职责与行为变化
 
 ## 1. 评审前提
@@ -256,7 +256,7 @@
 
 `extensionItemID` 当前通过合成 `Codable` 写入文件列表状态。没有历史用户意味着可以直接改变当前存储格式，但不能忽略应用重启和当前版本内的恢复。
 
-在队列修复之前先明确语义：
+阶段 0 已确定最小恢复方案：复用公共 currentItemID，限定同 Provider/版本及未变化资源的原始请求顺序；外部文件盖章只作会话内缓存。具体编辑、恢复和测试约束以[阶段 0 决策记录](extension-boundary-closeout-stage0.zh-CN.md) §3–5 为准，阶段 2 落实代码；以下原则继续适用：
 
 - 如果 ID 只在单个 Runtime session 内有效，将其改为仅内存态，并在新会话建立后重新盖章。
 - 如果扩展契约保证 ID 在同一资源和当前扩展版本内稳定，可以持久化，但宿主只能等值比较，不解释格式。

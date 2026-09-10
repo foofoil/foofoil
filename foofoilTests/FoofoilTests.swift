@@ -2511,3 +2511,91 @@ struct AudioTerminationTests {
         #expect(controllers.allSatisfy { !$0.isPlaying })
     }
 }
+
+@MainActor
+@Suite(.serialized)
+struct TextEditorFocusLifecycleTests {
+    private func coordinator() -> CustomTextEditor.Coordinator {
+        CustomTextEditor.Coordinator(CustomTextEditor(
+            text: .constant(""), calculatedHeight: .constant(40),
+            fontSize: 14, shouldMaintainFocus: true
+        ))
+    }
+
+    private func drainMainQueue() async {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.main.async { continuation.resume() }
+        }
+    }
+
+    @Test func focusConfigurationDoesNotReadWindowDuringViewUpdate() async {
+        let coordinator = coordinator()
+        let textView = FocusLifecycleTextView()
+        let readsBeforeConfigure = textView.windowReads
+        coordinator.configureFocus(for: textView)
+        #expect(textView.windowReads == readsBeforeConfigure)
+        await drainMainQueue()
+        #expect(textView.windowReads > readsBeforeConfigure)
+        coordinator.dismantle()
+    }
+
+    @Test func dismantleCancelsPendingFocusAndHeightUpdates() async {
+        var height: CGFloat = 40
+        let coordinator = CustomTextEditor.Coordinator(CustomTextEditor(
+            text: .constant(""), calculatedHeight: Binding(get: { height }, set: { height = $0 }),
+            fontSize: 14, shouldMaintainFocus: true
+        ))
+        let scrollView = NSScrollView()
+        let textView = FocusLifecycleTextView()
+        textView.string = String(repeating: "line\n", count: 12)
+        scrollView.documentView = textView
+        textView.delegate = coordinator
+        coordinator.updateHeight(scrollView)
+        coordinator.configureFocus(for: textView)
+        CustomTextEditor.dismantleNSView(scrollView, coordinator: coordinator)
+        await drainMainQueue()
+        #expect(height == 40)
+        #expect(textView.delegate == nil)
+    }
+
+    @Test func windowDetachDoesNotReobserveDeallocatingWindow() async {
+        let coordinator = coordinator()
+        let textView = FocusLifecycleTextView()
+        weak var releasedWindow: NSWindow?
+        autoreleasepool {
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 200, height: 100),
+                                  styleMask: .borderless, backing: .buffered, defer: false)
+            window.isReleasedWhenClosed = false
+            window.contentView = textView
+            releasedWindow = window
+            textView.willDetach = { [weak textView] in
+                if let textView { coordinator.configureFocus(for: textView) }
+            }
+        }
+        await drainMainQueue()
+        #expect(releasedWindow == nil)
+        #expect(textView.window == nil)
+        #expect(textView.detachCount > 0)
+        coordinator.dismantle()
+    }
+}
+
+@MainActor
+private final class FocusLifecycleTextView: NSTextView {
+    var windowReads = 0
+    var detachCount = 0
+    var willDetach: (() -> Void)?
+
+    override var window: NSWindow? {
+        windowReads += 1
+        return super.window
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if newWindow == nil {
+            detachCount += 1
+            willDetach?()
+        }
+        super.viewWillMove(toWindow: newWindow)
+    }
+}
