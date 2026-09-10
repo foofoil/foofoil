@@ -57,6 +57,7 @@ struct ExtensionPlaybackSupportTests {
     @Test func genericAudioProviderReusesHostChromeWithoutExclusiveHandoff() {
         let generic = session(providerID: "test.generic-audio")
         #expect(ExtensionPlaybackSupport.usesHostAudioChrome(generic))
+        #expect(ExtensionPlaybackSupport.showsInteractiveMediaControls(generic))
         #expect(ExtensionPlaybackSupport.presentationURL(in: generic)?.lastPathComponent == "second.dsf")
         #expect(!ExtensionPlaybackSupport.requiresExclusiveHandoff(generic))
         #expect(!ExtensionPlaybackSupport.usesDeviceService(generic))
@@ -87,11 +88,34 @@ struct ExtensionPlaybackSupportTests {
     }
 
     @Test func sessionWithoutTransportCapabilityDoesNotTakeAudioChrome() {
-        let other = session(providerID: "test.content", mediaPlayback: false, transportCapability: false)
+        let other = session(providerID: "test.content", mediaPlayback: true, transportCapability: false)
+        #expect(other.mediaPlayback != nil)
+        #expect(!MediaPlaybackRequest.isSupported(by: other))
         #expect(!ExtensionPlaybackSupport.usesHostAudioChrome(other))
+        #expect(!ExtensionPlaybackSupport.showsInteractiveMediaControls(other))
         #expect(ExtensionPlaybackSupport.presentationURL(in: other) == nil)
         #expect(!ExtensionPlaybackSupport.acceptsGaplessCollection(other))
         #expect(!ExtensionPlaybackSupport.requiresExclusiveHandoff(other))
+    }
+
+    /// 音频家族且有播放快照，但没有协商 `media.transport` 时，专用音频界面与通用可交互控件都必须关闭。
+    @Test func audioFamilyWithoutTransportOnlyShowsReadOnlyStatus() {
+        let provider = AudioFamilyNoTransportTestProvider()
+        ExtensionHost.shared.resolver.register(provider)
+        defer { ExtensionHost.shared.resolver.unregister(providerID: provider.descriptor.id) }
+        let session = ContentSession(
+            extensionID: nil,
+            providerID: provider.descriptor.id,
+            request: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/readonly.nta"))),
+            presentation: .text(titleKey: "Test", body: "Fixture"),
+            mediaPlayback: .init(state: .paused, position: 1, duration: 10, isSeekable: true)
+        )
+        #expect(session.mediaPlayback != nil)
+        #expect(ExtensionPlaybackSupport.resolvedContentFamily(for: session) == .audio)
+        #expect(!MediaPlaybackRequest.isSupported(by: session))
+        #expect(!ExtensionPlaybackSupport.usesHostAudioChrome(session))
+        #expect(!ExtensionPlaybackSupport.showsInteractiveMediaControls(session))
+        #expect(ExtensionPlaybackSupport.presentationURL(in: session) == nil)
     }
 
     @Test func hiFiSessionKeepsLegacyChromeQueueAndHandoff() {
@@ -262,6 +286,37 @@ private final class ContiguousAudioTestProvider: ContentProvider {
             providerID: descriptor.id,
             request: request,
             presentation: .text(titleKey: "Test", body: request.primaryFileURL?.lastPathComponent ?? "")
+        )
+    }
+}
+
+@MainActor
+private final class AudioFamilyNoTransportTestProvider: ContentProvider {
+    let descriptor = ProviderDescriptor(
+        id: "test.audio-family-no-transport",
+        extensionID: nil,
+        role: .primary,
+        fallbackProviderID: nil,
+        enhancementDomain: "audio",
+        contentFamily: .audio,
+        filenameExtensions: ["nta"],
+        isEnabled: true,
+        isRuntimeAvailable: true
+    )
+
+    func match(_ request: ContentRequest) -> ProviderMatch? {
+        request.primaryFileURL?.pathExtension.lowercased() == "nta"
+            ? ProviderMatch(strength: .fileExtension, explanation: "no-transport")
+            : nil
+    }
+
+    func makeSession(for request: ContentRequest, negotiatedAPI: UInt32) async throws -> ContentSession {
+        ContentSession(
+            extensionID: nil,
+            providerID: descriptor.id,
+            request: request,
+            presentation: .text(titleKey: "Test", body: "Fixture"),
+            mediaPlayback: .init(state: .paused, position: 1, duration: 10, isSeekable: true)
         )
     }
 }

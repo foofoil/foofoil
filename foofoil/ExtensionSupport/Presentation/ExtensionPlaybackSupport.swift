@@ -4,13 +4,22 @@ import FoofoilExtensionKit
 /// 宿主内部播放呈现、队列投影与独占交接入口。
 /// 独占交接按已协商设备服务，不把所有 `media.transport` 纳入抢占。
 enum ExtensionPlaybackSupport {
-    /// 有播放快照且内容家族为音频（或已协商 `media.transport` / 旧 Hi-Fi）时复用宿主音频 UI。
+    /// 有播放快照、内容家族为音频，且已协商 `media.transport`（旧 Hi-Fi 兼容期暂放行）时才复用宿主音频 UI。
     static func usesHostAudioChrome(_ session: ContentSession) -> Bool {
         guard session.mediaPlayback != nil else { return false }
+        guard MediaPlaybackRequest.isSupported(by: session) || HiFiLegacyAdapter.supports(session) else {
+            return false
+        }
         if let family = resolvedContentFamily(for: session) {
             return family == .audio
         }
-        return MediaPlaybackRequest.isSupported(by: session) || HiFiLegacyAdapter.supports(session)
+        return true
+    }
+
+    /// 通用呈现只有在会话存在播放快照且实际协商 `media.transport` 时才显示可交互媒体控件；
+    /// 否则只能显示只读状态，不能发送媒体动作。
+    static func showsInteractiveMediaControls(_ session: ContentSession) -> Bool {
+        session.mediaPlayback != nil && MediaPlaybackRequest.isSupported(by: session)
     }
 
     static func resolvedContentFamily(for session: ContentSession) -> ExtensionContentFamily? {

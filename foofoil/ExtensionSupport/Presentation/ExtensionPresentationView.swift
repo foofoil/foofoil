@@ -52,7 +52,11 @@ struct ExtensionPresentationView: View {
                         .accessibilityLabel(outputStatus)
                 }
                 if let playback = session.mediaPlayback {
-                    playbackControls(playback, hasQueue: (session.playbackQueue?.items.count ?? 0) > 1)
+                    if ExtensionPlaybackSupport.showsInteractiveMediaControls(session) {
+                        playbackControls(playback, hasQueue: (session.playbackQueue?.items.count ?? 0) > 1)
+                    } else {
+                        readOnlyPlaybackStatus(playback)
+                    }
                     if playback.state == .failed {
                         Label(
                             NSLocalizedString(
@@ -131,6 +135,22 @@ struct ExtensionPresentationView: View {
     private func playbackTime(_ seconds: TimeInterval) -> String {
         let value = max(0, Int(seconds.rounded(.down)))
         return String(format: "%d:%02d", value / 60, value % 60)
+    }
+
+    /// 会话有播放快照但未协商 `media.transport` 时的只读回退：只展示进度，不提供任何可发送动作的控件。
+    @ViewBuilder
+    private func readOnlyPlaybackStatus(_ playback: MediaPlaybackSnapshot) -> some View {
+        HStack(spacing: 12) {
+            ProgressView(value: playback.position, total: max(playback.duration ?? 1, 1))
+                .accessibilityLabel(NSLocalizedString("Playback Progress", comment: ""))
+            Text(playbackTime(playback.position))
+                .monospacedDigit()
+            if let duration = playback.duration {
+                Text("/ \(playbackTime(duration))")
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 }
 
