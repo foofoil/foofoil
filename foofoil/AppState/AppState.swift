@@ -56,6 +56,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
             let oldSessionID = oldValue?.id
             let newSessionID = extensionSession?.id
             guard oldSessionID != newSessionID else { return }
+            // 删除意图只对产生它的会话有效，新会话不复用旧编辑记录。
+            if oldSessionID != nil { extensionRemovedItemIDs.removeAll() }
             let oldID = oldValue?.extensionID
             let newID = extensionSession?.extensionID
             if let oldValue {
@@ -77,6 +79,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     var exclusivePlaybackGeneration: UInt64 = 0
     /// 媒体操作序号：每个会改变状态的媒体动作递增，用于丢弃过期回包，避免旧 seek/暂停覆盖新状态。
     var extensionPlaybackOperationVersion: UInt64 = 0
+    /// 当前会话内被宿主显式删除的扩展队列项目 ID；用于区分“映射失效”和“用户删除”。
+    var extensionRemovedItemIDs: Set<String> = []
 
     /// Built-in 与扩展统一投影到同一宿主导航模型；同一窗口只会有一个主内容来源。
     @Published var builtInNavigatorContributions: [NavigatorContribution] = []

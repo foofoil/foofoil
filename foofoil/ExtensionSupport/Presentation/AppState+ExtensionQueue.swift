@@ -23,39 +23,101 @@ extension AppState {
     }
 
     /// 会话建立后把扩展队列 ID 盖到宿主列表项上，之后不再解析 ID 布局。
+    /// 旧会话的盖章不能跨会话复用：先清除，再按新快照的资源对应关系重新映射。
     func stampHostListWithExtensionQueueIDs(_ session: ContentSession) {
         guard var list = fileList, session.playbackQueue != nil else { return }
-        var changed = false
+        var changed = list.items.contains { $0.extensionItemID != nil }
         for index in list.items.indices {
-            guard let id = ExtensionPlaybackSupport.queueItemID(for: list.items[index], in: session),
-                  list.items[index].extensionItemID != id else { continue }
-            list.items[index].extensionItemID = id
-            changed = true
+            list.items[index].extensionItemID = nil
+        }
+        for index in list.items.indices {
+            guard let id = ExtensionPlaybackSupport.queueItemID(for: list.items[index], in: session) else { continue }
+            if list.items[index].extensionItemID != id {
+                list.items[index].extensionItemID = id
+                changed = true
+            }
         }
         if changed { fileList = list }
     }
 
+    /// 宿主对扩展播放队列的投影结果。宿主内部使用，不进入公共契约。
+    enum HostPlaybackSequenceProjection: Equatable {
+        /// 宿主无法可靠映射当前会话队列（含队列归扩展所有的单资源容器）；保持扩展队列不变。
+        case unchanged
+        /// 宿主确认的当前项与有效后继队列项 ID 顺序（含当前项）。
+        case sequence([String])
+        /// 当前项被宿主显式删除；只允许当前项收尾，不能续播旧列表。
+        case currentOnly(String)
+    }
+
+    /// 区分“宿主确认的有效序列”“不改动”和“映射失效/显式删除”，不把映射失败解释为删除。
+    func hostPlaybackSequenceProjection(
+        for session: ContentSession,
+        fileList explicitList: FileListState? = nil
+    ) -> HostPlaybackSequenceProjection {
+        // 单资源容器队列由扩展拥有，宿主只投影和转发动作，不按外部文件列表规则裁剪。
+        if ExtensionPlaybackSupport.containerPlaybackQueue(from: session) != nil {
+            return .unchanged
+        }
+        guard let queue = session.playbackQueue, let list = explicitList ?? fileList else {
+            return .unchanged
+        }
+        guard let currentID = queue.currentItemID,
+              let currentIndex = list.items.firstIndex(where: {
+                  ExtensionPlaybackSupport.queueItemID(for: $0, in: session) == currentID
+              }) else {
+            // 无法定位当前项：只有宿主明确记录了删除意图才允许收尾，否则保持原队列。
+            if let currentID = queue.currentItemID, extensionRemovedItemIDs.contains(currentID) {
+                return .currentOnly(currentID)
+            }
+            return .unchanged
+        }
+        var ids: [String] = []
+        for item in list.items.dropFirst(currentIndex) {
+            guard let id = ExtensionPlaybackSupport.queueItemID(for: item, in: session) else { break }
+            ids.append(id)
+            if mediaPlaybackMode != .sequential && mediaPlaybackMode != .sequentialLoop { break }
+        }
+        guard !ids.isEmpty else { return .unchanged }
+        return .sequence(ids)
+    }
+
     /// 每次命令携带宿主允许的顺序；移除、排序或切换模式后废弃旧的预读后继。
     func sessionByApplyingHostPlaybackSequence(_ original: ContentSession) -> ContentSession {
-        guard original.playbackQueue != nil, var queue = original.playbackQueue,
-              let list = fileList else { return original }
-        var session = original
-        let currentID = queue.currentItemID
-        var ids: [String] = []
-        if let index = list.items.firstIndex(where: { ExtensionPlaybackSupport.queueItemID(for: $0, in: original) == currentID }) {
-            for item in list.items.dropFirst(index) {
-                guard let id = ExtensionPlaybackSupport.queueItemID(for: item, in: original),
-                      queue.items.contains(where: { $0.id == id }) else { break }
-                ids.append(id)
-                if mediaPlaybackMode != .sequential && mediaPlaybackMode != .sequentialLoop { break }
-            }
-        }
+        guard let queue = original.playbackQueue else { return original }
         let byID = Dictionary(uniqueKeysWithValues: queue.items.map { ($0.id, $0) })
-        queue.items = ids.compactMap { byID[$0] }
-        // 当前曲已从宿主列表移除时仍允许其收尾，但不能续播旧列表。
-        if queue.items.isEmpty, let currentID, let item = byID[currentID] { queue.items = [item] }
-        session.playbackQueue = queue
-        return session
+        switch hostPlaybackSequenceProjection(for: original) {
+        case .unchanged:
+            return original
+        case .currentOnly(let currentID):
+            guard let current = byID[currentID] else { return original }
+            var session = original
+            session.playbackQueue?.items = [current]
+            return session
+        case .sequence(let ids):
+            let items = ids.compactMap { byID[$0] }
+            guard !items.isEmpty else { return original }
+            var session = original
+            session.playbackQueue?.items = items
+            return session
+        }
+    }
+
+    /// 记录宿主显式删除的扩展队列项目，供映射失效与用户删除的区分使用。
+    func recordExtensionRemovals(in items: [FileListItem]) {
+        guard let session = extensionSession, session.playbackQueue != nil else { return }
+        for item in items {
+            guard let id = extensionQueueItemID(for: item, in: session) else { continue }
+            extensionRemovedItemIDs.insert(id)
+        }
+    }
+
+    /// 不解析 ID 布局：依次尝试容器曲目 ID、会话盖章和不透明资源对应关系。
+    func extensionQueueItemID(for item: FileListItem, in session: ContentSession) -> String? {
+        let queueIDs = Set(session.playbackQueue?.items.map(\.id) ?? [])
+        if let id = item.cue?.containerTrackID, queueIDs.contains(id) { return id }
+        if let id = item.extensionItemID, queueIDs.contains(id) { return id }
+        return ExtensionPlaybackSupport.queueItemID(for: item, in: session)
     }
 
     func synchronizeFileListWithExtensionQueue(_ session: ContentSession) {

@@ -86,7 +86,8 @@ public nonisolated struct FileListItem: Codable, Equatable, Identifiable, Sendab
     public var displayName: String
     /// CUE 曲目分段信息；普通文件列表项为空。
     public var cue: FileListCueInfo?
-    /// 扩展队列项目 ID，对宿主不透明。会话建立时按资源一一对应盖章，不解析 ID 布局。
+    /// 扩展队列项目 ID，对宿主不透明。只在当前会话到宿主列表的映射内有效，属于会话内状态，
+    /// 不写入持久化；新会话建立后按资源对应关系重新盖章，不能因旧值恰好存在而复用。
     public var extensionItemID: String?
 
     public var url: URL { URL(fileURLWithPath: path) }
@@ -105,6 +106,30 @@ public nonisolated struct FileListItem: Codable, Equatable, Identifiable, Sendab
         self.displayName = displayName
         self.cue = cue
         self.extensionItemID = extensionItemID
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, path, bookmark, displayName, cue
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        path = try container.decode(String.self, forKey: .path)
+        bookmark = try container.decodeIfPresent(Data.self, forKey: .bookmark)
+        displayName = try container.decode(String.self, forKey: .displayName)
+        cue = try container.decodeIfPresent(FileListCueInfo.self, forKey: .cue)
+        // 旧的持久化盖章不再跨会话复用；由新会话重新映射。
+        extensionItemID = nil
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(path, forKey: .path)
+        try container.encodeIfPresent(bookmark, forKey: .bookmark)
+        try container.encode(displayName, forKey: .displayName)
+        try container.encodeIfPresent(cue, forKey: .cue)
     }
 }
 

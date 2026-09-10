@@ -561,12 +561,19 @@ extension AppState {
         guard var list = fileList else { return }
         let removing = Set(ids)
         let removedCurrent = removing.contains(list.currentID)
+        recordExtensionRemovals(in: list.items.filter { removing.contains($0.id) })
         list.items.removeAll { removing.contains($0.id) }
         let remainingSectionIDs = Set(list.items.compactMap(\.cue?.sectionID))
         list.sections.removeAll { !remainingSectionIDs.contains($0.id) }
 
         if list.items.count < 2 {
             let remaining = list.items.first
+            if remaining == nil {
+                // 删除全部项目：停止并关闭扩展会话，清空队列呈现，不保留隐藏连播。
+                extensionSession = nil
+                extensionStateReference = nil
+                extensionFallbackProviderID = nil
+            }
             fileList = nil
             builtInNavigatorContributions = []
             builtInNavigatorActionHandler = nil
