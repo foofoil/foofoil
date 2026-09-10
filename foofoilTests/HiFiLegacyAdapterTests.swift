@@ -93,6 +93,32 @@ struct HiFiLegacyAdapterTests {
         ) == nil)
     }
 
+    /// 声明导航贡献但没有协商 `ui.navigator-actions` 的通用 Provider 不会收到 Hi-Fi 私有导航命令。
+    @Test func nonHiFiSessionDoesNotBuildPrivateNavigationCommand() {
+        let generic = ContentSession(
+            extensionID: nil,
+            providerID: "test.content",
+            request: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/content.foo"))),
+            presentation: .text(titleKey: "Test", body: "Fixture"),
+            navigatorContributions: [.init(
+                id: "test.items", titleLocalizationKey: "Items", style: .flat,
+                items: ["a", "b", "c"].map { .init(id: $0, title: $0) },
+                selectedItemIDs: ["a"], allowedActions: [.activate, .move]
+            )]
+        )
+        #expect(HiFiLegacyAdapter.navigatorRequest(
+            action: .init(contributionID: "test.items", kind: .activate, itemIDs: ["b"]),
+            session: generic
+        ) == nil)
+        #expect(HiFiLegacyAdapter.navigatorRequest(
+            action: .init(
+                contributionID: "test.items", kind: .move, itemIDs: ["a"],
+                destinationItemID: "b", movePosition: .after
+            ),
+            session: generic
+        ) == nil)
+    }
+
     @Test func restorationDoesNotReplayHiFiStateIntoAnotherProvider() async throws {
         let saved = session()
         let fresh = ContentSession(

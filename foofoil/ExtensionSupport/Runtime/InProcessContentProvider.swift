@@ -119,7 +119,10 @@ final class InProcessContentProvider: ContentProvider {
                 try runtime.perform(navigation: request)
             }.value
         }
-        guard let request = HiFiLegacyAdapter.navigatorRequest(action: navigatorAction, session: session) else {
+        // 未协商 `ui.navigator-actions` 时只允许仍是 Hi-Fi Provider 的会话走兼容层；
+        // 通用 Provider 不会收到任何 `hifi.*` 私有导航命令。
+        guard HiFiLegacyAdapter.supports(session),
+              let request = HiFiLegacyAdapter.navigatorRequest(action: navigatorAction, session: session) else {
             return session
         }
         let commandID = request.commandID

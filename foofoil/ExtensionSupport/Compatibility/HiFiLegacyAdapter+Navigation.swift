@@ -3,9 +3,12 @@ import FoofoilExtensionKit
 
 extension HiFiLegacyAdapter {
     /// 暂时保留旧 Runtime 以修改后的快照接收导航操作的约定。
+    /// 只服务仍是 Hi-Fi Provider 的会话，避免把私有导航命令泄漏给声明了导航贡献但没有
+    /// 协商 `ui.navigator-actions` 的通用 Provider。
     static func navigatorRequest(
         action navigatorAction: NavigatorAction, session: ContentSession
     ) -> (commandID: String, session: ContentSession)? {
+        guard supports(session) else { return nil }
         guard let index = session.navigatorContributions.firstIndex(where: {
             $0.id == navigatorAction.contributionID
         }) else {
