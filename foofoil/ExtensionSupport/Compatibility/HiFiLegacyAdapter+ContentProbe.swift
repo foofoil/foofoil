@@ -1,7 +1,7 @@
 import Foundation
 
 extension HiFiLegacyAdapter {
-    /// 只认 Scarlet Book 主 TOC 魔数，避免把普通磁盘 ISO 收进 Hi-Fi。
+    /// 仅给未声明 `content.probe` 的旧 Hi-Fi 做 P0 回退；新 Runtime 由扩展嗅探。
     nonisolated static func sniffSACDISOMagic(_ url: URL) -> Bool {
         guard url.pathExtension.lowercased() == "iso" else { return false }
         guard let handle = try? FileHandle(forReadingFrom: url) else { return false }

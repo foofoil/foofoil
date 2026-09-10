@@ -225,7 +225,8 @@ final class ExtensionHost: ExtensionRuntimeHost {
                     resolver.register(InProcessContentProvider(
                         extensionID: loaded.manifest.id,
                         declaration: declaration,
-                        runtime: runtime
+                        runtime: runtime,
+                        capabilities: loaded.manifest.capabilities
                     ))
                 }
                 inProcessRuntimes[loaded.manifest.id] = runtime

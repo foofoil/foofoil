@@ -835,7 +835,8 @@ extension AppState {
                 path: url.path,
                 bookmark: bookmark,
                 displayName: item.title,
-                cue: cue
+                cue: cue,
+                extensionItemID: item.id
             )
         }
         let currentID = queue.currentItemID.flatMap { id in

@@ -439,8 +439,19 @@ struct ExtensionKitTests {
         let first = URL(fileURLWithPath: "/tmp/first.dsf")
         let second = URL(fileURLWithPath: "/tmp/second.dsf")
         let state = AppState()
-        defer { state.extensionSession = nil }
-
+        defer {
+            state.extensionSession = nil
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        let list = FileListState(
+            kind: .audio,
+            items: [
+                FileListItem(id: "host:0", path: first.path, displayName: "first.dsf", extensionItemID: "item-a"),
+                FileListItem(id: "host:1", path: second.path, displayName: "second.dsf", extensionItemID: "item-b")
+            ],
+            currentID: "host:1"
+        )
+        state.fileList = list
         state.extensionSession = ContentSession(
             extensionID: nil,
             providerID: "audio.hifi",
@@ -452,21 +463,23 @@ struct ExtensionKitTests {
             mediaPlayback: .init(state: .playing, position: 1, duration: 10, isSeekable: true),
             playbackQueue: .init(
                 items: [
-                    .init(id: "file:0", title: "first"),
-                    .init(id: "file:1", title: "second")
+                    .init(id: "item-a", title: "first"),
+                    .init(id: "item-b", title: "second")
                 ],
-                currentItemID: "file:1"
+                currentItemID: "item-b"
             )
         )
 
         #expect(state.isAudioDocument)
         #expect(state.isExternalMediaDocument)
         #expect(state.currentAudioPresentationURL == second)
+        #expect(ExtensionPlaybackSupport.authorizedResource(in: try #require(state.extensionSession), fileList: list)?.url == second)
 
         var reordered = try #require(state.extensionSession)
         reordered.playbackQueue?.items.swapAt(0, 1)
         state.extensionSession = reordered
         #expect(state.currentAudioPresentationURL == second)
+        #expect(ExtensionPlaybackSupport.authorizedResource(in: reordered, fileList: list)?.url == second)
     }
 
     @Test func hiFiGaplessSequenceFollowsHostOrderAndPlaybackMode() throws {
@@ -1351,6 +1364,66 @@ struct ExtensionKitTests {
         #expect(!ExtensionHost.shared.resolver.candidates(for: staleOnly).contains {
             $0.descriptor.id == provider.descriptor.id
         })
+    }
+
+    @Test(arguments: [true, false])
+    func missingOrReplacedSniffResourceRestoreDegradesToUnavailable(missing: Bool) async throws {
+        let provider = SniffHistoryTestProvider()
+        ExtensionHost.shared.resolver.register(provider)
+        defer { ExtensionHost.shared.resolver.unregister(providerID: provider.descriptor.id) }
+
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let sourceURL = directory.appendingPathComponent("disc.isotest")
+        try Data("SACDMTOC".utf8).write(to: sourceURL)
+        let savedSession = ContentSession(
+            extensionID: provider.descriptor.extensionID,
+            providerID: provider.descriptor.id,
+            request: .singleFile(.init(url: sourceURL)),
+            presentation: .text(titleKey: "Test", body: sourceURL.lastPathComponent)
+        )
+        let reference = "history-\(UUID().uuidString.lowercased())"
+        try ExtensionHost.shared.stateStore.save(
+            extensionID: try #require(provider.descriptor.extensionID),
+            schemaVersion: 1,
+            payload: JSONEncoder().encode(savedSession),
+            reference: reference
+        )
+        let stateFile = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("foofoil/ExtensionState", isDirectory: true)
+            .appendingPathComponent(try #require(provider.descriptor.extensionID), isDirectory: true)
+            .appendingPathComponent(reference)
+            .appendingPathExtension("json")
+        defer { try? FileManager.default.removeItem(at: stateFile) }
+
+        if missing {
+            try FileManager.default.removeItem(at: sourceURL)
+        } else {
+            try Data("ISO".utf8).write(to: sourceURL)
+        }
+
+        let historyID = UUID()
+        let state = AppState(config: WindowConfig(
+            id: historyID,
+            originalImageName: sourceURL.lastPathComponent,
+            contentKind: .extensionContent,
+            extensionID: provider.descriptor.extensionID,
+            extensionStateReference: reference
+        ))
+        for _ in 0..<100 where state.isLoading {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+
+        let restored = try #require(state.extensionSession)
+        #expect(!state.isLoading)
+        #expect(restored.id != savedSession.id)
+        #expect(restored.providerID == "unavailable")
+        #expect(restored.presentation == .unavailable(
+            titleKey: "Extension Session Unavailable",
+            messageKey: "Extension Session Restore Failed"
+        ))
+        #expect(restored.stateReference == reference)
+        HistoryManager.shared.removeFromHistory(state.toConfig())
     }
 
     /// 扩展音频（DSF 目录列表）不占用 imageURL，同目录封面书签必须独立恢复，

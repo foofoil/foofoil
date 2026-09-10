@@ -17,13 +17,27 @@ struct HiFiLegacyAdapterTests {
         )
     }
 
-    /// 私有文件 ID 在队列被裁剪后仍指向原始资源，而非当前队列下标。
+    /// 队列裁剪后仍靠宿主列表上的不透明 ID 指向原始资源，而不是解析 ID 布局。
     @Test func sourceURLSurvivesQueueTrimming() {
         var session = session()
         session.playbackQueue = .init(
-            items: [.init(id: "file:1", title: "Second")], currentItemID: "file:1"
+            items: [.init(id: "item-b", title: "Second")], currentItemID: "item-b"
         )
-        #expect(HiFiLegacyAdapter.currentURL(in: session)?.lastPathComponent == "second.dsf")
+        let list = FileListState(
+            kind: .audio,
+            items: [
+                FileListItem(
+                    id: "host:0", path: "/tmp/first.dsf", displayName: "first.dsf",
+                    extensionItemID: "item-a"
+                ),
+                FileListItem(
+                    id: "host:1", path: "/tmp/second.dsf", displayName: "second.dsf",
+                    extensionItemID: "item-b"
+                )
+            ],
+            currentID: "host:1"
+        )
+        #expect(HiFiLegacyAdapter.currentURL(in: session, fileList: list)?.lastPathComponent == "second.dsf")
     }
 
     @Test(arguments: ["file:99", "file:-1", "file:invalid", "missing"])
@@ -95,6 +109,22 @@ struct HiFiLegacyAdapterTests {
         #expect(restored == fresh)
     }
 
+    @Test func trackNumberIsNotInterpretedAsContainerID() {
+        let queue = MediaPlaybackQueueSnapshot(
+            items: [.init(id: "track:stereo:01", title: "One"), .init(id: "track:stereo:02", title: "Two")],
+            currentItemID: "track:stereo:01"
+        )
+        let item = FileListItem(
+            id: "host-track",
+            path: "/tmp/disc.iso",
+            displayName: "One",
+            cue: FileListCueInfo(startCueFrames: 0, trackNumber: "2")
+        )
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        #expect(state.containerTrackID(for: item, in: queue) == nil)
+    }
+
     @Test func probeRequiresSACDMagicAtMainTOCOffset() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -112,5 +142,19 @@ struct HiFiLegacyAdapterTests {
         contents[510 * 2048] = 0
         try contents.write(to: iso)
         #expect(!HiFiLegacyAdapter.sniffSACDISOMagic(iso))
+    }
+
+    @Test func contentMatchingUsesProbeWhenDeclared() {
+        let url = URL(fileURLWithPath: "/tmp/disc.iso")
+        let probeCapability = [
+            ExtensionCapabilityDeclaration(id: ExtensionCapabilityIdentifier.contentProbe, scope: .application)
+        ]
+        #expect(ExtensionContentMatching.sniff(url, providerID: "audio.hifi", capabilities: probeCapability) { _ in
+            ContentProbeResult(disposition: .matched, reason: "sacd-master-toc")
+        })
+        #expect(!ExtensionContentMatching.sniff(url, providerID: "audio.hifi", capabilities: probeCapability) { _ in
+            ContentProbeResult(disposition: .unmatched)
+        })
+        #expect(!ExtensionContentMatching.sniff(url, providerID: "other.audio", capabilities: []))
     }
 }

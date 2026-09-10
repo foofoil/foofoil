@@ -277,6 +277,13 @@ final class InProcessExtensionInterface: @unchecked Sendable {
     nonisolated func performApplicationCommand(
         _ request: AudioDeviceServiceRequest
     ) throws -> AudioDeviceServiceSnapshot {
+        try performApplicationCommand(request, as: AudioDeviceServiceSnapshot.self)
+    }
+
+    nonisolated func performApplicationCommand<Response: Decodable>(
+        _ request: some Encodable,
+        as _: Response.Type = Response.self
+    ) throws -> Response {
         let fieldOffset = MemoryLayout<FoofoilExtensionInterfaceV1>.offset(
             of: \FoofoilExtensionInterfaceV1.perform_application_command
         ) ?? MemoryLayout<FoofoilExtensionInterfaceV1>.size

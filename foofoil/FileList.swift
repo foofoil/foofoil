@@ -86,6 +86,8 @@ public nonisolated struct FileListItem: Codable, Equatable, Identifiable, Sendab
     public var displayName: String
     /// CUE 曲目分段信息；普通文件列表项为空。
     public var cue: FileListCueInfo?
+    /// 扩展队列项目 ID，对宿主不透明。会话建立时按资源一一对应盖章，不解析 ID 布局。
+    public var extensionItemID: String?
 
     public var url: URL { URL(fileURLWithPath: path) }
 
@@ -94,13 +96,15 @@ public nonisolated struct FileListItem: Codable, Equatable, Identifiable, Sendab
         path: String,
         bookmark: Data? = nil,
         displayName: String,
-        cue: FileListCueInfo? = nil
+        cue: FileListCueInfo? = nil,
+        extensionItemID: String? = nil
     ) {
         self.id = id
         self.path = path
         self.bookmark = bookmark
         self.displayName = displayName
         self.cue = cue
+        self.extensionItemID = extensionItemID
     }
 }
 
@@ -168,7 +172,7 @@ public nonisolated struct FileListCueInfo: Codable, Equatable, Sendable {
     public var trackNumber: String?
     public var sectionID: String?
     public var cueSheetPath: String?
-    /// SACD 容器内部的 Hi-Fi 队列项目 ID。它只在对应容器会话内唯一，
+    /// 容器内部的扩展队列项目 ID。它只在对应容器会话内唯一，
     /// 不能直接用作跨多个容器的 FileListItem.id。
     public var containerTrackID: String?
 

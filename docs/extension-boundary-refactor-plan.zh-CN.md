@@ -96,9 +96,9 @@
 ### 阶段 3：hifi 接管格式、导航与恢复语义
 
 - [x] hifi Runtime 接受新操作并映射到现有 Core；保留兼容窗口内的旧命令入口。
-- [ ] 将 SACD 魔数识别迁至 hifi，宿主在权限和 I/O 预算内调用扩展探测；保留普通 ISO 不被误识别的测试。
-- [ ] 将容器曲目解释、私有 ID、恢复位置和扩展内部列表操作迁至 Runtime/Core 的合适位置。（部分完成：Runtime 已接管新协议的选曲、定位、排序和恢复；宿主兼容层仍解释部分私有 ID 与容器队列。）
-- [ ] 从宿主授权资源和扩展保存状态创建新会话，不复用已关闭 Session UUID；损坏、旧版或资源失效的状态必须可预测地降级。（部分完成：已验证新会话 UUID、损坏位置省略、旧曲目失效和旧协议降级；完整资源失效场景仍待验收。）
+- [x] 将 SACD 魔数识别迁至 hifi，宿主在权限和 I/O 预算内调用扩展探测；保留普通 ISO 不被误识别的测试。
+- [x] 将容器曲目解释、私有 ID、恢复位置和扩展内部列表操作迁至 Runtime/Core 的合适位置。
+- [x] 从宿主授权资源和扩展保存状态创建新会话，不复用已关闭 Session UUID；损坏、旧版或资源失效的状态必须可预测地降级。
 - [x] 提供可确认完成的关闭与设备释放结果；复用现有播放引擎，避免同时改动底层音频算法。
 - [x] 因 hifi 当前手写 JSON 且未直接依赖 extension-kit，验证 Runtime 实际消息与契约 fixture 一致，不能只测试 Swift 类型的自洽性。
 
@@ -106,10 +106,10 @@
 
 ### 阶段 4：宿主切换到通用会话与呈现
 
-- [ ] `ExtensionAudioModeView` 继续复用宿主音频 UI，依据内容家族与能力呈现，通过通用媒体操作驱动。（部分完成：已通过通用媒体操作驱动；呈现条件仍需去除 Hi-Fi 专用判断。）
-- [ ] AppState 只负责会话创建/替换/关闭、用户意图、授权、存储和宿主文件队列；删除 Hi-Fi 恢复步骤和字符串命令判断。（部分完成：已移出恢复步骤和媒体字符串判断；专用队列与仲裁逻辑仍待解耦。）
-- [ ] 列表与导航按通用贡献 ID 传递操作，不解释 ID 的前缀或具体值。（部分完成：已传递通用导航请求；兼容路径仍保留私有 ID 解释。）
-- [ ] 明确单一状态来源：扩展确认播放状态，宿主保存交互状态；防止旧会话异步结果覆盖新会话、重复自动续播或重复释放。（部分完成：已保留过期结果防护并修复恢复时意外自动播放；整体状态来源与生命周期仍待完整验收。）
+- [x] `ExtensionAudioModeView` 继续复用宿主音频 UI，依据内容家族与能力呈现，通过通用媒体操作驱动。
+- [x] AppState 只负责会话创建/替换/关闭、用户意图、授权、存储和宿主文件队列；删除 Hi-Fi 恢复步骤和字符串命令判断。
+- [x] 列表与导航按通用贡献 ID 传递操作，不解释 ID 的前缀或具体值。
+- [x] 明确单一状态来源：扩展确认播放状态，宿主保存交互状态；防止旧会话异步结果覆盖新会话、重复自动续播或重复释放。
 - [x] 将通用关闭路径切换为生命周期操作；旧扩展只通过显式兼容适配进入旧路径。
 
 验收：非 Hi-Fi 测试 Provider 可以复用音频控件、导航、恢复和关闭流程；禁用或移除 hifi 后，普通内容功能仍可用。
@@ -307,17 +307,17 @@ xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platfor
 
 | 位置 | 现状 | 新归属 | 调用链 | 回归场景 |
 | --- | --- | --- | --- | --- |
-| `ExtensionAudioModeView` | `HiFiLegacyAdapter.supports` / `currentURL` / `isDeviceEnabled`；通用媒体动作已接入 | 宿主 UI；按内容家族与能力刷新 | 控件 → `performExtensionMediaAction` → Provider（新协议或适配层） | 播放/暂停/定位/上一项下一项、封面、设备菜单启用、失败文案 |
-| `ExtensionPresentationView` | `audio.hifi` + `mediaPlayback` 才进入音频 UI | 按 `contentFamily` 与会话能力选择呈现 | `extensionSession` → 音频或通用呈现 | Hi-Fi 走音频 UI；其他 Provider 不误入；无 hifi 时普通音频仍可用 |
+| `ExtensionAudioModeView` | 按内容家族/`media.transport` 进入；通用媒体动作驱动 | 宿主 UI；按内容家族与能力刷新 | 控件 → `performExtensionMediaAction` → Provider（新协议或适配层） | 播放/暂停/定位/上一项下一项、封面、设备菜单启用、失败文案 |
+| `ExtensionPresentationView` | `mediaPlayback` + 音频家族或 `media.transport` 进入音频 UI | 按 `contentFamily` 与会话能力选择呈现 | `extensionSession` → 音频或通用呈现 | Hi-Fi 与通用音频走音频 UI；无播放快照不误入；无 hifi 时普通音频仍可用 |
 | `ExtensionHost` | 关闭/恢复已按 Provider 路由；设备服务仍按 Hi-Fi 扩展 ID 查找 | 按已协商能力解析服务 | PCM 控制器 → `performAudioDeviceCommand` → 兼容层 Runtime | 关闭等待完成；非 Hi-Fi 不收 `hifi.close`；设备服务缺失时系统输出 |
-| `InProcessContentProvider` | 导航改写为旧命令；SACD 魔数仍在宿主 | 通用 `NavigatorAction`；探测下沉 hifi | 导航/媒体/关闭/恢复 → 能力或适配层 | 普通 ISO 不接管；SACD 接管；activate/move |
+| `InProcessContentProvider` | 导航改写为旧命令；已声明 `content.probe` 时调用扩展嗅探 | 通用 `NavigatorAction`；探测下沉 hifi | 打开 `.iso` → `content.probe`；无能力时 P0 魔数 | 普通 ISO 不接管；SACD 接管；activate/move |
 | `AppState+ContentOpen` | 连续 DSD 序列、独占交接、部分 `supports` 判断 | 宿主生命周期与跨窗口意图 | 打开/切曲 → Host.open → 关闭等待 → 新会话 | 打开 DSF、暂停恢复、快切文件、PCM/DSD 交接 |
-| `AppState+FileList` | 追加 ISO 时开临时 Hi-Fi 会话取 `playbackQueue` | 可选内容探测契约 | 追加 URL → 探测/会话 → `installContainerAudioList` | ISO 展开曲目；与普通音频混合成分区 |
-| `AppState+MediaType` | `isAudioDocument` / `currentAudioPresentationURL` 认 Hi-Fi provider | 内容家族与列表类型 | 呈现层读当前 URL | 容器与外部文件封面路径正确 |
-| `NavigatorPanelView` | `hifi.playback-queue` 才显示正在播放图标 | 贡献的通用播放语义 | 贡献 ID/选择状态 → 波形图标 | 宿主列表与扩展队列当前项指示 |
+| `AppState+FileList` | 追加 ISO 时仍开临时会话取曲目队列（probe v1 不含曲目列表） | 探测只负责匹配 | 追加 URL → 匹配 → 会话 → `installContainerAudioList` | ISO 展开曲目；与普通音频混合成分区 |
+| `AppState+MediaType` | `isAudioDocument` / `currentAudioPresentationURL` 走音频 chrome 与列表类型 | 内容家族与列表类型 | 呈现层读当前 URL | 容器与外部文件封面路径正确 |
+| `NavigatorPanelView` | 会话播放贡献 ID 或宿主音视频列表显示正在播放图标 | 贡献的通用播放语义 | 贡献 ID/选择状态 → 波形图标 | 宿主列表与扩展队列当前项指示 |
 | `AudioPlaybackController` | 已走窄设备服务入口；实现仍固定 Hi-Fi | 已协商的可选设备服务 | play/stop → snapshot/prepare/release | 独占 PCM、系统默认回退、停止释放租约 |
-| `AppState+HiFiLegacyQueue` | 宿主列表与旧队列桥接，解释 `file:` / `containerTrackID` | 扩展解释私有 ID | 列表选择 → 通用 activate | 容器切曲、文件队列裁剪后资源仍指向原文件 |
-| `HiFiLegacyAdapter+ContentProbe` | 宿主读 `SACDMTOC` | hifi sniff | 打开 `.iso` → 探测 | 普通 ISO 拒绝；SACD 主 TOC 接受 |
+| `AppState+HiFiLegacyQueue` | 不透明 ID 盖章与 1:1 资源对应；不再解析 `file:` / 曲目序号 | 扩展解释私有 ID | 列表选择 → 通用 activate | 容器切曲、文件队列裁剪后资源仍指向原文件 |
+| `HiFiLegacyAdapter+ContentProbe` | 仅未声明 `content.probe` 的旧 Hi-Fi 读主 TOC | hifi `content.probe` | 打开 `.iso` → 探测 | 普通 ISO 拒绝；SACD 主 TOC 接受 |
 
 配置（允许保留 Hi-Fi 标识）：`hifi/ExtensionManifest.json` 的 `audio.hifi`、安装/偏好中的扩展 ID、`UserDefaults` 键 `app.foofoil.extension.hifi.preferred-pcm-device-uid`（扩展私有）。
 
@@ -420,7 +420,7 @@ xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platfor
 
 阶段 0 验收已满足。阶段 1 见第 13 节。阶段 2 见第 14 节。
 
-阶段 3–6：见第 4 节未勾选项。硬件回归未通过前，阶段 5 不得标完成。
+阶段 3 见第 15 节。阶段 4 见第 16 节。阶段 5–6：见第 4 节未勾选项。硬件回归未通过前，阶段 5 不得标完成。
 
 阻塞：无。阶段 6 删除旧适配前需按 12.2 确认支持窗口。
 
@@ -484,4 +484,53 @@ xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platfor
 
 ### 剩余事项
 
-阶段 2 验收已满足。阶段 3：探测下沉 hifi、私有 ID 与资源失效。阶段 4：按内容家族呈现。阶段 5：独占交接与去掉 Hi-Fi ID 回退。硬件回归未通过前阶段 5 不得标完成。
+阶段 2 验收已满足。阶段 3 见第 15 节。阶段 4：按内容家族呈现。阶段 5：独占交接与去掉 Hi-Fi ID 回退。硬件回归未通过前阶段 5 不得标完成。
+
+## 15. 实施记录：2026-09-10，阶段 3 格式、导航与恢复语义下沉
+
+本批修改 hifi 与 foofoil；extension-kit 契约未改，复用阶段 2 的 `content.probe` v1。不改 PCM 引擎、窗口或历史库。
+
+### 已实现
+
+- hifi 声明并实现 `content.probe`：只在 I/O 预算内读 Scarlet Book 主 TOC 魔数，不建会话、不碰设备。普通 ISO、DSF 和过小预算返回 `unmatched`；命中返回 `matched` / `reason: sacd-master-toc`。
+- 宿主 `InProcessContentProvider` 在已声明该能力时调用探测；未声明的旧 Hi-Fi 仍走 `HiFiLegacyAdapter.sniffSACDISOMagic`。
+- 宿主不再解析 `file:` 前缀或曲目序号。队列对应改为：`containerTrackID`、列表上的不透明 `extensionItemID` 盖章，以及资源与队列 1:1 配对。
+- 连续可衔接文件按同一非内置音频 Provider 收集，嗅探命中的容器单独打开，不再写死 `dsf`/`dff`。
+- 历史恢复时资源缺失或嗅探不再命中，降级为 `unavailable` 呈现；新会话 UUID 不复用已关闭会话。
+
+探测 v1 不含曲目列表，追加 ISO 展开仍开临时会话读取 `playbackQueue`。呈现 chrome 与独占交接仍 Hi-Fi 门控（阶段 4–5）。
+
+### 验证
+
+- hifi `swift test`：43 项通过（含 Runtime `content.probe` ABI 与契约 fixture 键）。
+- hifi smoke `--self-test`：生命周期、媒体/导航，以及 DSF / 普通 ISO / 魔数 ISO / 过小预算探测。不播放合成 DSF，不 prepareExclusivePCM。
+- 宿主：219 项通过、1 项硬件跳过、0 失败；展开 235 次。跳过仍为 `CueSheetTests/exclusivePlaybackSurvivesTrackChangesAndPause()`。
+- `./run` 构建、注入并签名 Hi-Fi 开发插件后启动。未做 DAC 听音。
+- 两仓库 `git diff --check` 通过。无新增源码编译警告。未改 extension-kit，未重复跑其测试。
+
+### 剩余事项
+
+阶段 3 验收已满足。阶段 4 见第 16 节。阶段 5：独占交接与去掉 Hi-Fi ID 回退。硬件回归未通过前阶段 5 不得标完成。
+
+## 16. 实施记录：2026-09-10，阶段 4 通用会话与呈现
+
+本批只改宿主；不改 ABI、JSON、历史格式或 hifi 引擎。独占交接与设备服务仍走兼容层（阶段 5）。
+
+### 已实现
+
+- `usesHostAudioChrome` 按内容家族与已协商 `media.transport` 决定，不再认 `audio.hifi`。有播放快照的通用音频 Provider 复用 `ExtensionAudioModeView`；无快照的增强器仍走通用文本呈现。
+- 无缝序列 `acceptsGaplessCollection` 跟随音频 chrome，不再写死 Hi-Fi。
+- 正在播放指示使用会话播放贡献 ID，不再认 `hifi.playback-queue`。宿主文件列表的音视频指示保持原路径。
+- `requiresExclusiveHandoff` 与旧命令映射仍留在兼容层，阶段 5 再按设备服务解耦。
+- 过期媒体结果不得覆盖新会话：会话 UUID 与 `exclusivePlaybackGeneration` 防护已有测试覆盖。
+
+### 验证
+
+- 宿主：221 项通过、1 项硬件跳过、0 失败；展开 237 次。跳过仍为 `CueSheetTests/exclusivePlaybackSurvivesTrackChangesAndPause()`。
+- `GenericAudioContractTests`：通用 Provider 走音频 chrome、贡献 ID 指示、导航/恢复/关闭；过期 play 不覆盖新会话。无 `media.transport` 的会话不进入音频 UI。Hi-Fi 仍独占交接。
+- `./run` 构建、注入并签名 Hi-Fi 开发插件后启动。未做 DAC 听音。
+- `git diff --check` 通过。无新增源码编译警告。未改 extension-kit 或 hifi。
+
+### 剩余事项
+
+阶段 4 验收已满足。阶段 5：独占交接按已协商设备服务，去掉 Hi-Fi 扩展 ID 回退；硬件回归未通过前不得标完成。阶段 6：目录整理与旧适配删除。

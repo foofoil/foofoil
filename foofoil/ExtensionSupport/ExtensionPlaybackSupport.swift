@@ -1,20 +1,45 @@
 import Foundation
 import FoofoilExtensionKit
 
-/// 宿主内部播放呈现、队列投影与独占交接入口。当前委托 Hi-Fi 兼容层，以保持现有行为。
-/// 阶段 4 改为内容家族与已协商媒体能力；阶段 3 接管容器探测与私有 ID；阶段 5 按设备服务能力决定独占。
+/// 宿主内部播放呈现、队列投影与独占交接入口。
+/// 阶段 5 按已协商设备服务决定独占，不把所有 `media.transport` 纳入抢占。
 enum ExtensionPlaybackSupport {
+    /// 有播放快照且内容家族为音频（或已协商 `media.transport` / 旧 Hi-Fi）时复用宿主音频 UI。
     static func usesHostAudioChrome(_ session: ContentSession) -> Bool {
-        session.mediaPlayback != nil && HiFiLegacyAdapter.supports(session)
+        guard session.mediaPlayback != nil else { return false }
+        if let family = resolvedContentFamily(for: session) {
+            return family == .audio
+        }
+        return MediaPlaybackRequest.isSupported(by: session) || HiFiLegacyAdapter.supports(session)
     }
 
-    static func presentationURL(in session: ContentSession) -> URL? {
+    static func resolvedContentFamily(for session: ContentSession) -> ExtensionContentFamily? {
+        ExtensionHost.shared.resolver.provider(id: session.providerID)?.descriptor.contentFamily
+    }
+
+    static func presentationURL(in session: ContentSession, fileList: FileListState? = nil) -> URL? {
         guard usesHostAudioChrome(session) else { return nil }
-        return HiFiLegacyAdapter.currentURL(in: session)
+        return authorizedResource(in: session, fileList: fileList)?.url ?? session.request.primaryFileURL
     }
 
-    static func authorizedResource(in session: ContentSession) -> ExtensionResource? {
-        HiFiLegacyAdapter.currentResource(in: session)
+    /// 单资源容器用该资源；多文件集合用宿主列表上的不透明 ID 盖章，或资源与队列一一对应。
+    static func authorizedResource(in session: ContentSession, fileList: FileListState? = nil) -> ExtensionResource? {
+        let resources = session.request.resources
+        guard !resources.isEmpty else { return nil }
+        if resources.count == 1 { return resources[0] }
+        guard let currentID = session.playbackQueue?.currentItemID else { return resources.first }
+        if let item = fileList?.items.first(where: {
+            $0.extensionItemID == currentID || $0.cue?.containerTrackID == currentID
+        }) {
+            let path = standardizedPath(item.url)
+            return resources.first { standardizedPath($0.url) == path } ?? resources.first
+        }
+        if let queue = session.playbackQueue,
+           queue.items.count == resources.count,
+           let index = queue.items.firstIndex(where: { $0.id == currentID }) {
+            return resources[index]
+        }
+        return resources.first
     }
 
     static func isActionAvailable(_ action: MediaPlaybackActionKind, in session: ContentSession) -> Bool {
@@ -49,22 +74,35 @@ enum ExtensionPlaybackSupport {
     }
 
     static func queueItemID(for item: FileListItem, in session: ContentSession) -> String? {
-        if let id = item.cue?.containerTrackID,
-           session.playbackQueue?.items.contains(where: { $0.id == id }) == true {
+        guard let queue = session.playbackQueue else { return nil }
+        if let id = item.cue?.containerTrackID, queue.items.contains(where: { $0.id == id }) {
             return id
         }
-        return HiFiLegacyAdapter.legacyQueueItemID(for: item, in: session)
+        if let id = item.extensionItemID, queue.items.contains(where: { $0.id == id }) {
+            return id
+        }
+        let resources = session.request.resources
+        guard queue.items.count == resources.count,
+              let resourceIndex = resources.firstIndex(where: {
+                  standardizedPath($0.url) == standardizedPath(item.url)
+              }) else { return nil }
+        return queue.items[resourceIndex].id
+    }
+
+    fileprivate static func standardizedPath(_ url: URL) -> String {
+        url.resolvingSymlinksInPath().standardizedFileURL.path
     }
 
     static func showsPlaybackIndicator(
         for contribution: NavigatorContribution, session: ContentSession?
     ) -> Bool {
-        guard let session else { return false }
-        return contribution.id == HiFiLegacyAdapter.playbackQueueID && usesHostAudioChrome(session)
+        guard let session, usesHostAudioChrome(session),
+              let id = playbackContributionID(in: session) else { return false }
+        return contribution.id == id
     }
 
     static func acceptsGaplessCollection(_ session: ContentSession) -> Bool {
-        HiFiLegacyAdapter.supports(session)
+        usesHostAudioChrome(session)
     }
 
     static func containerPlaybackQueue(from session: ContentSession) -> MediaPlaybackQueueSnapshot? {

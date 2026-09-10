@@ -256,7 +256,7 @@ struct ExtensionAudioModeView: View {
         self.appState = appState
         self.shouldHideBorder = shouldHideBorder
         _controller = StateObject(wrappedValue: ExtensionAudioPlaybackController(appState: appState, session: session))
-        let url = ExtensionPlaybackSupport.presentationURL(in: session)
+        let url = ExtensionPlaybackSupport.presentationURL(in: session, fileList: appState.fileList)
         var fallback = AudioTrackInfo.fallback(fileName: url?.lastPathComponent ?? "")
         fallback.artwork = appState.customCoverImage
         _info = State(initialValue: AudioModeView.overlay(
@@ -371,7 +371,7 @@ struct ExtensionAudioModeView: View {
 
     private func loadTrackInfo() async -> AudioTrackInfo {
         guard let session = appState.extensionSession,
-              let url = ExtensionPlaybackSupport.presentationURL(in: session) else {
+              let url = ExtensionPlaybackSupport.presentationURL(in: session, fileList: appState.fileList) else {
             return AudioTrackInfo.fallback(fileName: "")
         }
         var loaded = await AudioMetadataLoader.load(from: url)

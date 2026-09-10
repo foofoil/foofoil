@@ -12,14 +12,17 @@ final class InProcessContentProvider: ContentProvider {
 
     private let declaration: ExtensionProviderDeclaration
     private let runtime: InProcessExtensionInterface
+    private let capabilities: [ExtensionCapabilityDeclaration]
 
     init(
         extensionID: String,
         declaration: ExtensionProviderDeclaration,
-        runtime: InProcessExtensionInterface
+        runtime: InProcessExtensionInterface,
+        capabilities: [ExtensionCapabilityDeclaration] = []
     ) {
         self.declaration = declaration
         self.runtime = runtime
+        self.capabilities = capabilities
         descriptor = ProviderDescriptor(
             id: declaration.id,
             extensionID: extensionID,
@@ -37,10 +40,28 @@ final class InProcessContentProvider: ContentProvider {
         ProviderContentMatcher.match(
             request,
             declarations: declaration.contentTypes,
-            sniff: declaration.id == HiFiLegacyAdapter.providerID
-                ? HiFiLegacyAdapter.sniffSACDISOMagic
-                : { _ in false }
+            sniff: sniffContent
         )
+    }
+
+    /// 已声明 `content.probe` 时把嗅探交给扩展；旧 Hi-Fi 无该能力时仍读主 TOC 魔数。
+    private func sniffContent(_ url: URL) -> Bool {
+        ExtensionContentMatching.sniff(
+            url,
+            providerID: declaration.id,
+            capabilities: capabilities,
+            probe: probeContent
+        )
+    }
+
+    private func probeContent(_ url: URL) -> ContentProbeResult? {
+        do {
+            let request = ContentProbeRequest(resource: ExtensionResource(url: url))
+            try request.validate()
+            return try runtime.performApplicationCommand(request, as: ContentProbeResult.self)
+        } catch {
+            return nil
+        }
     }
 
     func makeSession(for request: ContentRequest, negotiatedAPI: UInt32) async throws -> ContentSession {
@@ -107,5 +128,20 @@ final class InProcessContentProvider: ContentProvider {
         return try await Task.detached(priority: .userInitiated) {
             try runtime.perform(commandID: commandID, session: requested)
         }.value
+    }
+}
+
+enum ExtensionContentMatching {
+    static func sniff(
+        _ url: URL,
+        providerID: String,
+        capabilities: [ExtensionCapabilityDeclaration],
+        probe: ((URL) -> ContentProbeResult?)? = nil
+    ) -> Bool {
+        if ContentProbeRequest.isDeclared(in: capabilities) {
+            return probe?(url)?.disposition == .matched
+        }
+        guard providerID == HiFiLegacyAdapter.providerID else { return false }
+        return HiFiLegacyAdapter.sniffSACDISOMagic(url)
     }
 }

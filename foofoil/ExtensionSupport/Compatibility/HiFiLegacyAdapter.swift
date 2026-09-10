@@ -49,32 +49,11 @@ enum HiFiLegacyAdapter {
         return String(commandID.dropFirst(prefix.count))
     }
 
-    /// 旧协议把源文件序号编码在曲目 ID 中；该约定不应进入通用呈现代码。
-    static func currentResource(in session: ContentSession) -> ExtensionResource? {
-        let resources = session.request.resources
-        guard let queue = session.playbackQueue,
-              let currentID = queue.currentItemID else {
-            return resources.first
-        }
-        let sourceIndex = currentID.hasPrefix("file:")
-            ? Int(currentID.dropFirst("file:".count))
-            : queue.items.firstIndex(where: { $0.id == currentID })
-        guard let index = sourceIndex, resources.indices.contains(index) else {
-            return resources.first
-        }
-        return resources[index]
+    static func currentResource(in session: ContentSession, fileList: FileListState? = nil) -> ExtensionResource? {
+        ExtensionPlaybackSupport.authorizedResource(in: session, fileList: fileList)
     }
 
-    static func currentURL(in session: ContentSession) -> URL? {
-        currentResource(in: session)?.url ?? session.request.primaryFileURL
-    }
-
-    /// 旧协议把外部文件编码为 `file:{resourceIndex}`；通用路径不得复用该前缀。
-    static func legacyQueueItemID(for item: FileListItem, in session: ContentSession) -> String? {
-        guard supports(session), item.cue == nil,
-              let index = session.request.resources.firstIndex(where: {
-                  $0.url.standardizedFileURL == item.url.standardizedFileURL
-              }) else { return nil }
-        return "file:\(index)"
+    static func currentURL(in session: ContentSession, fileList: FileListState? = nil) -> URL? {
+        currentResource(in: session, fileList: fileList)?.url ?? session.request.primaryFileURL
     }
 }

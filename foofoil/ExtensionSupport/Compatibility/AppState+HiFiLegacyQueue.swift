@@ -1,20 +1,38 @@
 import Foundation
 import FoofoilExtensionKit
 
-/// 旧 Hi-Fi 队列与宿主文件列表之间的过渡桥接。
-/// 阶段 3 下沉容器曲目与私有 ID；阶段 4 按通用贡献 ID 传递操作，不再在此解释 `file:` 前缀。
+/// 宿主文件列表与扩展队列之间的桥接。呈现与无缝序列按内容家族/能力；独占交接见阶段 5。
 extension AppState {
-    /// 连续 DSF/DFF 可共享会话。阶段 3 改为由扩展声明可衔接的格式，而不是宿主写死后缀。
+    /// 同一非内置音频 Provider 的连续外部文件可共享会话；嗅探命中的容器单独打开。
     func contiguousExtensionAudioURLs(startingAt itemID: String) -> [URL] {
         guard let list = fileList, let index = list.items.firstIndex(where: { $0.id == itemID }),
               mediaPlaybackMode == .sequential || mediaPlaybackMode == .sequentialLoop else { return [] }
         var urls: [URL] = []
+        var sharedProviderID: String?
         for item in list.items.dropFirst(index) {
-            guard item.cue == nil, ["dsf", "dff"].contains(item.url.pathExtension.lowercased()),
-                  let url = resolvedURL(for: item) else { break }
+            guard item.cue == nil, let url = resolvedURL(for: item) else { break }
+            let candidates = ExtensionHost.shared.resolver.candidates(for: .singleFile(.init(url: url)))
+            guard let candidate = candidates.first(where: { !$0.descriptor.isBuiltIn }),
+                  candidate.descriptor.contentFamily == .audio else { break }
+            if candidate.match.strength == .sniff { break }
+            if let sharedProviderID, sharedProviderID != candidate.descriptor.id { break }
+            sharedProviderID = candidate.descriptor.id
             urls.append(url)
         }
         return urls
+    }
+
+    /// 会话建立后把扩展队列 ID 盖到宿主列表项上，之后不再解析 ID 布局。
+    func stampHostListWithExtensionQueueIDs(_ session: ContentSession) {
+        guard var list = fileList, session.playbackQueue != nil else { return }
+        var changed = false
+        for index in list.items.indices {
+            guard let id = ExtensionPlaybackSupport.queueItemID(for: list.items[index], in: session),
+                  list.items[index].extensionItemID != id else { continue }
+            list.items[index].extensionItemID = id
+            changed = true
+        }
+        if changed { fileList = list }
     }
 
     /// 每次命令携带宿主允许的顺序；移除、排序或切换模式后废弃旧的预读后继。
@@ -118,20 +136,17 @@ extension AppState {
         return true
     }
 
-    /// 新列表显式保存容器内部 ID；旧版持久化数据则按原 ID 或曲目序号兼容恢复。
+    /// 只使用已保存的不透明 ID；不把曲目序号或 `file:` 布局当成协议。
     func containerTrackID(for item: FileListItem, in queue: MediaPlaybackQueueSnapshot) -> String? {
         if let id = item.cue?.containerTrackID,
            queue.items.contains(where: { $0.id == id }) {
             return id
         }
+        if let id = item.extensionItemID, queue.items.contains(where: { $0.id == id }) {
+            return id
+        }
         if queue.items.contains(where: { $0.id == item.id }) {
             return item.id
-        }
-        if let number = item.cue?.trackNumber.flatMap(Int.init) {
-            let index = number - 1
-            if queue.items.indices.contains(index) {
-                return queue.items[index].id
-            }
         }
         return nil
     }

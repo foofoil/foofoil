@@ -47,6 +47,65 @@ struct GenericAudioContractTests {
         try await provider.closeSession(fresh)
         #expect(provider.closeCount == 2)
         #expect(HiFiLegacyAdapter.mediaAction(for: "hifi.play", in: session) == nil)
+        #expect(ExtensionPlaybackSupport.usesHostAudioChrome(session))
+        #expect(ExtensionPlaybackSupport.presentationURL(in: session)?.pathExtension == "gaud")
+        #expect(!ExtensionPlaybackSupport.requiresExclusiveHandoff(session))
+        #expect(ExtensionPlaybackSupport.acceptsGaplessCollection(session))
+        #expect(ExtensionPlaybackSupport.playbackContributionID(in: session) == "generic.playback-queue")
+        #expect(ExtensionPlaybackSupport.showsPlaybackIndicator(
+            for: session.navigatorContributions[0], session: session
+        ))
+        #expect(!ExtensionPlaybackSupport.showsPlaybackIndicator(
+            for: NavigatorContribution(
+                id: "hifi.playback-queue", titleLocalizationKey: "Queue", style: .flat, items: []
+            ),
+            session: session
+        ))
+
+        let state = AppState()
+        defer {
+            state.extensionSession = nil
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        state.extensionSession = session
+        #expect(state.isAudioDocument)
+        #expect(state.currentAudioPresentationURL?.pathExtension == "gaud")
+    }
+
+    @Test func staleMediaResultDoesNotReplaceNewerSession() async throws {
+        let provider = GateableAudioTestProvider()
+        let host = ExtensionHost.shared
+        host.resolver.register(provider)
+        defer { host.resolver.unregister(providerID: provider.descriptor.id) }
+
+        let first = try await provider.makeSession(
+            for: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/first.gaud"))), negotiatedAPI: 1
+        )
+        let second = try await provider.makeSession(
+            for: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/second.gaud"))), negotiatedAPI: 1
+        )
+        #expect(first.id != second.id)
+
+        let state = AppState()
+        defer {
+            state.extensionSession = nil
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        state.extensionSession = first
+        state.performExtensionMediaAction(.play)
+        for _ in 0..<100 where provider.mediaActions.isEmpty {
+            await Task.yield()
+        }
+        #expect(!provider.mediaActions.isEmpty)
+        state.extensionSession = second
+        state.exclusivePlaybackGeneration &+= 1
+        provider.releaseGate()
+        for _ in 0..<100 where !provider.didFinish {
+            await Task.yield()
+        }
+        #expect(provider.didFinish)
+        #expect(state.extensionSession?.id == second.id)
+        #expect(state.extensionSession?.mediaPlayback?.state != .playing)
     }
 
     @Test func explicitUnavailableActionIsRejectedBeforeProviderWork() async throws {
@@ -193,5 +252,46 @@ private final class GenericAudioTestProvider: ContentProvider {
             actions.append(.play)
         }
         return actions
+    }
+}
+
+@MainActor
+private final class GateableAudioTestProvider: ContentProvider {
+    let descriptor = ProviderDescriptor(
+        id: "test.gateable-audio", extensionID: "app.foofoil.extension.test-gateable-audio",
+        role: .primary, fallbackProviderID: nil, enhancementDomain: "audio", contentFamily: .audio,
+        filenameExtensions: ["gaud"], isEnabled: true, isRuntimeAvailable: true
+    )
+    var mediaActions: [MediaPlaybackAction] = []
+    var didFinish = false
+    private var gate: CheckedContinuation<Void, Never>?
+
+    func match(_ request: ContentRequest) -> ProviderMatch? { nil }
+
+    func makeSession(for request: ContentRequest, negotiatedAPI: UInt32) async throws -> ContentSession {
+        ContentSession(
+            extensionID: descriptor.extensionID, providerID: descriptor.id, request: request,
+            presentation: .text(titleKey: "Generic Audio", body: request.primaryFileURL?.lastPathComponent ?? ""),
+            capabilities: [
+                .init(declaration: .init(id: ExtensionCapabilityIdentifier.mediaTransport, scope: .session), state: .active)
+            ],
+            mediaPlayback: .init(state: .paused, position: 0, duration: 10, isSeekable: true)
+        )
+    }
+
+    func perform(mediaAction: MediaPlaybackAction, session: ContentSession) async throws -> ContentSession {
+        mediaActions.append(mediaAction)
+        await withCheckedContinuation { continuation in
+            gate = continuation
+        }
+        didFinish = true
+        var updated = session
+        updated.mediaPlayback?.state = .playing
+        return updated
+    }
+
+    func releaseGate() {
+        gate?.resume()
+        gate = nil
     }
 }
