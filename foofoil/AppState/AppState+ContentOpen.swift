@@ -992,12 +992,7 @@ extension AppState {
         }
 
         func performExtensionCommand(_ commandID: String) {
-            if let session = extensionSession,
-               let action = ExtensionPlaybackSupport.legacyMediaAction(for: commandID, in: session) {
-                performExtensionMediaAction(action)
-            } else {
-                performExtensionOperation(.command(commandID))
-            }
+            performExtensionOperation(.command(commandID))
         }
 
         func performExtensionMediaAction(_ action: ExtensionMediaAction) {

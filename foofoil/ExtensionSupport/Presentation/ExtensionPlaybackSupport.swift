@@ -4,12 +4,10 @@ import FoofoilExtensionKit
 /// 宿主内部播放呈现、队列投影与独占交接入口。
 /// 独占交接按已协商设备服务，不把所有 `media.transport` 纳入抢占。
 enum ExtensionPlaybackSupport {
-    /// 有播放快照、内容家族为音频，且已协商 `media.transport`（旧 Hi-Fi 兼容期暂放行）时才复用宿主音频 UI。
+    /// 有播放快照、内容家族为音频，且已协商 `media.transport` 时才复用宿主音频 UI。
     static func usesHostAudioChrome(_ session: ContentSession) -> Bool {
         guard session.mediaPlayback != nil else { return false }
-        guard MediaPlaybackRequest.isSupported(by: session) || HiFiLegacyAdapter.supports(session) else {
-            return false
-        }
+        guard MediaPlaybackRequest.isSupported(by: session) else { return false }
         if let family = resolvedContentFamily(for: session) {
             return family == .audio
         }
@@ -63,9 +61,6 @@ enum ExtensionPlaybackSupport {
         if session.mediaPlayback?.availableActions != nil,
            !isActionAvailable(.selectDevice, in: session) {
             return false
-        }
-        if HiFiLegacyAdapter.supports(session) {
-            return HiFiLegacyAdapter.isDeviceEnabled(deviceID, in: session)
         }
         return true
     }
@@ -128,9 +123,5 @@ enum ExtensionPlaybackSupport {
 
     static func requiresExclusiveHandoff(_ session: ContentSession) -> Bool {
         usesHostAudioChrome(session) && usesDeviceService(session)
-    }
-
-    static func legacyMediaAction(for commandID: String, in session: ContentSession) -> MediaPlaybackAction? {
-        HiFiLegacyAdapter.mediaAction(for: commandID, in: session)
     }
 }

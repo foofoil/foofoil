@@ -20,7 +20,8 @@ protocol ContentProvider: AnyObject {
 
 extension ContentProvider {
     func perform(mediaAction: MediaPlaybackAction, session: ContentSession) async throws -> ContentSession {
-        try await HiFiLegacyAdapter.perform(mediaAction: mediaAction, session: session, provider: self)
+        // 未协商 media.transport 的 Provider 明确不支持，不再回退到旧私有命令。
+        throw ContentProviderError.unsupportedRequest
     }
     func perform(commandID: String, session: ContentSession) async throws -> ContentSession {
         session

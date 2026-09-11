@@ -44,11 +44,10 @@ final class InProcessContentProvider: ContentProvider {
         )
     }
 
-    /// 已声明 `content.probe` 时把嗅探交给扩展；旧 Hi-Fi 无该能力时仍读主 TOC 魔数。
+    /// 只支持公共 `content.probe`；不再回退到旧 Hi-Fi SACD 魔数嗅探。
     private func sniffContent(_ url: URL) -> Bool {
         ExtensionContentMatching.sniff(
             url,
-            providerID: declaration.id,
             capabilities: capabilities,
             probe: probeContent
         )
@@ -80,7 +79,7 @@ final class InProcessContentProvider: ContentProvider {
 
     func perform(mediaAction: MediaPlaybackAction, session: ContentSession) async throws -> ContentSession {
         guard MediaPlaybackRequest.isSupported(by: session) else {
-            return try await HiFiLegacyAdapter.perform(mediaAction: mediaAction, session: session, provider: self)
+            throw ContentProviderError.unsupportedRequest
         }
         let runtime = runtime
         let request = MediaPlaybackRequest(action: mediaAction, session: session)
@@ -90,18 +89,15 @@ final class InProcessContentProvider: ContentProvider {
     }
 
     func restorePlayback(from saved: ContentSession, in fresh: ContentSession) async throws -> ContentSession {
-        if let request = ExtensionSessionLifecycle.restorationRequest(from: saved, in: fresh) {
-            return try await performLifecycle(request)
+        guard let request = ExtensionSessionLifecycle.restorationRequest(from: saved, in: fresh) else {
+            return fresh
         }
-        return try await HiFiLegacyAdapter.restorePlayback(saved: saved, fresh: fresh, provider: self)
+        return try await performLifecycle(request)
     }
 
     func closeSession(_ session: ContentSession) async throws {
-        if SessionLifecycleRequest.isSupported(by: session) {
-            _ = try await performLifecycle(.init(operation: .close, session: session))
-            return
-        }
-        try await HiFiLegacyAdapter.closeSession(session, provider: self)
+        guard SessionLifecycleRequest.isSupported(by: session) else { return }
+        _ = try await performLifecycle(.init(operation: .close, session: session))
     }
 
     private func performLifecycle(_ request: SessionLifecycleRequest) async throws -> ContentSession {
@@ -112,24 +108,14 @@ final class InProcessContentProvider: ContentProvider {
     }
 
     func perform(navigatorAction: NavigatorAction, session: ContentSession) async throws -> ContentSession {
-        if NavigatorActionRequest.isSupported(by: session) {
-            let runtime = runtime
-            let request = NavigatorActionRequest(action: navigatorAction, session: session)
-            return try await Task.detached(priority: .userInitiated) {
-                try runtime.perform(navigation: request)
-            }.value
-        }
-        // 未协商 `ui.navigator-actions` 时只允许仍是 Hi-Fi Provider 的会话走兼容层；
-        // 通用 Provider 不会收到任何 `hifi.*` 私有导航命令。
-        guard HiFiLegacyAdapter.supports(session),
-              let request = HiFiLegacyAdapter.navigatorRequest(action: navigatorAction, session: session) else {
+        guard NavigatorActionRequest.isSupported(by: session) else {
+            // 未协商 `ui.navigator-actions`：明确保持会话，不构造任何私有导航命令。
             return session
         }
-        let commandID = request.commandID
-        let requested = request.session
         let runtime = runtime
+        let request = NavigatorActionRequest(action: navigatorAction, session: session)
         return try await Task.detached(priority: .userInitiated) {
-            try runtime.perform(commandID: commandID, session: requested)
+            try runtime.perform(navigation: request)
         }.value
     }
 }
@@ -137,13 +123,10 @@ final class InProcessContentProvider: ContentProvider {
 enum ExtensionContentMatching {
     static func sniff(
         _ url: URL,
-        providerID: String,
         capabilities: [ExtensionCapabilityDeclaration],
         probe: ((URL) -> ContentProbeResult?)? = nil
     ) -> Bool {
-        if ContentProbeRequest.isDeclared(in: capabilities) {
-            return probe?(url)?.disposition == .matched
-        }
-        return HiFiLegacyAdapter.matchesLegacyContent(url, providerID: providerID)
+        guard ContentProbeRequest.isDeclared(in: capabilities) else { return false }
+        return probe?(url)?.disposition == .matched
     }
 }
