@@ -1,7 +1,7 @@
 # 扩展边界重构收尾 checklist
 
 日期：2026-09-10  
-状态：收尾阶段 0–3 已完成，阶段 4 尚未开始；阶段 3 实机回归由用户复验通过（含系统默认采样率变更回归修复）  
+状态：收尾阶段 0–3 已完成；阶段 4 代码与自动测试/ABI smoke 完成，菜单/媒体键/设备菜单与无 hifi 的普通 PCM 待实机复验，阶段 4 尚未验收  
 依据：[评审终稿](extension-boundary-refactor-review-final.zh-CN.md)
 
 本清单是评审后的新增收尾工作，阶段编号不替代原重构计划的阶段 0–6。任务路径按对应仓库根目录理解。
@@ -78,15 +78,15 @@
 
 对应评审 §5.1–5.3。
 
-- [ ] hifi 的标准媒体/设备操作改由宿主 UI 与公共能力承接，不再贡献对应 `hifi.*` 菜单命令。
-- [ ] `ui.commands` 只保留确有产品用途的自定义操作；没有此类命令则取消该能力。
-- [ ] hifi 与宿主统一消费 `availableActions` 和公共设备快照，移除旧 command 的 `isEnabled` 读取。
-- [ ] 按当前契约始终包含 `.refresh`；明确 `.selectDevice` 与设备连接状态的共同约束，不顺带改轮询协议语义。
-- [ ] Runtime 公共媒体/生命周期/导航入口直接调用类型化动作或方法，移除旧命令字符串 dispatch；保留合法的插件内部不透明 ID/命名空间。
-- [ ] 将关闭幂等、恢复位置、资源失效、设备错误传播等有价值断言迁入公共协议测试。
-- [ ] 删除宿主 P0 适配、hifi 外部 P0 命令入口及仅服务 P0 的 fixture/测试；保留 C ABI v1 函数表及当前版本恢复。
+- [x] hifi 的标准媒体/设备操作改由宿主 UI 与公共能力承接，不再贡献对应 `hifi.*` 菜单命令。
+- [x] `ui.commands` 只保留确有产品用途的自定义操作；没有此类命令则取消该能力。
+- [x] hifi 与宿主统一消费 `availableActions` 和公共设备快照，移除旧 command 的 `isEnabled` 读取。
+- [x] 按当前契约始终包含 `.refresh`；明确 `.selectDevice` 与设备连接状态的共同约束，不顺带改轮询协议语义。
+- [x] Runtime 公共媒体/生命周期/导航入口直接调用类型化动作或方法，移除旧命令字符串 dispatch；保留合法的插件内部不透明 ID/命名空间。
+- [x] 将关闭幂等、恢复位置、资源失效、设备错误传播等有价值断言迁入公共协议测试。
+- [x] 删除宿主 P0 适配、hifi 外部 P0 命令入口及仅服务 P0 的 fixture/测试；保留 C ABI v1 函数表及当前版本恢复。
 - [ ] 验证旧协议明确被拒绝、当前公共协议成功，菜单/媒体键/设备菜单仍可用，普通 PCM 无 hifi 时可播放。
-- [ ] 更新 smoke 的真实公共 fixture 参数、AGENTS/计划/支持文档，清除过时的继续兼容要求。
+- [x] 更新 smoke 的真实公共 fixture 参数、AGENTS/计划/支持文档，清除过时的继续兼容要求。
 - [ ] **验收：** 菜单、设备状态与协议迁移一并完成，无新路径暗中依赖兼容层；三仓库相关测试、ABI smoke 与 `./run` 通过。
 
 ## 收尾阶段 5：扫描、通用容器与余项
@@ -191,3 +191,21 @@
 - 未验证范围 / 风险 / 阻塞：故障注入使用测试闭包模拟释放失败，未在真实 HAL/hog 场景逐一注入；`closeOutput` 的失败保留 owner 依赖控制器 `pauseForExclusiveHandoff`，窗口关闭后控制器可能已释放，该重试路径未单独实机触发，保留为后续观察项。本文未逐项转录设备型号/UID 与采样率，若需完整硬件证据可补充。
 - 验收是否通过及证据：通过。自动测试、故障注入、构建/`./run` 与本阶段实机回归（用户复验）均通过；失败不会静默进入新独占会话。
 - 下一阶段：收尾阶段 4（菜单、动作状态与 P0 删除）。
+
+## 收尾阶段 4 执行记录（2026-09-11）— 待实机复验，未验收
+
+- 执行者：当前任务 agent。改动跨 foofoil、extension-kit、hifi 三仓库。基线：foofoil `120089f`、extension-kit `6a617c2`、hifi `334d71d`。
+- 完成任务与关键行为变化：
+  - hifi 菜单/能力：`makeSession` 不再返回 `hifi.play/pause/previous/next/output-device/device.*`，`commands` 置空并移除 `ui.commands` 能力；`refreshDeviceSelection`/`selectDevice` 不再维护设备子命令；标准操作由宿主 UI 与公共能力承接。
+  - 可用性来源：`updatePlaybackState` 与初始快照写入公共 `availableActions`（始终含 `refresh`；按状态给 play/pause；按曲目数给 previous/next；有已连接设备才给 `selectDevice`），宿主只消费该字段与设备连接快照。
+  - 类型化执行：新增内部 `RuntimeAction`；`MediaPlaybackMessage.runtimeAction` 取代 `runtimeCommand`；`RuntimeController.perform(action:)` 取代字符串 switch，生命周期/导航内部改为 `.pause`/`.seek`/`.activate`/`.move`。
+  - 外部入口：`performCommandCallback` 只接受 `media.transport`、`ui.navigator.action`、`session.lifecycle`，其它（含旧 `hifi.*`）返回 invalidMessage；C ABI v1 函数表不变。
+  - 宿主删除：删除 `foofoil/ExtensionSupport/Compatibility/`（`HiFiLegacyAdapter*`）及全部引用；`InProcessContentProvider`、`ContentProvider` 默认、`ExtensionPlaybackSupport`、`performExtensionCommand` 不再回退私有命令/SACD 魔数/旧设备状态读取。
+  - 三仓库文档/AGENTS/README/支持说明同步为 P0 窗口已关闭、无兼容层；extension-kit 删除 `LegacySessionCommands.json` 及其 P0 断言。
+- 测试：迁移有价值断言到公共协议测试（容器曲目 ID、内容探测能力、设备可用性、`ExtensionSessionOperation`），删除仅服务 P0 的适配测试与 hifi fixture；hifi 新增 `mediaMapsToTypedRuntimeActions` 与 smoke 旧入口拒绝检查。
+- 测试命令 / 结果 / 失败与跳过：extension-kit `swift test` 25 项通过；hifi `swift test` 44 项通过；hifi 公共 lifecycle/media-navigation ABI smoke 退出 0（含旧 `hifi.*` 明确被拒、公共命令成功）；foofoil `xcodebuild test ... -only-testing:foofoilTests` 通过，xcresult 汇总 239 项、238 通过、0 失败、1 硬件跳过。
+- 构建、ABI smoke、`./run`：三仓库构建通过，`./run` `BUILD SUCCEEDED`、插件注入并启动，无新增编译警告。
+- 实机设备 / 文件类型与采样率 / 操作 / 结果来源：**未进行**。菜单/媒体键/设备菜单可用性、无 hifi 时的普通 PCM 播放、以及扩展菜单不再出现旧命令，需要实机点击确认；自动测试与 smoke 不能替代。
+- 未验证范围 / 风险 / 阻塞：hifi 扩展菜单不再显示任何命令（预期）；需确认宿主音频覆盖层的设备菜单、媒体键与传输控件仍可用。普通 PCM 无 hifi 路径未改动，但未实机复验。
+- 验收是否通过及证据：未通过。代码迁移、三仓库测试、ABI smoke 与 `./run` 通过，但“菜单/媒体键/设备菜单/普通 PCM”实机项未完成，验收项保持未勾选。
+- 下一阶段（仅在本阶段验收通过后）：收尾阶段 5（扫描、通用容器与余项）。

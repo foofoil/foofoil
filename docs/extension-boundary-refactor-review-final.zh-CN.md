@@ -1,7 +1,7 @@
 # 扩展边界重构评审终稿
 
 日期：2026-09-10  
-状态：收尾阶段 0–3 已完成，阶段 4 尚未开始；进度见[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)
+状态：收尾阶段 0–3 已完成；阶段 4 代码与自动测试/ABI smoke 完成，菜单与无 hifi 普通 PCM 待实机复验；进度见[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)
 评审范围：`foofoil`、`extension-kit`、`hifi` 当前 `ext` / `ext-fix` 实现相对各仓库 `main` 的职责与行为变化
 
 ## 1. 评审前提
@@ -27,7 +27,7 @@
 
 当前未发现会使唯一现有 hifi 主流程必然无法工作的致命缺陷，但仍有五项应作为合并阻塞问题处理：私有导航命令可能泄漏给其他 Provider、音频控件缺少完整能力门控、seek 乐观更新可造成状态不一致、队列映射失败可能破坏后继序列，以及关闭/设备交接错误不能完整传播（§4.6）。内容探测的同步 I/O 与授权范围也应在合并前至少完成低成本修复和验证。
 
-收尾阶段 1 已关闭其中三项：导航泄漏、能力门控与 seek 状态一致性（§4.1–4.3）。收尾阶段 2 已关闭队列映射（§4.4）与 ID 生命周期（§5.6）。收尾阶段 3 已关闭关闭/设备交接错误传播（§4.6），自动测试与实机回归均通过。连续扫描（§4.5）仍未处理。
+收尾阶段 1 已关闭其中三项：导航泄漏、能力门控与 seek 状态一致性（§4.1–4.3）。收尾阶段 2 已关闭队列映射（§4.4）与 ID 生命周期（§5.6）。收尾阶段 3 已关闭关闭/设备交接错误传播（§4.6），自动测试与实机回归均通过。收尾阶段 4 已关闭菜单、动作状态与 P0 删除（§5.1–5.3）：`Compatibility` 层删除、hifi 不再贡献旧命令、可用性统一走 `availableActions`。连续扫描（§4.5）仍未处理。
 
 此外，P0 兼容协议没有发布服务对象，支持窗口已关闭，应按依赖顺序落实删除。但当前新宿主与新 hifi 仍通过扩展菜单实际使用部分 `hifi.*` 命令映射，因此不能直接把整个兼容目录当作死代码删除；应先迁移菜单贡献和 hifi Runtime 内部 dispatch，再完成清理。
 
@@ -181,6 +181,8 @@
 
 ### 5.1 关闭 P0 支持窗口，但先迁移当前仍在使用的菜单命令
 
+收尾阶段 4 已完成：hifi 不再贡献标准媒体/设备 `hifi.*` 菜单命令并取消 `ui.commands`；宿主 `ExtensionSupport/Compatibility/` 与 `HiFiLegacyAdapter` 全部删除，通用路径不再解析私有命令或回退 SACD 魔数；旧外部入口在 hifi Runtime 明确被拒；C ABI v1 函数表与当前版本恢复保留。有条件断言已迁入公共协议测试，仅服务 P0 的 fixture（`LegacySessionCommands.json`）与适配测试已删除。下文为原始计划，仅作记录。
+
 位置：
 
 - `foofoil/ExtensionSupport/Compatibility/`
@@ -204,6 +206,8 @@
 
 ### 5.2 将 hifi 内部执行从旧协议字符串改为类型化动作
 
+收尾阶段 4 已完成：hifi Runtime 引入内部 `RuntimeAction`，公共媒体/生命周期/导航消息直接调用类型化 `perform(action:)`，删除 `MediaPlaybackMessage.runtimeCommand` 与 Runtime 内部 `hifi.*` dispatch 字符串；合法的 `hifi.playback-queue` 等不透明内部命名空间保留。下文为原始建议。
+
 位置：
 
 - `hifi/Sources/HiFiExtensionRuntime/MediaActionMessages.swift:24-33`
@@ -221,6 +225,8 @@
 这项可与 P0 清理一起完成，避免形成“外部协议已通用、内部仍以旧协议为核心”的长期结构。
 
 ### 5.3 统一媒体动作可用性的状态来源
+
+收尾阶段 4 已完成：hifi 在每个公共快照写入完整 `availableActions`（始终含 `.refresh`；`.selectDevice` 与设备连接状态共同约束），宿主只消费公共字段与设备快照，删除旧 command 的 `isEnabled` 读取。轮询协议语义未改动。下文为原始建议。
 
 位置：
 
