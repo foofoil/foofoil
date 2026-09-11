@@ -1,7 +1,7 @@
 # 扩展边界重构收尾 checklist
 
 日期：2026-09-10  
-状态：收尾阶段 0、1、2 已完成，阶段 3 尚未开始；宿主单元测试全绿  
+状态：收尾阶段 0–2 已完成；阶段 3 代码与自动测试完成，待实机回归，阶段 3 尚未验收  
 依据：[评审终稿](extension-boundary-refactor-review-final.zh-CN.md)
 
 本清单是评审后的新增收尾工作，阶段编号不替代原重构计划的阶段 0–6。任务路径按对应仓库根目录理解。
@@ -64,13 +64,13 @@
 
 对应评审 §4.6（原 §5.5），合并阻塞项。
 
-- [ ] 需要竞争同一设备的会话替换显式等待旧会话关闭并处理失败；整理 didSet 兜底，避免重复关闭。
-- [ ] PCM 与扩展暂停/释放回调可向协调器传播错误，删除交接关键路径中的吞错行为。
-- [ ] 释放成功后才删除旧 owner；失败保留 owner 或等价待释放记录，阻止同设备新 start，保留重试所需上下文。
-- [ ] 幂等且明确可重试的释放错误至多重试一次；下一次请求不能绕过未释放状态。
-- [ ] 新获取失败、取消、旧界面消失和过期结果不遗失资源归属；不同设备及系统输出不受无关错误永久阻塞。
-- [ ] 失败提示可本地化，刷新失败有界；刷新结果不能覆盖新会话/新操作。
-- [ ] 故障注入覆盖 PCM → 扩展、扩展 → PCM、扩展 → 扩展：释放失败时新 start 为零、旧记录保留、恢复后重试成功；覆盖取消/过期/不同设备。
+- [x] 需要竞争同一设备的会话替换显式等待旧会话关闭并处理失败；整理 didSet 兜底，避免重复关闭。
+- [x] PCM 与扩展暂停/释放回调可向协调器传播错误，删除交接关键路径中的吞错行为。
+- [x] 释放成功后才删除旧 owner；失败保留 owner 或等价待释放记录，阻止同设备新 start，保留重试所需上下文。
+- [x] 幂等且明确可重试的释放错误至多重试一次；下一次请求不能绕过未释放状态。
+- [x] 新获取失败、取消、旧界面消失和过期结果不遗失资源归属；不同设备及系统输出不受无关错误永久阻塞。
+- [x] 失败提示可本地化，刷新失败有界；刷新结果不能覆盖新会话/新操作。
+- [x] 故障注入覆盖 PCM → 扩展、扩展 → PCM、扩展 → 扩展：释放失败时新 start 为零、旧记录保留、恢复后重试成功；覆盖取消/过期/不同设备。
 - [ ] 实机验证同 DAC 双向交接、快速切换、设备失效恢复、关窗/退出释放及系统默认输出，记录版本和设备。
 - [ ] **验收：** 故障注入、相关测试、构建/`./run` 与本阶段实机回归均通过；失败不会静默进入新独占会话。
 
@@ -173,3 +173,20 @@
 - 未验证范围 / 风险 / 阻塞：未实现按文件大小/修改时间的内容指纹比较；同一路径内容被替换且 fresh 仍含同 ID 时，恢复仍可能套用旧位置。当前只通过“fresh 队列不含保存 ID/临时 ID 改变”测试锁定可观察的降级行为，内容替换检测留待后续或阶段 6 评估。真机删除/重排续播、容器激活仍待最终手动回归。
 - 验收是否通过及证据：通过本阶段的可自动化部分。宿主投影与 Runtime 后继在测试与 smoke 中一致，ID 生命周期与恢复测试通过，三仓库相关测试与 `./run` 成功；内容指纹检测缺口已如实登记。
 - 下一阶段（仅在本阶段验收通过后）：收尾阶段 3（关闭与独占交接失败），依赖当前会话/队列语义。
+
+## 收尾阶段 3 执行记录（2026-09-10）— 待实机回归，未验收
+
+- 执行者：当前任务 agent。仅 foofoil 有源码/测试改动；extension-kit、hifi 无改动、工作区干净。基线：foofoil 阶段 2 提交 `0e9036f`（阶段 3 改动尚未提交）、extension-kit `6a617c2`、hifi `334d71d`。
+- 完成任务与关键行为变化：
+  - 协调器：`ExclusivePlaybackCoordinator` 的暂停/释放回调改为 `async throws`；只有释放成功才移除旧 owner，失败保留记录、抛出 `HandoffError.releaseFailed` 并阻止同设备 `start`；释放最多重试一次；取消/过期不触碰旧 owner；不同设备互不影响。
+  - PCM：`AudioPlaybackController.pauseForExclusiveHandoff` 改为抛出，失败保留 `activeLeaseClientID` 供重试；`closeOutput` 只在释放成功后移除协调器 owner；交接失败写入可本地化 `deviceFailureMessage`。
+  - 扩展：`AppState.pauseExtensionForExclusiveHandoff` 改为抛出，失败保留会话；交接失败写入本地化 `extensionHandoffFailureMessage`，并在音频/通用呈现中显示；成功后清除。
+  - 关闭传播：`ExtensionHost.closeSessionAndWait` 改为 `throws`，`closeSession` 保留日志兜底；`extensionSessionCloseTask` 改为携带 `Result`，重建/打开流程在旧会话释放失败且新会话竞争同一独占设备时放弃安装新会话（`sharesExclusiveDevice` 判定），不同设备/系统输出不被永久阻塞。
+  - 有界刷新：媒体动作失败后仅补发一次 `.refresh`；refresh 不再触发二次刷新，结果仍受会话 ID、`exclusivePlaybackGeneration` 与操作序号校验。
+- 测试：新增 `foofoilTests/ExclusiveHandoffFailureTests.swift`：释放失败阻止新 start 且重试一次（参数化 PCM→ext / ext→PCM / ext→ext）、释放恢复后可交接、单设备失败不阻塞另一设备、取消不暂停/不启动、新获取失败不登记 owner、`closeSessionAndWait` 失败可观察、幂等关闭成功。
+- 测试命令 / 结果 / 失败与跳过：extension-kit `swift test` 26 项通过；hifi `swift test` 43 项通过；foofoil `xcodebuild test ... -only-testing:foofoilTests` 通过，xcresult 汇总 250 项、249 通过、0 失败、1 硬件跳过（`CueSheetTests/exclusivePlaybackSurvivesTrackChangesAndPause()`）。
+- 构建、ABI smoke、`./run`：`xcodebuild build` 与应用 `./run` 均 `BUILD SUCCEEDED`，插件注入并启动成功，无新增编译警告。本阶段未改 extension-kit/hifi 契约，未重跑 ABI smoke。
+- 实机设备 / 文件类型与采样率 / 操作 / 结果来源：**未进行**。本阶段核心是独占设备释放失败路径，其真机行为（同 DAC 双向交接、快速切换、设备失效恢复、关窗/退出释放、系统默认输出）不能在无硬件时验证；此前用户复验不覆盖本阶段改动。
+- 未验证范围 / 风险 / 阻塞：**实机回归未完成，按 checklist 执行规则阶段 3 不验收、不进入阶段 4**。故障注入使用测试闭包模拟释放失败，未在真实 HAL/hog 场景注入；`closeOutput` 的失败保留 owner 依赖控制器 `pauseForExclusiveHandoff`，窗口关闭后控制器可能已释放，重试路径需实机确认。
+- 验收是否通过及证据：未通过。自动测试与构建/`./run` 通过，但实机回归缺失，验收项保持未勾选。
+- 下一阶段（仅在本阶段验收通过后）：完成实机回归并记录设备/版本后才能进入收尾阶段 4。
