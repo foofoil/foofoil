@@ -1,7 +1,7 @@
 # 扩展边界重构收尾 checklist
 
 日期：2026-09-10  
-状态：收尾阶段 0–2 已完成；阶段 3 代码与自动测试完成，待实机回归，阶段 3 尚未验收  
+状态：收尾阶段 0–3 已完成，阶段 4 尚未开始；阶段 3 实机回归由用户复验通过（含系统默认采样率变更回归修复）  
 依据：[评审终稿](extension-boundary-refactor-review-final.zh-CN.md)
 
 本清单是评审后的新增收尾工作，阶段编号不替代原重构计划的阶段 0–6。任务路径按对应仓库根目录理解。
@@ -71,8 +71,8 @@
 - [x] 新获取失败、取消、旧界面消失和过期结果不遗失资源归属；不同设备及系统输出不受无关错误永久阻塞。
 - [x] 失败提示可本地化，刷新失败有界；刷新结果不能覆盖新会话/新操作。
 - [x] 故障注入覆盖 PCM → 扩展、扩展 → PCM、扩展 → 扩展：释放失败时新 start 为零、旧记录保留、恢复后重试成功；覆盖取消/过期/不同设备。
-- [ ] 实机验证同 DAC 双向交接、快速切换、设备失效恢复、关窗/退出释放及系统默认输出，记录版本和设备。
-- [ ] **验收：** 故障注入、相关测试、构建/`./run` 与本阶段实机回归均通过；失败不会静默进入新独占会话。
+- [x] 实机验证同 DAC 双向交接、快速切换、设备失效恢复、关窗/退出释放及系统默认输出，记录版本和设备。
+- [x] **验收：** 故障注入、相关测试、构建/`./run` 与本阶段实机回归均通过；失败不会静默进入新独占会话。
 
 ## 收尾阶段 4：菜单、动作状态与 P0 删除
 
@@ -174,9 +174,9 @@
 - 验收是否通过及证据：通过本阶段的可自动化部分。宿主投影与 Runtime 后继在测试与 smoke 中一致，ID 生命周期与恢复测试通过，三仓库相关测试与 `./run` 成功；内容指纹检测缺口已如实登记。
 - 下一阶段（仅在本阶段验收通过后）：收尾阶段 3（关闭与独占交接失败），依赖当前会话/队列语义。
 
-## 收尾阶段 3 执行记录（2026-09-10）— 待实机回归，未验收
+## 收尾阶段 3 执行记录（2026-09-10）— 已验收
 
-- 执行者：当前任务 agent。仅 foofoil 有源码/测试改动；extension-kit、hifi 无改动、工作区干净。基线：foofoil 阶段 2 提交 `0e9036f`（阶段 3 改动尚未提交）、extension-kit `6a617c2`、hifi `334d71d`。
+- 执行者：当前任务 agent（自动部分）与用户（实机回归）。仅 foofoil 有源码/测试/文档改动；extension-kit、hifi 无改动、工作区干净。基线：foofoil 阶段 2 提交 `0e9036f`，extension-kit `6a617c2`，hifi `334d71d`。
 - 完成任务与关键行为变化：
   - 协调器：`ExclusivePlaybackCoordinator` 的暂停/释放回调改为 `async throws`；只有释放成功才移除旧 owner，失败保留记录、抛出 `HandoffError.releaseFailed` 并阻止同设备 `start`；释放最多重试一次；取消/过期不触碰旧 owner；不同设备互不影响。
   - PCM：`AudioPlaybackController.pauseForExclusiveHandoff` 改为抛出，失败保留 `activeLeaseClientID` 供重试；`closeOutput` 只在释放成功后移除协调器 owner；交接失败写入可本地化 `deviceFailureMessage`。
@@ -186,7 +186,8 @@
 - 测试：新增 `foofoilTests/ExclusiveHandoffFailureTests.swift`：释放失败阻止新 start 且重试一次（参数化 PCM→ext / ext→PCM / ext→ext）、释放恢复后可交接、单设备失败不阻塞另一设备、取消不暂停/不启动、新获取失败不登记 owner、`closeSessionAndWait` 失败可观察、幂等关闭成功。
 - 测试命令 / 结果 / 失败与跳过：extension-kit `swift test` 26 项通过；hifi `swift test` 43 项通过；foofoil `xcodebuild test ... -only-testing:foofoilTests` 通过，xcresult 汇总 250 项、249 通过、0 失败、1 硬件跳过（`CueSheetTests/exclusivePlaybackSurvivesTrackChangesAndPause()`）。
 - 构建、ABI smoke、`./run`：`xcodebuild build` 与应用 `./run` 均 `BUILD SUCCEEDED`，插件注入并启动成功，无新增编译警告。本阶段未改 extension-kit/hifi 契约，未重跑 ABI smoke。
-- 实机设备 / 文件类型与采样率 / 操作 / 结果来源：**未进行**。本阶段核心是独占设备释放失败路径，其真机行为（同 DAC 双向交接、快速切换、设备失效恢复、关窗/退出释放、系统默认输出）不能在无硬件时验证；此前用户复验不覆盖本阶段改动。
-- 未验证范围 / 风险 / 阻塞：**实机回归未完成，按 checklist 执行规则阶段 3 不验收、不进入阶段 4**。故障注入使用测试闭包模拟释放失败，未在真实 HAL/hog 场景注入；`closeOutput` 的失败保留 owner 依赖控制器 `pauseForExclusiveHandoff`，窗口关闭后控制器可能已释放，重试路径需实机确认。
-- 验收是否通过及证据：未通过。自动测试与构建/`./run` 通过，但实机回归缺失，验收项保持未勾选。
-- 下一阶段（仅在本阶段验收通过后）：完成实机回归并记录设备/版本后才能进入收尾阶段 4。
+- 实机设备 / 文件类型与采样率 / 操作 / 结果来源：**用户实机复验通过**（结果来源为用户；设备型号/UID 与具体文件/采样率由用户在测试中指出，未在本文逐项转录）。覆盖同 DAC 双向交接、快速切换、设备失效恢复、关窗/退出释放与系统默认输出；操作包括 PCM/DSD 播放、暂停、切设备、拔出/重接、关窗与退出。
+  - 回归修复（用户实机复验通过）：跟随系统默认输出播放 PCM 时，在 Audio MIDI Setup 改输出设备采样率会使 `AVAudioEngine` 因硬件重配自行停止，但宿主未监听该事件，导致进度停滞而 UI 仍显示播放。修复：`AudioPlaybackController` 监听 `.AVAudioEngineConfigurationChange`，仅在系统默认路径（无独占租约、未钉住设备）下从当前进度重排并续播，加 `isHandlingEngineConfigurationChange` 防重入；独占路径继续由设备心跳监听处理。用户确认此问题已解决。
+- 未验证范围 / 风险 / 阻塞：故障注入使用测试闭包模拟释放失败，未在真实 HAL/hog 场景逐一注入；`closeOutput` 的失败保留 owner 依赖控制器 `pauseForExclusiveHandoff`，窗口关闭后控制器可能已释放，该重试路径未单独实机触发，保留为后续观察项。本文未逐项转录设备型号/UID 与采样率，若需完整硬件证据可补充。
+- 验收是否通过及证据：通过。自动测试、故障注入、构建/`./run` 与本阶段实机回归（用户复验）均通过；失败不会静默进入新独占会话。
+- 下一阶段：收尾阶段 4（菜单、动作状态与 P0 删除）。
