@@ -149,11 +149,13 @@ struct ExtensionPlaybackSupportTests {
         var session = session(providerID: "audio.hifi")
         session.audioDeviceSelection = .init(devices: [
             .init(id: "connected", displayName: "Connected"),
-            .init(id: "gone", displayName: "Gone", isConnected: false)
+            .init(id: "gone", displayName: "Gone", isConnected: false),
+            .init(id: "incompatible", displayName: "Incompatible", isCompatible: false)
         ])
         session.mediaPlayback?.availableActions = [.refresh, .seek, .selectDevice, .play]
         #expect(ExtensionPlaybackSupport.isOutputDeviceEnabled("connected", in: session))
         #expect(!ExtensionPlaybackSupport.isOutputDeviceEnabled("gone", in: session))
+        #expect(!ExtensionPlaybackSupport.isOutputDeviceEnabled("incompatible", in: session))
 
         session.mediaPlayback?.availableActions = [.refresh, .seek, .play]
         #expect(!ExtensionPlaybackSupport.isOutputDeviceEnabled("connected", in: session))

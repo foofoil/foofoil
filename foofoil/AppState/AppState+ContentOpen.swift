@@ -1040,14 +1040,11 @@ extension AppState {
                             start: { [weak self] in
                                 guard let self, self.extensionSession?.id == session.id,
                                       self.exclusivePlaybackGeneration == generation else { throw CancellationError() }
+                                // 设备切换由扩展在 selectDevice 内校验并按需暂停/恢复；失败时不得先暂停。
+                                result = try await operation.perform(in: session)
                                 if isDeviceChange {
-                                    let paused = try await ExtensionHost.shared.perform(mediaAction: .pause, in: session)
+                                    // 成功后清除旧设备持有记录，协调器随后登记新设备。
                                     ExclusivePlaybackCoordinator.shared.release(ownerID: session.id)
-                                    let selected = try await operation.perform(in: paused)
-                                    guard self.exclusivePlaybackGeneration == generation else { throw CancellationError() }
-                                    result = try await ExtensionHost.shared.perform(mediaAction: .play, in: self.sessionByApplyingHostPlaybackSequence(selected))
-                                } else {
-                                    result = try await operation.perform(in: session)
                                 }
                             }
                         )

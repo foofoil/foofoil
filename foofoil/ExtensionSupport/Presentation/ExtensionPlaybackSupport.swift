@@ -55,7 +55,7 @@ enum ExtensionPlaybackSupport {
 
     static func isOutputDeviceEnabled(_ deviceID: String, in session: ContentSession) -> Bool {
         if let device = session.audioDeviceSelection?.devices.first(where: { $0.id == deviceID }),
-           !device.isConnected {
+           !device.isConnected || !device.isCompatible {
             return false
         }
         if session.mediaPlayback?.availableActions != nil,

@@ -205,6 +205,37 @@ struct GenericAudioContractTests {
         #expect(state.extensionPlaybackPendingWrites.isEmpty)
     }
 
+    /// 目标设备切换失败时不得先把播放暂停；应保持旧设备继续播放。
+    @Test func failedDeviceChangeKeepsPlaybackRunning() async throws {
+        let provider = DeviceChangeFailureTestProvider()
+        let host = ExtensionHost.shared
+        host.resolver.register(provider)
+        defer { host.resolver.unregister(providerID: provider.descriptor.id) }
+        var session = try await provider.makeSession(
+            for: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/switch.gaud"))), negotiatedAPI: 1
+        )
+        session.mediaPlayback?.state = .playing
+        session.audioDeviceSelection = .init(
+            devices: [
+                .init(id: "old", displayName: "Old"),
+                .init(id: "bad", displayName: "Bad", isCompatible: false)
+            ],
+            selectedDeviceID: "old"
+        )
+        session.mediaPlayback?.availableActions = [.refresh, .seek, .selectDevice, .pause]
+
+        let state = AppState()
+        defer {
+            state.extensionSession = nil
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        state.extensionSession = session
+        state.performExtensionMediaAction(.selectDevice("bad"))
+        for _ in 0..<200 { await Task.yield() }
+        #expect(state.extensionSession?.audioDeviceSelection?.selectedDeviceID == "old")
+        #expect(state.extensionSession?.mediaPlayback?.state == .playing)
+    }
+
     @Test func deviceServiceDiscoveryPrefersUniqueOrPreferredExtension() {
         #expect(ExtensionAudioDeviceDiscovery.extensionID(amongCapable: ["app.foofoil.extension.hifi"], preferredExtensionID: nil) == "app.foofoil.extension.hifi")
         #expect(ExtensionAudioDeviceDiscovery.extensionID(
@@ -444,5 +475,33 @@ private final class GatedSeekTestProvider: ContentProvider {
         var updated = item.session
         updated.mediaPlayback?.position = position
         item.continuation.resume(returning: updated)
+    }
+}
+
+@MainActor
+private final class DeviceChangeFailureTestProvider: ContentProvider {
+    let descriptor = ProviderDescriptor(
+        id: "test.device-change-failure", extensionID: "app.foofoil.extension.test-device-change-failure",
+        role: .primary, fallbackProviderID: nil, enhancementDomain: "audio", contentFamily: .audio,
+        filenameExtensions: ["gaud"], isEnabled: true, isRuntimeAvailable: true
+    )
+
+    func match(_ request: ContentRequest) -> ProviderMatch? { nil }
+
+    func makeSession(for request: ContentRequest, negotiatedAPI: UInt32) async throws -> ContentSession {
+        ContentSession(
+            extensionID: descriptor.extensionID, providerID: descriptor.id, request: request,
+            presentation: .text(titleKey: "Generic Audio", body: request.primaryFileURL?.lastPathComponent ?? ""),
+            capabilities: [
+                .init(declaration: .init(id: ExtensionCapabilityIdentifier.mediaTransport, scope: .session), state: .active),
+                .init(declaration: .init(id: ExtensionCapabilityIdentifier.seekable, scope: .session), state: .active)
+            ],
+            mediaPlayback: .init(state: .playing, position: 0, duration: 10, isSeekable: true)
+        )
+    }
+
+    /// 所有媒体动作都失败，模拟目标设备不可用。
+    func perform(mediaAction: MediaPlaybackAction, session: ContentSession) async throws -> ContentSession {
+        throw ContentProviderError.unsupportedRequest
     }
 }
