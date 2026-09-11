@@ -4,16 +4,22 @@ import FoofoilExtensionKit
 /// 宿主文件列表与扩展队列之间的桥接。呈现与无缝序列按内容家族/能力；独占交接见阶段 5。
 extension AppState {
     /// 同一非内置音频 Provider 的连续外部文件可共享会话；嗅探命中的容器单独打开。
-    func contiguousExtensionAudioURLs(startingAt itemID: String) -> [URL] {
+    /// 只做声明级预判，不逐项执行探针；需要 sniff 才能确认的项作为序列边界。
+    /// 书签解析与存在检查移出主 actor，主 actor 只做快速预判。
+    func contiguousExtensionAudioURLs(startingAt itemID: String) async -> [URL] {
         guard let list = fileList, let index = list.items.firstIndex(where: { $0.id == itemID }),
               mediaPlaybackMode == .sequential || mediaPlaybackMode == .sequentialLoop else { return [] }
+        let items = Array(list.items.dropFirst(index)).filter { $0.cue == nil }
+        let resolved: [(FileListItem, URL)] = await Task.detached(priority: .userInitiated) {
+            items.compactMap { item in Self.resolveItemURL(item).map { (item, $0) } }
+        }.value
         var urls: [URL] = []
         var sharedProviderID: String?
-        for item in list.items.dropFirst(index) {
-            guard item.cue == nil, let url = resolvedURL(for: item) else { break }
-            let candidates = ExtensionHost.shared.resolver.candidates(for: .singleFile(.init(url: url)))
+        for (_, url) in resolved {
+            let candidates = ExtensionHost.shared.resolver.preflightCandidates(for: .singleFile(.init(url: url)))
             guard let candidate = candidates.first(where: { !$0.descriptor.isBuiltIn }),
                   candidate.descriptor.contentFamily == .audio else { break }
+            // 声明为 sniff 的候选需要 probe 才能确认，作为边界停止，避免扫描期 I/O。
             if candidate.match.strength == .sniff { break }
             if let sharedProviderID, sharedProviderID != candidate.descriptor.id { break }
             sharedProviderID = candidate.descriptor.id

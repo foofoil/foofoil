@@ -114,6 +114,18 @@ final class ProviderResolver {
         matchingCandidates(for: request)
     }
 
+    /// 只读声明的候选；不执行 sniff/probe，供连续序列扫描预判，避免逐项阻塞 I/O。
+    /// 需要 probe 才能确认的候选以 `sniff` 强度返回，调用方应作为边界处理。
+    func preflightCandidates(for request: ContentRequest) -> [ProviderCandidate] {
+        registrationOrder.compactMap { id in
+            guard let provider = providers[id],
+                  provider.descriptor.isEnabled,
+                  provider.descriptor.isRuntimeAvailable,
+                  let match = provider.preflightMatch(request) else { return nil }
+            return ProviderCandidate(descriptor: provider.descriptor, match: match)
+        }
+    }
+
     func canResolve(_ request: ContentRequest) -> Bool {
         !matchingCandidates(for: request).isEmpty
     }
@@ -212,6 +224,20 @@ final class ProviderResolver {
 }
 
 enum ProviderContentMatcher {
+    /// 只读声明的预判：`sniff` 声明只按扩展名/UTType 判断是否需要 probe，不读书。
+    static func preflightMatch(_ request: ContentRequest, declarations: [ContentTypeDeclaration]) -> ProviderMatch? {
+        guard let url = effectiveURL(for: request) else { return nil }
+        let fileExtension = url.pathExtension.lowercased()
+        for declaration in declarations where declaration.strategy == .sniff {
+            let extensionMatches = declaration.extensions?.contains(fileExtension) == true
+            let typeMatches = matchesUTType(url: url, identifiers: declaration.utTypes ?? [])
+            if extensionMatches || typeMatches {
+                return ProviderMatch(strength: .sniff, explanation: "content-probe-pending")
+            }
+        }
+        return match(request, declarations: declarations, sniff: nil)
+    }
+
     static func match(_ request: ContentRequest, declarations: [ContentTypeDeclaration], sniff: ((URL) -> Bool)? = nil) -> ProviderMatch? {
         // 历史恢复的 request.url 可能是移动前的旧路径；sniff 必须读书签解析后的真实位置，
         // 否则文件移动后 ISO 匹配失败而 DSF（纯扩展名）不受影响。

@@ -627,6 +627,11 @@ extension AppState {
     }
 
     func resolvedURL(for item: FileListItem) -> URL? {
+        Self.resolveItemURL(item)
+    }
+
+    /// 书签解析与文件存在检查可能访问存储；独立为非隔离方法，供扫描在后台执行。
+    nonisolated static func resolveItemURL(_ item: FileListItem) -> URL? {
         if let bookmark = item.bookmark, let url = Self.resolveVideoBookmark(bookmark) {
             return url
         }
@@ -655,7 +660,7 @@ extension AppState {
                         id: section.id,
                         title: section.title,
                         symbolName: "opticaldisc",
-                        badge: NSLocalizedString(section.resolvedFormat.badgeLocalizationKey, comment: ""),
+                        badge: section.resolvedFormat.badgeLocalizationKey.map { NSLocalizedString($0, comment: "") },
                         isEnabled: true,
                         isCurrent: false
                     )
@@ -824,7 +829,7 @@ extension AppState {
             title: album,
             cueSheetPath: url.path,
             cueSheetBookmark: bookmark,
-            format: .sacd
+            format: .generic
         )
         var start: Int64 = 0
         let items: [FileListItem] = queue.items.enumerated().map { index, item in
@@ -842,7 +847,7 @@ extension AppState {
             )
             start += max(0, frames)
             return FileListItem(
-                id: "sacd:\(sectionID):\(index):\(item.id)",
+                id: "container:\(sectionID):\(index)",
                 path: url.path,
                 bookmark: bookmark,
                 displayName: item.title,

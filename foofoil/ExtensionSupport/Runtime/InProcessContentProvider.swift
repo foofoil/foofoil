@@ -44,6 +44,11 @@ final class InProcessContentProvider: ContentProvider {
         )
     }
 
+    /// 只读声明预判：不调用扩展 probe，消除连续扫描的逐项同步 I/O。
+    func preflightMatch(_ request: ContentRequest) -> ProviderMatch? {
+        ProviderContentMatcher.preflightMatch(request, declarations: declaration.contentTypes)
+    }
+
     /// 只支持公共 `content.probe`；不再回退到旧 Hi-Fi SACD 魔数嗅探。
     private func sniffContent(_ url: URL) -> Bool {
         ExtensionContentMatching.sniff(

@@ -229,11 +229,11 @@ struct NavigatorPanelView: View {
         return localizedTitle(for: contribution)
     }
 
-    /// 只有纯单 CUE / SACD 列表在标题显示格式；混合列表的格式跟随容器子目录。
+    /// 只有纯单 CUE / SACD 列表在标题显示格式；通用扩展容器不显示徽标。
     private func containerHeaderBadge(for contribution: NavigatorContribution) -> String? {
         guard contribution.id == AppState.fileListNavigatorID,
               let format = appState.fileList?.soleContainerFormat else { return nil }
-        return NSLocalizedString(format.badgeLocalizationKey, comment: "")
+        return format.badgeLocalizationKey.map { NSLocalizedString($0, comment: "") }
     }
 
     /// CUE / SACD 曲目把 Track 号显示为左侧序号，标题本身用曲名。

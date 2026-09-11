@@ -136,11 +136,14 @@ public nonisolated struct FileListItem: Codable, Equatable, Identifiable, Sendab
 public nonisolated enum FileListContainerFormat: String, Codable, Equatable, Sendable {
     case cue
     case sacd
+    /// 未知扩展容器使用通用样式，不显示具体格式徽标。
+    case generic
 
-    var badgeLocalizationKey: String {
+    var badgeLocalizationKey: String? {
         switch self {
         case .cue: "Navigator CUE Badge"
         case .sacd: "Navigator SACD Badge"
+        case .generic: nil
         }
     }
 }

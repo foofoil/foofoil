@@ -10,6 +10,9 @@ import Foundation
 protocol ContentProvider: AnyObject {
     var descriptor: ProviderDescriptor { get }
     func match(_ request: ContentRequest) -> ProviderMatch?
+    /// 只读 Manifest 声明的预判入口；不执行 sniff/probe，供连续序列扫描避免逐项 I/O。
+    /// 声明为 `.sniff` 且扩展名/类型相符时返回 `sniff` 强度表示“需要 probe 才能确认”，由调用方作为边界。
+    func preflightMatch(_ request: ContentRequest) -> ProviderMatch?
     func makeSession(for request: ContentRequest, negotiatedAPI: UInt32) async throws -> ContentSession
     func perform(commandID: String, session: ContentSession) async throws -> ContentSession
     func perform(mediaAction: MediaPlaybackAction, session: ContentSession) async throws -> ContentSession
@@ -19,6 +22,10 @@ protocol ContentProvider: AnyObject {
 }
 
 extension ContentProvider {
+    /// 缺省回退完整匹配；进程内 Provider 覆盖为不执行 probe 的声明级预判。
+    func preflightMatch(_ request: ContentRequest) -> ProviderMatch? {
+        match(request)
+    }
     func perform(mediaAction: MediaPlaybackAction, session: ContentSession) async throws -> ContentSession {
         // 未协商 media.transport 的 Provider 明确不支持，不再回退到旧私有命令。
         throw ContentProviderError.unsupportedRequest

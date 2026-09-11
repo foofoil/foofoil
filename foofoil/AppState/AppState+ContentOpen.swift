@@ -690,8 +690,6 @@ extension AppState {
                     self.sourceFingerprint = Self.localSourceFingerprint(for: url)
                     self.extensionSession = outcome.session
                     self.extensionFallbackProviderID = outcome.failures.first?.providerID
-                    self.stampHostListWithExtensionQueueIDs(outcome.session)
-                    self.holdExtensionAudioFileAccess(for: outcome.session)
                     self.extensionStateReference = nil
                     self.installExtensionContainerListIfNeeded(
                         url: url,
@@ -699,6 +697,7 @@ extension AppState {
                         preferredItemID: nil
                     )
                     self.stampHostListWithExtensionQueueIDs(outcome.session)
+                    self.holdExtensionAudioFileAccess(for: outcome.session)
                     if let extensionID = outcome.session.extensionID {
                         let payload = try JSONEncoder().encode(outcome.session)
                         self.extensionStateReference = try ExtensionHost.shared.stateStore.save(
@@ -818,14 +817,13 @@ extension AppState {
                     self.noteUserPausedMediaPlayback()
                     self.extensionSession = restoredSession
                     self.extensionFallbackProviderID = outcome.failures.first?.providerID
-                    self.stampHostListWithExtensionQueueIDs(restoredSession)
-                    self.holdExtensionAudioFileAccess(for: restoredSession)
                     self.installExtensionContainerListIfNeeded(
                         url: sourceURL,
                         session: restoredSession,
                         preferredItemID: self.fileList?.currentID
                     )
                     self.stampHostListWithExtensionQueueIDs(restoredSession)
+                    self.holdExtensionAudioFileAccess(for: restoredSession)
                     if let extensionID = restoredSession.extensionID {
                         let payload = try JSONEncoder().encode(restoredSession)
                         self.extensionStateReference = try ExtensionHost.shared.stateStore.save(
@@ -871,7 +869,7 @@ extension AppState {
                     let closeResult = await closeTask?.value
                     guard self.currentMediaRouteGeneration == routeGeneration,
                           self.fileList?.currentID == itemID else { return }
-                    let urls = self.contiguousExtensionAudioURLs(startingAt: itemID)
+                    let urls = await self.contiguousExtensionAudioURLs(startingAt: itemID)
                     let outcome: SessionResolutionOutcome
                     if urls.count > 1, let sequence = try? await ExtensionHost.shared.open(urls: urls) {
                         if ExtensionPlaybackSupport.acceptsGaplessCollection(sequence.session) {
@@ -918,14 +916,13 @@ extension AppState {
                     self.sourceFingerprint = nil
                     self.extensionSession = outcome.session
                     self.extensionFallbackProviderID = outcome.failures.first?.providerID
-                    self.stampHostListWithExtensionQueueIDs(outcome.session)
-                    self.holdExtensionAudioFileAccess(for: outcome.session)
                     self.installExtensionContainerListIfNeeded(
                         url: url,
                         session: outcome.session,
                         preferredItemID: itemID
                     )
                     self.stampHostListWithExtensionQueueIDs(outcome.session)
+                    self.holdExtensionAudioFileAccess(for: outcome.session)
                     if let extensionID = outcome.session.extensionID {
                         let payload = try JSONEncoder().encode(outcome.session)
                         self.extensionStateReference = try ExtensionHost.shared.stateStore.save(
