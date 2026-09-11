@@ -432,7 +432,7 @@ extension AppState {
                     return
                 }
                 if let closeTask = self.extensionSessionCloseTask {
-                    await closeTask.value
+                    _ = await closeTask.value
                 }
                 guard self.currentMediaRouteGeneration == routeGeneration else {
                     if holdsSecurityAccess { url.stopAccessingSecurityScopedResource() }
@@ -632,6 +632,12 @@ extension AppState {
             openUsingExtension(urls: [url])
         }
 
+        /// 两个会话是否竞争同一显式独占设备；系统默认/未选设备不构成冲突。
+        nonisolated static func sharesExclusiveDevice(_ lhs: ContentSession, _ rhs: ContentSession) -> Bool {
+            guard let deviceID = lhs.audioDeviceSelection?.selectedDeviceID else { return false }
+            return deviceID == rhs.audioDeviceSelection?.selectedDeviceID
+        }
+
         func openUsingExtension(urls: [URL]) {
             guard let url = urls.first else { return }
             currentMediaRouteGeneration &+= 1
@@ -640,6 +646,7 @@ extension AppState {
                 ? UUID()
                 : id
             isLoading = true
+            let previousSession = extensionSession
             extensionSession = nil
             extensionFallbackProviderID = nil
             extensionStateReference = nil
@@ -648,13 +655,21 @@ extension AppState {
                 guard let self else { return }
                 defer { self.isLoading = false }
                 do {
-                    await closeTask?.value
+                    let closeResult = await closeTask?.value
                     guard self.currentMediaRouteGeneration == routeGeneration else { return }
                     let outcome = try await (urls.count == 1
                         ? ExtensionHost.shared.open(url: url)
                         : ExtensionHost.shared.open(urls: urls))
                     guard self.currentMediaRouteGeneration == routeGeneration else {
                         ExtensionHost.shared.closeSession(outcome.session)
+                        return
+                    }
+                    if case .failure(let error) = closeResult,
+                       let previousSession,
+                       Self.sharesExclusiveDevice(previousSession, outcome.session) {
+                        // 旧会话释放失败且新会话竞争同一独占设备：不安装新会话，保留待释放记录并提示。
+                        ExtensionHost.shared.closeSession(outcome.session)
+                        self.extensionHandoffFailureMessage = error.localizedDescription
                         return
                     }
                     if outcome.session.providerID == "builtin.audio" {
@@ -763,17 +778,24 @@ extension AppState {
                     }
                 }
                 do {
-                    await closeTask?.value
+                    let closeResult = await closeTask?.value
                     guard self.id == expectedStateID,
                           self.currentMediaRouteGeneration == routeGeneration else { return }
                     let outcome = try await ExtensionHost.shared.open(request: savedSession.request)
+                    if case .failure(let error) = closeResult,
+                       Self.sharesExclusiveDevice(savedSession, outcome.session) {
+                        // 旧会话释放失败且恢复目标竞争同一独占设备：不恢复播放，保留待释放记录并提示。
+                        ExtensionHost.shared.closeSession(outcome.session)
+                        self.extensionHandoffFailureMessage = error.localizedDescription
+                        return
+                    }
                     var restoredSession = outcome.session
                     do {
                         restoredSession = try await ExtensionHost.shared.restorePlayback(
                             from: savedSession, in: outcome.session
                         )
                     } catch {
-                        await ExtensionHost.shared.closeSessionAndWait(outcome.session)
+                        try? await ExtensionHost.shared.closeSessionAndWait(outcome.session)
                         throw error
                     }
                     guard self.id == expectedStateID,
@@ -832,6 +854,7 @@ extension AppState {
         func openFileListAudioUsingExtension(url: URL, itemID: String) {
             currentMediaRouteGeneration &+= 1
             let routeGeneration = currentMediaRouteGeneration
+            let previousSession = extensionSession
             extensionSession = nil
             extensionFallbackProviderID = nil
             extensionStateReference = nil
@@ -845,7 +868,7 @@ extension AppState {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 do {
-                    await closeTask?.value
+                    let closeResult = await closeTask?.value
                     guard self.currentMediaRouteGeneration == routeGeneration,
                           self.fileList?.currentID == itemID else { return }
                     let urls = self.contiguousExtensionAudioURLs(startingAt: itemID)
@@ -854,7 +877,7 @@ extension AppState {
                         if ExtensionPlaybackSupport.acceptsGaplessCollection(sequence.session) {
                             outcome = sequence
                         } else {
-                            await ExtensionHost.shared.closeSessionAndWait(sequence.session)
+                            try? await ExtensionHost.shared.closeSessionAndWait(sequence.session)
                             outcome = try await ExtensionHost.shared.open(url: url)
                         }
                     } else {
@@ -863,6 +886,15 @@ extension AppState {
                     guard self.currentMediaRouteGeneration == routeGeneration,
                           self.fileList?.currentID == itemID else {
                         ExtensionHost.shared.closeSession(outcome.session)
+                        return
+                    }
+                    if case .failure(let error) = closeResult,
+                       let previousSession,
+                       Self.sharesExclusiveDevice(previousSession, outcome.session) {
+                        // 旧会话释放失败且新会话竞争同一独占设备：不安装新会话，保留待释放记录并提示。
+                        ExtensionHost.shared.closeSession(outcome.session)
+                        self.extensionHandoffFailureMessage = error.localizedDescription
+                        self.isLoading = false
                         return
                     }
                     if outcome.session.providerID == "builtin.audio" {
@@ -942,20 +974,20 @@ extension AppState {
             }
         }
 
-        private func pauseExtensionForExclusiveHandoff(sessionID: UUID) async {
+        /// 作为协调器的释放回调；失败时保留会话供重试，不静默清空。
+        private func pauseExtensionForExclusiveHandoff(sessionID: UUID) async throws {
             guard let session = extensionSession, session.id == sessionID else { return }
             exclusivePlaybackGeneration &+= 1
             noteUserPausedMediaPlayback()
-            if let updated = try? await ExtensionHost.shared.perform(mediaAction: .pause, in: session),
-               extensionSession?.id == sessionID {
-                extensionSession = updated
-                isMediaPlaying = false
-                if let extensionID = updated.extensionID, let reference = extensionStateReference {
-                    _ = try? ExtensionHost.shared.stateStore.save(
-                        extensionID: extensionID, schemaVersion: 1,
-                        payload: JSONEncoder().encode(updated), reference: reference
-                    )
-                }
+            let updated = try await ExtensionHost.shared.perform(mediaAction: .pause, in: session)
+            guard extensionSession?.id == sessionID else { return }
+            extensionSession = updated
+            isMediaPlaying = false
+            if let extensionID = updated.extensionID, let reference = extensionStateReference {
+                _ = try? ExtensionHost.shared.stateStore.save(
+                    extensionID: extensionID, schemaVersion: 1,
+                    payload: JSONEncoder().encode(updated), reference: reference
+                )
             }
         }
 
@@ -998,7 +1030,7 @@ extension AppState {
                         let generation = commandGeneration
                         try await ExclusivePlaybackCoordinator.shared.perform(
                             deviceID: deviceID, ownerID: session.id,
-                            pause: { [weak self] in await self?.pauseExtensionForExclusiveHandoff(sessionID: session.id) },
+                            pause: { [weak self] in try await self?.pauseExtensionForExclusiveHandoff(sessionID: session.id) },
                             isCurrent: { [weak self] in
                                 self?.extensionSession?.id == session.id && self?.exclusivePlaybackGeneration == generation
                             },
@@ -1024,6 +1056,7 @@ extension AppState {
                           self.exclusivePlaybackGeneration == commandGeneration,
                           self.extensionPlaybackOperationVersion == operationVersion else { return }
                     self.extensionSession = updated
+                    self.extensionHandoffFailureMessage = nil
                     self.synchronizeFileListWithExtensionQueue(updated)
                     // 进度最多每五秒保存一次扩展快照，避免每秒写盘或刷新历史排序。
                     let persistsState = operation.mediaAction != .refresh
@@ -1043,8 +1076,19 @@ extension AppState {
                         self.lastExtensionPlaybackCheckpoint = Date()
                     }
                     if persistsState { self.saveState() }
+                } catch is CancellationError {
+                    // 过期/取消不是释放失败，不提示。
                 } catch {
+                    if case ExclusivePlaybackCoordinator.HandoffError.releaseFailed = error {
+                        // 释放失败：保留旧会话/待释放记录，阻止同设备新获取并提示。
+                        self.extensionHandoffFailureMessage = error.localizedDescription
+                    }
                     NSLog("Extension command failed: \(error.localizedDescription)")
+                    // 失败后只刷新一次扩展快照；refresh 不再触发二次刷新，结果仍受会话/序号校验。
+                    if let mediaAction = operation.mediaAction, mediaAction != .refresh,
+                       self.extensionSession?.id == session.id {
+                        self.performExtensionMediaAction(.refresh)
+                    }
                 }
             }
         }

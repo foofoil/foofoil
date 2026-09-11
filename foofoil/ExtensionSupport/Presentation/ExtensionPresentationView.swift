@@ -51,6 +51,12 @@ struct ExtensionPresentationView: View {
                         .foregroundStyle(.secondary)
                         .accessibilityLabel(outputStatus)
                 }
+                if let handoffFailure = appState.extensionHandoffFailureMessage,
+                   !handoffFailure.isEmpty {
+                    Label(handoffFailure, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
                 if let playback = session.mediaPlayback {
                     if ExtensionPlaybackSupport.showsInteractiveMediaControls(session) {
                         playbackControls(playback, hasQueue: (session.playbackQueue?.items.count ?? 0) > 1)

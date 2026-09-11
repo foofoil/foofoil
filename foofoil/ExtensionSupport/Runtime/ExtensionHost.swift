@@ -157,21 +157,21 @@ final class ExtensionHost: ExtensionRuntimeHost {
         return try type(of: provider).validateSession(updated)
     }
 
-    /// 通知 Provider 释放会话资源；具体实现决定是否需要向扩展发送关闭消息。
+    /// 通知 Provider 释放会话资源；不要求错误传播的兜底关闭，失败只记录日志。
     func closeSession(_ session: ContentSession) {
         Task { @MainActor in
-            await closeSessionAndWait(session)
+            do {
+                try await closeSessionAndWait(session)
+            } catch {
+                NSLog("Extension session close failed: \(error.localizedDescription)")
+            }
         }
     }
 
-    /// 需要紧接着接管同一硬件资源时使用。等待 Provider 关闭完成；失败记录日志。
-    func closeSessionAndWait(_ session: ContentSession) async {
+    /// 需要紧接着接管同一硬件资源时使用。等待 Provider 关闭完成；失败抛出，调用方决定是否继续。
+    func closeSessionAndWait(_ session: ContentSession) async throws {
         guard let provider = resolver.provider(id: session.providerID) else { return }
-        do {
-            try await provider.closeSession(session)
-        } catch {
-            NSLog("Extension session close failed: \(error.localizedDescription)")
-        }
+        try await provider.closeSession(session)
     }
 
     func perform(navigatorAction: NavigatorAction, in session: ContentSession) async throws -> ContentSession {

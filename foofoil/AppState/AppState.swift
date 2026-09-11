@@ -32,8 +32,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     var currentDropGeneration: UInt64 = 0
     /// 列表切项可能异步创建扩展会话；只允许最后一次路由结果接管播放器。
     var currentMediaRouteGeneration: UInt64 = 0
-    /// 串行关闭旧扩展会话；切回原生播放器时用作音频设备释放屏障。
-    var extensionSessionCloseTask: Task<Void, Never>?
+    /// 串行关闭旧扩展会话；结果携带释放失败以供接管同一设备前判断。
+    var extensionSessionCloseTask: Task<Result<Void, Error>, Never>?
     /// 目录扫描令牌；新的拖放会主动终止仍在枚举的旧目录。
     var activeDirectoryDropScan: DroppedFileScanCancellation?
 
@@ -58,15 +58,24 @@ public class AppState: NSObject, ObservableObject, Identifiable {
             guard oldSessionID != newSessionID else { return }
             // 删除意图只对产生它的会话有效，新会话不复用旧编辑记录。
             if oldSessionID != nil { extensionRemovedItemIDs.removeAll() }
+            // 新会话接管后旧的交接失败提示不再适用。
+            extensionHandoffFailureMessage = nil
             let oldID = oldValue?.extensionID
             let newID = extensionSession?.extensionID
             if let oldValue {
                 let precedingClose = extensionSessionCloseTask
                 extensionSessionCloseTask = Task { @MainActor in
-                    await precedingClose?.value
-                    await ExtensionHost.shared.closeSessionAndWait(oldValue)
-                    if let oldID {
-                        ExtensionHost.shared.releaseSession(extensionID: oldID)
+                    _ = await precedingClose?.value
+                    do {
+                        try await ExtensionHost.shared.closeSessionAndWait(oldValue)
+                        if let oldID {
+                            ExtensionHost.shared.releaseSession(extensionID: oldID)
+                        }
+                        return .success(())
+                    } catch {
+                        // 释放失败：不释放 session 计数，保留待释放记录供后续协调器重试。
+                        NSLog("Extension session close failed: \(error.localizedDescription)")
+                        return .failure(error)
                     }
                 }
             }
@@ -74,6 +83,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         }
     }
     @Published var extensionFallbackProviderID: String?
+    /// 独占设备交接释放失败时的本地化提示；成功获取或切换内容后清除。
+    @Published var extensionHandoffFailureMessage: String?
     var extensionStateReference: String?
     var lastExtensionPlaybackCheckpoint = Date.distantPast
     var exclusivePlaybackGeneration: UInt64 = 0

@@ -203,7 +203,7 @@ extension AppState {
                     let queue = ExtensionPlaybackSupport.containerPlaybackQueue(from: session)
                     let bookmark = session.request.resources.first?.securityScopedBookmark
                         ?? Self.makeSecurityScopedBookmark(for: url)
-                    await ExtensionHost.shared.closeSessionAndWait(session)
+                    try? await ExtensionHost.shared.closeSessionAndWait(session)
                     guard let queue, queue.items.count >= 2,
                           self.fileList?.items.contains(where: { item in
                               item.cue == nil
@@ -287,10 +287,14 @@ extension AppState {
             if let closeTask = extensionSessionCloseTask {
                 isLoading = true
                 Task { @MainActor [weak self] in
-                    await closeTask.value
+                    let closeResult = await closeTask.value
                     guard let self,
                           self.currentMediaRouteGeneration == routeGeneration,
                           self.fileList?.currentID == item.id else { return }
+                    // 旧扩展会话释放失败且切回的原生输出可能竞争同一设备时，提示但不永久阻塞系统输出。
+                    if case .failure(let error) = closeResult {
+                        self.extensionHandoffFailureMessage = error.localizedDescription
+                    }
                     self.isLoading = false
                     self.applyExternalMedia(
                         url: url,

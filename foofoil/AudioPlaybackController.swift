@@ -292,8 +292,18 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         routeGeneration &+= 1
         let clientID = activeLeaseClientID ?? deviceServiceClientID
         activeLeaseClientID = nil
-        ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
-        enqueuePCMRelease(clientID: clientID)
+        let ownerID = deviceServiceClientID
+        // 旧持有者记录只在释放成功后移除；失败时保留，供后续同设备获取重试。
+        enqueuePCMRelease(clientID: clientID) { clientID in
+            do {
+                _ = try await ExtensionHost.shared.performAudioDeviceCommand(.init(
+                    command: .releasePCM, clientID: clientID
+                ))
+                ExclusivePlaybackCoordinator.shared.release(ownerID: ownerID)
+            } catch {
+                NSLog("AudioPlaybackController close release failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     func selectSystemDefaultOutput() {
@@ -572,7 +582,13 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 await refreshDeviceService()
                 return
             }
-            await pauseForExclusiveHandoff()
+            do {
+                try await pauseForExclusiveHandoff()
+            } catch {
+                // 释放失败：保留 owner 记录阻止同设备新获取，并显示可本地化提示。
+                deviceFailureMessage = error.localizedDescription
+                return
+            }
             ExclusivePlaybackCoordinator.shared.release(ownerID: deviceServiceClientID)
             await refreshDeviceService()
             return
@@ -582,7 +598,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         do {
             try await ExclusivePlaybackCoordinator.shared.perform(
                 deviceID: deviceID, ownerID: deviceServiceClientID,
-                pause: { [weak self] in await self?.pauseForExclusiveHandoff() },
+                pause: { [weak self] in try await self?.pauseForExclusiveHandoff() },
                 isCurrent: { [weak self] in self?.routeGeneration == generation },
                 start: { [weak self] in
                     guard let self, generation == self.routeGeneration else { throw CancellationError() }
@@ -590,7 +606,11 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                     guard generation == self.routeGeneration else { throw CancellationError() }
                 }
             )
-        } catch { }
+        } catch is CancellationError {
+            // 过期/取消不是释放失败，不提示。
+        } catch {
+            deviceFailureMessage = error.localizedDescription
+        }
     }
 
     /// 暂停保留的租约可直接复用：同设备、同源采样率且租约未交出去。
@@ -601,18 +621,28 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             && preparedSourceSampleRate == sampleRate
     }
 
-    private func pauseForExclusiveHandoff() async {
+    private func pauseForExclusiveHandoff() async throws {
         playbackIntentHandler?(false)
         routeGeneration &+= 1
         stopEngineForRouteChange()
         if enginePinnedToExclusiveDevice { discardOutputEngine() }
         stopExclusiveDeviceObservation()
         let clientID = activeLeaseClientID
-        activeLeaseClientID = nil
-        preparedDeviceID = nil
-        preparedSourceSampleRate = nil
-        if let clientID {
-            _ = try? await ExtensionHost.shared.performAudioDeviceCommand(.init(command: .releasePCM, clientID: clientID))
+        guard let clientID else {
+            preparedDeviceID = nil
+            preparedSourceSampleRate = nil
+            MediaRemoteCommandCoordinator.shared.update(self)
+            return
+        }
+        do {
+            _ = try await ExtensionHost.shared.performAudioDeviceCommand(.init(command: .releasePCM, clientID: clientID))
+            activeLeaseClientID = nil
+            preparedDeviceID = nil
+            preparedSourceSampleRate = nil
+        } catch {
+            // 释放失败：保留 activeLeaseClientID 作为待释放记录，交由协调器重试，不能静默清空。
+            MediaRemoteCommandCoordinator.shared.update(self)
+            throw error
         }
         MediaRemoteCommandCoordinator.shared.update(self)
     }
@@ -1318,12 +1348,28 @@ private struct QueuedSuccessor {
 }
 
 /// 交接按设备串行，先等待旧输出暂停和释放，再启动新输出；系统默认输出不登记。
+/// 释放失败时保留旧持有者记录并阻止同设备新获取，最多重试一次，避免静默进入冲突的新独占会话。
 @MainActor
 final class ExclusivePlaybackCoordinator {
     static let shared = ExclusivePlaybackCoordinator()
+
+    enum HandoffError: LocalizedError, Equatable {
+        case releaseFailed(deviceID: String)
+
+        var errorDescription: String? {
+            switch self {
+            case .releaseFailed:
+                NSLocalizedString(
+                    "Exclusive Output Release Failed Message",
+                    comment: "Previous exclusive audio output could not release the device"
+                )
+            }
+        }
+    }
+
     private struct Owner {
         let id: UUID
-        let pause: @MainActor () async -> Void
+        let pause: @MainActor () async throws -> Void
     }
     private var owners: [String: Owner] = [:]
     private var tails: [String: Task<Void, Error>] = [:]
@@ -1331,27 +1377,46 @@ final class ExclusivePlaybackCoordinator {
     func perform(
         deviceID: String,
         ownerID: UUID,
-        pause: @escaping @MainActor () async -> Void,
+        pause: @escaping @MainActor () async throws -> Void,
         isCurrent: @escaping @MainActor () -> Bool = { true },
         start: @escaping @MainActor () async throws -> Void
     ) async throws {
         let preceding = tails[deviceID]
         let task = Task { @MainActor in
+            // 前序失败只表示该设备仍需仲裁；失败时旧 owner 会被保留，下面会再次尝试释放，不能直接绕过。
             _ = try? await preceding?.value
             guard isCurrent() else { throw CancellationError() }
-            if let old = self.owners[deviceID], old.id != ownerID {
-                self.owners.removeValue(forKey: deviceID)
-                await old.pause()
-            }
+            try await self.releasePreviousOwnerIfNeeded(deviceID: deviceID, ownerID: ownerID)
+            guard isCurrent() else { throw CancellationError() }
             try await start()
-            self.release(ownerID: ownerID)
             self.owners[deviceID] = Owner(id: ownerID, pause: pause)
         }
         tails[deviceID] = task
         try await task.value
     }
 
+    /// 只在旧持有者确认释放后移除记录；失败保留记录并抛出，最多重试一次。
+    private func releasePreviousOwnerIfNeeded(deviceID: String, ownerID: UUID) async throws {
+        guard let old = owners[deviceID], old.id != ownerID else { return }
+        do {
+            try await old.pause()
+        } catch {
+            do {
+                try await old.pause()
+            } catch {
+                throw HandoffError.releaseFailed(deviceID: deviceID)
+            }
+        }
+        owners.removeValue(forKey: deviceID)
+    }
+
     func release(ownerID: UUID) {
         for uid in owners.keys.filter({ owners[$0]?.id == ownerID }) { owners.removeValue(forKey: uid) }
+    }
+
+    /// 诊断/测试：该设备是否仍被其他持有者占用（等价于存在未释放记录）。
+    func hasOwner(deviceID: String, otherThan ownerID: UUID? = nil) -> Bool {
+        guard let owner = owners[deviceID] else { return false }
+        return owner.id != ownerID
     }
 }

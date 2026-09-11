@@ -974,6 +974,23 @@
         }
       }
     },
+    "Exclusive Output Release Failed Message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not release the previous exclusive output. The device is still held; try again."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法释放上一个独占输出，设备仍被占用，请重试。"
+          }
+        }
+      }
+    },
     "Exclusive PCM" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -98,6 +98,11 @@ struct ExtensionAudioModeView: View {
                     )
                     .fixedSize()
                 }
+                if let handoffFailure = appState.extensionHandoffFailureMessage,
+                   !handoffFailure.isEmpty {
+                    Label(handoffFailure, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.red)
+                }
                 if session.mediaPlayback?.state == .failed {
                     Label(
                         NSLocalizedString(

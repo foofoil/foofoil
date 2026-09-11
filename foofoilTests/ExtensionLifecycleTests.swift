@@ -15,7 +15,7 @@ extension ExtensionKitTests {
         saved.mediaPlayback = .init(position: 42, duration: 100)
         let restored = try await host.restorePlayback(from: saved, in: fresh)
         #expect(restored == fresh)
-        await host.closeSessionAndWait(fresh)
+        try await host.closeSessionAndWait(fresh)
         #expect(provider.commands.isEmpty)
     }
 
