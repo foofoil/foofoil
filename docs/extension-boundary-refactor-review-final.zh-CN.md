@@ -1,7 +1,7 @@
 # 扩展边界重构评审终稿
 
 日期：2026-09-10  
-状态：收尾阶段 0–5 代码完成；阶段 6 自动集成与残留标识审查通过，最终实机回归待用户，整体尚未最终验收；进度见[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)
+状态：收尾阶段 0–6 全部完成，全部实机/界面手动项已由用户复验通过，最终验收通过；进度见[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)
 评审范围：`foofoil`、`extension-kit`、`hifi` 当前 `ext` / `ext-fix` 实现相对各仓库 `main` 的职责与行为变化
 
 ## 1. 评审前提
@@ -383,6 +383,8 @@ P0 fixture 删除后，应更新 smoke 参数和文档，只引用当前公共�
 每阶段只运行与改动有关的检查，最终阶段做跨仓库集成。行为修复、契约变更与纯清理分开提交；新增硬件行为不能用上一版本的听音记录代替。用户已确认之前 PCM/CUE 问题解决，此结果作为当前基线，不代表后续收尾改动已通过实机验证。
 
 ## 9. 完成标准
+
+**收尾结果（2026-09-11）：以下条件均已满足，全部自动测试、ABI smoke、`./run` 与用户实机手动回归通过，本轮扩展边界重构收尾完成。** 结论记录见[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)与[手动验证步骤](extension-boundary-closeout-manual-tests.zh-CN.md)。
 
 满足以下条件后，可以将本轮扩展边界重构视为完成：
 
