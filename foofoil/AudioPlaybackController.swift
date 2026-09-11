@@ -46,6 +46,8 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         return created
     }
     private var engineStartError: Error?
+    /// 防止硬件重配通知在处理中再次触发重排。
+    private var isHandlingEngineConfigurationChange = false
     private let playerNode = AVAudioPlayerNode()
     private let deviceServiceClientID = UUID()
     private var activeLeaseClientID: UUID?
@@ -115,6 +117,22 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 MainActor.assumeIsolated {
                     guard let self, notification.userInfo?["id"] as? UUID == self.appStateID else { return }
                     self.togglePlayPause()
+                }
+            }
+        )
+        // 系统默认输出在 Audio MIDI Setup 改采样率等硬件重配会让引擎停止但通知不经过 CoreAudio 设备监听；
+        // 这里兜底重建并续播，避免界面仍显示播放而进度停滞。
+        observers.append(
+            NotificationCenter.default.addObserver(
+                forName: .AVAudioEngineConfigurationChange,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                MainActor.assumeIsolated {
+                    guard let self,
+                          let engine = self.engineStorage,
+                          (notification.object as? AVAudioEngine) === engine else { return }
+                    self.handleEngineConfigurationChange()
                 }
             }
         )
@@ -968,6 +986,21 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         playerNode.stop()
         engine.stop()
         schedule(from: currentTime, play: true)
+    }
+
+    /// 跟随系统默认输出时，输出设备采样率/格式被外部改动会让 AVAudioEngine 停止。
+    /// 独占路由由设备心跳监听处理；输出链路支持速率转换，这里只重启引擎并从原位重排，不重建图。
+    private func handleEngineConfigurationChange() {
+        guard !isHandlingEngineConfigurationChange,
+              let engine = engineStorage, !engine.isRunning,
+              !enginePinnedToExclusiveDevice, activeLeaseClientID == nil else { return }
+        isHandlingEngineConfigurationChange = true
+        defer { isHandlingEngineConfigurationChange = false }
+        NSLog("AudioPlaybackController system default engine reconfigured")
+        guard isPlaying else { return }
+        refreshCurrentTime()
+        let resumeTime = currentTime
+        schedule(from: resumeTime, play: true)
     }
 
     private static func resolveDeviceID(uid: String) throws -> AudioDeviceID {
