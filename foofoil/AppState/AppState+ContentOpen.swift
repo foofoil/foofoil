@@ -1002,14 +1002,19 @@ extension AppState {
                 return
             }
             if operation.mediaAction == .pause { exclusivePlaybackGeneration &+= 1 }
+            // 写操作完成前不发起读取；写前已发出的读取由递增版本丢弃。
+            if operation.mediaAction == .refresh, !extensionPlaybackPendingWrites.isEmpty { return }
             // refresh 是只读同步，不推进序号；其它动作递增序号，使过期回包在完成时被丢弃。
             if operation.mediaAction != .refresh { extensionPlaybackOperationVersion &+= 1 }
             let operationVersion = extensionPlaybackOperationVersion
             guard let currentSession = extensionSession else { return }
             let session = sessionByApplyingHostPlaybackSequence(currentSession)
             let commandGeneration = exclusivePlaybackGeneration
+            let isWrite = operation.mediaAction != .refresh
+            if isWrite { extensionPlaybackPendingWrites.insert(operationVersion) }
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                defer { if isWrite { self.extensionPlaybackPendingWrites.remove(operationVersion) } }
                 do {
                     let updated: ContentSession
                     let isStart = operation.mediaAction == .play
@@ -1022,7 +1027,13 @@ extension AppState {
                         let generation = commandGeneration
                         try await ExclusivePlaybackCoordinator.shared.perform(
                             deviceID: deviceID, ownerID: session.id,
-                            pause: { [weak self] in try await self?.pauseExtensionForExclusiveHandoff(sessionID: session.id) },
+                            pause: { [weak self] in
+                                if let self, self.extensionSession?.id == session.id {
+                                    try await self.pauseExtensionForExclusiveHandoff(sessionID: session.id)
+                                } else {
+                                    try await ExtensionHost.shared.closeSessionAndWait(session)
+                                }
+                            },
                             isCurrent: { [weak self] in
                                 self?.extensionSession?.id == session.id && self?.exclusivePlaybackGeneration == generation
                             },
@@ -1071,13 +1082,17 @@ extension AppState {
                 } catch is CancellationError {
                     // 过期/取消不是释放失败，不提示。
                 } catch {
+                    guard self.extensionSession?.id == session.id,
+                          self.extensionPlaybackOperationVersion == operationVersion else { return }
                     if case ExclusivePlaybackCoordinator.HandoffError.releaseFailed = error {
                         // 释放失败：保留旧会话/待释放记录，阻止同设备新获取并提示。
                         self.extensionHandoffFailureMessage = error.localizedDescription
                     }
                     NSLog("Extension command failed: \(error.localizedDescription)")
                     // 失败后只刷新一次扩展快照；refresh 不再触发二次刷新，结果仍受会话/序号校验。
+                    self.extensionPlaybackPendingWrites.remove(operationVersion)
                     if let mediaAction = operation.mediaAction, mediaAction != .refresh,
+                       self.extensionPlaybackOperationVersion == operationVersion,
                        self.extensionSession?.id == session.id {
                         self.performExtensionMediaAction(.refresh)
                     }

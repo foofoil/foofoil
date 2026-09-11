@@ -272,6 +272,28 @@ struct ExtensionPlaybackSupportTests {
         #expect(provider.sniffCount == 0)
     }
 
+    @Test(arguments: [false, true])
+    func contiguousScanPreservesCueAndMissingFileBoundaries(cue: Bool) async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let urls = ["a.gaud", "boundary.gaud", "b.gaud"].map { directory.appendingPathComponent($0) }
+        try Data().write(to: urls[0])
+        try Data().write(to: urls[2])
+        if cue { try Data().write(to: urls[1]) }
+        var items = urls.map { FileListItem(id: $0.lastPathComponent, path: $0.path, displayName: $0.lastPathComponent) }
+        if cue { items[1].cue = FileListCueInfo(startCueFrames: 0) }
+        let provider = ContiguousAudioTestProvider()
+        ExtensionHost.shared.resolver.register(provider)
+        defer { ExtensionHost.shared.resolver.unregister(providerID: provider.descriptor.id) }
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.fileList = FileListState(kind: .audio, items: items, currentID: items[0].id)
+        state.mediaPlaybackMode = .sequential
+        #expect(await state.contiguousExtensionAudioURLs(startingAt: items[0].id) == [urls[0]])
+        #expect(await state.contiguousExtensionAudioURLs(startingAt: items[1].id) == [])
+    }
+
     /// 连续扫描只做声明级预判：100 个文件不触发逐项 probe。
     @Test func contiguousScanOfHundredFilesDoesNotProbe() async throws {
         let directory = FileManager.default.temporaryDirectory

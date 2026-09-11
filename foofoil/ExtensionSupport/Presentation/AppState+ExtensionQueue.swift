@@ -9,9 +9,14 @@ extension AppState {
     func contiguousExtensionAudioURLs(startingAt itemID: String) async -> [URL] {
         guard let list = fileList, let index = list.items.firstIndex(where: { $0.id == itemID }),
               mediaPlaybackMode == .sequential || mediaPlaybackMode == .sequentialLoop else { return [] }
-        let items = Array(list.items.dropFirst(index)).filter { $0.cue == nil }
+        let items = Array(list.items.dropFirst(index).prefix { $0.cue == nil })
         let resolved: [(FileListItem, URL)] = await Task.detached(priority: .userInitiated) {
-            items.compactMap { item in Self.resolveItemURL(item).map { (item, $0) } }
+            var resolved: [(FileListItem, URL)] = []
+            for item in items {
+                guard !Task.isCancelled, let url = Self.resolveItemURL(item) else { break }
+                resolved.append((item, url))
+            }
+            return resolved
         }.value
         var urls: [URL] = []
         var sharedProviderID: String?

@@ -36,6 +36,80 @@ struct ExclusiveHandoffFailureTests {
         #expect(coordinator.hasOwner(deviceID: "dac", otherThan: second), "\(pair): 旧持有者记录必须保留")
     }
 
+    @Test func replacedSessionRetainsRealCloseUntilRecovery() async throws {
+        let provider = FailingCloseTestProvider()
+        let host = ExtensionHost.shared
+        host.resolver.register(provider)
+        let device = "close-\(UUID().uuidString)"
+        var session = try await provider.makeSession(
+            for: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/close.dsf"))), negotiatedAPI: 1
+        )
+        session.audioDeviceSelection = .init(devices: [], selectedDeviceID: device)
+        let state = AppState()
+        state.extensionSession = session
+        state.extensionSession = nil
+        _ = await state.extensionSessionCloseTask?.value
+        defer {
+            ExclusivePlaybackCoordinator.shared.release(ownerID: session.id)
+            host.resolver.unregister(providerID: provider.descriptor.id)
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        var starts = 0
+        let next = UUID()
+        await #expect(throws: ExclusivePlaybackCoordinator.HandoffError.self) {
+            try await ExclusivePlaybackCoordinator.shared.perform(
+                deviceID: device, ownerID: next, pause: {}, start: { starts += 1 }
+            )
+        }
+        #expect(starts == 0)
+        #expect(provider.closeCount == 3)
+        provider.shouldFail = false
+        try await ExclusivePlaybackCoordinator.shared.perform(
+            deviceID: device, ownerID: next, pause: {}, start: { starts += 1 }
+        )
+        #expect(starts == 1)
+        #expect(provider.closeCount == 4)
+        ExclusivePlaybackCoordinator.shared.release(ownerID: next)
+    }
+
+    @Test func pendingLeaseSurvivesReplacementAndBlocksSameOwner() async throws {
+        let coordinator = ExclusivePlaybackCoordinator()
+        let owner = UUID(), client = UUID()
+        var failing = true
+        var releasedClients: [UUID] = []
+        var pending: PendingOutputRelease? = PendingOutputRelease {
+            releasedClients.append(client)
+            if failing { throw HandoffTestError.release }
+        }
+        coordinator.retainPendingRelease(deviceID: "dac", ownerID: owner, pending: pending!)
+        // 模拟关闭覆盖暂停请求：不能用默认 client 的释放覆盖真正待释放的租约。
+        coordinator.retainPendingRelease(deviceID: "dac", ownerID: owner, pending: PendingOutputRelease {
+            Issue.record("不得覆盖未释放的 client")
+        })
+        pending = nil
+        await #expect(throws: ExclusivePlaybackCoordinator.HandoffError.self) {
+            try await coordinator.perform(deviceID: "dac", ownerID: owner, pause: {}, start: {
+                Issue.record("同 owner 也不能绕过待释放租约")
+            })
+        }
+        #expect(releasedClients == [client, client])
+        failing = false
+        var started = false
+        try await coordinator.perform(deviceID: "dac", ownerID: UUID(), pause: {}, start: { started = true })
+        #expect(started)
+        #expect(releasedClients == [client, client, client])
+    }
+
+    @Test func oldCloseCompletionDoesNotRemoveReacquiredOwner() async throws {
+        let coordinator = ExclusivePlaybackCoordinator()
+        let owner = UUID()
+        let pending = PendingOutputRelease {}
+        coordinator.retainPendingRelease(deviceID: "dac", ownerID: owner, pending: pending)
+        try await coordinator.perform(deviceID: "dac", ownerID: owner, pause: {}, start: {})
+        coordinator.releasePending(ownerID: owner, pending: pending)
+        #expect(coordinator.hasOwner(deviceID: "dac"))
+    }
+
     /// 释放恢复后再次请求可以成功完成交接。
     @Test func releaseRecoveryAllowsNextHandoff() async throws {
         let coordinator = ExclusivePlaybackCoordinator()

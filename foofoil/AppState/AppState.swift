@@ -56,6 +56,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
             let oldSessionID = oldValue?.id
             let newSessionID = extensionSession?.id
             guard oldSessionID != newSessionID else { return }
+            // 旧会话的在途操作不阻止新会话刷新；旧回包仍由会话 ID 校验丢弃。
+            extensionPlaybackPendingWrites.removeAll()
             // 删除意图只对产生它的会话有效，新会话不复用旧编辑记录。
             if oldSessionID != nil { extensionRemovedItemIDs.removeAll() }
             // 新会话接管后旧的交接失败提示不再适用。
@@ -64,13 +66,19 @@ public class AppState: NSObject, ObservableObject, Identifiable {
             let newID = extensionSession?.extensionID
             if let oldValue {
                 let precedingClose = extensionSessionCloseTask
-                extensionSessionCloseTask = Task { @MainActor in
+                let pending = PendingOutputRelease {
                     _ = await precedingClose?.value
+                    try await ExtensionHost.shared.closeSessionAndWait(oldValue)
+                    if let oldID { ExtensionHost.shared.releaseSession(extensionID: oldID) }
+                }
+                ExclusivePlaybackCoordinator.shared.retainPendingRelease(
+                    deviceID: oldValue.audioDeviceSelection?.selectedDeviceID,
+                    ownerID: oldValue.id, pending: pending
+                )
+                extensionSessionCloseTask = Task { @MainActor in
                     do {
-                        try await ExtensionHost.shared.closeSessionAndWait(oldValue)
-                        if let oldID {
-                            ExtensionHost.shared.releaseSession(extensionID: oldID)
-                        }
+                        try await pending.release()
+                        ExclusivePlaybackCoordinator.shared.releasePending(ownerID: oldValue.id, pending: pending)
                         return .success(())
                     } catch {
                         // 释放失败：不释放 session 计数，保留待释放记录供后续协调器重试。
@@ -90,6 +98,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     var exclusivePlaybackGeneration: UInt64 = 0
     /// 媒体操作序号：每个会改变状态的媒体动作递增，用于丢弃过期回包，避免旧 seek/暂停覆盖新状态。
     var extensionPlaybackOperationVersion: UInt64 = 0
+    var extensionPlaybackPendingWrites: Set<UInt64> = []
     /// 当前会话内被宿主显式删除的扩展队列项目 ID；用于区分“映射失效”和“用户删除”。
     var extensionRemovedItemIDs: Set<String> = []
 

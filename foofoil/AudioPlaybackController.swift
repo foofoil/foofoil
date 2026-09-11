@@ -268,11 +268,12 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         if releaseLease, let clientID = activeLeaseClientID {
             NSLog("AudioPlaybackController pause releasing lease")
             // 同步先清本地状态，并发再播走全新获取；尾链保证释放先于获取到达扩展侧。
+            let deviceID = preparedDeviceID ?? selectedOutputDeviceID
             activeLeaseClientID = nil
             preparedDeviceID = nil
             preparedSourceSampleRate = nil
             stopExclusiveDeviceObservation()
-            enqueuePCMRelease(clientID: clientID)
+            queuePCMLeaseRelease(clientID: clientID, deviceID: deviceID)
         }
         MediaRemoteCommandCoordinator.shared.update(self)
     }
@@ -310,16 +311,25 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         routeGeneration &+= 1
         let clientID = activeLeaseClientID ?? deviceServiceClientID
         activeLeaseClientID = nil
+        queuePCMLeaseRelease(clientID: clientID, deviceID: selectedOutputDeviceID)
+    }
+
+    private func queuePCMLeaseRelease(clientID: UUID, deviceID: String?) {
         let ownerID = deviceServiceClientID
-        // 旧持有者记录只在释放成功后移除；失败时保留，供后续同设备获取重试。
-        enqueuePCMRelease(clientID: clientID) { clientID in
+        let pending = PendingOutputRelease {
+            _ = try await ExtensionHost.shared.performAudioDeviceCommand(.init(
+                command: .releasePCM, clientID: clientID
+            ))
+        }
+        let retained = ExclusivePlaybackCoordinator.shared.retainPendingRelease(
+            deviceID: deviceID, ownerID: ownerID, pending: pending
+        )
+        enqueuePCMRelease(clientID: clientID) { _ in
             do {
-                _ = try await ExtensionHost.shared.performAudioDeviceCommand(.init(
-                    command: .releasePCM, clientID: clientID
-                ))
-                ExclusivePlaybackCoordinator.shared.release(ownerID: ownerID)
+                try await retained.release()
+                ExclusivePlaybackCoordinator.shared.releasePending(ownerID: ownerID, pending: retained)
             } catch {
-                NSLog("AudioPlaybackController close release failed: \(error.localizedDescription)")
+                NSLog("AudioPlaybackController release pending: \(error.localizedDescription)")
             }
         }
     }
@@ -1380,6 +1390,33 @@ private struct QueuedSuccessor {
     let playerTimeOrigin: Double
 }
 
+/// 释放请求独立于界面存活；并发调用等待同一次释放，失败后保留重试入口。
+@MainActor
+final class PendingOutputRelease {
+    private let operation: @MainActor () async throws -> Void
+    private var inFlight: Task<Void, Error>?
+    private var completed = false
+
+    init(operation: @escaping @MainActor () async throws -> Void) {
+        self.operation = operation
+    }
+
+    func release() async throws {
+        if completed { return }
+        if let inFlight { return try await inFlight.value }
+        let task = Task { try await operation() }
+        inFlight = task
+        do {
+            try await task.value
+            completed = true
+            inFlight = nil
+        } catch {
+            inFlight = nil
+            throw error
+        }
+    }
+}
+
 /// 交接按设备串行，先等待旧输出暂停和释放，再启动新输出；系统默认输出不登记。
 /// 释放失败时保留旧持有者记录并阻止同设备新获取，最多重试一次，避免静默进入冲突的新独占会话。
 @MainActor
@@ -1403,6 +1440,7 @@ final class ExclusivePlaybackCoordinator {
     private struct Owner {
         let id: UUID
         let pause: @MainActor () async throws -> Void
+        var pending: PendingOutputRelease? = nil
     }
     private var owners: [String: Owner] = [:]
     private var tails: [String: Task<Void, Error>] = [:]
@@ -1430,7 +1468,7 @@ final class ExclusivePlaybackCoordinator {
 
     /// 只在旧持有者确认释放后移除记录；失败保留记录并抛出，最多重试一次。
     private func releasePreviousOwnerIfNeeded(deviceID: String, ownerID: UUID) async throws {
-        guard let old = owners[deviceID], old.id != ownerID else { return }
+        guard let old = owners[deviceID], old.id != ownerID || old.pending != nil else { return }
         do {
             try await old.pause()
         } catch {
@@ -1441,6 +1479,25 @@ final class ExclusivePlaybackCoordinator {
             }
         }
         owners.removeValue(forKey: deviceID)
+    }
+
+    /// 关闭界面前以独立释放记录替换弱引用回调，失败时仍可重试实际资源。
+    @discardableResult
+    func retainPendingRelease(deviceID: String?, ownerID: UUID, pending: PendingOutputRelease) -> PendingOutputRelease {
+        if let existing = owners.values.first(where: { $0.id == ownerID })?.pending { return existing }
+        let deviceIDs = deviceID.map { [$0] } ?? owners.compactMap { $0.value.id == ownerID ? $0.key : nil }
+        for id in deviceIDs {
+            guard owners[id] == nil || owners[id]?.id == ownerID else { continue }
+            owners[id] = Owner(id: ownerID, pause: { try await pending.release() }, pending: pending)
+        }
+        return pending
+    }
+
+    /// 旧关闭任务的完成不能清掉后来同 owner 新获取的租约。
+    func releasePending(ownerID: UUID, pending: PendingOutputRelease) {
+        for id in owners.keys.filter({ owners[$0]?.id == ownerID && owners[$0]?.pending === pending }) {
+            owners.removeValue(forKey: id)
+        }
     }
 
     func release(ownerID: UUID) {

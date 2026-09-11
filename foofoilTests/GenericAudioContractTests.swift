@@ -178,6 +178,33 @@ struct GenericAudioContractTests {
         #expect(state.extensionSession?.id == session.id)
     }
 
+    @Test func refreshCannotRacePendingSeek() async throws {
+        let provider = GatedSeekTestProvider()
+        let host = ExtensionHost.shared
+        host.resolver.register(provider)
+        defer { host.resolver.unregister(providerID: provider.descriptor.id) }
+        let state = AppState()
+        state.extensionSession = try await provider.makeSession(
+            for: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/gated.gaud"))), negotiatedAPI: 1
+        )
+        defer {
+            state.extensionSession = nil
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        state.performExtensionMediaAction(.refresh)
+        for _ in 0..<200 where provider.mediaActions.isEmpty { await Task.yield() }
+        state.seekExtensionPlayback(to: 9)
+        state.performExtensionMediaAction(.refresh)
+        for _ in 0..<200 where provider.mediaActions.count < 2 { await Task.yield() }
+        #expect(provider.mediaActions == [.refresh, .seek(9)])
+        await provider.releaseSeek(toPosition: 9)
+        for _ in 0..<200 where state.extensionSession?.mediaPlayback?.position != 9 { await Task.yield() }
+        provider.releaseRefresh()
+        for _ in 0..<200 { await Task.yield() }
+        #expect(state.extensionSession?.mediaPlayback?.position == 9)
+        #expect(state.extensionPlaybackPendingWrites.isEmpty)
+    }
+
     @Test func deviceServiceDiscoveryPrefersUniqueOrPreferredExtension() {
         #expect(ExtensionAudioDeviceDiscovery.extensionID(amongCapable: ["app.foofoil.extension.hifi"], preferredExtensionID: nil) == "app.foofoil.extension.hifi")
         #expect(ExtensionAudioDeviceDiscovery.extensionID(
@@ -399,6 +426,12 @@ private final class GatedSeekTestProvider: ContentProvider {
         return await withCheckedContinuation { continuation in
             pending.append((mediaAction, session, continuation))
         }
+    }
+
+    func releaseRefresh() {
+        guard let index = pending.firstIndex(where: { $0.action == .refresh }) else { return }
+        let item = pending.remove(at: index)
+        item.continuation.resume(returning: item.session)
     }
 
     /// 按 seek 目标位置放行，避免依赖并发任务的入队顺序。
