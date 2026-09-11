@@ -1,7 +1,7 @@
 # 扩展边界重构评审终稿
 
 日期：2026-09-10  
-状态：收尾阶段 0–3 已完成；阶段 4、5 代码与自动测试完成，阶段 4 菜单/PCM 实机项待复验，两阶段均未正式验收；进度见[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)
+状态：收尾阶段 0–5 代码完成；阶段 6 自动集成与残留标识审查通过，最终实机回归待用户，整体尚未最终验收；进度见[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)
 评审范围：`foofoil`、`extension-kit`、`hifi` 当前 `ext` / `ext-fix` 实现相对各仓库 `main` 的职责与行为变化
 
 ## 1. 评审前提

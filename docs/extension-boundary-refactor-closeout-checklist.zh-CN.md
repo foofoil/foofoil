@@ -1,7 +1,7 @@
 # 扩展边界重构收尾 checklist
 
 日期：2026-09-10  
-状态：收尾阶段 0–3 已完成；阶段 4 代码与自动测试完成、菜单/无 hifi 普通 PCM 待实机复验；阶段 5 代码与自动测试已按用户指示先行完成，两阶段均未正式验收  
+状态：收尾阶段 0–3 已完成；阶段 4、5 代码与自动测试完成、待实机复验；阶段 6 自动集成与残留标识审查完成，最终实机回归待用户，整体尚未最终验收  
 依据：[评审终稿](extension-boundary-refactor-review-final.zh-CN.md)
 
 本清单是评审后的新增收尾工作，阶段编号不替代原重构计划的阶段 0–6。任务路径按对应仓库根目录理解。
@@ -106,16 +106,16 @@
 
 对应评审 §7、§9。
 
-- [ ] extension-kit：`swift test` 通过。
-- [ ] hifi：`swift test` 与实际公共协议 Runtime smoke 通过，记录完整命令及 fixture 路径，不保留占位参数。
-- [ ] foofoil：`xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platform=macOS'` 通过；跳过项逐项注明，不能计为通过。
-- [ ] `./run` 构建、插件注入/签名及启动成功；无新增编译警告，差异检查通过。
+- [x] extension-kit：`swift test` 通过。
+- [x] hifi：`swift test` 与实际公共协议 Runtime smoke 通过，记录完整命令及 fixture 路径，不保留占位参数。
+- [x] foofoil：`xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platform=macOS'` 通过；跳过项逐项注明，不能计为通过。
+- [x] `./run` 构建、插件注入/签名及启动成功；无新增编译警告，差异检查通过。
 - [ ] 实机回归 PCM 系统/独占、同 DAC PCM/DSD 双向快速交接、DSF/DFF/SACD 播放/暂停/定位/切曲。
 - [ ] 实机回归删除当前曲、删除/裁剪/重排后继后的续播，以及容器激活/呈现。
 - [ ] 实机回归设备拔出/重接/忙碌/切换、关窗/退出释放、菜单与媒体键。
 - [ ] 实机回归 PCM 独立文件同采样率连播、CUE 首次播放；自动覆盖 44.1 kHz 单/双声道，防止仅单声道测试掩盖默认格式路径。
 - [ ] 汇总 foofoil/hifi/extension-kit 提交与工作区、设备型号或 UID、文件类型/采样率、操作与结果来源；不外推未测硬件。
-- [ ] 按职责审查残留标识：通用宿主不含 Hi-Fi 特例/适配调用；允许配置、文案、测试及插件自身的不透明标识，不以全局字符串零命中代替审查。
+- [x] 按职责审查残留标识：通用宿主不含 Hi-Fi 特例/适配调用；允许配置、文案、测试及插件自身的不透明标识，不以全局字符串零命中代替审查。
 - [ ] **最终验收：** 评审 §9 全部满足，所有必需手动验证通过；文档与实际状态一致，无未记录阻塞。
 
 ## 每阶段执行记录模板
@@ -226,3 +226,25 @@
 - 未验证范围 / 风险 / 阻塞：一次性打开/恢复时的 `resolve/match` 探针仍在调用 actor 上（有资源作用域），未移出主 actor；大列表或网络盘首次打开仍可能有短暂阻塞，需实测决定是否进一步并发化。阶段 4 的菜单/PCM 实机项仍未完成，阶段 4、5 均未正式验收。
 - 验收是否通过及证据：本阶段可自动化部分通过（测试、构建、`./run`、无新增缓存/并发基础设施）；因阶段 4 未验收且无实机性能数据，整体未验收。
 - 下一阶段（需阶段 4、5 验收通过后）：收尾阶段 6（最终集成与交付）。
+
+## 收尾阶段 6 执行记录（2026-09-11）— 自动集成完成，最终实机回归待用户
+
+- 执行者：当前任务 agent（自动部分）。三仓库工作区干净。提交：foofoil `5cb99f7`、extension-kit `3b63bb5`、hifi `d8fb45b`。
+- 完成：
+  - extension-kit `swift test`：25 项通过。
+  - hifi `swift test`：44 项通过；公共协议 Runtime smoke 通过（命令见下，退出 0）。
+  - foofoil 完整 `xcodebuild test`（含 UI 测试）：244 项，243 通过、0 失败、1 跳过。
+  - `./run`：`BUILD SUCCEEDED`，hifi 开发插件注入、重签并启动；无新增编译警告。
+  - 残留标识审查：通用宿主 Swift 源码检索 `audio.hifi`、`app.foofoil.extension.hifi`、`hifi.`、`SACDMTOC` 均无命中（仅 `hifispeaker.2` SF Symbol 与历史 docs 示例）；`ExtensionSupport/Compatibility/` 已不存在。
+- smoke 命令与 fixture（无占位参数）：
+  ```sh
+  # hifi 仓库根目录
+  swift run hifi-runtime-smoke --self-test \
+    ../extension-kit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json \
+    ../extension-kit/Sources/FoofoilExtensionKit/Fixtures/MediaNavigationRequests.json
+  ```
+- 跳过项：`CueSheetTests/exclusivePlaybackSurvivesTrackChangesAndPause()`（需要真实 DAC 独占，未注入插件时跳过，不计为通过）。
+- 实机设备 / 文件类型与采样率 / 操作 / 结果来源：**未进行**。手动回归项（PCM 系统/独占、同 DAC PCM/DSD 双向快速交接、DSF/DFF/SACD 播放/暂停/定位/切曲、删除/裁剪/重排续播、容器激活/呈现、设备拔出/重接/忙碌/切换、关窗/退出释放、菜单与媒体键、PCM 连播与 CUE 首次播放听感）需用户按[手动验证步骤](extension-boundary-closeout-manual-tests.zh-CN.md)执行并记录设备型号/UID 与采样率。
+- 未验证范围 / 风险 / 阻塞：阶段 4 的菜单/PCM 实机项、阶段 5 的大列表扫描与通用容器实机项、本阶段全部手动项均未完成；一次性打开 resolve 探针仍在调用 actor（有资源作用域）。未测硬件不外推。
+- 验收是否通过及证据：自动集成通过（三仓库测试、公共协议 smoke、完整 `xcodebuild test`、`./run`、残留标识审查）；因必需实机回归未完成，最终验收未通过。
+- 收尾结论（待实机）：代码、契约与文档已就绪，等待用户完成手动回归并汇总证据后勾选最终验收。
