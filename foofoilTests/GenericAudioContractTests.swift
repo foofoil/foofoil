@@ -46,7 +46,6 @@ struct GenericAudioContractTests {
         try await provider.closeSession(fresh)
         try await provider.closeSession(fresh)
         #expect(provider.closeCount == 2)
-        #expect(HiFiLegacyAdapter.mediaAction(for: "hifi.play", in: session) == nil)
         #expect(ExtensionPlaybackSupport.usesHostAudioChrome(session))
         #expect(ExtensionPlaybackSupport.presentationURL(in: session)?.pathExtension == "gaud")
         #expect(!ExtensionPlaybackSupport.requiresExclusiveHandoff(session))

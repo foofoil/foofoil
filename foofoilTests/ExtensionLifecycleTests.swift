@@ -55,53 +55,6 @@ extension ExtensionKitTests {
         #expect(provider.restoreCount == 0)
     }
 
-    @Test func legacyCloseIsAwaitedAndNeverSentToUnrelatedProvider() async throws {
-        let provider = DefaultLifecycleTestProvider()
-        let unrelated = try await provider.makeSession(for: lifecycleRequest, negotiatedAPI: 1)
-        try await HiFiLegacyAdapter.closeSession(unrelated, provider: provider)
-        #expect(provider.commands.isEmpty)
-        let legacy = ContentSession(
-            extensionID: nil, providerID: "audio.hifi", request: lifecycleRequest,
-            presentation: .text(titleKey: "Test", body: "DSD")
-        )
-        try await HiFiLegacyAdapter.closeSession(legacy, provider: provider)
-        #expect(provider.commands == ["hifi.close"])
-        #expect(provider.commandCompleted)
-    }
-
-    @Test(arguments: [false, true])
-    func legacyRestoreValidatesActivationBeforeSeeking(invalid: Bool) async throws {
-        let provider = RestoringLifecycleTestProvider()
-        provider.invalidRestoration = invalid
-        var fresh = ContentSession(
-            extensionID: nil, providerID: "audio.hifi", request: lifecycleRequest,
-            presentation: .text(titleKey: "Test", body: "DSD"),
-            navigatorContributions: [.init(
-                id: "hifi.playback-queue", titleLocalizationKey: "Queue", style: .flat,
-                items: [.init(id: "a", title: "A"), .init(id: "b", title: "B")]
-            )]
-        )
-        fresh.mediaPlayback = .init(duration: 100, isSeekable: true)
-        fresh.playbackQueue = .init(
-            items: [.init(id: "a", title: "A"), .init(id: "b", title: "B")], currentItemID: "a"
-        )
-        var saved = fresh
-        saved.playbackQueue?.currentItemID = "b"
-        saved.mediaPlayback?.position = 42
-        if invalid {
-            await #expect(throws: MediaSessionContractError.invalidPlaybackPosition) {
-                try await HiFiLegacyAdapter.restorePlayback(saved: saved, fresh: fresh, provider: provider)
-            }
-            #expect(provider.events == ["activate:b"])
-        } else {
-            let restored = try await HiFiLegacyAdapter.restorePlayback(saved: saved, fresh: fresh, provider: provider)
-            #expect(provider.events == ["activate:b", "hifi.seek"])
-            #expect(restored.mediaPlayback?.position == 42)
-            #expect(restored.mediaPlayback?.state == .paused)
-            #expect(restored.id == fresh.id)
-        }
-    }
-
     @Test func inProcessDeviceServicePreservesRequestAndRunsOffMainThread() async throws {
         let request = AudioDeviceServiceRequest(
             command: .releasePCM, clientID: UUID(), selectedDeviceID: "test-dac",

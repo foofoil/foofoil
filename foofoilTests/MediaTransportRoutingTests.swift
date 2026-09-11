@@ -20,23 +20,9 @@ extension ExtensionKitTests {
             try await host.perform(mediaAction: .seek(-1), in: session)
         }
         #expect(provider.mediaActions.count == 1)
-        #expect(HiFiLegacyAdapter.mediaAction(for: "hifi.play", in: session) == nil)
     }
 
-    @Test func legacyMediaSeekEncodesPositionWithoutMutatingOriginal() async throws {
-        let provider = MediaRoutingTestProvider()
-        var session = ContentSession(
-            extensionID: nil, providerID: "audio.hifi",
-            request: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/routing.dsf"))),
-            presentation: .text(titleKey: "Test", body: "DSD")
-        )
-        session.mediaPlayback = .init(duration: 100, isSeekable: true)
-        let updated = try await HiFiLegacyAdapter.perform(mediaAction: .seek(42), session: session, provider: provider)
-        #expect(provider.commands == ["hifi.seek"])
-        #expect(updated.mediaPlayback?.position == 42)
-        #expect(session.mediaPlayback?.position == 0)
-        #expect(HiFiLegacyAdapter.mediaAction(for: "hifi.pause", in: session) == .pause)
-        #expect(HiFiLegacyAdapter.mediaAction(for: "hifi.device.opaque-uid", in: session) == .selectDevice("opaque-uid"))
+    @Test func sessionOperationExtractsDeviceAndCommandWithoutMedia() {
         #expect(ExtensionSessionOperation.media(.selectDevice("opaque-uid")).selectedDeviceID == "opaque-uid")
         #expect(ExtensionSessionOperation.command("other.command").mediaAction == nil)
     }

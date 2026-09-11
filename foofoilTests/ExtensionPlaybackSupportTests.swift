@@ -37,9 +37,6 @@ struct ExtensionPlaybackSupportTests {
             ]),
             presentation: .text(titleKey: "Test", body: "Fixture"),
             capabilities: capabilities,
-            commands: [
-                .init(id: "hifi.device.test-dac-uid", titleLocalizationKey: "Output", isEnabled: false)
-            ],
             navigatorContributions: [
                 .init(
                     id: queueContributionID, titleLocalizationKey: "Queue", style: .flat,
@@ -63,7 +60,6 @@ struct ExtensionPlaybackSupportTests {
         #expect(!ExtensionPlaybackSupport.usesDeviceService(generic))
         #expect(ExtensionPlaybackSupport.acceptsGaplessCollection(generic))
         #expect(ExtensionPlaybackSupport.containerPlaybackQueue(from: generic) == nil)
-        #expect(ExtensionPlaybackSupport.legacyMediaAction(for: "hifi.play", in: generic) == nil)
         let playbackContribution = NavigatorContribution(
             id: "generic.playback-queue", titleLocalizationKey: "Queue", style: .flat,
             items: [.init(id: "file:1", title: "second")]
@@ -118,7 +114,7 @@ struct ExtensionPlaybackSupportTests {
         #expect(ExtensionPlaybackSupport.presentationURL(in: session) == nil)
     }
 
-    @Test func hiFiSessionKeepsLegacyChromeQueueAndHandoff() {
+    @Test func hiFiSessionUsesPublicChromeQueueAndHandoff() {
         let hifi = session(providerID: "audio.hifi")
         #expect(ExtensionPlaybackSupport.usesHostAudioChrome(hifi))
         #expect(ExtensionPlaybackSupport.presentationURL(in: hifi)?.lastPathComponent == "second.dsf")
@@ -126,8 +122,6 @@ struct ExtensionPlaybackSupportTests {
         #expect(ExtensionPlaybackSupport.usesDeviceService(hifi))
         #expect(ExtensionPlaybackSupport.acceptsGaplessCollection(hifi))
         #expect(ExtensionPlaybackSupport.containerPlaybackQueue(from: hifi) == nil)
-        #expect(ExtensionPlaybackSupport.legacyMediaAction(for: "hifi.pause", in: hifi) == .pause)
-        #expect(!ExtensionPlaybackSupport.isOutputDeviceEnabled("test-dac-uid", in: hifi))
         let contribution = NavigatorContribution(
             id: "hifi.playback-queue", titleLocalizationKey: "Queue", style: .flat,
             items: [.init(id: "file:1", title: "second")]
@@ -146,6 +140,21 @@ struct ExtensionPlaybackSupportTests {
         state.extensionSession = hifi
         #expect(state.isAudioDocument)
         #expect(state.currentAudioPresentationURL?.lastPathComponent == "second.dsf")
+    }
+
+    /// 设备菜单可用性只来自公共设备连接快照与 `availableActions`，不再读旧 command 的 isEnabled。
+    @Test func outputDeviceEnabledFollowsPublicAvailabilityAndConnection() {
+        var session = session(providerID: "audio.hifi")
+        session.audioDeviceSelection = .init(devices: [
+            .init(id: "connected", displayName: "Connected"),
+            .init(id: "gone", displayName: "Gone", isConnected: false)
+        ])
+        session.mediaPlayback?.availableActions = [.refresh, .seek, .selectDevice, .play]
+        #expect(ExtensionPlaybackSupport.isOutputDeviceEnabled("connected", in: session))
+        #expect(!ExtensionPlaybackSupport.isOutputDeviceEnabled("gone", in: session))
+
+        session.mediaPlayback?.availableActions = [.refresh, .seek, .play]
+        #expect(!ExtensionPlaybackSupport.isOutputDeviceEnabled("connected", in: session))
     }
 
     @Test func deviceSnapshotEnablesExclusiveHandoffWithoutHiFiProviderID() {
@@ -251,6 +260,39 @@ struct ExtensionPlaybackSupportTests {
         state.mediaPlaybackMode = .sequential
         #expect(state.contiguousExtensionAudioURLs(startingAt: items[0].id) == [first, second])
         #expect(state.contiguousExtensionAudioURLs(startingAt: items[2].id).isEmpty)
+    }
+
+    /// 迁移自旧 Hi-Fi 适配测试：容器曲目 ID 不被曲目序号或私有布局推导。
+    @Test func trackNumberIsNotInterpretedAsContainerID() {
+        let queue = MediaPlaybackQueueSnapshot(
+            items: [.init(id: "track:stereo:01", title: "One"), .init(id: "track:stereo:02", title: "Two")],
+            currentItemID: "track:stereo:01"
+        )
+        let item = FileListItem(
+            id: "host-track",
+            path: "/tmp/disc.iso",
+            displayName: "One",
+            cue: FileListCueInfo(startCueFrames: 0, trackNumber: "2")
+        )
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        #expect(state.containerTrackID(for: item, in: queue) == nil)
+    }
+
+    /// 迁移自旧 Hi-Fi 适配测试：只有声明 `content.probe` 才交给扩展嗅探，不再读 SACD 魔数。
+    @Test func contentMatchingRequiresProbeCapability() {
+        let url = URL(fileURLWithPath: "/tmp/disc.iso")
+        let probeCapability = [
+            ExtensionCapabilityDeclaration(id: ExtensionCapabilityIdentifier.contentProbe, scope: .application)
+        ]
+        #expect(ExtensionContentMatching.sniff(url, capabilities: probeCapability) { _ in
+            ContentProbeResult(disposition: .matched, reason: "sacd-master-toc")
+        })
+        #expect(!ExtensionContentMatching.sniff(url, capabilities: probeCapability) { _ in
+            ContentProbeResult(disposition: .unmatched)
+        })
+        // 没有 content.probe 声明时不再回退到旧 SACD 魔数嗅探。
+        #expect(!ExtensionContentMatching.sniff(url, capabilities: []))
     }
 }
 
