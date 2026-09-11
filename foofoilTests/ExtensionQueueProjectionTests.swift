@@ -3,7 +3,9 @@ import FoofoilExtensionKit
 import Testing
 @testable import foofoil
 
+extension ExtensionKitTests {
 @MainActor
+@Suite
 struct ExtensionQueueProjectionTests {
     private func url(_ name: String) -> URL {
         URL(fileURLWithPath: "/tmp/\(name)")
@@ -253,6 +255,7 @@ struct ExtensionQueueProjectionTests {
     private var restoreRequest: ContentRequest {
         .fileCollection([.init(url: url("restore-a.dsf")), .init(url: url("restore-b.dsf"))])
     }
+}
 }
 
 @MainActor

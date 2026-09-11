@@ -566,7 +566,7 @@ struct CueSheetTests {
         #expect(state.fileList?.kind == .audio)
         #expect(state.fileList?.isCueBased == true)
         #expect(state.fileList?.isReorderable == false)
-        #expect(state.fileList?.soleContainerFormat == .sacd)
+        #expect(state.fileList?.soleContainerFormat == .generic)
         #expect(state.fileList?.title == "Symphony No. 5")
         #expect(state.fileList?.items.map(\.displayName) == ["Allegro", "Andante"])
         #expect(state.fileList?.items.map(\.path) == [url.path, url.path])
@@ -618,15 +618,15 @@ struct CueSheetTests {
 
         let list = try #require(state.fileList)
         #expect(list.items.map(\.cue?.containerTrackID) == ["track:1", "track:2", nil])
-        #expect(list.items.map(\.id).dropLast().allSatisfy { $0.hasPrefix("sacd:") })
+        #expect(list.items.map(\.id).dropLast().allSatisfy { $0.hasPrefix("container:") })
         #expect(list.sections.count == 1)
-        #expect(list.sections[0].resolvedFormat == .sacd)
+        #expect(list.sections[0].resolvedFormat == .generic)
         #expect(list.soleContainerFormat == nil)
         #expect(list.currentID == songItem.id)
         let contribution = try #require(state.navigatorContributions.first)
         #expect(contribution.style == .outline)
         #expect(contribution.items.map(\.title) == ["Album", "First", "Second", "encore.mp3"])
-        #expect(contribution.items.first?.badge == "SACD")
+        #expect(contribution.items.first?.badge == nil)
         #expect(contribution.items.last?.parentID == nil)
     }
 

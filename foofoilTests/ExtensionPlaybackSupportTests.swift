@@ -3,7 +3,9 @@ import FoofoilExtensionKit
 import Testing
 @testable import foofoil
 
+extension ExtensionKitTests {
 @MainActor
+@Suite
 struct ExtensionPlaybackSupportTests {
     private func session(
         providerID: String,
@@ -203,6 +205,10 @@ struct ExtensionPlaybackSupportTests {
         #expect(state.fileList?.items.map(\.cue?.containerTrackID) == ["track:stereo:01", "track:stereo:02", nil])
         #expect(state.fileList?.items.last?.id == "host:1")
         #expect(state.fileList?.items.map(\.extensionItemID) == ["track:stereo:01", "track:stereo:02", nil])
+        // 未知扩展容器使用宿主命名空间与通用样式，不显示 SACD 徽标或私有前缀。
+        #expect(state.fileList?.items.dropLast().allSatisfy { $0.id.hasPrefix("container:") } == true)
+        #expect(state.fileList?.sections.first?.resolvedFormat == .generic)
+        #expect(state.navigatorContributions.first?.items.first?.badge == nil)
     }
 
     @Test func opaqueQueueIDsPairByStampAndResourceWithoutParsingLayout() {
@@ -237,7 +243,7 @@ struct ExtensionPlaybackSupportTests {
         #expect(ExtensionPlaybackSupport.queueItemID(for: stamped[0], in: trimmed) == nil)
     }
 
-    @Test func contiguousAudioURLsFollowSharedProviderAndStopAtSniffedContainer() throws {
+    @Test func contiguousAudioURLsFollowSharedProviderAndStopAtSniffedContainer() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("foofoil-contiguous-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -258,8 +264,39 @@ struct ExtensionPlaybackSupportTests {
         let items = [first, second, container].map { FileListItem(id: $0.lastPathComponent, path: $0.path, displayName: $0.lastPathComponent) }
         state.fileList = FileListState(kind: .audio, items: items, currentID: items[0].id)
         state.mediaPlaybackMode = .sequential
-        #expect(state.contiguousExtensionAudioURLs(startingAt: items[0].id) == [first, second])
-        #expect(state.contiguousExtensionAudioURLs(startingAt: items[2].id).isEmpty)
+        let sequence = await state.contiguousExtensionAudioURLs(startingAt: items[0].id)
+        let containerSequence = await state.contiguousExtensionAudioURLs(startingAt: items[2].id)
+        #expect(sequence == [first, second])
+        #expect(containerSequence.isEmpty)
+        // 直接扫描不执行任何 sniff/probe。
+        #expect(provider.sniffCount == 0)
+    }
+
+    /// 连续扫描只做声明级预判：100 个文件不触发逐项 probe。
+    @Test func contiguousScanOfHundredFilesDoesNotProbe() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-contiguous-100-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        var urls: [URL] = []
+        for index in 0..<100 {
+            let url = directory.appendingPathComponent(String(format: "track-%03d.gaud", index))
+            try Data("x".utf8).write(to: url)
+            urls.append(url)
+        }
+
+        let provider = ContiguousAudioTestProvider()
+        ExtensionHost.shared.resolver.register(provider)
+        defer { ExtensionHost.shared.resolver.unregister(providerID: provider.descriptor.id) }
+
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        let items = urls.map { FileListItem(id: $0.lastPathComponent, path: $0.path, displayName: $0.lastPathComponent) }
+        state.fileList = FileListState(kind: .audio, items: items, currentID: items[0].id)
+        state.mediaPlaybackMode = .sequential
+        let sequence = await state.contiguousExtensionAudioURLs(startingAt: items[0].id)
+        #expect(sequence == urls)
+        #expect(provider.sniffCount == 0)
     }
 
     /// 迁移自旧 Hi-Fi 适配测试：容器曲目 ID 不被曲目序号或私有布局推导。
@@ -295,6 +332,7 @@ struct ExtensionPlaybackSupportTests {
         #expect(!ExtensionContentMatching.sniff(url, capabilities: []))
     }
 }
+}
 
 @MainActor
 private final class ContiguousAudioTestProvider: ContentProvider {
@@ -309,17 +347,22 @@ private final class ContiguousAudioTestProvider: ContentProvider {
         isEnabled: true,
         isRuntimeAvailable: true
     )
+    private let declarations = [
+        ContentTypeDeclaration(extensions: ["iso"], strategy: .sniff),
+        ContentTypeDeclaration(extensions: ["gaud"], strategy: .fileExtension)
+    ]
+    /// 记录 sniff 执行次数；连续扫描预判不应触发任何一次。
+    private(set) var sniffCount = 0
 
     func match(_ request: ContentRequest) -> ProviderMatch? {
-        ProviderContentMatcher.match(
-            request,
-            declarations: [
-                ContentTypeDeclaration(extensions: ["iso"], strategy: .sniff),
-                ContentTypeDeclaration(extensions: ["gaud"], strategy: .fileExtension)
-            ]
-        ) { url in
-            url.pathExtension.lowercased() == "iso"
+        ProviderContentMatcher.match(request, declarations: declarations) { [weak self] url in
+            self?.sniffCount += 1
+            return url.pathExtension.lowercased() == "iso"
         }
+    }
+
+    func preflightMatch(_ request: ContentRequest) -> ProviderMatch? {
+        ProviderContentMatcher.preflightMatch(request, declarations: declarations)
     }
 
     func makeSession(for request: ContentRequest, negotiatedAPI: UInt32) async throws -> ContentSession {

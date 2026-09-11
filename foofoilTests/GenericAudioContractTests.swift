@@ -3,7 +3,9 @@ import FoofoilExtensionKit
 import Testing
 @testable import foofoil
 
+extension ExtensionKitTests {
 @MainActor
+@Suite
 struct GenericAudioContractTests {
     @Test func genericProviderExpressesTransportNavigationRestoreAndClose() async throws {
         let provider = GenericAudioTestProvider()
@@ -203,6 +205,7 @@ struct GenericAudioContractTests {
             .init(id: ExtensionCapabilityIdentifier.contentProbe, scope: .application)
         ]))
     }
+}
 }
 
 @MainActor

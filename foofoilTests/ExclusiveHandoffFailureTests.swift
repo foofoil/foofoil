@@ -8,7 +8,9 @@ private enum HandoffTestError: Error, Equatable {
     case start
 }
 
+extension ExtensionKitTests {
 @MainActor
+@Suite
 struct ExclusiveHandoffFailureTests {
     /// 释放失败时保留旧持有者、阻止同设备新 start，并且只重试一次释放。
     @Test(arguments: ["PCM→ext", "ext→PCM", "ext→ext"])
@@ -131,6 +133,7 @@ struct ExclusiveHandoffFailureTests {
         try await host.closeSessionAndWait(session)
         #expect(provider.closeCount == 2)
     }
+}
 }
 
 @MainActor
