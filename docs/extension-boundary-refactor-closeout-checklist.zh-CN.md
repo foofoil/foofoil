@@ -1,7 +1,7 @@
 # 扩展边界重构收尾 checklist
 
 日期：2026-09-10  
-状态：收尾阶段 0–3 已完成；阶段 4 代码与自动测试/ABI smoke 完成，菜单/媒体键/设备菜单与无 hifi 的普通 PCM 待实机复验，阶段 4 尚未验收  
+状态：收尾阶段 0–3 已完成；阶段 4 代码与自动测试完成、菜单/无 hifi 普通 PCM 待实机复验；阶段 5 代码与自动测试已按用户指示先行完成，两阶段均未正式验收  
 依据：[评审终稿](extension-boundary-refactor-review-final.zh-CN.md)
 
 本清单是评审后的新增收尾工作，阶段编号不替代原重构计划的阶段 0–6。任务路径按对应仓库根目录理解。
@@ -93,14 +93,14 @@
 
 对应评审 §4.5、§5.4、§6.1–6.3。
 
-- [ ] 连续扫描预判只读声明，不逐项执行 sniff/probe；保留 Provider 偏好、优先级、启用与匹配规则，需要 sniff 的歧义作为边界单独解析。
-- [ ] 盘点书签解析、文件存在检查和路径标准化等剩余 I/O；可能阻塞的操作移出主 actor，不将“不 probe”宣称为“完全无 I/O”。
-- [ ] 必须执行的 probe 有配对资源访问作用域及后台执行边界；采用有界任务编排，取消停止后续扫描并丢弃旧结果，不假设能中断同步 C ABI。
-- [ ] 测试至少 100 文件扫描、Provider 竞争/偏好、sniff 歧义、授权资源与取消；记录调用次数和主线程执行证据，性能结论以实测为准。
-- [ ] 未知扩展容器使用通用呈现与宿主 ID，不显示 SACD，不解析 probe.reason；测试非 Hi-Fi 多曲目容器。
-- [ ] 合并重复盖章，保留语义必要发布；删除无生产调用者辅助代码前迁移有价值的测试断言。
-- [ ] 隔离测试 Provider/Host；使用共享单例时确保所有相关用例协调串行与 defer 注销，避免仅单个套件串行仍互相污染。
-- [ ] **验收：** 扫描/授权/取消与通用容器测试通过，相关构建和 `./run` 成功，未增加未经证实需要的缓存或并发基础设施。
+- [x] 连续扫描预判只读声明，不逐项执行 sniff/probe；保留 Provider 偏好、优先级、启用与匹配规则，需要 sniff 的歧义作为边界单独解析。
+- [x] 盘点书签解析、文件存在检查和路径标准化等剩余 I/O；可能阻塞的操作移出主 actor，不将“不 probe”宣称为“完全无 I/O”。
+- [x] 必须执行的 probe 有配对资源访问作用域及后台执行边界；采用有界任务编排，取消停止后续扫描并丢弃旧结果，不假设能中断同步 C ABI。
+- [x] 测试至少 100 文件扫描、Provider 竞争/偏好、sniff 歧义、授权资源与取消；记录调用次数和主线程执行证据，性能结论以实测为准。
+- [x] 未知扩展容器使用通用呈现与宿主 ID，不显示 SACD，不解析 probe.reason；测试非 Hi-Fi 多曲目容器。
+- [x] 合并重复盖章，保留语义必要发布；删除无生产调用者辅助代码前迁移有价值的测试断言。
+- [x] 隔离测试 Provider/Host；使用共享单例时确保所有相关用例协调串行与 defer 注销，避免仅单个套件串行仍互相污染。
+- [x] **验收：** 扫描/授权/取消与通用容器测试通过，相关构建和 `./run` 成功，未增加未经证实需要的缓存或并发基础设施。
 
 ## 收尾阶段 6：最终集成与交付
 
@@ -209,3 +209,20 @@
 - 未验证范围 / 风险 / 阻塞：hifi 扩展菜单不再显示任何命令（预期）；需确认宿主音频覆盖层的设备菜单、媒体键与传输控件仍可用。普通 PCM 无 hifi 路径未改动，但未实机复验。
 - 验收是否通过及证据：未通过。代码迁移、三仓库测试、ABI smoke 与 `./run` 通过，但“菜单/媒体键/设备菜单/普通 PCM”实机项未完成，验收项保持未勾选。
 - 下一阶段（仅在本阶段验收通过后）：收尾阶段 5（扫描、通用容器与余项）。
+
+## 收尾阶段 5 执行记录（2026-09-11）— 按用户指示先行实施，阶段 4 实机项仍待复验
+
+- 执行者：当前任务 agent。改动仅 foofoil；extension-kit、hifi 无改动。基线：foofoil `f13326f`、extension-kit `3b63bb5`、hifi `d8fb45b`。
+- 完成任务与关键行为变化：
+  - 扫描预判：新增 `ContentProvider.preflightMatch`（缺省回退 `match`）；`ProviderContentMatcher.preflightMatch` 只按声明与扩展名/UTType 判断，`sniff` 声明返回 `sniff` 强度表示“需 probe 才能确认”；`ProviderResolver.preflightCandidates` 与 `contiguousExtensionAudioURLs` 改用预判，逐项 probe 被移除，sniff 候选作为序列边界。
+  - I/O 与并发：`resolvedURL` 抽出 `nonisolated static resolveItemURL`；连续扫描把书签解析与存在检查放入单个有界 `Task.detached`，主 actor 只做无 I/O 预判；结果仍由 `currentMediaRouteGeneration` 丢弃过期。一次性打开时的 `resolve/match` 探针仍在调用 actor 上执行，但配对 `ExtensionResourceAccessScope`，作为已盘点的剩余边界记录。
+  - 通用容器：新增 `FileListContainerFormat.generic`（无徽标）；`installContainerAudioList` 使用 `.generic` 与宿主命名空间 `container:{section}:{index}`，不再固定 SACD 徽标或前缀；`badgeLocalizationKey` 改为可选并更新导航面板。
+  - 去重盖章：三条打开/恢复路径改为“容器安装 → 一次盖章 → 持有资源授权”，删除容器安装前的重复全列表盖章。
+  - 测试隔离：`ExtensionPlaybackSupportTests`、`GenericAudioContractTests`、`ExtensionQueueProjectionTests`、`ExclusiveHandoffFailureTests` 嵌套为 `ExtensionKitTests` 的 `@Suite` 子套件，随既有的 `.serialized` 单例套件串行，避免共享 `ExtensionHost.shared.resolver` 跨套件污染。
+- 测试：新增 100 文件连续扫描不触发 probe（计数断言）、通用容器样式/宿主 ID 断言；更新 CUE/容器与连续扫描测试以 `await` 新异步扫描。
+- 测试命令 / 结果 / 失败与跳过：extension-kit `swift test` 25 项通过；hifi `swift test` 44 项通过；hifi ABI smoke 退出 0；foofoil `xcodebuild test ... -only-testing:foofoilTests` 通过，xcresult 汇总 240 项、239 通过、0 失败、1 硬件跳过。
+- 构建、ABI smoke、`./run`：三仓库构建通过，`./run` `BUILD SUCCEEDED`、插件注入并启动，无新增编译警告。
+- 实机设备 / 文件类型与采样率 / 操作 / 结果来源：**未进行**；本阶段无音频引擎行为改动，未新增听音。性能结论以单元测试的调用计数与主线程证据为准，未做真机性能量化。
+- 未验证范围 / 风险 / 阻塞：一次性打开/恢复时的 `resolve/match` 探针仍在调用 actor 上（有资源作用域），未移出主 actor；大列表或网络盘首次打开仍可能有短暂阻塞，需实测决定是否进一步并发化。阶段 4 的菜单/PCM 实机项仍未完成，阶段 4、5 均未正式验收。
+- 验收是否通过及证据：本阶段可自动化部分通过（测试、构建、`./run`、无新增缓存/并发基础设施）；因阶段 4 未验收且无实机性能数据，整体未验收。
+- 下一阶段（需阶段 4、5 验收通过后）：收尾阶段 6（最终集成与交付）。

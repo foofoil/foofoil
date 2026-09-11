@@ -1,7 +1,7 @@
 # 扩展边界重构评审终稿
 
 日期：2026-09-10  
-状态：收尾阶段 0–3 已完成；阶段 4 代码与自动测试/ABI smoke 完成，菜单与无 hifi 普通 PCM 待实机复验；进度见[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)
+状态：收尾阶段 0–3 已完成；阶段 4、5 代码与自动测试完成，阶段 4 菜单/PCM 实机项待复验，两阶段均未正式验收；进度见[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)
 评审范围：`foofoil`、`extension-kit`、`hifi` 当前 `ext` / `ext-fix` 实现相对各仓库 `main` 的职责与行为变化
 
 ## 1. 评审前提
@@ -27,7 +27,7 @@
 
 当前未发现会使唯一现有 hifi 主流程必然无法工作的致命缺陷，但仍有五项应作为合并阻塞问题处理：私有导航命令可能泄漏给其他 Provider、音频控件缺少完整能力门控、seek 乐观更新可造成状态不一致、队列映射失败可能破坏后继序列，以及关闭/设备交接错误不能完整传播（§4.6）。内容探测的同步 I/O 与授权范围也应在合并前至少完成低成本修复和验证。
 
-收尾阶段 1 已关闭其中三项：导航泄漏、能力门控与 seek 状态一致性（§4.1–4.3）。收尾阶段 2 已关闭队列映射（§4.4）与 ID 生命周期（§5.6）。收尾阶段 3 已关闭关闭/设备交接错误传播（§4.6），自动测试与实机回归均通过。收尾阶段 4 已关闭菜单、动作状态与 P0 删除（§5.1–5.3）：`Compatibility` 层删除、hifi 不再贡献旧命令、可用性统一走 `availableActions`。连续扫描（§4.5）仍未处理。
+收尾阶段 1 已关闭其中三项：导航泄漏、能力门控与 seek 状态一致性（§4.1–4.3）。收尾阶段 2 已关闭队列映射（§4.4）与 ID 生命周期（§5.6）。收尾阶段 3 已关闭关闭/设备交接错误传播（§4.6），自动测试与实机回归均通过。收尾阶段 4 已关闭菜单、动作状态与 P0 删除（§5.1–5.3）：`Compatibility` 层删除、hifi 不再贡献旧命令、可用性统一走 `availableActions`。收尾阶段 5 已关闭连续扫描、通用容器与余项（§4.5、§5.4、§6.1–6.3）；一次性打开的 resolve 探针仍留有已盘点边界。
 
 此外，P0 兼容协议没有发布服务对象，支持窗口已关闭，应按依赖顺序落实删除。但当前新宿主与新 hifi 仍通过扩展菜单实际使用部分 `hifi.*` 命令映射，因此不能直接把整个兼容目录当作死代码删除；应先迁移菜单贡献和 hifi Runtime 内部 dispatch，再完成清理。
 
@@ -125,6 +125,8 @@
 - 增加当前 ID 无法映射、用户删除当前曲、删除后继、重排、多文件无缝播放和单资源容器六类测试。
 
 ### 4.5 连续文件扫描可能在主线程同步执行 probe
+
+收尾阶段 5 已处理：新增声明级 `preflightMatch`/`preflightCandidates`，连续序列扫描不再逐项 probe，sniff 候选作为边界；书签解析与存在检查移入有界后台任务，主 actor 只做无 I/O 预判，过期结果由路由代次丢弃。一次性打开时的 resolve/match 探针仍在调用 actor 上但有 `ExtensionResourceAccessScope`，作为已盘点的剩余边界保留。下文为原始分析。
 
 位置：
 
@@ -247,6 +249,8 @@
 
 ### 5.4 通用容器仍使用 SACD 专用呈现
 
+收尾阶段 5 已处理：扩展容器统一使用 `FileListContainerFormat.generic`（无徽标），宿主项目 ID 使用 `container:{section}:{index}` 宿主命名空间，不再固定 SACD 徽标或 `sacd:` 前缀，也不解析 `content.probe.reason`。下文为原始分析。
+
 位置：
 
 - `foofoil/AppState/AppState+FileList.swift:801-839`
@@ -291,13 +295,19 @@
 
 ### 6.1 重复队列 ID 盖章
 
+收尾阶段 5 已处理：打开/恢复路径改为“容器安装 → 一次盖章 → 持有资源授权”，删除容器安装前的重复全列表盖章。下文为原始分析。
+
 `AppState+ContentOpen.swift` 三条路径均在容器安装前后调用 `stampHostListWithExtensionQueueIDs`。容器安装本身已经为新项目写入扩展 ID，第二次全列表标准化和盖章在部分路径是重复工作。应在行为修复后，每条路径只保留语义必要的一次，并用测试确认列表发布次数。
 
 ### 6.2 无生产调用者兼容辅助方法
 
+收尾阶段 4 随兼容层删除：`HiFiLegacyAdapter.currentResource`/`currentURL` 与整个适配器一并移除，有价值的资源定位断言已迁入公共 `ExtensionPlaybackSupport`/`AppState.containerTrackID` 测试。下文为原始记录。
+
 `HiFiLegacyAdapter.currentResource` 和 `currentURL` 当前没有生产调用者，但 `currentURL` 仍有测试调用，且内部调用 `currentResource`。迁移有价值的资源定位断言后，可随兼容层一起删除。
 
 ### 6.3 测试共享单例污染
+
+收尾阶段 5 已处理：共享 `ExtensionHost.shared.resolver` 的相关测试套件（`ExtensionPlaybackSupportTests`、`GenericAudioContractTests`、`ExtensionQueueProjectionTests`、`ExclusiveHandoffFailureTests`）嵌套进既有 `.serialized` 的 `ExtensionKitTests` 子套件，配合各处 `defer` 注销，避免跨套件并行污染。下文为原始记录。
 
 部分测试把 Provider 注册到 `ExtensionHost.shared.resolver`。Swift Testing 可能并行执行，同进程共享注册表存在跨用例污染风险。优先让被测逻辑接受独立 `ProviderResolver` 或测试 Host；无法立即解耦时，至少将相关套件串行化并严格 defer 注销。
 
