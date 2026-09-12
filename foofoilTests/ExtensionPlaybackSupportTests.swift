@@ -289,6 +289,60 @@ struct ExtensionPlaybackSupportTests {
         #expect(state.fileList?.currentID == state.fileList?.items[2].id)
     }
 
+    /// APE 起播把宿主 CUE 换成扩展分轨时，不能把混合列表里的其它音频一起清掉。
+    @Test func hostAPECueMixedWithOtherAudioKeepsOtherFiles() {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        let apePath = "/tmp/CDImage.ape"
+        let cueItems = (1...2).map { number in
+            FileListItem(
+                id: "cue:\(number)",
+                path: apePath,
+                displayName: "Track \(number)",
+                cue: FileListCueInfo(
+                    startCueFrames: Int64(number - 1) * 1_000,
+                    trackNumber: "\(number)",
+                    sectionID: "cue-section",
+                    cueSheetPath: "/tmp/CDImage.cue"
+                )
+            )
+        }
+        let extra = FileListItem(id: "host:mp3", path: "/tmp/encore.mp3", displayName: "encore.mp3")
+        state.fileList = FileListState(
+            kind: .audio,
+            items: cueItems + [extra],
+            currentID: cueItems[0].id,
+            title: "Mixed",
+            sections: [FileListSection(id: "cue-section", title: "Album", cueSheetPath: "/tmp/CDImage.cue", format: .cue)]
+        )
+        let session = ContentSession(
+            extensionID: nil,
+            providerID: "audio.hifi",
+            request: .singleFile(.init(url: URL(fileURLWithPath: apePath))),
+            presentation: .text(titleKey: "Test", body: "Fixture"),
+            navigatorContributions: [
+                .init(
+                    id: "hifi.playback-queue", titleLocalizationKey: "Queue", style: .flat,
+                    items: (1...2).map { .init(id: "track:cue:0\($0)", title: "Track \($0)") },
+                    selectedItemIDs: ["track:cue:01"], allowedActions: [.activate]
+                )
+            ],
+            playbackQueue: .init(
+                items: (1...2).map { .init(id: "track:cue:0\($0)", title: "Track \($0)") },
+                currentItemID: "track:cue:01", title: "Album"
+            )
+        )
+        state.installExtensionContainerListIfNeeded(
+            url: URL(fileURLWithPath: apePath),
+            session: session,
+            preferredItemID: cueItems[0].id
+        )
+        #expect(state.fileList?.items.map(\.cue?.containerTrackID) == ["track:cue:01", "track:cue:02", nil])
+        #expect(state.fileList?.items.last?.id == extra.id)
+        #expect(state.fileList?.items.last?.displayName == "encore.mp3")
+        #expect(state.fileList?.items.count == 3)
+    }
+
     @Test func opaqueQueueIDsPairByStampAndResourceWithoutParsingLayout() {
         let first = URL(fileURLWithPath: "/tmp/first.dsf")
         let second = URL(fileURLWithPath: "/tmp/second.dsf")

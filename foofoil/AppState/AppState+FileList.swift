@@ -861,19 +861,45 @@ extension AppState {
             items.first(where: { $0.cue?.containerTrackID == id })?.id
         }
             ?? items[0].id
-        if var list = fileList,
-           list.kind == .audio,
-           let containerIndex = list.items.firstIndex(where: {
-               $0.cue == nil && $0.url.resolvingSymlinksInPath().standardizedFileURL.path
-                   == url.resolvingSymlinksInPath().standardizedFileURL.path
-           }) {
-            // 混合列表首次打开 ISO 时，将占位文件原位展开为 SACD 子目录并保留其它音频。
-            list.items.replaceSubrange(containerIndex...containerIndex, with: items)
-            list.sections.append(section)
-            if selectsContainerTrack {
-                list.currentID = currentID
+        if var list = fileList, list.kind == .audio {
+            let matching = containerItemIndices(
+                in: list,
+                for: url,
+                prefersCurrentItem: selectsContainerTrack
+            )
+            if !matching.isEmpty {
+                // 占位文件或宿主已展开的 CUE 曲目都只替换本容器，混合列表里的其它音频必须保留。
+                var replacement: [FileListItem] = []
+                var inserted = false
+                for (index, item) in list.items.enumerated() {
+                    if matching.contains(index) {
+                        if !inserted {
+                            replacement.append(contentsOf: items)
+                            inserted = true
+                        }
+                    } else {
+                        replacement.append(item)
+                    }
+                }
+                list.items = replacement
+                let remainingSectionIDs = Set(list.items.compactMap(\.cue?.sectionID))
+                list.sections.removeAll { !remainingSectionIDs.contains($0.id) }
+                if !list.sections.contains(where: { $0.id == section.id }) {
+                    list.sections.append(section)
+                }
+                if selectsContainerTrack || !list.items.contains(where: { $0.id == list.currentID }) {
+                    list.currentID = currentID
+                }
+                fileList = list
+            } else {
+                fileList = FileListState(
+                    kind: .audio,
+                    items: items,
+                    currentID: currentID,
+                    title: album,
+                    sections: [section]
+                )
             }
-            fileList = list
         } else {
             fileList = FileListState(
                 kind: .audio,
@@ -885,6 +911,40 @@ extension AppState {
         }
         mediaPlaybackMode = .sequentialLoop
         syncFileListNavigator()
+    }
+
+    /// 定位应被本容器曲目替换的列表项：音频路径、书签解析路径或 CUE 谱表路径命中即可。
+    /// 宿主已把 APE CUE 展开成曲目时没有 cue == nil 的占位项，必须整段替换这些曲目而不能重建整张列表。
+    private func containerItemIndices(
+        in list: FileListState,
+        for url: URL,
+        prefersCurrentItem: Bool
+    ) -> Set<Int> {
+        let normalized = url.resolvingSymlinksInPath().standardizedFileURL.path
+        func matches(_ item: FileListItem) -> Bool {
+            if item.url.resolvingSymlinksInPath().standardizedFileURL.path == normalized {
+                return true
+            }
+            if let resolved = Self.resolveItemURL(item),
+               resolved.resolvingSymlinksInPath().standardizedFileURL.path == normalized {
+                return true
+            }
+            if let cuePath = item.cue?.cueSheetPath,
+               URL(fileURLWithPath: cuePath).resolvingSymlinksInPath().standardizedFileURL.path == normalized {
+                return true
+            }
+            return false
+        }
+        let byURL = Set(list.items.indices.filter { matches(list.items[$0]) })
+        if !byURL.isEmpty { return byURL }
+        guard prefersCurrentItem,
+              let currentIndex = list.items.firstIndex(where: { $0.id == list.currentID }) else {
+            return []
+        }
+        if let sectionID = list.items[currentIndex].cue?.sectionID {
+            return Set(list.items.indices.filter { list.items[$0].cue?.sectionID == sectionID })
+        }
+        return [currentIndex]
     }
 
     func installCueSheets(urls: [URL], preservesIdentity: Bool) {

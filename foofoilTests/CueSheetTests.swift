@@ -630,6 +630,70 @@ struct CueSheetTests {
         #expect(contribution.items.last?.parentID == nil)
     }
 
+    /// 宿主已展开的 APE CUE 与其它音频共存时，扩展分轨只能替换该 CUE 段。
+    @Test func apeCueTracksMixedWithAudioKeepOtherFilesWhenContainerInstalls() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-ape-mixed-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let ape = directory.appendingPathComponent("album.ape")
+        let song = directory.appendingPathComponent("encore.mp3")
+        try Data("ape".utf8).write(to: ape)
+        try Data().write(to: song)
+
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        let sectionID = "cue-section"
+        let cueItems = (1...2).map { number in
+            FileListItem(
+                id: "cue:\(number)",
+                path: ape.path,
+                displayName: "Track \(number)",
+                cue: FileListCueInfo(
+                    startCueFrames: Int64(number - 1) * 75,
+                    trackNumber: "\(number)",
+                    sectionID: sectionID,
+                    cueSheetPath: directory.appendingPathComponent("album.cue").path
+                )
+            )
+        }
+        let songItem = state.makeFileListItem(url: song)
+        state.fileList = FileListState(
+            kind: .audio,
+            items: cueItems + [songItem],
+            currentID: cueItems[0].id,
+            sections: [FileListSection(
+                id: sectionID,
+                title: "Album",
+                cueSheetPath: directory.appendingPathComponent("album.cue").path,
+                format: .cue
+            )]
+        )
+        state.installContainerAudioList(
+            url: ape,
+            queue: MediaPlaybackQueueSnapshot(
+                items: [
+                    MediaPlaybackQueueItem(id: "track:cue:01", title: "First", duration: 60),
+                    MediaPlaybackQueueItem(id: "track:cue:02", title: "Second", duration: 90)
+                ],
+                currentItemID: "track:cue:01",
+                title: "Album"
+            ),
+            bookmark: nil
+        )
+
+        let list = try #require(state.fileList)
+        #expect(list.items.map(\.cue?.containerTrackID) == ["track:cue:01", "track:cue:02", nil])
+        #expect(list.items.last?.id == songItem.id)
+        #expect(list.items.last?.displayName == "encore.mp3")
+        #expect(list.items.count == 3)
+        #expect(list.sections.contains(where: { $0.id == sectionID }) == false)
+        let contribution = try #require(state.navigatorContributions.first)
+        #expect(contribution.items.map(\.title).contains("encore.mp3"))
+        #expect(contribution.items.map(\.title).contains("First"))
+        #expect(contribution.items.map(\.title).contains("Second"))
+    }
+
     @Test func multipleSACDSectionsKeepDistinctRowsAndSingleCurrentItem() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("foofoil-sacd-multiple-\(UUID().uuidString)", isDirectory: true)
