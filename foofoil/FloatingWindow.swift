@@ -515,12 +515,12 @@ public class FloatingWindow: NSWindow {
             }
         }
 
-        // ⇧⌘v 从剪贴板打开图片；⇧⌘+/- 增大/缩小箔，确保各内容模式窗口都可响应。
+        // ⇧⌘v 直接打开剪贴板内容；⇧⌘+/- 增大/缩小箔，确保各内容模式窗口都可响应。
         if modifiers == [.command, .shift],
            let chars = event.charactersIgnoringModifiers {
             let key = chars.lowercased()
             if key == "v" {
-                if delegate?.openClipboardImageInNewWindow() == true {
+                if delegate?.openClipboardContentInNewWindow() == true {
                     return true
                 }
             } else if key == "=" || key == "+" {

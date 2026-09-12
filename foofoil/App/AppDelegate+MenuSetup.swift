@@ -95,11 +95,11 @@ extension AppDelegate {
         addToListItem.target = self
         fileMenu.addItem(addToListItem)
 
-        let openClipboardImageItem = NSMenuItem(title: NSLocalizedString("Open Clipboard Image", comment: ""), action: #selector(openClipboardImageAction), keyEquivalent: "v")
-        openClipboardImageItem.withSymbol("photo.on.rectangle")
-        openClipboardImageItem.keyEquivalentModifierMask = [.command, .shift]
-        openClipboardImageItem.target = self
-        fileMenu.addItem(openClipboardImageItem)
+        let openClipboardContentItem = NSMenuItem(title: NSLocalizedString("Open Clipboard Content", comment: ""), action: #selector(openClipboardContentAction), keyEquivalent: "v")
+        openClipboardContentItem.withSymbol("doc.on.clipboard")
+        openClipboardContentItem.keyEquivalentModifierMask = [.command, .shift]
+        openClipboardContentItem.target = self
+        fileMenu.addItem(openClipboardContentItem)
 
         let openWebURLItem = NSMenuItem(title: NSLocalizedString("Open URL Menu Item", comment: ""), action: #selector(openWebURLAction), keyEquivalent: "l")
         openWebURLItem.withSymbol("link")

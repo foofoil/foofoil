@@ -20,7 +20,7 @@ struct BlankStateTipCarousel: View {
             NSLocalizedString("Tip: Hold Command while dragging to move the window", comment: ""),
             NSLocalizedString("Tip: Command-T keeps the window on top", comment: ""),
             NSLocalizedString("Tip: Command-L opens a web link", comment: ""),
-            NSLocalizedString("Tip: Command-V opens an image from the clipboard", comment: ""),
+            NSLocalizedString("Tip: Command-Shift-V opens clipboard content", comment: ""),
             NSLocalizedString("Tip: Try a two-finger pinch", comment: "")
         ]
     }

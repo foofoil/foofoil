@@ -29,8 +29,13 @@ extension AppDelegate {
 
     func showNewWindow(with state: AppState) {
         let controller = FloatingWindowController(appState: state)
+        prepareNewWindowFrame(for: controller)
+        addWindowController(controller)
+        controller.showWindow(nil)
+    }
 
-        // 如果存在激活的窗口，则稍作偏移，避免新窗口完全重合
+    /// 新箔片错开当前活跃窗口，避免完全重合；无活跃窗口时居中。
+    func prepareNewWindowFrame(for controller: FloatingWindowController) {
         if let keyWindow = NSApplication.shared.keyWindow {
             let keyFrame = keyWindow.frame
             let size = controller.window?.frame.size ?? NSSize(width: 400, height: 400)
@@ -44,9 +49,6 @@ extension AppDelegate {
         } else {
             controller.window?.center()
         }
-
-        addWindowController(controller)
-        controller.showWindow(nil)
     }
 
     func showSaveErrorAlert(_ error: Error) {
@@ -483,57 +485,152 @@ extension AppDelegate {
         HistorySearchWindowController.shared.dismiss()
     }
 
-    @objc func openClipboardImageAction() {
-        _ = openClipboardImageInNewWindow()
+    @objc func openClipboardContentAction() {
+        _ = openClipboardContentInNewWindow()
     }
 
+    /// 直接打开剪贴板内容：文件/文件夹/图片复用拖入箔片的处理管线，文本按 Markdown / HTML / 笔记区分。
     @discardableResult
-    func openClipboardImageInNewWindow() -> Bool {
+    func openClipboardContentInNewWindow() -> Bool {
+        let fileURLs = clipboardFileURLs()
+        if !fileURLs.isEmpty {
+            return openClipboardFileURLs(fileURLs)
+        }
+
+        if let image = clipboardImage() {
+            let target = clipboardContentTarget()
+            target.state.openImage(image: image, imageSource: .clipboard)
+            presentClipboardTarget(target)
+            return true
+        }
+
+        return openClipboardText(from: NSPasteboard.general)
+    }
+
+    /// 剪贴板文件与拖入箔片走同一条管线；没有空白箔片时新建一扇再接管。
+    private func openClipboardFileURLs(_ urls: [URL]) -> Bool {
+        if let controller = availableBlankWindowController {
+            guard controller.appState.handleDroppedFileURLs(urls) else { return false }
+            activateWindow(controller)
+            return true
+        }
+
+        // 多个文件分组会通过通知回到源窗口，先把控制器登记进窗口表再交给拖放管线。
         let state = AppState()
-        if let fileURL = clipboardSupportedFileURL(using: state) {
-            // Finder 复制文件时也会提供文件图标；必须从原文件读取实际内容。
-            if let controller = availableBlankWindowController {
-                controller.appState.openFile(url: fileURL)
-                activateWindow(controller)
-            } else {
-                state.openFile(url: fileURL)
-                showNewWindow(with: state)
-            }
-        } else if let image = clipboardImage() {
-            if let controller = availableBlankWindowController {
-                controller.appState.openImage(image: image, imageSource: .clipboard)
-                activateWindow(controller)
-            } else {
-                state.openImage(image: image, imageSource: .clipboard)
-                showNewWindow(with: state)
-            }
-        } else {
+        let controller = FloatingWindowController(appState: state)
+        prepareNewWindowFrame(for: controller)
+        addWindowController(controller)
+        guard state.handleDroppedFileURLs(urls) else {
+            removeWindowController(controller)
+            controller.close()
             return false
         }
+        activateWindow(controller)
         return true
     }
 
-    func clipboardSupportedFileURL(using appState: AppState) -> URL? {
+    private func openClipboardText(from pasteboard: NSPasteboard) -> Bool {
+        let declaredMarkdownRaw = Self.markdownPasteboardTypes
+            .compactMap { pasteboard.availableType(from: [$0]) }
+            .first
+            .flatMap { pasteboard.string(forType: $0) }
+        let isDeclaredMarkdown = !(declaredMarkdownRaw?
+            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        let text = isDeclaredMarkdown ? declaredMarkdownRaw : pasteboard.string(forType: .string)
+
+        if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if isDeclaredMarkdown || AppState.looksLikeMarkdown(text) {
+                let target = clipboardContentTarget()
+                target.state.openText(text, isMarkdown: true)
+                presentClipboardTarget(target)
+                return true
+            }
+            if let html = clipboardHTML(from: pasteboard) ?? (AppState.looksLikeHTML(text) ? text : nil) {
+                return openClipboardHTML(html)
+            }
+            let target = clipboardContentTarget()
+            target.state.openText(text, isMarkdown: false)
+            presentClipboardTarget(target)
+            return true
+        }
+
+        // 只有 HTML 表示、没有可读纯文本时仍按网页打开。
+        guard let html = clipboardHTML(from: pasteboard) else { return false }
+        return openClipboardHTML(html)
+    }
+
+    private func openClipboardHTML(_ html: String) -> Bool {
+        let target = clipboardContentTarget()
+        guard target.state.openHTML(html, originalName: NSLocalizedString("Clipboard Web Page", comment: "")) else {
+            return false
+        }
+        presentClipboardTarget(target)
+        return true
+    }
+
+    /// 剪贴板内容优先落到空白箔片（当前活跃优先），否则新建一扇。
+    private struct ClipboardContentTarget {
+        let state: AppState
+        let controller: FloatingWindowController?
+    }
+
+    private func clipboardContentTarget() -> ClipboardContentTarget {
+        if let controller = availableBlankWindowController {
+            return ClipboardContentTarget(state: controller.appState, controller: controller)
+        }
+        return ClipboardContentTarget(state: AppState(), controller: nil)
+    }
+
+    private func presentClipboardTarget(_ target: ClipboardContentTarget) {
+        if let controller = target.controller {
+            activateWindow(controller)
+        } else {
+            showNewWindow(with: target.state)
+        }
+    }
+
+    private static let markdownPasteboardTypes: [NSPasteboard.PasteboardType] = [
+        NSPasteboard.PasteboardType("net.daringfireball.markdown"),
+        NSPasteboard.PasteboardType("public.markdown")
+    ]
+
+    private func clipboardHTML(from pasteboard: NSPasteboard) -> String? {
+        guard let html = pasteboard.string(forType: .html),
+              !html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return html
+    }
+
+    func clipboardFileURLs() -> [URL] {
         let pasteboard = NSPasteboard.general
         let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        let fileURLs = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL] ?? []
-
-        // 若剪贴板包含文件，不能回退到它的 Finder 图标。
-        guard !fileURLs.isEmpty else { return nil }
-        return fileURLs.first { appState.canOpenFile(url: $0) }
+        return (pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL]) ?? []
     }
 
     func clipboardImage() -> NSImage? {
+        // 若剪贴板包含文件，不能回退到它的 Finder 图标。
+        guard clipboardFileURLs().isEmpty else { return nil }
         let pasteboard = NSPasteboard.general
-        let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        if let fileURLs = pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL],
-           !fileURLs.isEmpty {
-            return nil
-        }
         guard pasteboard.canReadObject(forClasses: [NSImage.self], options: nil) else {
             return nil
         }
         return NSImage(pasteboard: pasteboard)
+    }
+
+    /// 菜单校验：剪贴板里存在会被箔片打开的文件、图片或文本。
+    func hasOpenableClipboardContent(using appState: AppState?) -> Bool {
+        let fileURLs = clipboardFileURLs()
+        if !fileURLs.isEmpty {
+            // 没有活跃箔片时无法判断扩展/图片可打开性，交给动作本身筛选。
+            guard let appState else { return true }
+            return fileURLs.contains { $0.hasDirectoryPath || appState.canOpenFile(url: $0) }
+        }
+        if clipboardImage() != nil { return true }
+        let pasteboard = NSPasteboard.general
+        if let text = pasteboard.string(forType: .string),
+           !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return true
+        }
+        return clipboardHTML(from: pasteboard) != nil
     }
 
     @objc func resetContentAction() {
@@ -610,7 +707,7 @@ extension AppDelegate {
             if url.scheme == "foofoil" {
                 if url.host == "open-clipboard" {
                     NSApp.activate(ignoringOtherApps: true)
-                    _ = openClipboardImageInNewWindow()
+                    _ = openClipboardContentInNewWindow()
                 }
             } else if url.isFileURL {
                 filePaths.append(url.path)

@@ -583,6 +583,23 @@
         }
       }
     },
+    "Clipboard Web Page" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clipboard Web Page"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "剪贴板网页"
+          }
+        }
+      }
+    },
     "Close (ContextMenu)" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2248,19 +2265,19 @@
         }
       }
     },
-    "Open Clipboard Image" : {
+    "Open Clipboard Content" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open Clipboard Image"
+            "value" : "Open Clipboard Content"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开剪贴板图片"
+            "value" : "打开剪贴板内容"
           }
         }
       }
@@ -3456,19 +3473,19 @@
         }
       }
     },
-    "Tip: Command-V opens an image from the clipboard" : {
+    "Tip: Command-Shift-V opens clipboard content" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⌘V → Open an image from the clipboard"
+            "value" : "⌘⇧V → Open content from the clipboard"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "⌘V → 打开剪贴板中的图片"
+            "value" : "⌘⇧V → 打开剪贴板内容"
           }
         }
       }

@@ -216,8 +216,9 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             return activeAppState != nil
         }
 
-        if menuItem.action == #selector(openClipboardImageAction) {
-            return activeAppState != nil && clipboardImage() != nil
+        if menuItem.action == #selector(openClipboardContentAction) {
+            // 菜单跟踪期间 key window 可能不可用：没有活跃箔片时仍按剪贴板本身判断可用性。
+            return hasOpenableClipboardContent(using: activeAppState)
         }
 
         if menuItem.action == #selector(addToFileListAction) {

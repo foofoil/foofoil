@@ -442,7 +442,7 @@ extension AppState {
             }
         }
 
-        public func openWeb(url: URL) {
+        public func openWeb(url: URL, originalName: String? = nil) {
             resetFileList()
             let targetID = (imageURL != nil || webURL != nil || textURL != nil || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 ? UUID()
@@ -463,7 +463,7 @@ extension AppState {
             }
             self.id = targetID
             self.sourceFingerprint = Self.localSourceFingerprint(for: url)
-            self.originalImageName = url.lastPathComponent
+            self.originalImageName = originalName ?? url.lastPathComponent
             self.imageSource = nil
             self.showBorder = true
             self.imageScale = 1.0

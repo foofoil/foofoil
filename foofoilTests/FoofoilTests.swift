@@ -2599,3 +2599,50 @@ private final class FocusLifecycleTextView: NSTextView {
         super.viewWillMove(toWindow: newWindow)
     }
 }
+
+@MainActor
+@Suite(.serialized)
+struct ClipboardContentDetectionTests {
+    @Test func detectsMarkdownHeadingsLinksFencesAndTables() {
+        #expect(AppState.looksLikeMarkdown("# Title\n\nSome body text."))
+        #expect(AppState.looksLikeMarkdown("See [docs](https://example.com)."))
+        #expect(AppState.looksLikeMarkdown("```swift\nprint(\"hi\")\n```"))
+        #expect(AppState.looksLikeMarkdown("| a | b |\n| --- | --- |\n| 1 | 2 |"))
+        #expect(AppState.looksLikeMarkdown("> 引用\n\n- 项目"))
+    }
+
+    @Test func keepsPlainNotesAsNotes() {
+        #expect(!AppState.looksLikeMarkdown("今天买牛奶\n鸡蛋\n面包"))
+        #expect(!AppState.looksLikeMarkdown("议题 1：预算\n议题 2：排期"))
+        // 单个弱特征（列表、分隔线）不足以判定为 Markdown。
+        #expect(!AppState.looksLikeMarkdown("- 牛奶\n- 鸡蛋"))
+        #expect(!AppState.looksLikeMarkdown("---"))
+        #expect(!AppState.looksLikeMarkdown("#标签 不是标题"))
+    }
+
+    @Test func detectsHTMLDocuments() {
+        #expect(AppState.looksLikeHTML("<!DOCTYPE html>\n<html><body>hi</body></html>"))
+        #expect(AppState.looksLikeHTML("<html><head></head><body></body></html>"))
+        #expect(AppState.looksLikeHTML("  <body>content</body>"))
+        #expect(!AppState.looksLikeHTML("普通文本 < 比较符号"))
+        #expect(!AppState.looksLikeHTML("just <b>bold</b> text"))
+    }
+
+    @Test func openTextAppliesMarkdownAndNoteState() {
+        let markdownState = AppState()
+        markdownState.openText("# 标题", isMarkdown: true)
+        #expect(markdownState.text == "# 标题")
+        #expect(markdownState.isMarkdownPreview)
+        #expect(markdownState.isMarkdownDocument)
+        #expect(markdownState.imageURL == nil)
+        #expect(markdownState.webURL == nil)
+        #expect(markdownState.textURL == nil)
+
+        let noteState = AppState()
+        noteState.openText("普通笔记", isMarkdown: false)
+        #expect(noteState.text == "普通笔记")
+        #expect(!noteState.isMarkdownPreview)
+        #expect(!noteState.isMarkdownDocument)
+        #expect(noteState.originalImageName == nil)
+    }
+}
