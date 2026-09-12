@@ -125,4 +125,15 @@ enum ExtensionPlaybackSupport {
         usesHostAudioChrome(session) && usesDeviceService(session)
             && session.audioDeviceSelection?.followsSystemDefault != true
     }
+
+    /// 跟随系统默认时与宿主 PCM 右上角一致：在设备/格式状态后标明「跟随系统默认」。
+    /// APE 扩展只回设备名或 PCM 格式，不带该标记；DSD 没有跟随模式，原样返回。
+    static func outputStatusTitle(for selection: AudioDeviceSelectionSnapshot) -> String {
+        let status = selection.statusDescription?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard selection.followsSystemDefault == true else { return status }
+        let followLabel = NSLocalizedString("System Default Output", comment: "")
+        if status.isEmpty || status == followLabel { return followLabel }
+        if status.contains(followLabel) { return status }
+        return "\(status) · \(followLabel)"
+    }
 }

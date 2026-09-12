@@ -145,6 +145,38 @@ struct ExtensionPlaybackSupportTests {
     }
 
     /// 设备菜单可用性只来自公共设备连接快照与 `availableActions`，不再读旧 command 的 isEnabled。
+    /// APE 跟随系统默认时右上角必须写明跟随，不能只显示设备名。
+    @Test func followingSystemDefaultMarksAPEOutputStatus() {
+        let followLabel = NSLocalizedString("System Default Output", comment: "")
+        let following = AudioDeviceSelectionSnapshot(
+            devices: [.init(id: "built-in", displayName: "Built-in Output", isSystemDefault: true)],
+            selectedDeviceID: "built-in",
+            followsSystemDefault: true,
+            statusDescription: "Built-in Output"
+        )
+        #expect(ExtensionPlaybackSupport.outputStatusTitle(for: following) == "Built-in Output · \(followLabel)")
+        let playing = AudioDeviceSelectionSnapshot(
+            devices: following.devices,
+            selectedDeviceID: "built-in",
+            followsSystemDefault: true,
+            statusDescription: "44.1 kHz · 16-bit · 2ch PCM · Built-in Output"
+        )
+        #expect(ExtensionPlaybackSupport.outputStatusTitle(for: playing).hasSuffix(" · \(followLabel)"))
+        let exclusive = AudioDeviceSelectionSnapshot(
+            devices: following.devices,
+            selectedDeviceID: "built-in",
+            followsSystemDefault: false,
+            statusDescription: "Built-in Output"
+        )
+        #expect(ExtensionPlaybackSupport.outputStatusTitle(for: exclusive) == "Built-in Output")
+        let unlabeled = AudioDeviceSelectionSnapshot(
+            devices: following.devices,
+            selectedDeviceID: "built-in",
+            followsSystemDefault: true
+        )
+        #expect(ExtensionPlaybackSupport.outputStatusTitle(for: unlabeled) == followLabel)
+    }
+
     @Test func outputDeviceEnabledFollowsPublicAvailabilityAndConnection() {
         var session = session(providerID: "audio.hifi")
         session.audioDeviceSelection = .init(devices: [

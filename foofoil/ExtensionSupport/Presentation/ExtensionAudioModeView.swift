@@ -79,15 +79,16 @@ struct ExtensionAudioModeView: View {
     private var statusOverlay: some View {
         if let session = appState.extensionSession {
             VStack(alignment: .trailing, spacing: 6) {
-                if let selection = session.audioDeviceSelection,
-                   let status = selection.statusDescription,
-                   !status.isEmpty {
-                    AppKitPopupMenuButton(
-                        title: status,
-                        symbolName: "hifispeaker.2",
-                        items: deviceMenuItems(selection: selection, session: session)
-                    )
-                    .fixedSize()
+                if let selection = session.audioDeviceSelection {
+                    let status = ExtensionPlaybackSupport.outputStatusTitle(for: selection)
+                    if !status.isEmpty {
+                        AppKitPopupMenuButton(
+                            title: status,
+                            symbolName: "hifispeaker.2",
+                            items: deviceMenuItems(selection: selection, session: session)
+                        )
+                        .fixedSize()
+                    }
                 }
                 if !controller.supportsVolumeControl, session.audioDeviceSelection != nil {
                     Label(
