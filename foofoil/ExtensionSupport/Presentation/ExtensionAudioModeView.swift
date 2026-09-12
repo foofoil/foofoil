@@ -123,7 +123,7 @@ struct ExtensionAudioModeView: View {
         ExtensionPlaybackSupport.isOutputDeviceEnabled(deviceID, in: session)
     }
 
-    /// 跟随系统默认与显式设备二选一：选择具体设备会退出跟随，避免默认变化再改路由。
+    /// 系统默认是一次性设备选择；勾选实际输出设备，避免独占输出追随系统默认迁移。
     private func deviceMenuItems(
         selection: AudioDeviceSelectionSnapshot,
         session: ContentSession
@@ -132,7 +132,7 @@ struct ExtensionAudioModeView: View {
             .command(
                 id: "system-default",
                 title: NSLocalizedString("System Default Output", comment: ""),
-                selected: controller.followsSystemDefault
+                selected: false
             ) {
                 controller.selectSystemDefaultOutput()
             },
@@ -142,7 +142,7 @@ struct ExtensionAudioModeView: View {
             .command(
                 id: device.id,
                 title: device.displayName,
-                selected: !controller.followsSystemDefault && selection.selectedDeviceID == device.id,
+                selected: selection.selectedDeviceID == device.id,
                 enabled: device.isConnected && isDSDDeviceEnabled(device.id, in: session)
             ) {
                 controller.selectDevice(device.id)

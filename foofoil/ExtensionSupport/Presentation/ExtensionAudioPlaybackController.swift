@@ -12,7 +12,6 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
     @Published private(set) var isMuted = false
     @Published private(set) var volume: Float = 1
     @Published private(set) var supportsVolumeControl = false
-    @Published private(set) var followsSystemDefault = false
     var isScrubbing = false
     let supportsPlaybackModeControl = true
 
@@ -64,9 +63,6 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
         availablePause = false
         mediaTitle = Self.title(for: session)
         apply(session: session)
-        // 会话初始选中的设备就是系统默认兼容设备时，视为跟随系统默认。
-        followsSystemDefault = session.audioDeviceSelection?.selectedDeviceID != nil
-            && session.audioDeviceSelection?.selectedDeviceID == HostAudioVolume.defaultOutputUID()
         observer = NotificationCenter.default.addObserver(
             forName: .shouldToggleVideoPlayback,
             object: nil,
@@ -133,7 +129,6 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.requestDeviceRefresh()
-                if self.followsSystemDefault { self.routeToSystemDefaultIfPossible() }
             }
         }
         systemDevicesListener = devicesListener
@@ -171,7 +166,6 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
         currentSession = session
         mediaTitle = Self.title(for: session)
         syncHardwareVolume(with: session)
-        if followsSystemDefault { routeToSystemDefaultIfPossible() }
         let queueCount = session.playbackQueue?.items.count ?? 0
         availablePlay = session.mediaPlayback?.allows(.play, queueItemCount: queueCount) ?? false
         availablePause = session.mediaPlayback?.allows(.pause, queueItemCount: queueCount) ?? false
@@ -223,17 +217,15 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
 
     @discardableResult
     func selectSystemDefaultOutput() -> Bool {
-        followsSystemDefault = true
         return routeToSystemDefaultIfPossible()
     }
 
     func selectDevice(_ deviceID: String) {
-        followsSystemDefault = false
         command(.selectDevice(deviceID))
     }
 
-    /// 系统默认输出与当前会话设备列表匹配且兼容时才切换；由 apply 在刷新后再次驱动。
-    /// 独占 Hog 期间系统默认读取为 unknown，播放中的默认变化会在暂停释放设备后随刷新补齐。
+    /// 仅在用户选择时解析默认设备并固定其 UID。独占输出会使系统迁移默认设备，
+    /// 不能在通知或快照刷新时追随该变化，否则会反复释放、抢占不同设备。
     @discardableResult
     private func routeToSystemDefaultIfPossible() -> Bool {
         guard let session = currentSession,

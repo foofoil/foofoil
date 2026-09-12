@@ -7,6 +7,42 @@ extension ExtensionKitTests {
 @MainActor
 @Suite
 struct GenericAudioContractTests {
+    @Test func deviceSnapshotDoesNotFollowSystemDefaultDuringExclusivePlayback() async throws {
+        let defaultUID = try #require(HostAudioVolume.defaultOutputUID())
+        let provider = GenericAudioTestProvider()
+        let host = ExtensionHost.shared
+        host.resolver.register(provider)
+        defer { host.resolver.unregister(providerID: provider.descriptor.id) }
+        var session = try await provider.makeSession(
+            for: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/generic.gaud"))), negotiatedAPI: 1
+        )
+        session.audioDeviceSelection = .init(
+            devices: [
+                .init(id: defaultUID, displayName: "System output"),
+                .init(id: "exclusive-output", displayName: "Exclusive output")
+            ],
+            selectedDeviceID: defaultUID
+        )
+        session.mediaPlayback?.availableActions = [.refresh, .selectDevice, .pause]
+        let state = AppState()
+        defer { state.extensionSession = nil }
+        state.extensionSession = session
+        let controller = ExtensionAudioPlaybackController(appState: state, session: session)
+
+        // 模拟独占设备与系统默认发生分离；反复刷新不能再发出设备切换命令。
+        session.audioDeviceSelection?.selectedDeviceID = "exclusive-output"
+        session.audioDeviceSelection?.activeTransport = .pcm
+        session.mediaPlayback?.state = .playing
+        state.extensionSession = session
+        for _ in 0..<5 { controller.apply(session: session) }
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(!provider.mediaActions.contains { action in
+            if case .selectDevice = action { return true }
+            return false
+        })
+        #expect(state.extensionSession?.audioDeviceSelection?.selectedDeviceID == "exclusive-output")
+    }
+
     @Test func genericProviderExpressesTransportNavigationRestoreAndClose() async throws {
         let provider = GenericAudioTestProvider()
         let host = ExtensionHost.shared
