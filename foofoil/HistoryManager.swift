@@ -8,6 +8,10 @@ public final class HistoryManager: ObservableObject {
 
     @Published public private(set) var historyConfigs: [WindowConfig] = []
     private let repository = HistoryRepository.shared
+    private let listSaveQueue = DispatchQueue(label: "com.foofoil.history.large-list", qos: .utility)
+    private var pendingListConfigs: [UUID: WindowConfig] = [:]
+    private var listSaveWorkItem: DispatchWorkItem?
+    private var historyMutationGeneration: UInt64 = 0
 
     private init() { refresh() }
 
@@ -18,12 +22,29 @@ public final class HistoryManager: ObservableObject {
     }
 
     public func addToHistory(_ config: WindowConfig) {
+        historyMutationGeneration &+= 1
+        // 大列表每次切歌都编码书签、重建索引并读取历史，不能阻塞主线程。
+        if (config.fileList?.items.count ?? 0) >= 256, hasPersistableContent(config) {
+            pendingListConfigs[config.id] = config
+            listSaveWorkItem?.cancel()
+            let work = DispatchWorkItem { [weak self] in self?.enqueuePendingListSaves() }
+            listSaveWorkItem = work
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+            return
+        }
+        // 同一历史项从大列表变为小列表时，先完成旧写入，再保存最新状态。
+        pendingListConfigs.removeValue(forKey: config.id)
+        listSaveQueue.sync {}
         guard hasPersistableContent(config), repository.upsert(config) else { return }
         refreshUI()
         ContentIndexCoordinator.shared.schedule(config: config)
     }
 
     public func removeFromHistory(_ config: WindowConfig) {
+        historyMutationGeneration &+= 1
+        pendingListConfigs.removeValue(forKey: config.id)
+        // 排空已提交写入，防止后台任务在删除之后重新创建历史项。
+        listSaveQueue.sync {}
         ContentIndexCoordinator.shared.cancel(historyID: config.id)
         repository.remove(id: config.id)
         let referencedPaths = Set(repository.recent(limit: Int.max).flatMap(cachePaths(for:)))
@@ -32,6 +53,10 @@ public final class HistoryManager: ObservableObject {
     }
 
     public func clearHistory(preserving activeConfigs: [WindowConfig]? = nil) {
+        historyMutationGeneration &+= 1
+        listSaveWorkItem?.cancel()
+        pendingListConfigs.removeAll()
+        listSaveQueue.sync {}
         let configs = activeConfigs ?? (NSApplication.shared.delegate as? AppDelegate)?.windowControllers.map { $0.appState.toConfig() } ?? []
         let active = configs.filter(hasPersistableContent)
         let activeIDs = Set(active.map(\.id))
@@ -71,6 +96,8 @@ public final class HistoryManager: ObservableObject {
     }
 
     public func updateHistoryTitle(configId: UUID, newTitle: String) {
+        flushPendingListSaves()
+        historyMutationGeneration &+= 1
         // 已打开列表也同步内存标题，避免下一次窗口状态保存把刚改好的数据库标题覆盖掉。
         if let appDelegate = NSApplication.shared.delegate as? AppDelegate,
            let state = appDelegate.windowControllers.first(where: { $0.appState.id == configId })?.appState,
@@ -88,6 +115,32 @@ public final class HistoryManager: ObservableObject {
         DispatchQueue.main.async {
             (NSApplication.shared.delegate as? AppDelegate)?.updateHistoryMenu()
         }
+    }
+
+    private func enqueuePendingListSaves() {
+        listSaveWorkItem?.cancel()
+        listSaveWorkItem = nil
+        guard !pendingListConfigs.isEmpty else { return }
+        let configs = Array(pendingListConfigs.values)
+        pendingListConfigs.removeAll()
+        let generation = historyMutationGeneration
+        let repository = repository
+        listSaveQueue.async { [weak self] in
+            let saved = configs.filter { repository.upsert($0) }
+            let recent = repository.recent(limit: 30)
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.historyMutationGeneration == generation else { return }
+                self.historyConfigs = recent
+                (NSApplication.shared.delegate as? AppDelegate)?.updateHistoryMenu(preloadedConfigs: recent)
+                for config in saved { ContentIndexCoordinator.shared.schedule(config: config) }
+            }
+        }
+    }
+
+    /// 退出和显式历史操作前落盘最后一次选择，避免防抖任务丢失恢复位置。
+    func flushPendingListSaves() {
+        enqueuePendingListSaves()
+        listSaveQueue.sync {}
     }
 
     private func activeCachePaths() -> Set<String> {

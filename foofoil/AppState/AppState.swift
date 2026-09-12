@@ -113,8 +113,11 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     @Published var fileList: FileListState?
     var fileListRevision: UInt64 = 0
     /// 媒体总时长在后台读取；按列表项缓存以免每次刷新导航都重复打开文件。
-    var navigatorMediaDurationBadges: [String: String] = [:]
-    var navigatorMediaDurationLoadingIDs: Set<String> = []
+    var navigatorMetadataTask: Task<Void, Never>?
+    var navigatorMetadataGeneration = UUID()
+    var navigatorMetadata: [String: FileListNavigatorMetadata] = [:]
+    var navigatorProjectedList: FileListState?
+    var navigatorRowIndices: [String: Int] = [:]
 
     @Published var navigatorPanelSide: NavigatorPanelSide {
         didSet { saveState() }
@@ -541,6 +544,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     }
 
     deinit {
+        navigatorMetadataTask?.cancel()
         renderTask?.cancel()
         saveTask?.cancel()
         imageListSlideshowWorkItem?.cancel()

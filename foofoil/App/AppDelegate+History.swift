@@ -54,7 +54,7 @@ extension AppDelegate {
         return dockMenu
     }
 
-    public func updateHistoryMenu() {
+    public func updateHistoryMenu(preloadedConfigs: [WindowConfig]? = nil) {
         guard let historyMenu = historyMenu else { return }
         historyMenu.removeAllItems()
 
@@ -65,7 +65,7 @@ extension AppDelegate {
         historyMenu.addItem(searchItem)
         historyMenu.addItem(NSMenuItem.separator())
 
-        let configs = HistoryRepository.shared.recent(limit: 10)
+        let configs = preloadedConfigs.map { Array($0.prefix(10)) } ?? HistoryRepository.shared.recent(limit: 10)
 
         if configs.isEmpty {
             let noHistoryItem = NSMenuItem(title: NSLocalizedString("No History", comment: ""), action: nil, keyEquivalent: "")

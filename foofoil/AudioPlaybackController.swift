@@ -726,7 +726,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             if !reusingLease || engineStorage == nil {
                 try await startExclusiveEngine(deviceUID: deviceID, generation: generation, play: shouldResume)
             } else {
-                schedule(from: currentTime, play: shouldResume)
+                schedule(from: currentTime, play: shouldResume, keepsLeaseOnFailure: true)
             }
             if shouldResume, !isPlaying {
                 throw engineStartError ?? NSError(domain: NSOSStatusErrorDomain, code: Int(kAudio_ParamError))
@@ -819,7 +819,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             tearDownOutputEngine()
             do {
                 try routeEngine(to: deviceUID)
-                schedule(from: currentTime, play: play)
+                schedule(from: currentTime, play: play, keepsLeaseOnFailure: true)
                 if !play || isPlaying { return }
                 lastError = engineStartError ?? NSError(domain: NSOSStatusErrorDomain, code: Int(kAudio_ParamError))
             } catch {
@@ -1046,7 +1046,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         return deviceID
     }
 
-    private func schedule(from displayTime: Double, play: Bool, watchdogAttempt: Int = 0) {
+    private func schedule(from displayTime: Double, play: Bool, watchdogAttempt: Int = 0, keepsLeaseOnFailure: Bool = false) {
         guard let file = audioFile, segmentFrames > 0, sampleRate > 0 else { return }
         scheduleGeneration &+= 1
         queuedSuccessor = nil
@@ -1073,11 +1073,15 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                     isPlaying = false
                     return
                 }
+                enqueueSegment(file, startingFrame: startFrame + localStart, frameCount: remaining, generation: generation)
             } else if !engine.isRunning {
                 isPlaying = false
                 return
             }
-            playerNode.play()
+            guard startPlayerNode() else {
+                if !keepsLeaseOnFailure { stopOutput() }
+                return
+            }
             isPlaying = true
             MediaRemoteCommandCoordinator.shared.update(self)
             armStallWatchdog(attempt: watchdogAttempt)
@@ -1271,12 +1275,14 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 frameCount: prepared.segmentFrames,
                 generation: generation
             )
-            if ensureEngineRunning() {
-                playerNode.play()
+            if ensureEngineRunning(), startPlayerNode() {
                 isPlaying = true
+                notifyPlaybackFinished()
+                enqueueGaplessSuccessor(generation: generation)
+            } else {
+                stopOutput()
+                notifyPlaybackFinished()
             }
-            notifyPlaybackFinished()
-            enqueueGaplessSuccessor(generation: generation)
             return
         }
         // 自然播完保留租约：自动切歌同速率可零 HAL 操作直接续播。
@@ -1309,6 +1315,31 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         } catch {
             engineStartError = error
             NSLog("AudioPlaybackController engine start failed: \(error.localizedDescription)")
+            return false
+        }
+    }
+
+    /// AVFAudio 的 NSException 不能用 Swift do/catch 捕获，必须在原生调用内转换。
+    static func playNodeSafely(_ node: AVAudioPlayerNode) throws {
+        var error: NSError?
+        guard FFAudioPlayerNodePlay(node, &error) else {
+            throw error ?? NSError(domain: NSOSStatusErrorDomain, code: Int(kAudio_ParamError))
+        }
+    }
+
+    private func startPlayerNode() -> Bool {
+        do {
+            try Self.playNodeSafely(playerNode)
+            return true
+        } catch {
+            engineStartError = error
+            isPlaying = false
+            // 当前图未能产生 I/O，立即失效旧回调；独占启动路径负责有上限的重建重试。
+            scheduleGeneration &+= 1
+            queuedSuccessor = nil
+            playerNode.stop()
+            engineStorage?.stop()
+            NSLog("AudioPlaybackController player start failed: %@", error.localizedDescription)
             return false
         }
     }

@@ -131,6 +131,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard !isTerminating else { return .terminateLater }
         isTerminating = true
+        HistoryManager.shared.flushPendingListSaves()
         // 进程退出只会自动归还 hog，不会恢复采样率；先停 PCM 引擎，再等待扩展恢复设备。
         AudioPlaybackController.stopAllOutputsForTermination()
         Task { @MainActor in

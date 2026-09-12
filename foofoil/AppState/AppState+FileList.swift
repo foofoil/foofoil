@@ -48,8 +48,12 @@ extension AppState {
     func resetFileList() {
         fileList = nil
         fileListRevision = 0
-        navigatorMediaDurationBadges = [:]
-        navigatorMediaDurationLoadingIDs = []
+        navigatorMetadataTask?.cancel()
+        navigatorMetadataTask = nil
+        navigatorMetadataGeneration = UUID()
+        navigatorMetadata = [:]
+        navigatorProjectedList = nil
+        navigatorRowIndices = [:]
         stopImageListSlideshow()
         builtInNavigatorContributions = []
         builtInNavigatorActionHandler = nil
@@ -643,11 +647,26 @@ extension AppState {
 
     func syncFileListNavigator() {
         guard let list = fileList, list.isPresentable else {
+            navigatorMetadataTask?.cancel()
+            navigatorMetadataGeneration = UUID()
+            navigatorProjectedList = nil
+            navigatorRowIndices = [:]
             builtInNavigatorContributions = []
             builtInNavigatorActionHandler = nil
             return
         }
 
+        // 选中项变化不重新解析书签、读取文件或构造整张列表。
+        if let projected = navigatorProjectedList,
+           projected.kind == list.kind, projected.items == list.items,
+           projected.sections == list.sections,
+           !builtInNavigatorContributions.isEmpty {
+            updateFileListNavigatorSelection(list.currentID)
+            return
+        }
+        navigatorProjectedList = list
+        let sourceItems = Dictionary(uniqueKeysWithValues: list.items.map { ($0.id, $0) })
+        navigatorMetadata = navigatorMetadata.filter { sourceItems[$0.key] == $0.value.item }
         fileListRevision &+= 1
         let useOutline = !list.sections.isEmpty && list.soleContainerFormat == nil
         if useOutline {
@@ -656,6 +675,7 @@ extension AppState {
         let items: [NavigatorItem]
         if useOutline {
             var rows: [NavigatorItem] = []
+            let grouped = Dictionary(grouping: list.items, by: { $0.cue?.sectionID })
             for section in list.sections {
                 rows.append(
                     NavigatorItem(
@@ -667,7 +687,7 @@ extension AppState {
                         isCurrent: false
                     )
                 )
-                for item in list.items where item.cue?.sectionID == section.id {
+                for item in grouped[section.id] ?? [] {
                     rows.append(makeNavigatorItem(for: item, in: list, parentID: section.id))
                 }
             }
@@ -678,6 +698,7 @@ extension AppState {
         } else {
             items = list.items.map { makeNavigatorItem(for: $0, in: list, parentID: nil) }
         }
+        navigatorRowIndices = Dictionary(uniqueKeysWithValues: items.enumerated().map { ($0.element.id, $0.offset) })
         let canMove = list.isReorderable || list.sections.count >= 2
         builtInNavigatorContributions = [
             NavigatorContribution(
@@ -701,68 +722,84 @@ extension AppState {
     }
 
     func makeNavigatorItem(for item: FileListItem, in list: FileListState, parentID: String?) -> NavigatorItem {
-        let accessible = resolvedURL(for: item) != nil
+        let accessible = navigatorMetadata[item.id]?.isAccessible ?? true
         return NavigatorItem(
             id: item.id,
             parentID: parentID,
             title: item.displayName,
             subtitle: accessible ? item.cue?.artist : NSLocalizedString("File List Item Unavailable", comment: ""),
             symbolName: list.kind.itemSymbolName,
-            badge: cueSegmentDurationBadge(for: item) ?? navigatorMediaDurationBadges[item.id],
+            badge: navigatorMetadata[item.id]?.badge ?? item.cue.flatMap { cue in
+                guard let end = cue.endCueFrames, end > cue.startCueFrames else { return nil }
+                return AudioMetadataLoader.formatDuration(CueTime.seconds(from: end - cue.startCueFrames))
+            },
             isEnabled: accessible,
             isCurrent: item.id == list.currentID
         )
     }
 
-    /// CUE / SACD 曲目在列表末尾显示分段时长；序号由导航行单独绘制。
-    func cueSegmentDurationBadge(for item: FileListItem) -> String? {
-        guard let seconds = cueSegmentDurationSeconds(for: item) else { return nil }
-        return AudioMetadataLoader.formatDuration(seconds)
-    }
-
-    func cueSegmentDurationSeconds(for item: FileListItem) -> Double? {
-        guard let cue = item.cue else { return nil }
-        if let endFrames = cue.endCueFrames, endFrames > cue.startCueFrames {
-            return CueTime.seconds(from: endFrames - cue.startCueFrames)
-        }
-        let audioURL = resolvedURL(for: item) ?? item.url
-        let timing: AudioPlaybackTiming?
-        if let path = cue.cueSheetPath {
-            timing = CueSheetLoader.playbackTiming(
-                audioURL: audioURL,
-                cueURL: URL(fileURLWithPath: path)
-            )
-        } else {
-            let accessed = audioURL.startAccessingSecurityScopedResource()
-            defer { if accessed { audioURL.stopAccessingSecurityScopedResource() } }
-            timing = AudioMetadataLoader.playbackTiming(for: audioURL)
-        }
-        guard let timing, timing.sampleRate > 0 else { return nil }
-        let startSamples = CueTime.sampleFrame(cueFrames: cue.startCueFrames, sampleRate: timing.sampleRate)
-        return Double(max(0, timing.sampleCount - startSamples)) / timing.sampleRate
-    }
-
-    /// 音视频时长可能触发文件 I/O，因此在后台完成后再仅刷新导航投影。
-    func loadNavigatorMediaDurationsIfNeeded(for list: FileListState) {
-        guard list.kind == .audio || list.kind == .video else { return }
-        for item in list.items where item.cue == nil && navigatorMediaDurationBadges[item.id] == nil && !navigatorMediaDurationLoadingIDs.contains(item.id) {
-            guard let url = resolvedURL(for: item) else { continue }
-            let itemID = item.id
-            let kind = list.kind
-            navigatorMediaDurationLoadingIDs.insert(itemID)
-            Task { [weak self] in
-                let duration = await MediaDurationLoader.duration(for: url, kind: kind)
-                await MainActor.run {
-                    guard let self else { return }
-                    self.navigatorMediaDurationLoadingIDs.remove(itemID)
-                    guard self.fileList?.items.contains(where: { $0.id == itemID }) == true else { return }
-                    if let duration, let badge = AudioMetadataLoader.formatDuration(duration) {
-                        self.navigatorMediaDurationBadges[itemID] = badge
-                        self.syncFileListNavigator()
-                    }
-                }
+    /// 只改旧/新选中行；其他行保持已有的可访问性和时长结果。
+    func updateFileListNavigatorSelection(_ id: String) {
+        guard !builtInNavigatorContributions.isEmpty,
+              builtInNavigatorContributions[0].selectedItemIDs != [id] else { return }
+        var contribution = builtInNavigatorContributions[0]
+        let previous = contribution.selectedItemIDs
+        for oldID in previous {
+            if let index = navigatorRowIndices[oldID] {
+                contribution.items[index].isCurrent = false
             }
         }
+        if let index = navigatorRowIndices[id] {
+            contribution.items[index].isCurrent = true
+        }
+        fileListRevision &+= 1
+        contribution.selectedItemIDs = [id]
+        contribution.revision = fileListRevision
+        builtInNavigatorContributions = [contribution]
+    }
+
+    /// 单个后台任务顺序探测，按批次回传；失败也缓存，切歌不会反复重试坏文件。
+    func loadNavigatorMediaDurationsIfNeeded(for list: FileListState) {
+        navigatorMetadataTask?.cancel()
+        let generation = UUID()
+        navigatorMetadataGeneration = generation
+        let pending = list.items.filter { navigatorMetadata[$0.id]?.item != $0 }
+        let kind = list.kind
+        navigatorMetadataTask = Task.detached(priority: .utility) { [weak self] in
+            var batch: [FileListNavigatorMetadata] = []
+            var lastDelivery = ContinuousClock.now
+            for item in pending {
+                guard !Task.isCancelled else { return }
+                let result = await FileListNavigatorMetadata.load(item: item, kind: kind)
+                guard !Task.isCancelled else { return }
+                batch.append(result)
+                if batch.count >= 32 || lastDelivery.duration(to: .now) >= .milliseconds(150) {
+                    await self?.applyNavigatorMetadata(batch, generation: generation)
+                    batch.removeAll(keepingCapacity: true)
+                    lastDelivery = .now
+                }
+            }
+            if !batch.isEmpty {
+                await self?.applyNavigatorMetadata(batch, generation: generation)
+            }
+        }
+    }
+
+    func applyNavigatorMetadata(_ batch: [FileListNavigatorMetadata], generation: UUID) {
+        guard generation == navigatorMetadataGeneration, !builtInNavigatorContributions.isEmpty else { return }
+        // 每批只发布一次，不再让每首完成都触发全表重建和磁盘访问。
+        var contribution = builtInNavigatorContributions[0]
+        for result in batch {
+            guard let index = navigatorRowIndices[result.item.id] else { continue }
+            navigatorMetadata[result.item.id] = result
+            contribution.items[index].isEnabled = result.isAccessible
+            contribution.items[index].subtitle = result.isAccessible
+                ? result.item.cue?.artist : NSLocalizedString("File List Item Unavailable", comment: "")
+            contribution.items[index].badge = result.badge
+        }
+        fileListRevision &+= 1
+        contribution.revision = fileListRevision
+        builtInNavigatorContributions = [contribution]
     }
 
     func makeFileListItem(url: URL) -> FileListItem {

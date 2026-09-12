@@ -311,7 +311,7 @@ struct CueSheetTests {
         #expect(contribution.items.first?.badge == "CUE")
     }
 
-    @Test func navigatorShowsCueSegmentDurationInsteadOfTrackNumber() throws {
+    @Test func navigatorShowsCueSegmentDurationInsteadOfTrackNumber() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("foofoil-cue-duration-badge-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -333,6 +333,7 @@ struct CueSheetTests {
         let displayTitle = state.toConfig().historyMenuDisplayName
         #expect(displayTitle.contains("Disc"))
         #expect(displayTitle.contains("2"))
+        await state.navigatorMetadataTask?.value
         let items = try #require(state.navigatorContributions.first?.items)
         #expect(items.map(\.title) == ["Intro", "Song"])
         #expect(items.map(\.badge) == ["0:01", "0:01"])
