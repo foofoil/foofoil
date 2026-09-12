@@ -85,18 +85,16 @@ struct ExtensionAudioModeView: View {
                     AppKitPopupMenuButton(
                         title: status,
                         symbolName: "hifispeaker.2",
-                        items: selection.devices.map { device in
-                            .command(
-                                id: device.id,
-                                title: device.displayName,
-                                selected: selection.selectedDeviceID == device.id,
-                                enabled: device.isConnected && isDSDDeviceEnabled(device.id, in: session)
-                            ) {
-                                appState.performExtensionMediaAction(.selectDevice(device.id))
-                            }
-                        }
+                        items: deviceMenuItems(selection: selection, session: session)
                     )
                     .fixedSize()
+                }
+                if !controller.supportsVolumeControl, session.audioDeviceSelection != nil {
+                    Label(
+                        NSLocalizedString("Fixed Volume Bit-perfect", comment: ""),
+                        systemImage: "lock.fill"
+                    )
+                    .font(.caption2)
                 }
                 if let handoffFailure = appState.extensionHandoffFailureMessage,
                    !handoffFailure.isEmpty {
@@ -123,6 +121,34 @@ struct ExtensionAudioModeView: View {
 
     private func isDSDDeviceEnabled(_ deviceID: String, in session: ContentSession) -> Bool {
         ExtensionPlaybackSupport.isOutputDeviceEnabled(deviceID, in: session)
+    }
+
+    /// 跟随系统默认与显式设备二选一：选择具体设备会退出跟随，避免默认变化再改路由。
+    private func deviceMenuItems(
+        selection: AudioDeviceSelectionSnapshot,
+        session: ContentSession
+    ) -> [AppKitPopupMenuButton.Item] {
+        var items: [AppKitPopupMenuButton.Item] = [
+            .command(
+                id: "system-default",
+                title: NSLocalizedString("System Default Output", comment: ""),
+                selected: controller.followsSystemDefault
+            ) {
+                controller.selectSystemDefaultOutput()
+            },
+            .separator(id: "device-separator")
+        ]
+        items += selection.devices.map { device in
+            .command(
+                id: device.id,
+                title: device.displayName,
+                selected: !controller.followsSystemDefault && selection.selectedDeviceID == device.id,
+                enabled: device.isConnected && isDSDDeviceEnabled(device.id, in: session)
+            ) {
+                controller.selectDevice(device.id)
+            }
+        }
+        return items
     }
 
     private var presentationID: String {

@@ -11,8 +11,9 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
     @Published private(set) var duration: Double = 0
     @Published private(set) var isMuted = false
     @Published private(set) var volume: Float = 1
+    @Published private(set) var supportsVolumeControl = false
+    @Published private(set) var followsSystemDefault = false
     var isScrubbing = false
-    let supportsVolumeControl = false
     let supportsPlaybackModeControl = true
 
     private let appStateID: UUID
@@ -30,6 +31,9 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
     private var observer: NSObjectProtocol?
     private var systemDevicesListener: AudioObjectPropertyListenerBlock?
     private var systemDefaultListener: AudioObjectPropertyListenerBlock?
+    private var currentSession: ContentSession?
+    private var hardwareDeviceUID: String?
+    private var preMuteVolume: Float?
 
     init(appState: AppState, session: ContentSession) {
         appStateID = appState.id
@@ -60,6 +64,9 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
         availablePause = false
         mediaTitle = Self.title(for: session)
         apply(session: session)
+        // 会话初始选中的设备就是系统默认兼容设备时，视为跟随系统默认。
+        followsSystemDefault = session.audioDeviceSelection?.selectedDeviceID != nil
+            && session.audioDeviceSelection?.selectedDeviceID == HostAudioVolume.defaultOutputUID()
         observer = NotificationCenter.default.addObserver(
             forName: .shouldToggleVideoPlayback,
             object: nil,
@@ -123,7 +130,11 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
             Task { @MainActor [weak self] in self?.requestDeviceRefresh() }
         }
         let defaultListener: AudioObjectPropertyListenerBlock = { [weak self] _, _ in
-            Task { @MainActor [weak self] in self?.requestDeviceRefresh() }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.requestDeviceRefresh()
+                if self.followsSystemDefault { self.routeToSystemDefaultIfPossible() }
+            }
         }
         systemDevicesListener = devicesListener
         systemDefaultListener = defaultListener
@@ -151,7 +162,10 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
 
     func apply(session: ContentSession) {
         let wasPlaying = isPlaying
+        currentSession = session
         mediaTitle = Self.title(for: session)
+        syncHardwareVolume(with: session)
+        if followsSystemDefault { routeToSystemDefaultIfPossible() }
         let queueCount = session.playbackQueue?.items.count ?? 0
         availablePlay = session.mediaPlayback?.allows(.play, queueItemCount: queueCount) ?? false
         availablePause = session.mediaPlayback?.allows(.pause, queueItemCount: queueCount) ?? false
@@ -175,6 +189,55 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
 
     func activateRemoteCommands() {
         MediaRemoteCommandCoordinator.shared.activate(self, title: mediaTitle)
+    }
+
+    /// 扩展独占输出没有宿主 mixer：音量控件只在所选设备有硬件音量时出现，直接读写设备标量。
+    private func syncHardwareVolume(with session: ContentSession) {
+        let selectedUID = session.audioDeviceSelection?.selectedDeviceID
+        guard selectedUID != hardwareDeviceUID else { return }
+        hardwareDeviceUID = selectedUID
+        preMuteVolume = nil
+        guard let selectedUID,
+              let deviceID = HostAudioVolume.deviceID(forUID: selectedUID),
+              HostAudioVolume.supportsVolume(deviceID: deviceID) else {
+            supportsVolumeControl = false
+            return
+        }
+        supportsVolumeControl = true
+        if let hardwareVolume = HostAudioVolume.volume(deviceID: deviceID) {
+            volume = hardwareVolume
+        }
+        isMuted = HostAudioVolume.isMuted(deviceID: deviceID) ?? false
+    }
+
+    private var hardwareDeviceID: AudioDeviceID? {
+        guard let hardwareDeviceUID else { return nil }
+        return HostAudioVolume.deviceID(forUID: hardwareDeviceUID)
+    }
+
+    @discardableResult
+    func selectSystemDefaultOutput() -> Bool {
+        followsSystemDefault = true
+        return routeToSystemDefaultIfPossible()
+    }
+
+    func selectDevice(_ deviceID: String) {
+        followsSystemDefault = false
+        command(.selectDevice(deviceID))
+    }
+
+    /// 系统默认输出与当前会话设备列表匹配且兼容时才切换；由 apply 在刷新后再次驱动。
+    /// 独占 Hog 期间系统默认读取为 unknown，播放中的默认变化会在暂停释放设备后随刷新补齐。
+    @discardableResult
+    private func routeToSystemDefaultIfPossible() -> Bool {
+        guard let session = currentSession,
+              ExtensionPlaybackSupport.usesDeviceService(session),
+              let uid = HostAudioVolume.defaultOutputUID(),
+              let device = session.audioDeviceSelection?.devices.first(where: { $0.id == uid }),
+              device.isConnected, device.isCompatible,
+              session.audioDeviceSelection?.selectedDeviceID != uid else { return false }
+        command(.selectDevice(uid))
+        return true
     }
 
     func play() {
@@ -206,9 +269,48 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
     }
 
     func togglePlayPause() { isPlaying ? pause() : play() }
-    func toggleMute() {}
-    func setVolume(_ newValue: Float) {}
-    func adjustVolume(by delta: Float) {}
+    func toggleMute() {
+        guard supportsVolumeControl, let deviceID = hardwareDeviceID else { return }
+        if HostAudioVolume.supportsMute(deviceID: deviceID) {
+            let target = !isMuted
+            HostAudioVolume.setMuted(target, deviceID: deviceID)
+            isMuted = target
+            if !target, let restored = preMuteVolume {
+                volume = restored
+                preMuteVolume = nil
+            }
+            return
+        }
+        // 没有 mute 属性时用音量 0 模拟，恢复原值。
+        if isMuted {
+            let restored = preMuteVolume ?? 1
+            HostAudioVolume.setVolume(restored, deviceID: deviceID)
+            volume = restored
+            isMuted = false
+            preMuteVolume = nil
+        } else {
+            preMuteVolume = volume
+            HostAudioVolume.setVolume(0, deviceID: deviceID)
+            volume = 0
+            isMuted = true
+        }
+    }
+
+    func setVolume(_ newValue: Float) {
+        guard supportsVolumeControl, let deviceID = hardwareDeviceID else { return }
+        let clamped = max(0, min(1, newValue))
+        HostAudioVolume.setVolume(clamped, deviceID: deviceID)
+        volume = clamped
+        if clamped > 0, isMuted {
+            isMuted = false
+            preMuteVolume = nil
+            HostAudioVolume.setMuted(false, deviceID: deviceID)
+        }
+    }
+
+    func adjustVolume(by delta: Float) {
+        setVolume(volume + delta)
+    }
 
     func seek(to time: Double) {
         let clamped = min(duration, max(0, time))
