@@ -217,7 +217,7 @@ extension AppState {
         /// 返回调用方是否需要重读元数据：弹面板获授权，或经书签恢复授权后目录已可读，都返回 true；
         /// 目录本来就可读则返回 false（首次读取已带授权，无需重读）。
         /// 取消会记住该目录，避免同一文件夹反复打扰。
-        func requestSidecarCoverAccessIfNeeded(for audioURL: URL) async -> Bool {
+        func requestSidecarCoverAccessIfNeeded(for audioURL: URL, forCuePlayback: Bool = false) async -> Bool {
             let directory = audioURL.deletingLastPathComponent()
             // 目录已可读（已持有授权、无需授权或确实没有封面文件）时不必请求
             guard !AudioMetadataLoader.isCoverDirectoryAccessible(for: audioURL) else { return false }
@@ -230,7 +230,7 @@ extension AppState {
                 if let refreshed = sidecar.refreshedBookmark { mediaSidecarBookmarkData = refreshed }
                 if AudioMetadataLoader.isCoverDirectoryAccessible(for: audioURL) { return true }
             }
-            guard !Self.hasDeclinedSidecarCoverAccess(for: directory) else { return false }
+            guard forCuePlayback || !Self.hasDeclinedSidecarCoverAccess(for: directory) else { return false }
 
             let panel = NSOpenPanel()
             panel.canChooseFiles = false
@@ -238,7 +238,7 @@ extension AppState {
             panel.allowsMultipleSelection = false
             panel.directoryURL = directory
             panel.message = String(
-                format: NSLocalizedString("Audio Cover Access Message Format", comment: ""),
+                format: NSLocalizedString(forCuePlayback ? "Cue Audio Access Message Format" : "Audio Cover Access Message Format", comment: ""),
                 directory.lastPathComponent
             )
             panel.prompt = NSLocalizedString("Grant Access", comment: "")
@@ -869,6 +869,13 @@ extension AppState {
                     let closeResult = await closeTask?.value
                     guard self.currentMediaRouteGeneration == routeGeneration,
                           self.fileList?.currentID == itemID else { return }
+                    if self.fileList?.currentItem?.cue != nil {
+                        // 扩展解码器直接读取 APE，不能依赖宿主解析 CUE 时短暂的关联项授权。
+                        // 在旧会话释放之后获取目录权限，并持有至新会话结束，封面也复用该授权。
+                        _ = await self.requestSidecarCoverAccessIfNeeded(for: url, forCuePlayback: true)
+                        guard self.currentMediaRouteGeneration == routeGeneration,
+                              self.fileList?.currentID == itemID else { return }
+                    }
                     let urls = await self.contiguousExtensionAudioURLs(startingAt: itemID)
                     let outcome: SessionResolutionOutcome
                     if urls.count > 1, let sequence = try? await ExtensionHost.shared.open(urls: urls) {

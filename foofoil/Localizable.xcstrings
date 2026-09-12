@@ -226,6 +226,23 @@
         }
       }
     },
+    "Cue Audio Access Message Format" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "foofoil needs access to the folder “%@” to load the audio referenced by the CUE sheet and its album cover."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "foofoil 需要访问文件夹“%@”，才能载入 CUE 引用的音频和专辑封面。"
+          }
+        }
+      }
+    },
     "Audio Enhancer" : {
       "extractionState" : "stale",
       "localizations" : {

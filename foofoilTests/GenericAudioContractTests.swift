@@ -43,6 +43,32 @@ struct GenericAudioContractTests {
         #expect(state.extensionSession?.audioDeviceSelection?.selectedDeviceID == "exclusive-output")
     }
 
+    @Test func unresolvedCueAudioStillReachesExtensionOpen() async throws {
+        let provider = GenericAudioTestProvider()
+        let host = ExtensionHost.shared
+        host.resolver.register(provider)
+        defer { host.resolver.unregister(providerID: provider.descriptor.id) }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("album.gaud")
+        let item = FileListItem(
+            id: "cue-track", path: url.path, displayName: "Track 1",
+            cue: .init(startCueFrames: 0, cueSheetPath: directory.appendingPathComponent("album.cue").path)
+        )
+        let state = AppState()
+        defer { state.extensionSession = nil }
+        state.fileList = .init(kind: .audio, items: [item], currentID: item.id)
+        #expect(state.resolvedURL(for: item) == nil)
+        // 假 provider 无需读取音频，用不可直接解析的路径模拟沙盒关联项。
+        state.presentFileListItem(id: item.id, rotatesIdentity: false)
+        for _ in 0..<200 where state.extensionSession == nil {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(state.extensionSession?.providerID == provider.descriptor.id)
+        #expect(state.isLoading == false)
+    }
+
     @Test func genericProviderExpressesTransportNavigationRestoreAndClose() async throws {
         let provider = GenericAudioTestProvider()
         let host = ExtensionHost.shared

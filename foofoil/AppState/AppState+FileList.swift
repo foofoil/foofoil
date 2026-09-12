@@ -252,7 +252,9 @@ extension AppState {
         list.currentID = id
         fileList = list
 
-        guard let url = resolvedURL(for: item) else {
+        // CUE 关联项尚未获得直接读取权限时，仍须进入扩展起播流程申请目录授权。
+        let cueExtensionURL = item.cue != nil && ExtensionHost.shared.canOpen(url: item.url) ? item.url : nil
+        guard let url = resolvedURL(for: item) ?? cueExtensionURL else {
             syncFileListNavigator()
             saveState()
             scheduleImageListSlideshowAdvance()
