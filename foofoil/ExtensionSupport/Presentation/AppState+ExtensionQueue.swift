@@ -150,14 +150,27 @@ extension AppState {
     ) {
         guard let queue = ExtensionPlaybackSupport.containerPlaybackQueue(from: session) else { return }
         let normalizedPath = url.resolvingSymlinksInPath().standardizedFileURL.path
+        // 只有扩展安装的容器曲目带 containerTrackID。宿主先解析的 CUE 曲目没有不透明 ID，
+        // 若沿用会让点击第 N 首却从第一首开始，必须整体替换为扩展队列。
         let alreadyInstalled = fileList?.items.contains(where: { item in
-            item.cue != nil
+            item.cue?.containerTrackID != nil
                 && item.url.resolvingSymlinksInPath().standardizedFileURL.path == normalizedPath
         }) == true
         if !alreadyInstalled {
+            // 替换前按点名项在原 CUE 内的次序记录目标曲目，替换后按队列顺序对齐。
+            let alignedTrackID = preferredContainerTrackID(preferredItemID: preferredItemID, in: queue)
             let bookmark = session.request.resources.first?.securityScopedBookmark
                 ?? Self.makeSecurityScopedBookmark(for: url)
             installContainerAudioList(url: url, queue: queue, bookmark: bookmark)
+            if let alignedTrackID,
+               let alignedItem = fileList?.items.first(where: { $0.cue?.containerTrackID == alignedTrackID }),
+               var list = fileList {
+                list.currentID = alignedItem.id
+                fileList = list
+                activateContainerTrack(alignedTrackID, session: session)
+            }
+            syncFileListNavigator()
+            return
         }
         if let preferredItemID,
            let preferredItem = fileList?.items.first(where: { $0.id == preferredItemID }),
@@ -165,19 +178,36 @@ extension AppState {
            var list = fileList {
             list.currentID = preferredItemID
             fileList = list
-            if containerTrackID != queue.currentItemID {
-                if let contributionID = ExtensionPlaybackSupport.playbackContributionID(in: session) {
-                    performNavigatorAction(
-                        NavigatorAction(
-                            contributionID: contributionID,
-                            kind: .activate,
-                            itemIDs: [containerTrackID]
-                        )
-                    )
-                }
-            }
+            activateContainerTrack(containerTrackID, session: session)
         }
         syncFileListNavigator()
+    }
+
+    /// 宿主 CUE 曲目与扩展单资源容器队列由同一 CUE 生成且顺序一致；只在替换列表时按原列表
+    /// 内次序翻译一次，不把曲目序号当作协议，也不跨 CUE 段猜测。
+    private func preferredContainerTrackID(
+        preferredItemID: String?,
+        in queue: MediaPlaybackQueueSnapshot
+    ) -> String? {
+        guard let preferredItemID, let list = fileList,
+              let index = list.items.firstIndex(where: { $0.id == preferredItemID }) else { return nil }
+        let preferred = list.items[index]
+        guard preferred.cue != nil, preferred.cue?.containerTrackID == nil else { return nil }
+        let sectionID = preferred.cue?.sectionID
+        let sectionItems = sectionID.map { id in
+            list.items.filter { $0.cue?.sectionID == id }
+        } ?? list.items
+        guard let ordinal = sectionItems.firstIndex(where: { $0.id == preferredItemID }),
+              queue.items.indices.contains(ordinal) else { return nil }
+        return queue.items[ordinal].id
+    }
+
+    private func activateContainerTrack(_ trackID: String, session: ContentSession) {
+        guard trackID != session.playbackQueue?.currentItemID,
+              let contributionID = ExtensionPlaybackSupport.playbackContributionID(in: session) else { return }
+        performNavigatorAction(
+            NavigatorAction(contributionID: contributionID, kind: .activate, itemIDs: [trackID])
+        )
     }
 
     /// 同一容器会话内切歌，不重建 Session；扩展负责后续播放，此处只切换队列项。

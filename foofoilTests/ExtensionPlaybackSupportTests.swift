@@ -213,6 +213,50 @@ struct ExtensionPlaybackSupportTests {
         #expect(state.navigatorContributions.first?.items.first?.badge == nil)
     }
 
+    @Test func hostCueItemsAreReplacedByExtensionContainerQueueByOrdinal() {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        let apePath = "/tmp/CDImage.ape"
+        let cueItems = (1...3).map { number in
+            FileListItem(
+                id: "cue:\(number)",
+                path: apePath,
+                displayName: "Track \(number)",
+                cue: FileListCueInfo(
+                    startCueFrames: Int64(number - 1) * 1_000,
+                    trackNumber: "\(number)",
+                    sectionID: "cue-section"
+                )
+            )
+        }
+        state.fileList = FileListState(kind: .audio, items: cueItems, currentID: cueItems[0].id, title: "Album")
+        let session = ContentSession(
+            extensionID: nil,
+            providerID: "audio.hifi",
+            request: .singleFile(.init(url: URL(fileURLWithPath: apePath))),
+            presentation: .text(titleKey: "Test", body: "Fixture"),
+            navigatorContributions: [
+                .init(
+                    id: "hifi.playback-queue", titleLocalizationKey: "Queue", style: .flat,
+                    items: (1...3).map { .init(id: "track:cue:0\($0)", title: "Track \($0)") },
+                    selectedItemIDs: ["track:cue:01"], allowedActions: [.activate]
+                )
+            ],
+            playbackQueue: .init(
+                items: (1...3).map { .init(id: "track:cue:0\($0)", title: "Track \($0)") },
+                currentItemID: "track:cue:01", title: "Album"
+            )
+        )
+        state.installExtensionContainerListIfNeeded(
+            url: URL(fileURLWithPath: apePath),
+            session: session,
+            preferredItemID: cueItems[2].id
+        )
+        // 宿主 CUE 项被扩展容器队列整体替换，并按点击的第 3 首对齐当前项。
+        #expect(state.fileList?.items.map(\.cue?.containerTrackID) == ["track:cue:01", "track:cue:02", "track:cue:03"])
+        #expect(state.fileList?.currentID == state.fileList?.items[2].id)
+    }
+
     @Test func opaqueQueueIDsPairByStampAndResourceWithoutParsingLayout() {
         let first = URL(fileURLWithPath: "/tmp/first.dsf")
         let second = URL(fileURLWithPath: "/tmp/second.dsf")
