@@ -158,7 +158,13 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
         command(.refresh)
     }
 
-    var volumeIconName: String { "speaker.wave.3.fill" }
+    var volumeIconName: String {
+        if isMuted || volume <= 0 { return "speaker.slash.fill" }
+        if volume < 1.0 / 3.0 { return "speaker.fill" }
+        if volume < 2.0 / 3.0 { return "speaker.wave.1.fill" }
+        if volume < 1.0 { return "speaker.wave.2.fill" }
+        return "speaker.wave.3.fill"
+    }
 
     func apply(session: ContentSession) {
         let wasPlaying = isPlaying
