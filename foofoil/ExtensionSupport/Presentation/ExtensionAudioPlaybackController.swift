@@ -12,6 +12,7 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
     @Published private(set) var isMuted = false
     @Published private(set) var volume: Float = 1
     @Published private(set) var supportsVolumeControl = false
+    @Published private(set) var followsSystemDefault = false
     var isScrubbing = false
     let supportsPlaybackModeControl = true
 
@@ -164,6 +165,7 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
     func apply(session: ContentSession) {
         let wasPlaying = isPlaying
         currentSession = session
+        followsSystemDefault = session.audioDeviceSelection?.followsSystemDefault == true
         mediaTitle = Self.title(for: session)
         syncHardwareVolume(with: session)
         let queueCount = session.playbackQueue?.items.count ?? 0
@@ -217,6 +219,10 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
 
     @discardableResult
     func selectSystemDefaultOutput() -> Bool {
+        if let session = currentSession, session.mediaPlayback?.availableActions?.contains(.selectSystemDefault) == true {
+            command(.selectSystemDefault)
+            return true
+        }
         return routeToSystemDefaultIfPossible()
     }
 

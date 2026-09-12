@@ -123,5 +123,6 @@ enum ExtensionPlaybackSupport {
 
     static func requiresExclusiveHandoff(_ session: ContentSession) -> Bool {
         usesHostAudioChrome(session) && usesDeviceService(session)
+            && session.audioDeviceSelection?.followsSystemDefault != true
     }
 }

@@ -16,6 +16,7 @@ struct GenericAudioContractTests {
         var session = try await provider.makeSession(
             for: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/generic.gaud"))), negotiatedAPI: 1
         )
+        session.capabilities.append(.init(declaration: .init(id: ExtensionCapabilityIdentifier.deviceSelector, scope: .application), state: .active))
         session.audioDeviceSelection = .init(
             devices: [
                 .init(id: defaultUID, displayName: "System output"),
@@ -41,6 +42,40 @@ struct GenericAudioContractTests {
             return false
         })
         #expect(state.extensionSession?.audioDeviceSelection?.selectedDeviceID == "exclusive-output")
+    }
+
+    @Test func systemDefaultSelectionUsesProviderRouteAndSnapshotState() async throws {
+        let provider = GenericAudioTestProvider()
+        let host = ExtensionHost.shared
+        host.resolver.register(provider)
+        defer { host.resolver.unregister(providerID: provider.descriptor.id) }
+        var session = try await provider.makeSession(
+            for: .singleFile(.init(url: URL(fileURLWithPath: "/tmp/generic.gaud"))), negotiatedAPI: 1
+        )
+        session.capabilities.append(.init(declaration: .init(id: ExtensionCapabilityIdentifier.deviceSelector, scope: .application), state: .active))
+        session.audioDeviceSelection = .init(devices: [.init(id: "output", displayName: "Output")], selectedDeviceID: "output")
+        session.mediaPlayback?.availableActions = [.selectSystemDefault, .selectDevice, .refresh]
+        let state = AppState()
+        defer { state.extensionSession = nil }
+        state.extensionSession = session
+        let controller = ExtensionAudioPlaybackController(appState: state, session: session)
+        #expect(controller.selectSystemDefaultOutput())
+        for _ in 0..<100 where state.extensionSession?.audioDeviceSelection?.followsSystemDefault != true {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let following = try #require(state.extensionSession)
+        controller.apply(session: following)
+        #expect(controller.followsSystemDefault)
+        #expect(!ExtensionPlaybackSupport.requiresExclusiveHandoff(following))
+        #expect(provider.mediaActions == [.selectSystemDefault])
+        for _ in 0..<5 { controller.apply(session: following) }
+        #expect(provider.mediaActions == [.selectSystemDefault])
+        controller.selectDevice("output")
+        for _ in 0..<100 where state.extensionSession?.audioDeviceSelection?.followsSystemDefault != false {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        controller.apply(session: try #require(state.extensionSession))
+        #expect(!controller.followsSystemDefault)
     }
 
     @Test func unresolvedCueAudioStillReachesExtensionOpen() async throws {
@@ -382,6 +417,10 @@ private final class GenericAudioTestProvider: ContentProvider {
         mediaActions.append(mediaAction)
         var updated = session
         switch mediaAction {
+        case .selectSystemDefault: updated.audioDeviceSelection?.followsSystemDefault = true
+        case .selectDevice(let uid):
+            updated.audioDeviceSelection?.followsSystemDefault = false
+            updated.audioDeviceSelection?.selectedDeviceID = uid
         case .play: updated.mediaPlayback?.state = .playing
         case .pause: updated.mediaPlayback?.state = .paused
         case .seek(let position): updated.mediaPlayback?.position = position
@@ -439,6 +478,7 @@ private final class GenericAudioTestProvider: ContentProvider {
 
     private static func actions(for session: ContentSession) -> [MediaPlaybackActionKind] {
         var actions: [MediaPlaybackActionKind] = [.refresh, .seek, .previous, .next]
+        if session.audioDeviceSelection != nil { actions += [.selectDevice, .selectSystemDefault] }
         if session.mediaPlayback?.state == .playing {
             actions.append(.pause)
         } else {

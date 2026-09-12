@@ -1029,7 +1029,9 @@ extension AppState {
                     let deviceID = isDeviceChange
                         ? operation.selectedDeviceID
                         : session.audioDeviceSelection?.selectedDeviceID
-                    if ExtensionPlaybackSupport.requiresExclusiveHandoff(session), (isStart || isDeviceChange), let deviceID {
+                    let needsHandoff = ExtensionPlaybackSupport.requiresExclusiveHandoff(session)
+                        || (isDeviceChange && ExtensionPlaybackSupport.usesDeviceService(session))
+                    if needsHandoff, (isStart || isDeviceChange), let deviceID {
                         var result = session
                         let generation = commandGeneration
                         try await ExclusivePlaybackCoordinator.shared.perform(
@@ -1063,6 +1065,9 @@ extension AppState {
                           self.exclusivePlaybackGeneration == commandGeneration,
                           self.extensionPlaybackOperationVersion == operationVersion else { return }
                     self.extensionSession = updated
+                    if updated.audioDeviceSelection?.followsSystemDefault == true {
+                        ExclusivePlaybackCoordinator.shared.release(ownerID: session.id)
+                    }
                     self.extensionHandoffFailureMessage = nil
                     self.synchronizeFileListWithExtensionQueue(updated)
                     // 进度最多每五秒保存一次扩展快照，避免每秒写盘或刷新历史排序。
