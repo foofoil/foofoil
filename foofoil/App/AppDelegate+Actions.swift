@@ -767,6 +767,18 @@ extension AppDelegate {
         activeAppState?.activateAdjacentFileListItem(delta: 1)
     }
 
+    @objc func findNavigatorAction() {
+        activeAppState?.focusNavigatorSearch()
+    }
+
+    @objc func findNavigatorNextAction() {
+        activeAppState?.advanceNavigatorSearchMatch(delta: 1)
+    }
+
+    @objc func findNavigatorPreviousAction() {
+        activeAppState?.advanceNavigatorSearchMatch(delta: -1)
+    }
+
     @objc func toggleImageListSlideshowAction() {
         activeAppState?.toggleImageListSlideshow()
     }

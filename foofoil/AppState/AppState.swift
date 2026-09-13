@@ -149,7 +149,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     var isFullScreenNavigatorVisible: Bool {
         isFullScreen && !navigatorContributions.isEmpty && !isNavigatorHiddenForVideoInactivity
             && (navigatorPanelVisibilityMode == .always || isNavigatorPanelExplicitlyVisible
-                || isNavigatorPanelHovered || isNavigatorEdgeHovered)
+                || isNavigatorPanelHovered || isNavigatorEdgeHovered || isNavigatorSearchActive)
     }
 
     var fullScreenNavigatorInset: CGFloat {
@@ -158,6 +158,12 @@ public class AppState: NSObject, ObservableObject, Identifiable {
 
     @Published var activeNavigatorContributionID: String?
     @Published var expandedNavigatorItemIDs: Set<String> = []
+    /// 导航列表搜索：仅当前会话有效，不持久化；⌘F 进入并聚焦，⌘G/⇧⌘G 定位匹配。
+    @Published var isNavigatorSearchActive = false
+    @Published var navigatorSearchQuery = ""
+    @Published var navigatorSearchCurrentMatchID: String?
+    /// 递增的聚焦请求；视图据此把焦点移回关键字输入框。
+    @Published var navigatorSearchFocusRequest: UInt64 = 0
     var isAdjustingNavigatorPanelWidth = false
 
     @Published public var svgColor: String? {

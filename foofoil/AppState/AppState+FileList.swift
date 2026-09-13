@@ -60,6 +60,7 @@ extension AppState {
         isNavigatorPanelExplicitlyVisible = false
         activeNavigatorContributionID = nil
         expandedNavigatorItemIDs = []
+        endNavigatorSearch()
     }
 
     func restoreFileList(from config: WindowConfig) {
@@ -380,9 +381,15 @@ extension AppState {
         DispatchQueue.main.asyncAfter(deadline: .now() + interval, execute: workItem)
     }
 
-    /// 右/下/⌃N/⌃F 下一项，左/上/⌃P/⌃B 上一项。
+    /// 右/下/⌃N/⌃F 下一项，左/上/⌃P/⌃B 上一项；搜索快捷键先于播放列表切换处理。
     @discardableResult
     func handleFileListKeyDown(_ event: NSEvent) -> Bool {
+        if handleNavigatorSearchKey(event) { return true }
+        if event.keyCode == 53, event.modifierFlags.intersection(.deviceIndependentFlagsMask).isEmpty,
+           isNavigatorSearchActive {
+            endNavigatorSearch()
+            return true
+        }
         guard fileList?.isPresentable == true, !isPDFDocument else { return false }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         if modifiers.isEmpty {

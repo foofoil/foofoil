@@ -574,6 +574,7 @@ extension AppDelegate {
                 copyImageItem.withSymbol("photo.on.rectangle")
                 menu.addItem(copyImageItem)
             }
+            appendNavigatorFindMenu(to: menu)
             return
         }
 
@@ -619,5 +620,46 @@ extension AppDelegate {
         let selectAllItem = NSMenuItem(title: NSLocalizedString("Select All", comment: ""), action: #selector(EditMenuCommands.selectAll(_:)), keyEquivalent: "a")
         selectAllItem.withSymbol("checkmark.square")
         menu.addItem(selectAllItem)
+
+        appendNavigatorFindMenu(to: menu)
+    }
+
+    /// 列表超过阈值时提供查找定位：⌘F 进入/聚焦，⌘G / ⇧⌘G 循环定位匹配标题。
+    private func appendNavigatorFindMenu(to menu: NSMenu) {
+        guard activeAppState?.canSearchActiveNavigator == true else { return }
+        menu.addItem(NSMenuItem.separator())
+
+        let submenu = NSMenu(title: NSLocalizedString("Find", comment: ""))
+        let findItem = NSMenuItem(
+            title: NSLocalizedString("Find", comment: ""),
+            action: #selector(findNavigatorAction),
+            keyEquivalent: "f"
+        )
+        findItem.withSymbol("magnifyingglass")
+        findItem.target = self
+        submenu.addItem(findItem)
+
+        let findNextItem = NSMenuItem(
+            title: NSLocalizedString("Find Next", comment: ""),
+            action: #selector(findNavigatorNextAction),
+            keyEquivalent: "g"
+        )
+        findNextItem.withSymbol("chevron.down")
+        findNextItem.target = self
+        submenu.addItem(findNextItem)
+
+        let findPreviousItem = NSMenuItem(
+            title: NSLocalizedString("Find Previous", comment: ""),
+            action: #selector(findNavigatorPreviousAction),
+            keyEquivalent: "g"
+        )
+        findPreviousItem.withSymbol("chevron.up")
+        findPreviousItem.keyEquivalentModifierMask = [.command, .shift]
+        findPreviousItem.target = self
+        submenu.addItem(findPreviousItem)
+
+        let findMenuItem = NSMenuItem(title: NSLocalizedString("Find", comment: ""), action: nil, keyEquivalent: "")
+        findMenuItem.submenu = submenu
+        menu.addItem(findMenuItem)
     }
 }

@@ -742,6 +742,12 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
+        appState.$isNavigatorSearchActive
+            .sink { [weak self] _ in
+                DispatchQueue.main.async { self?.updateNavigatorPanelVisibility() }
+            }
+            .store(in: &cancellables)
+
         appState.navigatorHover.$isPanelHovered
             .sink { [weak self] _ in
                 DispatchQueue.main.async { self?.updateNavigatorPanelVisibility() }
@@ -782,6 +788,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         return appState.isNavigatorPanelExplicitlyVisible
             || appState.isNavigatorPanelHovered
             || appState.isNavigatorEdgeHovered
+            || appState.isNavigatorSearchActive
     }
 
     /// 全屏覆盖层下，指针落在导航栏区域内时 ⌘+滚轮改宽度而不是缩放箔片。

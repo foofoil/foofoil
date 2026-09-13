@@ -19,6 +19,7 @@ struct NavigatorPanelView: View {
     @State private var hoveringNavigatorRowID: String?
     /// 鼠标是否悬停在固定标题上，触发标题跑马灯。
     @State private var isHoveringNavigatorHeader = false
+    @FocusState private var isSearchFieldFocused: Bool
 
     private struct VisibleRow: Identifiable {
         let item: NavigatorItem
@@ -53,7 +54,9 @@ struct NavigatorPanelView: View {
                 if let contribution = activeContribution {
                     // 标题区位于滚动区域之外，列表滚动时保持固定；
                     // 多个贡献时由选择器兼任标题与切换，避免重复展示同一名称。
-                    if contributions.count > 1 {
+                    if appState.isNavigatorSearchActive {
+                        navigatorSearchBar
+                    } else if contributions.count > 1 {
                         contributionPicker
                     } else {
                         contributionTitleHeader(contribution)
@@ -93,6 +96,16 @@ struct NavigatorPanelView: View {
         .onChange(of: contributions.map(\.id)) { _, _ in
             selectFirstContributionIfNeeded()
         }
+        .onChange(of: activeContribution?.id) { _, _ in
+            appState.endNavigatorSearch()
+        }
+        .onChange(of: appState.navigatorSearchQuery) { _, _ in
+            appState.navigatorSearchQueryDidChange()
+        }
+        .onChange(of: appState.navigatorSearchFocusRequest) { _, _ in
+            guard appState.isNavigatorSearchActive else { return }
+            isSearchFieldFocused = true
+        }
     }
 
     private func localizedTitle(for contribution: NavigatorContribution) -> String {
@@ -100,23 +113,115 @@ struct NavigatorPanelView: View {
     }
 
     private var contributionPicker: some View {
-        Picker(
-            NSLocalizedString("Navigator", comment: ""),
-            selection: Binding(
-                get: { activeContribution?.id ?? contributions.first?.id ?? "" },
-                set: { appState.activeNavigatorContributionID = $0 }
-            )
-        ) {
-            ForEach(contributions) { contribution in
-                Text(localizedTitle(for: contribution))
-                    .tag(contribution.id)
+        HStack(spacing: 0) {
+            Picker(
+                NSLocalizedString("Navigator", comment: ""),
+                selection: Binding(
+                    get: { activeContribution?.id ?? contributions.first?.id ?? "" },
+                    set: { appState.activeNavigatorContributionID = $0 }
+                )
+            ) {
+                ForEach(contributions) { contribution in
+                    Text(localizedTitle(for: contribution))
+                        .tag(contribution.id)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .padding(.leading, 12)
+            .frame(height: 32)
+            .background(NonMovableBackground())
+
+            if let contribution = activeContribution, canSearch(contribution) {
+                navigatorSearchButton
+                    .padding(.trailing, 4)
             }
         }
-        .labelsHidden()
-        .pickerStyle(.menu)
-        .padding(.horizontal, 12)
+    }
+
+    /// 列表项超过阈值时才显示搜索入口；标题栏右侧按钮点击后进入搜索状态。
+    private func canSearch(_ contribution: NavigatorContribution) -> Bool {
+        contribution.items.count > AppState.navigatorSearchMinimumItemCount
+    }
+
+    private var navigatorSearchButton: some View {
+        Button {
+            appState.beginNavigatorSearch()
+        } label: {
+            Image(systemName: "magnifyingglass")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 28)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(NSLocalizedString("Search List", comment: ""))
+        .accessibilityLabel(NSLocalizedString("Search List", comment: ""))
+    }
+
+    /// 搜索栏：关键字输入 + 上一个/下一个定位；没有匹配时定位按钮禁用。
+    private var navigatorSearchBar: some View {
+        let matches = appState.navigatorSearchMatchIDs()
+        return HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField(
+                NSLocalizedString("Search List", comment: ""),
+                text: $appState.navigatorSearchQuery
+            )
+            .textFieldStyle(.plain)
+            .font(.caption)
+            .focused($isSearchFieldFocused)
+            .onSubmit { appState.openNavigatorSearchMatch() }
+            .accessibilityLabel(NSLocalizedString("Search List", comment: ""))
+
+            Button {
+                appState.advanceNavigatorSearchMatch(delta: -1)
+                isSearchFieldFocused = true
+            } label: {
+                Image(systemName: "chevron.up")
+                    .font(.caption.weight(.semibold))
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(matches.isEmpty)
+            .help(NSLocalizedString("Previous Match", comment: ""))
+            .accessibilityLabel(NSLocalizedString("Previous Match", comment: ""))
+
+            Button {
+                appState.advanceNavigatorSearchMatch(delta: 1)
+                isSearchFieldFocused = true
+            } label: {
+                Image(systemName: "chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .disabled(matches.isEmpty)
+            .help(NSLocalizedString("Next Match", comment: ""))
+            .accessibilityLabel(NSLocalizedString("Next Match", comment: ""))
+
+            Button {
+                appState.endNavigatorSearch()
+            } label: {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(NSLocalizedString("Close Search", comment: ""))
+            .accessibilityLabel(NSLocalizedString("Close Search", comment: ""))
+        }
+        .padding(.horizontal, 10)
         .frame(height: 32)
         .background(NonMovableBackground())
+        .onAppear { isSearchFieldFocused = true }
+        .onExitCommand { appState.endNavigatorSearch() }
     }
 
     /// 单一贡献时的固定小标题：显示列表自定义/专辑标题（不附数量），过长时悬停滚动，
@@ -142,6 +247,13 @@ struct NavigatorPanelView: View {
         // 可移动背景盖在最上层：按住标题任意处（含文字与徽标）都走“拖父窗口、面板跟随”的
         // 贴附拖动路径；若只作背景，命中文字时会走仅拖面板的原生路径。
         .overlay(MovableBackground())
+        // 搜索按钮必须叠在可移动背景之上才能收到点击。
+        .overlay(alignment: .trailing) {
+            if canSearch(contribution) {
+                navigatorSearchButton
+                    .padding(.trailing, 4)
+            }
+        }
         // 整条标题区命中悬停，与列表行的整行命中保持一致。
         .onHover { isHoveringNavigatorHeader = $0 }
         .contextMenu {
@@ -258,19 +370,30 @@ struct NavigatorPanelView: View {
             .allowsHitTesting(false)
         } else {
             GeometryReader { geo in
-                ScrollView {
-                    LazyVStack(spacing: 2) {
-                        ForEach(visibleRows(for: contribution)) { row in
-                            navigatorRow(row, contribution: contribution)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 2) {
+                            ForEach(visibleRows(for: contribution)) { row in
+                                navigatorRow(row, contribution: contribution)
+                            }
+                        }
+                        .padding(6)
+                        .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .top)
+                        .background(MovableBackground())
+                        .onDrop(
+                            of: [.utf8PlainText],
+                            delegate: navigatorEndDropDelegate(for: contribution)
+                        )
+                    }
+                    .onChange(of: appState.navigatorSearchCurrentMatchID) { _, id in
+                        guard let id, appState.isNavigatorSearchActive else { return }
+                        // 等展开折叠分段后的目标行实际进入 LazyVStack 再滚动。
+                        Task { @MainActor in
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                proxy.scrollTo(id, anchor: .center)
+                            }
                         }
                     }
-                    .padding(6)
-                    .frame(maxWidth: .infinity, minHeight: geo.size.height, alignment: .top)
-                    .background(MovableBackground())
-                    .onDrop(
-                        of: [.utf8PlainText],
-                        delegate: navigatorEndDropDelegate(for: contribution)
-                    )
                 }
             }
         }
@@ -341,7 +464,8 @@ struct NavigatorPanelView: View {
                     VStack(alignment: .leading, spacing: 1) {
                         NavigatorScrollingTitle(
                             title: row.item.title,
-                            isRowHovering: hoveringNavigatorRowID == row.item.id
+                            isRowHovering: hoveringNavigatorRowID == row.item.id,
+                            highlightQuery: appState.isNavigatorSearchActive ? appState.navigatorSearchQuery : ""
                         )
                             .frame(maxWidth: .infinity, alignment: .leading)
                         if let subtitle = row.item.subtitle, !subtitle.isEmpty {
@@ -384,6 +508,13 @@ struct NavigatorPanelView: View {
             isSelected ? Color.accentColor.opacity(0.20) : Color.clear,
             in: RoundedRectangle(cornerRadius: 7, style: .continuous)
         )
+        .overlay {
+            if appState.isNavigatorSearchActive, appState.navigatorSearchCurrentMatchID == row.item.id {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .strokeBorder(Color.accentColor, lineWidth: 1.5)
+                    .allowsHitTesting(false)
+            }
+        }
         .background(NonMovableBackground())
         return reorderableRow(
             rowContent,
@@ -590,6 +721,7 @@ private struct NavigatorScrollingTitle: View {
     let title: String
     var font: Font = .body
     let isRowHovering: Bool
+    var highlightQuery: String = ""
 
     /// 循环衔接处两份文本之间的间隔。
     private static let loopGap: CGFloat = 24
@@ -601,11 +733,29 @@ private struct NavigatorScrollingTitle: View {
 
     private var overflow: CGFloat { max(0, titleWidth - availableWidth) }
     private var isScrolling: Bool { isRowHovering && overflow > 0 }
+    private var displayText: AttributedString { Self.highlighted(title, query: highlightQuery) }
+
+    /// 搜索关键字高亮：命中片段加背景色，未命中部分保持原样。
+    private static func highlighted(_ title: String, query: String) -> AttributedString {
+        let query = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return AttributedString(title) }
+        var result = AttributedString()
+        var remainder = title[...]
+        while let range = remainder.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) {
+            result += AttributedString(remainder[remainder.startIndex..<range.lowerBound])
+            var match = AttributedString(remainder[range])
+            match.backgroundColor = Color.yellow.opacity(0.38)
+            result += match
+            remainder = remainder[range.upperBound...]
+        }
+        result += AttributedString(remainder)
+        return result
+    }
 
     var body: some View {
         GeometryReader { proxy in
             HStack(spacing: Self.loopGap) {
-                Text(title)
+                Text(displayText)
                     .font(font)
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
@@ -617,7 +767,7 @@ private struct NavigatorScrollingTitle: View {
                 // 第二份文本用于无缝循环：偏移走到 -(titleWidth + gap) 时它与首份起点重合。
                 // 在静止（未滚动）时就提前创建，避免滚动期间插入触发带动画的透明度过渡。
                 if overflow > 0 {
-                    Text(title)
+                    Text(displayText)
                         .font(font)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)

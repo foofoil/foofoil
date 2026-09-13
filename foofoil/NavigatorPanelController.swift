@@ -4,6 +4,7 @@
 //  Created by tolg on 2026/8/26.
 
 import AppKit
+import Combine
 import QuartzCore
 import SwiftUI
 import FoofoilExtensionKit
@@ -44,6 +45,12 @@ final class NavigatorPanel: NSWindow {
             return
         }
         super.keyDown(with: event)
+    }
+
+    /// 菜单快捷键匹配前先处理列表导航与搜索键，避免被 PDF 翻页等菜单项吞掉。
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if handleKeyDown?(event) == true { return true }
+        return super.performKeyEquivalent(with: event)
     }
 
     private var isParentFullScreen: Bool {
@@ -104,6 +111,7 @@ final class NavigatorPanelController: NSWindowController {
     private var pendingHide: DispatchWorkItem?
     private var isHiding = false
     private let slideDuration: TimeInterval = 0.25
+    private var cancellables = Set<AnyCancellable>()
 
     init(appState: AppState) {
         self.appState = appState
@@ -155,6 +163,20 @@ final class NavigatorPanelController: NSWindowController {
                 )
             )
         }
+        // 输入框聚焦需要面板成为 key window；⌘F 从箔片触发时先取回键盘焦点。
+        // 全屏时搜索栏在覆盖层内、面板隐藏，不能把键盘焦点交给不可见窗口。
+        // 延后一拍，确保可见性更新已把面板 orderFront 之后再取 key。
+        appState.$navigatorSearchFocusRequest
+            .dropFirst()
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    guard let self,
+                          self.appState.isNavigatorSearchActive,
+                          !self.appState.isFullScreen else { return }
+                    self.window?.makeKey()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     required init?(coder: NSCoder) {

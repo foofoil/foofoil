@@ -307,6 +307,16 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             return activeAppState?.fileList?.isPresentable == true
         }
 
+        if menuItem.action == #selector(findNavigatorAction) {
+            return activeAppState?.canSearchActiveNavigator == true
+        }
+
+        if menuItem.action == #selector(findNavigatorNextAction) ||
+            menuItem.action == #selector(findNavigatorPreviousAction) {
+            guard let appState = activeAppState, appState.isNavigatorSearchActive else { return false }
+            return !appState.navigatorSearchMatchIDs().isEmpty
+        }
+
         if menuItem.action == #selector(toggleImageListSlideshowAction) {
             guard let appState = activeAppState, appState.canToggleImageListSlideshow else {
                 menuItem.state = .off
