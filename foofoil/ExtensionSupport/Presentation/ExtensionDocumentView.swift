@@ -89,6 +89,7 @@ enum ExtensionDocumentWebViewFactory {
 /// 纯文字缩放的固定宿主脚本：只改根字号与正文字号，不触碰图片与增量布局。
 enum DocumentTextZoom {
     static let basePoints = 16.0
+    static let anchorAttribute = "data-foofoil-zoom-anchor"
 
     static func fontPoints(for scale: Double) -> Int {
         max(1, Int((basePoints * scale).rounded()))
@@ -103,6 +104,43 @@ enum DocumentTextZoom {
             + "(document.head||document.documentElement).appendChild(el);}"
             + "el.textContent='html{font-size:\(points)px !important;} body{font-size:1em !important;}';"
             + "})();"
+    }
+
+    /// 记录当前视口顶端可见的文字块及其相对视口偏移，缩放后据此回位。
+    static let captureAnchorScript = """
+    (function(){
+      var nodes = document.body
+        ? document.body.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,td,th,figure,img,section')
+        : [];
+      var anchor = null;
+      var offset = 0;
+      for (var i = 0; i < nodes.length; i++) {
+        var rect = nodes[i].getBoundingClientRect();
+        if (rect.height > 0 && rect.bottom > 4) {
+          anchor = nodes[i];
+          offset = rect.top;
+          break;
+        }
+      }
+      if (!anchor) { return null; }
+      var previous = document.querySelectorAll('[data-foofoil-zoom-anchor]');
+      for (var j = 0; j < previous.length; j++) {
+        previous[j].removeAttribute('data-foofoil-zoom-anchor');
+      }
+      anchor.setAttribute('data-foofoil-zoom-anchor', '1');
+      return offset;
+    })();
+    """
+
+    static func restoreAnchorScript(offset: Double) -> String {
+        """
+        (function(){
+          var el = document.querySelector('[data-foofoil-zoom-anchor]');
+          if (!el) { return; }
+          var delta = el.getBoundingClientRect().top - (\(offset));
+          if (Math.abs(delta) > 0.5) { window.scrollBy(0, delta); }
+        })();
+        """
     }
 }
 
@@ -184,6 +222,7 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
         private var hasInstalledRuleList = false
         private var loadGeneration: UInt64 = 0
         private var appliedTextScale: Double = .nan
+        private var textScaleGeneration: UInt64 = 0
 
         init(_ parent: ExtensionDocumentWebView) {
             self.parent = parent
@@ -237,11 +276,29 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
             parent.loadFailed = true
         }
 
-        /// 纯文字缩放：只改根字号与正文字号，图片与版心按 CSS 自行处理。
+        /// 纯文字缩放：以视口顶端可见文字块为锚点，改字号后回位，避免内容跳走。
         func applyTextScale(_ scale: Double, force: Bool = false) {
             guard force || scale != appliedTextScale else { return }
             appliedTextScale = scale
-            webView?.evaluateJavaScript(DocumentTextZoom.styleScript(for: scale))
+            textScaleGeneration &+= 1
+            let generation = textScaleGeneration
+            guard let webView else { return }
+            Task { @MainActor [weak self] in
+                guard let self, self.textScaleGeneration == generation else { return }
+                var anchorOffset: Double?
+                if !force {
+                    anchorOffset = (try? await webView.evaluateJavaScript(
+                        DocumentTextZoom.captureAnchorScript
+                    )) as? Double
+                }
+                guard self.textScaleGeneration == generation else { return }
+                _ = try? await webView.evaluateJavaScript(DocumentTextZoom.styleScript(for: scale))
+                if let anchorOffset {
+                    _ = try? await webView.evaluateJavaScript(
+                        DocumentTextZoom.restoreAnchorScript(offset: anchorOffset)
+                    )
+                }
+            }
         }
 
         private func isCurrent(_ url: URL?) -> Bool {
