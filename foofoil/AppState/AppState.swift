@@ -58,6 +58,9 @@ public class AppState: NSObject, ObservableObject, Identifiable {
             guard oldSessionID != newSessionID else { return }
             // 旧会话的在途操作不阻止新会话刷新；旧回包仍由会话 ID 校验丢弃。
             extensionPlaybackPendingWrites.removeAll()
+            // 导航动作队列属于产生它的会话；换会话后旧队列与在途回包都必须失效。
+            navigatorActionGeneration &+= 1
+            pendingNavigatorActions.removeAll()
             // 删除意图只对产生它的会话有效，新会话不复用旧编辑记录。
             if oldSessionID != nil { extensionRemovedItemIDs.removeAll() }
             // 新会话接管后旧的交接失败提示不再适用。
@@ -101,6 +104,11 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     var extensionPlaybackPendingWrites: Set<UInt64> = []
     /// 当前会话内被宿主显式删除的扩展队列项目 ID；用于区分“映射失效”和“用户删除”。
     var extensionRemovedItemIDs: Set<String> = []
+    /// 扩展导航动作按点击顺序串行执行；ABI 锁只保证互斥，不保证 detached task 的获得顺序。
+    var pendingNavigatorActions: [NavigatorAction] = []
+    var isNavigatorActionInFlight = false
+    /// 会话或路由变更时递增；用于丢弃旧会话的排队动作与在途回包。
+    var navigatorActionGeneration: UInt64 = 0
 
     /// Built-in 与扩展统一投影到同一宿主导航模型；同一窗口只会有一个主内容来源。
     @Published var builtInNavigatorContributions: [NavigatorContribution] = []

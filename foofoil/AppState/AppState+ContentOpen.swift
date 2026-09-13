@@ -1131,33 +1131,63 @@ extension AppState {
                 }
                 return
             }
-            if let session = extensionSession {
-                Task { @MainActor [weak self] in
-                    guard let self else { return }
-                    do {
-                        let updated = try await ExtensionHost.shared.perform(
-                            navigatorAction: action,
-                            in: self.sessionByApplyingHostPlaybackSequence(session)
-                        )
-                        guard self.extensionSession?.id == session.id else { return }
-                        self.extensionSession = updated
-                        if let extensionID = updated.extensionID,
-                           let reference = self.extensionStateReference {
-                            let payload = try JSONEncoder().encode(updated)
-                            try ExtensionHost.shared.stateStore.save(
-                                extensionID: extensionID,
-                                schemaVersion: 1,
-                                payload: payload,
-                                reference: reference
-                            )
-                        }
-                        self.saveState()
-                    } catch {
-                        NSLog("Navigator action failed: \(error.localizedDescription)")
-                    }
-                }
+            guard extensionSession != nil else { return }
+            pendingNavigatorActions.append(action)
+            drainNavigatorActions()
+        }
+
+        /// 串行处理扩展导航动作：最多一个 ABI 调用在途，结果按提交顺序提交；
+        /// 每项执行前读取当前会话快照，换会话后旧队列与在途回包都不再生效。
+        func drainNavigatorActions() {
+            guard !isNavigatorActionInFlight, !pendingNavigatorActions.isEmpty else { return }
+            guard extensionSession != nil else {
+                pendingNavigatorActions.removeAll()
                 return
             }
+            let action = pendingNavigatorActions.removeFirst()
+            isNavigatorActionInFlight = true
+            let generation = navigatorActionGeneration
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                do {
+                    guard let session = self.extensionSession,
+                          self.navigatorActionGeneration == generation else {
+                        self.pendingNavigatorActions.removeAll()
+                        self.finishNavigatorAction()
+                        return
+                    }
+                    let sessionID = session.id
+                    let updated = try await ExtensionHost.shared.perform(
+                        navigatorAction: action,
+                        in: self.sessionByApplyingHostPlaybackSequence(session)
+                    )
+                    guard self.extensionSession?.id == sessionID,
+                          self.navigatorActionGeneration == generation else {
+                        self.finishNavigatorAction()
+                        return
+                    }
+                    self.extensionSession = updated
+                    if let extensionID = updated.extensionID,
+                       let reference = self.extensionStateReference {
+                        let payload = try JSONEncoder().encode(updated)
+                        try ExtensionHost.shared.stateStore.save(
+                            extensionID: extensionID,
+                            schemaVersion: 1,
+                            payload: payload,
+                            reference: reference
+                        )
+                    }
+                    self.saveState()
+                } catch {
+                    NSLog("Navigator action failed: \(error.localizedDescription)")
+                }
+                self.finishNavigatorAction()
+            }
+        }
+
+        private func finishNavigatorAction() {
+            isNavigatorActionInFlight = false
+            drainNavigatorActions()
         }
 
         @discardableResult
