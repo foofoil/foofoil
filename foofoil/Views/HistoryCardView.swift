@@ -254,6 +254,19 @@ struct HistoryCardView: View {
                         .multilineTextAlignment(.center)
                 }
                 .frame(width: 60, height: 60)
+            } else if let name = config.originalImageName, !name.isEmpty {
+                // 扩展内容（如 EPUB）没有缩略图，用类型图标 + 文件名占位。
+                VStack(spacing: 4) {
+                    Image(systemName: historyKind.symbolName)
+                        .font(.system(size: 24))
+                    Text(name)
+                        .font(.system(size: 7, design: .rounded))
+                        .foregroundColor(.primary.opacity(0.85))
+                        .lineLimit(3)
+                        .padding(.horizontal, 4)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(width: 60, height: 60)
             } else {
                 Text(config.text)
                     .font(.system(size: 8, design: .rounded))

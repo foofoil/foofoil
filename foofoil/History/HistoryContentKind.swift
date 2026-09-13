@@ -12,6 +12,7 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
     case video = 7
     case audio = 8
     case extensionContent = 9
+    case ebook = 10
 
     public var symbolName: String {
         switch self {
@@ -22,6 +23,7 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
         case .audio: return "music.note"
         case .markdown: return "arrow.down.document"
         case .csv: return "tablecells"
+        case .ebook: return "text.book.closed"
         case .extensionContent: return "puzzlepiece.extension"
         case .note, .text: return "note.text"
         }
@@ -31,9 +33,11 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
         // 宿主统一音频列表（含经扩展播放的 DSF/DFF/SACD）按列表类型归类，
         // 否则扩展音频会因 imagePath 为空而误判为笔记。
         if config.fileList?.isPresentable == true, config.fileList?.kind == .audio { return .audio }
+        let name = (config.originalImageName ?? config.textPath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "").lowercased()
+        // EPUB 由扩展承载，但历史仍按电子书归类，便于展示书名与书本图标。
+        if name.hasSuffix(".epub") { return .ebook }
         if config.extensionID != nil { return .extensionContent }
         if config.webURLString != nil { return .web }
-        let name = (config.originalImageName ?? config.textPath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "").lowercased()
         if name.hasSuffix(".pdf") { return .pdf }
         if config.imagePath != nil {
             let ext = URL(fileURLWithPath: name).pathExtension

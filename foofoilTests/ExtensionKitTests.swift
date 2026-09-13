@@ -1483,6 +1483,18 @@ struct ExtensionKitTests {
         #expect(HistoryContentKind.infer(from: WindowConfig(id: UUID(), text: "hello")) == .note)
     }
 
+    /// EPUB 历史按电子书归类，标题取原始文件名而不是"无标题笔记"。
+    @Test func extensionDocumentHistoryUsesFileName() {
+        let config = WindowConfig(
+            id: UUID(),
+            originalImageName: "Programming Rust.epub",
+            extensionID: "app.foofoil.extension.ebook"
+        )
+        #expect(HistoryContentKind.infer(from: config) == .ebook)
+        #expect(HistoryContentKind.ebook.symbolName == "text.book.closed")
+        #expect(config.historyMenuDisplayName == "Programming Rust.epub")
+    }
+
     /// kind 改为 .audio 后，剪枝必须认宿主列表项：有存活项保留，全丢才移除。
     @Test func recentKeepsExtensionAudioListWhileAnyItemAlive() throws {
         let directory = try temporaryDirectory()
