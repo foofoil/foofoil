@@ -906,6 +906,23 @@
         }
       }
     },
+    "Document Security Setup Failed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Secure document loading could not be initialized."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法初始化安全文档加载。"
+          }
+        }
+      }
+    },
     "Download Extension Updates Automatically" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -38,13 +38,24 @@ struct ExtensionDocumentView: View {
 
     @State private var isLoading = true
     @State private var loadFailed = false
+    @State private var securityFailed = false
 
     var body: some View {
         ZStack {
-            ExtensionDocumentWebView(url: url, isLoading: $isLoading, loadFailed: $loadFailed)
-                .opacity(loadFailed ? 0 : 1)
+            ExtensionDocumentWebView(
+                url: url,
+                isLoading: $isLoading,
+                loadFailed: $loadFailed,
+                securityFailed: $securityFailed
+            )
+            .opacity(loadFailed || securityFailed ? 0 : 1)
 
-            if loadFailed {
+            if securityFailed {
+                ContentUnavailableView(
+                    NSLocalizedString("Document Security Setup Failed", comment: ""),
+                    systemImage: "lock.slash"
+                )
+            } else if loadFailed {
                 ContentUnavailableView(
                     NSLocalizedString("Document Load Failed", comment: ""),
                     systemImage: "doc.text"
@@ -58,7 +69,52 @@ struct ExtensionDocumentView: View {
         .onChange(of: url) {
             isLoading = true
             loadFailed = false
+            securityFailed = false
         }
+    }
+}
+
+/// 文档 WKWebView 的生产配置：禁用脚本、非持久化站点数据。
+enum ExtensionDocumentWebViewFactory {
+    static func makeConfiguration() -> WKWebViewConfiguration {
+        let configuration = WKWebViewConfiguration()
+        configuration.defaultWebpagePreferences.allowsContentJavaScript = false
+        configuration.websiteDataStore = .nonPersistent()
+        return configuration
+    }
+}
+
+/// 进程级内容规则表：加载前安装默认拒绝网络，编译失败不得降级为无规则加载。
+@MainActor
+enum DocumentContentRuleList {
+    private static var cached: WKContentRuleList?
+    private static var compilationTask: Task<WKContentRuleList?, Never>?
+
+    static func shared() async -> WKContentRuleList? {
+        if let cached { return cached }
+        if let compilationTask { return await compilationTask.value }
+        let task = Task { await compile() }
+        compilationTask = task
+        let list = await task.value
+        cached = list
+        compilationTask = nil
+        return list
+    }
+
+    private static func compile() async -> WKContentRuleList? {
+        // 只阻断明确的网络 scheme；file:/data: 由单文件读权限与 CSP 约束，避免误伤主文档。
+        let rules: [[String: Any]] = [
+            ["trigger": ["url-filter": "^https?://"], "action": ["type": "block"]],
+            ["trigger": ["url-filter": "^wss?://"], "action": ["type": "block"]],
+            ["trigger": ["url-filter": "^ftp://"], "action": ["type": "block"]]
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: rules),
+              let encoded = String(data: data, encoding: .utf8),
+              let store = WKContentRuleListStore.default() else { return nil }
+        return try? await store.compileContentRuleList(
+            forIdentifier: "app.foofoil.document-network-deny",
+            encodedContentRuleList: encoded
+        )
     }
 }
 
@@ -66,15 +122,14 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
     let url: URL
     @Binding var isLoading: Bool
     @Binding var loadFailed: Bool
+    @Binding var securityFailed: Bool
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
     }
 
     func makeNSView(context: Context) -> WKWebView {
-        let configuration = WKWebViewConfiguration()
-        configuration.defaultWebpagePreferences.allowsContentJavaScript = false
-        configuration.websiteDataStore = .nonPersistent()
+        let configuration = ExtensionDocumentWebViewFactory.makeConfiguration()
         let webView = WKWebView(frame: .zero, configuration: configuration)
         webView.setValue(false, forKey: "drawsBackground")
         webView.navigationDelegate = context.coordinator
@@ -102,6 +157,8 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
         private var loadedURL: URL?
         private var targetIdentity: String?
         private var hasReportedFailure = false
+        private var hasInstalledRuleList = false
+        private var loadGeneration: UInt64 = 0
 
         init(_ parent: ExtensionDocumentWebView) {
             self.parent = parent
@@ -110,6 +167,7 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
         func invalidate() {
             loadedURL = nil
             targetIdentity = nil
+            loadGeneration &+= 1
         }
 
         func load(url: URL) {
@@ -125,8 +183,26 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
             hasReportedFailure = false
             parent.isLoading = true
             parent.loadFailed = false
-            // 读权限只授予该 HTML 文件本身：文档资源全部内联。
-            webView?.loadFileURL(url, allowingReadAccessTo: fileURL)
+            parent.securityFailed = false
+            loadGeneration &+= 1
+            let generation = loadGeneration
+            if hasInstalledRuleList {
+                // 读权限只授予该 HTML 文件本身：文档资源全部内联。
+                webView?.loadFileURL(url, allowingReadAccessTo: fileURL)
+                return
+            }
+            Task { @MainActor in
+                guard let rules = await DocumentContentRuleList.shared() else {
+                    guard self.loadGeneration == generation else { return }
+                    self.parent.isLoading = false
+                    self.parent.securityFailed = true
+                    return
+                }
+                guard self.loadGeneration == generation, self.loadedURL == url else { return }
+                self.webView?.configuration.userContentController.add(rules)
+                self.hasInstalledRuleList = true
+                self.webView?.loadFileURL(url, allowingReadAccessTo: fileURL)
+            }
         }
 
         private func markFailed() {
