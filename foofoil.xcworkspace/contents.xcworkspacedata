@@ -10,4 +10,7 @@
    <FileRef
       location = "group:../hifi">
    </FileRef>
+   <FileRef
+      location = "group:../ebook">
+   </FileRef>
 </Workspace>
