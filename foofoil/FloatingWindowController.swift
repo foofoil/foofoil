@@ -1752,6 +1752,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         } else if let window = window {
             appState.windowFrame = window.frameDescriptor
         }
+        appState.endExtensionSessionOnWindowClose()
         appState.saveState()
 
         // 自动从 AppDelegate 的 windowControllers 列表中移除，避免内存泄漏

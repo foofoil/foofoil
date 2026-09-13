@@ -59,10 +59,17 @@ extension AppState {
             )
         }
 
+        /// 窗口关闭时显式结束扩展会话：会话 close 幂等，避免视图树延迟释放导致设备或临时文件在进程存活期间不释放。
+        func endExtensionSessionOnWindowClose() {
+            guard extensionSession != nil else { return }
+            extensionSession = nil
+            extensionFallbackProviderID = nil
+            extensionStateReference = nil
+        }
+
         public func togglePin() {
             self.isPinned.toggle()
         }
-
         public func increaseOpacity() {
             self.opacity = opacity + 0.1
         }
