@@ -759,6 +759,71 @@ struct CueSheetTests {
         #expect(contribution.selectedItemIDs.count == 1)
     }
 
+    /// 重新安装已经播放过的容器时，专辑分段必须留在原位置，不能整段跳到列表末尾。
+    @Test func reinstallingContainerKeepsSectionPosition() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-sacd-reinstall-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let firstISO = directory.appendingPathComponent("first.iso")
+        let secondISO = directory.appendingPathComponent("second.iso")
+        try Data("iso-1".utf8).write(to: firstISO)
+        try Data("iso-2".utf8).write(to: secondISO)
+
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        let firstPlaceholder = state.makeFileListItem(url: firstISO)
+        let secondPlaceholder = state.makeFileListItem(url: secondISO)
+        state.fileList = FileListState(
+            kind: .audio,
+            items: [firstPlaceholder, secondPlaceholder],
+            currentID: firstPlaceholder.id
+        )
+        let firstQueue = MediaPlaybackQueueSnapshot(
+            items: [
+                MediaPlaybackQueueItem(id: "track:stereo:01", title: "First A", duration: 10),
+                MediaPlaybackQueueItem(id: "track:stereo:02", title: "First B", duration: 20)
+            ],
+            currentItemID: "track:stereo:01",
+            title: "First Disc"
+        )
+        state.installContainerAudioList(url: firstISO, queue: firstQueue, bookmark: nil)
+        state.installContainerAudioList(
+            url: secondISO,
+            queue: MediaPlaybackQueueSnapshot(
+                items: [
+                    MediaPlaybackQueueItem(id: "track:stereo:01", title: "Second A", duration: 30),
+                    MediaPlaybackQueueItem(id: "track:stereo:02", title: "Second B", duration: 40)
+                ],
+                currentItemID: "track:stereo:01",
+                title: "Second Disc"
+            ),
+            bookmark: nil,
+            selectsContainerTrack: false
+        )
+        // 再次打开第一张专辑（新会话）时，分段仍应排在第二张专辑之前。
+        state.installContainerAudioList(
+            url: firstISO,
+            queue: MediaPlaybackQueueSnapshot(
+                items: [
+                    MediaPlaybackQueueItem(id: "track:stereo:01", title: "First A", duration: 10),
+                    MediaPlaybackQueueItem(id: "track:stereo:02", title: "First B", duration: 20)
+                ],
+                currentItemID: "track:stereo:02",
+                title: "First Disc"
+            ),
+            bookmark: nil
+        )
+
+        let list = try #require(state.fileList)
+        #expect(list.sections.map(\.title) == ["First Disc", "Second Disc"])
+        #expect(list.items.map(\.displayName) == ["First A", "First B", "Second A", "Second B"])
+        let contribution = try #require(state.navigatorContributions.first)
+        #expect(contribution.items.map(\.title) == [
+            "First Disc", "First A", "First B", "Second Disc", "Second A", "Second B"
+        ])
+    }
+
     @Test func sniffMatcherAcceptsSACDMagicAndIgnoresOrdinaryISO() throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("foofoil-iso-sniff-\(UUID().uuidString)", isDirectory: true)

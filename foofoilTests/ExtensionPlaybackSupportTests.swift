@@ -375,6 +375,133 @@ struct ExtensionPlaybackSupportTests {
         #expect(ExtensionPlaybackSupport.queueItemID(for: stamped[0], in: trimmed) == nil)
     }
 
+    /// 两张专辑的容器曲目 ID 相同（按序号生成）时，不能用另一张专辑的条目匹配当前队列。
+    @Test func containerQueueIDsDoNotMatchItemsFromAnotherContainer() {
+        let firstISO = URL(fileURLWithPath: "/tmp/first-disc.iso")
+        let secondISO = URL(fileURLWithPath: "/tmp/second-disc.iso")
+        let state = AppState()
+        defer {
+            state.extensionSession = nil
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        let firstItem = FileListItem(
+            id: "host:first",
+            path: firstISO.path,
+            displayName: "First",
+            cue: FileListCueInfo(startCueFrames: 0, sectionID: "section-first", containerTrackID: "track:stereo:01")
+        )
+        let secondItem = FileListItem(
+            id: "host:second",
+            path: secondISO.path,
+            displayName: "Second",
+            cue: FileListCueInfo(startCueFrames: 0, sectionID: "section-second", containerTrackID: "track:stereo:01")
+        )
+        state.fileList = FileListState(kind: .audio, items: [firstItem, secondItem], currentID: secondItem.id)
+        let session = ContentSession(
+            extensionID: nil,
+            providerID: "audio.hifi",
+            request: .singleFile(.init(url: secondISO)),
+            presentation: .text(titleKey: "Test", body: "Fixture"),
+            playbackQueue: .init(
+                items: [
+                    .init(id: "track:stereo:01", title: "Second A"),
+                    .init(id: "track:stereo:02", title: "Second B")
+                ],
+                currentItemID: "track:stereo:01"
+            )
+        )
+        #expect(ExtensionPlaybackSupport.queueItemID(for: secondItem, in: session) == "track:stereo:01")
+        #expect(ExtensionPlaybackSupport.queueItemID(for: firstItem, in: session) == nil)
+        state.extensionSession = session
+        state.synchronizeFileListWithExtensionQueue(session)
+        #expect(state.fileList?.currentID == secondItem.id)
+    }
+
+    /// 删除另一容器的同号曲目不得把当前会话的曲目记成已删除，否则后继会被裁掉。
+    @Test func removingAnotherContainersTrackDoesNotMarkCurrentAsRemoved() {
+        let firstISO = URL(fileURLWithPath: "/tmp/first-disc.iso")
+        let secondISO = URL(fileURLWithPath: "/tmp/second-disc.iso")
+        let state = AppState()
+        defer {
+            state.extensionSession = nil
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        let firstItem = FileListItem(
+            id: "host:first",
+            path: firstISO.path,
+            displayName: "First",
+            cue: FileListCueInfo(startCueFrames: 0, sectionID: "section-first", containerTrackID: "track:stereo:01")
+        )
+        let secondItem = FileListItem(
+            id: "host:second",
+            path: secondISO.path,
+            displayName: "Second",
+            cue: FileListCueInfo(startCueFrames: 0, sectionID: "section-second", containerTrackID: "track:stereo:01")
+        )
+        let session = ContentSession(
+            extensionID: nil,
+            providerID: "audio.hifi",
+            request: .singleFile(.init(url: secondISO)),
+            presentation: .text(titleKey: "Test", body: "Fixture"),
+            playbackQueue: .init(
+                items: [
+                    .init(id: "track:stereo:01", title: "Second A"),
+                    .init(id: "track:stereo:02", title: "Second B")
+                ],
+                currentItemID: "track:stereo:01"
+            )
+        )
+        state.extensionSession = session
+        state.recordExtensionRemovals(in: [firstItem])
+        #expect(state.extensionRemovedItemIDs.isEmpty)
+        state.recordExtensionRemovals(in: [secondItem])
+        #expect(state.extensionRemovedItemIDs == ["track:stereo:01"])
+    }
+
+    /// 点击同一多文件会话里的另一个文件应直接激活队列项，不关闭重建会话。
+    @Test func clickingAnotherFileInSameCollectionReusesSession() throws {
+        let first = URL(fileURLWithPath: "/tmp/first.dsf")
+        let second = URL(fileURLWithPath: "/tmp/second.dsf")
+        let state = AppState()
+        defer {
+            state.extensionSession = nil
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        let items = [
+            FileListItem(id: "host:0", path: first.path, displayName: "first.dsf"),
+            FileListItem(id: "host:1", path: second.path, displayName: "second.dsf")
+        ]
+        state.fileList = FileListState(kind: .audio, items: items, currentID: items[0].id)
+        let session = ContentSession(
+            extensionID: nil,
+            providerID: "audio.hifi",
+            request: .fileCollection([.init(url: first), .init(url: second)]),
+            presentation: .text(titleKey: "Test", body: "Fixture"),
+            capabilities: [
+                .init(declaration: .init(id: ExtensionCapabilityIdentifier.mediaTransport, scope: .session), state: .active),
+                .init(declaration: .init(id: ExtensionCapabilityIdentifier.deviceSelector, scope: .application), state: .active),
+                .init(declaration: .init(id: ExtensionCapabilityIdentifier.navigatorActions, scope: .presentation), state: .active)
+            ],
+            navigatorContributions: [
+                .init(
+                    id: "hifi.playback-queue", titleLocalizationKey: "Queue", style: .flat,
+                    items: [.init(id: "file:0", title: "first"), .init(id: "file:1", title: "second")],
+                    selectedItemIDs: ["file:0"], allowedActions: [.activate]
+                )
+            ],
+            mediaPlayback: .init(state: .playing, position: 1, duration: 10, isSeekable: true),
+            playbackQueue: .init(
+                items: [.init(id: "file:0", title: "first"), .init(id: "file:1", title: "second")],
+                currentItemID: "file:0"
+            )
+        )
+        state.extensionSession = session
+        state.stampHostListWithExtensionQueueIDs(session)
+        let stampedSecond = try #require(state.fileList?.items[1])
+        #expect(ExtensionPlaybackSupport.queueItemID(for: stampedSecond, in: session) == "file:1")
+        #expect(state.activateExistingContainerTrack(stampedSecond))
+    }
+
     @Test func contiguousAudioURLsFollowSharedProviderAndStopAtSniffedContainer() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("foofoil-contiguous-\(UUID().uuidString)", isDirectory: true)

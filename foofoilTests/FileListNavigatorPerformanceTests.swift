@@ -131,4 +131,29 @@ struct FileListNavigatorPerformanceTests {
         #expect(state.builtInNavigatorContributions[0].items.filter(\.isCurrent).map(\.id) == ["track-32"])
         #expect(state.navigatorMetadata.count == 64)
     }
+
+    @Test func activatingUnavailableItemKeepsCurrentSelection() throws {
+        let state = makeState(count: 2)
+        defer { state.resetFileList() }
+        state.presentFileListItem(id: "track-1", rotatesIdentity: false)
+        #expect(state.fileList?.currentID == "track-0")
+        #expect(state.builtInNavigatorContributions[0].selectedItemIDs == ["track-0"])
+    }
+
+    @Test func sessionStampsDoNotInvalidateNavigatorMetadata() throws {
+        let state = makeState(count: 4)
+        defer { state.resetFileList() }
+        let items = try #require(state.fileList?.items)
+        let generation = state.navigatorMetadataGeneration
+        state.applyNavigatorMetadata(items.map {
+            FileListNavigatorMetadata(item: $0, isAccessible: true, badge: "1:00")
+        }, generation: generation)
+        // 会话盖章只改 extensionItemID；列表重建后不能丢弃已探测的时长与可访问性。
+        var stamped = items
+        stamped[0].extensionItemID = "queue-0"
+        state.fileList = FileListState(kind: .audio, items: stamped, currentID: stamped[0].id)
+        state.syncFileListNavigator()
+        #expect(state.navigatorMetadata.count == 4)
+        #expect(state.builtInNavigatorContributions[0].items[0].badge == "1:00")
+    }
 }

@@ -124,7 +124,9 @@ extension AppState {
     }
 
     /// 不解析 ID 布局：依次尝试容器曲目 ID、会话盖章和不透明资源对应关系。
+    /// 条目不属于当前会话资源时返回 nil，避免不同专辑的同名 ID 被当成删除/后继记录。
     func extensionQueueItemID(for item: FileListItem, in session: ContentSession) -> String? {
+        guard itemBelongsToSession(item, session: session) else { return nil }
         let queueIDs = Set(session.playbackQueue?.items.map(\.id) ?? [])
         if let id = item.cue?.containerTrackID, queueIDs.contains(id) { return id }
         if let id = item.extensionItemID, queueIDs.contains(id) { return id }
@@ -152,13 +154,20 @@ extension AppState {
         let normalizedPath = url.resolvingSymlinksInPath().standardizedFileURL.path
         // 只有扩展安装的容器曲目带 containerTrackID。宿主先解析的 CUE 曲目没有不透明 ID，
         // 若沿用会让点击第 N 首却从第一首开始，必须整体替换为扩展队列。
-        let alreadyInstalled = fileList?.items.contains(where: { item in
+        let containerItems = fileList?.items.filter { item in
             item.cue?.containerTrackID != nil
                 && item.url.resolvingSymlinksInPath().standardizedFileURL.path == normalizedPath
-        }) == true
+        } ?? []
+        // 旧曲目 ID 仍能映射到新队列时才复用投影；扩展每次会话可能返回新 ID，
+        // 沿用旧 ID 会让列表高亮与点击定位指向已不存在的项，必须按新快照重新安装。
+        let alreadyInstalled = containerItems.contains { containerTrackID(for: $0, in: queue) != nil }
         if !alreadyInstalled {
             // 替换前按点名项在原 CUE 内的次序记录目标曲目，替换后按队列顺序对齐。
-            let alignedTrackID = preferredContainerTrackID(preferredItemID: preferredItemID, in: queue)
+            let alignedTrackID = preferredContainerTrackID(
+                preferredItemID: preferredItemID,
+                in: queue,
+                session: session
+            )
             let bookmark = session.request.resources.first?.securityScopedBookmark
                 ?? Self.makeSecurityScopedBookmark(for: url)
             installContainerAudioList(url: url, queue: queue, bookmark: bookmark)
@@ -174,25 +183,30 @@ extension AppState {
         }
         if let preferredItemID,
            let preferredItem = fileList?.items.first(where: { $0.id == preferredItemID }),
-           let containerTrackID = containerTrackID(for: preferredItem, in: queue),
-           var list = fileList {
-            list.currentID = preferredItemID
-            fileList = list
-            activateContainerTrack(containerTrackID, session: session)
+           itemBelongsToSession(preferredItem, session: session) {
+            // 已安装项的旧 ID 仍有效时直接激活；ID 变了则退回按容器内次序对齐新队列。
+            let trackID = containerTrackID(for: preferredItem, in: queue)
+                ?? preferredContainerTrackID(preferredItemID: preferredItemID, in: queue, session: session)
+            if let trackID, var list = fileList {
+                list.currentID = preferredItemID
+                fileList = list
+                activateContainerTrack(trackID, session: session)
+            }
         }
         syncFileListNavigator()
     }
 
-    /// 宿主 CUE 曲目与扩展单资源容器队列由同一 CUE 生成且顺序一致；只在替换列表时按原列表
+    /// 宿主 CUE 曲目与扩展单资源容器队列由同一 CUE 生成且顺序一致；只在替换/对齐列表时按原列表
     /// 内次序翻译一次，不把曲目序号当作协议，也不跨 CUE 段猜测。
     private func preferredContainerTrackID(
         preferredItemID: String?,
-        in queue: MediaPlaybackQueueSnapshot
+        in queue: MediaPlaybackQueueSnapshot,
+        session: ContentSession
     ) -> String? {
         guard let preferredItemID, let list = fileList,
               let index = list.items.firstIndex(where: { $0.id == preferredItemID }) else { return nil }
         let preferred = list.items[index]
-        guard preferred.cue != nil, preferred.cue?.containerTrackID == nil else { return nil }
+        guard preferred.cue != nil, itemBelongsToSession(preferred, session: session) else { return nil }
         let sectionID = preferred.cue?.sectionID
         let sectionItems = sectionID.map { id in
             list.items.filter { $0.cue?.sectionID == id }
@@ -200,6 +214,16 @@ extension AppState {
         guard let ordinal = sectionItems.firstIndex(where: { $0.id == preferredItemID }),
               queue.items.indices.contains(ordinal) else { return nil }
         return queue.items[ordinal].id
+    }
+
+    /// 条目是否属于该会话资源：单资源容器按容器文件，多文件序列按资源路径。
+    /// 容器曲目 ID 常按内部序号生成，不同专辑会重名，复用或对齐前必须确认，避免切到别的专辑。
+    func itemBelongsToSession(_ item: FileListItem, session: ContentSession) -> Bool {
+        let itemPath = (resolvedURL(for: item) ?? item.url)
+            .resolvingSymlinksInPath().standardizedFileURL.path
+        return session.request.resources.contains {
+            $0.url.resolvingSymlinksInPath().standardizedFileURL.path == itemPath
+        }
     }
 
     private func activateContainerTrack(_ trackID: String, session: ContentSession) {
@@ -215,17 +239,13 @@ extension AppState {
     func activateExistingContainerTrack(_ item: FileListItem) -> Bool {
         guard let session = extensionSession,
               let queue = session.playbackQueue,
-              let containerTrackID = containerTrackID(for: item, in: queue),
               let contributionID = ExtensionPlaybackSupport.playbackContributionID(in: session) else {
             return false
         }
-        let sessionURL = session.request.primaryFileURL
-        let itemURL = resolvedURL(for: item) ?? item.url
-        if let sessionURL {
-            let same = sessionURL.resolvingSymlinksInPath().standardizedFileURL.path
-                == itemURL.resolvingSymlinksInPath().standardizedFileURL.path
-            guard same else { return false }
-        }
+        // 只复用条目确实属于当前会话资源的播放：单资源容器按容器文件，多文件序列按资源路径。
+        // 大列表里点击同一序列的其它文件时无需关闭再重建会话，避免列表/封面长时间空白与错位。
+        guard itemBelongsToSession(item, session: session),
+              let containerTrackID = containerTrackID(for: item, in: queue) else { return false }
         if queue.currentItemID != containerTrackID {
             performNavigatorAction(
                 NavigatorAction(

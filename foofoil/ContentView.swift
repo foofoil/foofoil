@@ -84,6 +84,14 @@ public struct ContentView: View {
                 } else if let audioURL = appState.imageURL, appState.isAudioDocument {
                     AudioModeView(appState: appState, url: audioURL, shouldHideBorder: shouldHideBorder)
                         .transition(.opacity)
+                } else if appState.isAudioDocument, appState.fileList?.currentItem != nil {
+                    // 扩展音频会话打开失败或授权失效时不再落入空文本模式，保持可辨识的箔片外观。
+                    ContentUnavailableView(
+                        NSLocalizedString("Audio Content Unavailable", comment: ""),
+                        systemImage: "music.note",
+                        description: Text(NSLocalizedString("Audio Content Unavailable Message", comment: ""))
+                    )
+                    .transition(.opacity)
                 } else if let pdfURL = appState.imageURL, appState.isPDFDocument {
                     PDFModeView(appState: appState, url: pdfURL)
                         .transition(.opacity)

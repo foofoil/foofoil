@@ -209,6 +209,40 @@
         }
       }
     },
+    "Audio Content Unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio Unavailable"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频不可用"
+          }
+        }
+      }
+    },
+    "Audio Content Unavailable Message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The audio file could not be opened."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法打开该音频文件。"
+          }
+        }
+      }
+    },
     "Audio Cover Access Message Format" : {
       "extractionState" : "manual",
       "localizations" : {

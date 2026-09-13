@@ -252,23 +252,24 @@ extension AppState {
     }
 
     func presentFileListItem(id: String, rotatesIdentity: Bool) {
-        guard var list = fileList, let item = list.items.first(where: { $0.id == id }) else { return }
-        list.currentID = id
-        fileList = list
+        guard let list = fileList, let item = list.items.first(where: { $0.id == id }) else { return }
 
         // CUE 关联项尚未获得直接读取权限时，仍须进入扩展起播流程申请目录授权。
         let cueExtensionURL = item.cue != nil && ExtensionHost.shared.canOpen(url: item.url) ? item.url : nil
+        // 文件当前不可达时不要改写选中项：否则高亮会指向一个从未开始播放的文件。
         guard let url = resolvedURL(for: item) ?? cueExtensionURL else {
             syncFileListNavigator()
-            saveState()
-            scheduleImageListSlideshowAdvance()
             return
         }
+
+        var updatedList = list
+        updatedList.currentID = id
+        fileList = updatedList
 
         let accessed = url.startAccessingSecurityScopedResource()
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
 
-        switch list.kind {
+        switch updatedList.kind {
         case .image:
             applyImage(
                 url: url,
@@ -666,7 +667,9 @@ extension AppState {
         }
         navigatorProjectedList = list
         let sourceItems = Dictionary(uniqueKeysWithValues: list.items.map { ($0.id, $0) })
-        navigatorMetadata = navigatorMetadata.filter { sourceItems[$0.key] == $0.value.item }
+        navigatorMetadata = navigatorMetadata.filter {
+            sourceItems[$0.key]?.hasSameMediaIdentity(as: $0.value.item) == true
+        }
         fileListRevision &+= 1
         let useOutline = !list.sections.isEmpty && list.soleContainerFormat == nil
         if useOutline {
@@ -763,7 +766,9 @@ extension AppState {
         navigatorMetadataTask?.cancel()
         let generation = UUID()
         navigatorMetadataGeneration = generation
-        let pending = list.items.filter { navigatorMetadata[$0.id]?.item != $0 }
+        let pending = list.items.filter {
+            navigatorMetadata[$0.id]?.item.hasSameMediaIdentity(as: $0) != true
+        }
         let kind = list.kind
         navigatorMetadataTask = Task.detached(priority: .utility) { [weak self] in
             var batch: [FileListNavigatorMetadata] = []
@@ -905,6 +910,12 @@ extension AppState {
                 prefersCurrentItem: selectsContainerTrack
             )
             if !matching.isEmpty {
+                // 被替换分段在 sections 中的原槽位：替换后保持容器位置，避免切歌时整张专辑跳到列表末尾。
+                let replacedSectionIndex = matching.sorted().compactMap { index -> Int? in
+                    guard list.items.indices.contains(index),
+                          let sectionID = list.items[index].cue?.sectionID else { return nil }
+                    return list.sections.firstIndex(where: { $0.id == sectionID })
+                }.min()
                 // 占位文件或宿主已展开的 CUE 曲目都只替换本容器，混合列表里的其它音频必须保留。
                 var replacement: [FileListItem] = []
                 var inserted = false
@@ -922,7 +933,8 @@ extension AppState {
                 let remainingSectionIDs = Set(list.items.compactMap(\.cue?.sectionID))
                 list.sections.removeAll { !remainingSectionIDs.contains($0.id) }
                 if !list.sections.contains(where: { $0.id == section.id }) {
-                    list.sections.append(section)
+                    let insertIndex = min(replacedSectionIndex ?? list.sections.endIndex, list.sections.endIndex)
+                    list.sections.insert(section, at: insertIndex)
                 }
                 if selectsContainerTrack || !list.items.contains(where: { $0.id == list.currentID }) {
                     list.currentID = currentID

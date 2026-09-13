@@ -35,9 +35,7 @@ enum ExtensionPlaybackSupport {
         guard !resources.isEmpty else { return nil }
         if resources.count == 1 { return resources[0] }
         guard let currentID = session.playbackQueue?.currentItemID else { return resources.first }
-        if let item = fileList?.items.first(where: {
-            $0.extensionItemID == currentID || $0.cue?.containerTrackID == currentID
-        }) {
+        if let item = fileList?.items.first(where: { queueItemID(for: $0, in: session) == currentID }) {
             let path = standardizedPath(item.url)
             return resources.first { standardizedPath($0.url) == path } ?? resources.first
         }
@@ -79,16 +77,21 @@ enum ExtensionPlaybackSupport {
 
     static func queueItemID(for item: FileListItem, in session: ContentSession) -> String? {
         guard let queue = session.playbackQueue else { return nil }
-        if let id = item.cue?.containerTrackID, queue.items.contains(where: { $0.id == id }) {
-            return id
-        }
-        if let id = item.extensionItemID, queue.items.contains(where: { $0.id == id }) {
-            return id
-        }
         let resources = session.request.resources
+        let itemPath = standardizedPath(item.url)
+        // 容器曲目 ID 常按内部序号生成，多个容器会重名；先按资源路径确认条目属于当前会话，
+        // 否则高亮、封面和队列投影会把另一张专辑的同号曲目当成当前项。
+        if resources.contains(where: { standardizedPath($0.url) == itemPath }) {
+            if let id = item.cue?.containerTrackID, queue.items.contains(where: { $0.id == id }) {
+                return id
+            }
+            if let id = item.extensionItemID, queue.items.contains(where: { $0.id == id }) {
+                return id
+            }
+        }
         guard queue.items.count == resources.count,
               let resourceIndex = resources.firstIndex(where: {
-                  standardizedPath($0.url) == standardizedPath(item.url)
+                  standardizedPath($0.url) == itemPath
               }) else { return nil }
         return queue.items[resourceIndex].id
     }

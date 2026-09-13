@@ -92,6 +92,16 @@ public nonisolated struct FileListItem: Codable, Equatable, Identifiable, Sendab
 
     public var url: URL { URL(fileURLWithPath: path) }
 
+    /// 会话盖章（extensionItemID）只影响队列映射，不改变内容身份；
+    /// 元数据缓存失效与重探测判断必须忽略它，否则每次换会话都会把整张列表重新读一遍。
+    public func hasSameMediaIdentity(as other: FileListItem) -> Bool {
+        id == other.id
+            && path == other.path
+            && bookmark == other.bookmark
+            && displayName == other.displayName
+            && cue == other.cue
+    }
+
     public init(
         id: String,
         path: String,
