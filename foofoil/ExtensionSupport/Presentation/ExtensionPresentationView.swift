@@ -19,6 +19,10 @@ struct ExtensionPresentationView: View {
                         session: session,
                         shouldHideBorder: shouldHideBorder
                     )
+                } else if case .document(let url) = session.presentation {
+                    ExtensionDocumentView(url: url, sessionID: session.id)
+                        .id(session.id)
+                        .transition(.opacity)
                 } else {
                     genericPresentation(session)
                         .padding(16)
@@ -82,6 +86,9 @@ struct ExtensionPresentationView: View {
                 systemImage: "puzzlepiece.extension",
                 description: Text(NSLocalizedString(messageKey, comment: ""))
             )
+        case .document:
+            // 文档呈现在 body 中单独路由；这里保持 switch 穷尽。
+            EmptyView()
         }
     }
 
