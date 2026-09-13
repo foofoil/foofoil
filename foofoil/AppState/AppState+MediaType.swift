@@ -48,6 +48,13 @@ extension AppState {
             isVideoDocument || isAudioDocument
         }
 
+        /// 扩展 `document` presentation：正文由宿主的只读文档视图承载，缩放作用于文字。
+        public var isExtensionDocument: Bool {
+            guard let session = extensionSession else { return false }
+            if case .document = session.presentation { return true }
+            return false
+        }
+
         /// 全屏视频目录复用控制条的显隐状态和计时器，确保同一配置下同步隐藏。
         var isNavigatorHiddenForVideoInactivity: Bool {
             isFullScreen && isVideoDocument && !isMediaPlaybackControlsVisible

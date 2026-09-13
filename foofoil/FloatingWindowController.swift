@@ -1084,12 +1084,20 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             appState.webZoom = AppState.clampWebZoom(appState.webZoom * zoomStep)
             return
         }
+        if appState.isExtensionDocument {
+            appState.documentZoom = AppState.clampDocumentZoom(appState.documentZoom * zoomStep)
+            return
+        }
         zoomContent(by: zoomStep)
     }
 
     public func zoomOut() {
         if appState.webURL != nil {
             appState.webZoom = AppState.clampWebZoom(appState.webZoom / zoomStep)
+            return
+        }
+        if appState.isExtensionDocument {
+            appState.documentZoom = AppState.clampDocumentZoom(appState.documentZoom / zoomStep)
             return
         }
         zoomContent(by: 1.0 / zoomStep)
@@ -1127,6 +1135,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             }
         } else if appState.webURL != nil {
             appState.webZoom = 1.0
+        } else if appState.isExtensionDocument {
+            appState.documentZoom = 1.0
         } else {
             appState.textFontSize = AppState.defaultTextFontSize
         }

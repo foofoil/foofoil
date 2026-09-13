@@ -21,6 +21,9 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     public static let maxTextFontSize: Double = 48.0
     public static let minImageScale: Double = 0.05
     public static let maxImageScale: Double = 8.0
+    /// 扩展文档的正文缩放范围；只作用于文字，不影响图片与版心宽度。
+    public static let minDocumentZoom: Double = 0.5
+    public static let maxDocumentZoom: Double = 3.0
 
     public var id: UUID
     var sourceFingerprint: String?
@@ -352,6 +355,18 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         }
     }
 
+    /// 扩展 `document` 会话的正文缩放；通过根字号实现纯文字缩放。
+    @Published public var documentZoom: Double {
+        didSet {
+            let clamped = Self.clampDocumentZoom(documentZoom)
+            if clamped != documentZoom {
+                documentZoom = clamped
+            } else if !isInteractiveZooming {
+                saveState()
+            }
+        }
+    }
+
     /// 当前音视频是否正在播放；由媒体视图从播放控制器桥接，供导航面板显示“正在播放”图标状态。
     @Published public var isMediaPlaying = false
 
@@ -435,6 +450,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.imageScale = Self.clampImageScale(config.imageScale)
         self.textFontSize = Self.clampTextFontSize(config.textFontSize)
         self.webZoom = Self.clampWebZoom(config.webZoom)
+        self.documentZoom = Self.clampDocumentZoom(config.documentZoom)
         self.createdAt = config.createdAt
         self.svgColor = config.svgColor
         self.backgroundColorHex = config.backgroundColorHex
@@ -541,6 +557,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.imageScale = 1.0
         self.textFontSize = Self.defaultTextFontSize
         self.webZoom = 1.0
+        self.documentZoom = 1.0
         self.createdAt = Date()
         self.svgColor = nil
         self.backgroundColorHex = nil

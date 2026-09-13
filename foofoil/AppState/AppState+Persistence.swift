@@ -47,6 +47,7 @@ extension AppState {
             self.imageScale = Self.clampImageScale(config.imageScale)
             self.textFontSize = Self.clampTextFontSize(config.textFontSize)
             self.webZoom = Self.clampWebZoom(config.webZoom)
+            self.documentZoom = Self.clampDocumentZoom(config.documentZoom)
             self.isMarkdownPreview = config.isMarkdownPreview
             self.windowFrame = config.windowFrame
             self.createdAt = config.createdAt
@@ -184,6 +185,7 @@ extension AppState {
                 )),
                 sourceFingerprint: sourceFingerprint,
                 webZoom: webZoom,
+                documentZoom: documentZoom,
                 mediaPlaybackMode: mediaPlaybackMode,
                 videoBookmark: videoBookmarkData,
                 mediaSidecarBookmark: mediaSidecarBookmarkData,

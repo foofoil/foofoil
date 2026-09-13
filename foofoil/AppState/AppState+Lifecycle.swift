@@ -97,4 +97,8 @@ extension AppState {
         public static func clampWebZoom(_ value: Double) -> Double {
             max(0.25, min(5.0, value))
         }
+
+        public static func clampDocumentZoom(_ value: Double) -> Double {
+            max(minDocumentZoom, min(maxDocumentZoom, value))
+        }
 }

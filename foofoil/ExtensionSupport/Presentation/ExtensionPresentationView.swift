@@ -20,9 +20,13 @@ struct ExtensionPresentationView: View {
                         shouldHideBorder: shouldHideBorder
                     )
                 } else if case .document(let url) = session.presentation {
-                    ExtensionDocumentView(url: url, sessionID: session.id)
-                        .id(session.id)
-                        .transition(.opacity)
+                    ExtensionDocumentView(
+                        url: url,
+                        sessionID: session.id,
+                        textScale: appState.documentZoom
+                    )
+                    .id(session.id)
+                    .transition(.opacity)
                 } else {
                     genericPresentation(session)
                         .padding(16)

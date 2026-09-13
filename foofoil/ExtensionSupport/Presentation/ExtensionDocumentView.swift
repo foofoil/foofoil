@@ -35,6 +35,7 @@ enum ExtensionDocumentURLPolicy {
 struct ExtensionDocumentView: View {
     let url: URL
     let sessionID: UUID
+    let textScale: Double
 
     @State private var isLoading = true
     @State private var loadFailed = false
@@ -44,6 +45,7 @@ struct ExtensionDocumentView: View {
         ZStack {
             ExtensionDocumentWebView(
                 url: url,
+                textScale: textScale,
                 isLoading: $isLoading,
                 loadFailed: $loadFailed,
                 securityFailed: $securityFailed
@@ -84,6 +86,26 @@ enum ExtensionDocumentWebViewFactory {
     }
 }
 
+/// 纯文字缩放的固定宿主脚本：只改根字号与正文字号，不触碰图片与增量布局。
+enum DocumentTextZoom {
+    static let basePoints = 16.0
+
+    static func fontPoints(for scale: Double) -> Int {
+        max(1, Int((basePoints * scale).rounded()))
+    }
+
+    static func styleScript(for scale: Double) -> String {
+        let points = fontPoints(for: scale)
+        return "(function(){"
+            + "var id='foofoil-text-zoom';"
+            + "var el=document.getElementById(id);"
+            + "if(!el){el=document.createElement('style');el.id=id;"
+            + "(document.head||document.documentElement).appendChild(el);}"
+            + "el.textContent='html{font-size:\(points)px !important;} body{font-size:1em !important;}';"
+            + "})();"
+    }
+}
+
 /// 进程级内容规则表：加载前安装默认拒绝网络，编译失败不得降级为无规则加载。
 @MainActor
 enum DocumentContentRuleList {
@@ -120,6 +142,7 @@ enum DocumentContentRuleList {
 
 private struct ExtensionDocumentWebView: NSViewRepresentable {
     let url: URL
+    let textScale: Double
     @Binding var isLoading: Bool
     @Binding var loadFailed: Bool
     @Binding var securityFailed: Bool
@@ -142,6 +165,7 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
     func updateNSView(_ webView: WKWebView, context: Context) {
         context.coordinator.parent = self
         context.coordinator.load(url: url)
+        context.coordinator.applyTextScale(textScale)
     }
 
     static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
@@ -159,6 +183,7 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
         private var hasReportedFailure = false
         private var hasInstalledRuleList = false
         private var loadGeneration: UInt64 = 0
+        private var appliedTextScale: Double = .nan
 
         init(_ parent: ExtensionDocumentWebView) {
             self.parent = parent
@@ -212,6 +237,13 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
             parent.loadFailed = true
         }
 
+        /// 纯文字缩放：只改根字号与正文字号，图片与版心按 CSS 自行处理。
+        func applyTextScale(_ scale: Double, force: Bool = false) {
+            guard force || scale != appliedTextScale else { return }
+            appliedTextScale = scale
+            webView?.evaluateJavaScript(DocumentTextZoom.styleScript(for: scale))
+        }
+
         private func isCurrent(_ url: URL?) -> Bool {
             guard let url, let targetIdentity else { return false }
             return ExtensionDocumentURLPolicy.fileIdentity(
@@ -251,6 +283,7 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
             guard isCurrent(webView.url) else { return }
             parent.isLoading = false
             parent.loadFailed = false
+            applyTextScale(parent.textScale, force: true)
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
