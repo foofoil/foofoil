@@ -709,6 +709,7 @@ extension AppState {
                     }
                     self.isBatchUpdating = false
                     self.saveState()
+                    self.applyExtensionThumbnail(outcome.session)
                 } catch {
                     self.isBatchUpdating = false
                     NSLog("Extension session failed: \(error.localizedDescription)")
@@ -737,6 +738,16 @@ extension AppState {
             if url.startAccessingSecurityScopedResource() {
                 accessingVideoURL = url
             }
+        }
+
+        /// 扩展内容（如 EPUB）自带封面时，把像素复制为历史缩略图；不持久化封面 URL 本身。
+        func applyExtensionThumbnail(_ session: ContentSession) {
+            guard let url = session.thumbnailURL, url.isFileURL,
+                  FileManager.default.fileExists(atPath: url.path),
+                  let image = NSImage(contentsOf: url),
+                  image.size.width > 0, image.size.height > 0 else { return }
+            displayedArtwork = image
+            persistDisplayedArtworkForHistory(image, force: true)
         }
 
         /// 视图已展示的封面落盘为历史缩略图。无 imagePath 的扩展音频不走后台索引，
@@ -835,6 +846,7 @@ extension AppState {
                     }
                     self.isBatchUpdating = false
                     self.saveState()
+                    self.applyExtensionThumbnail(restoredSession)
                 } catch {
                     guard self.id == expectedStateID,
                           self.currentMediaRouteGeneration == routeGeneration else { return }
