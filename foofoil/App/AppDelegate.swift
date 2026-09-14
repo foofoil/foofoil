@@ -61,6 +61,12 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
         controller.window?.makeKeyAndOrderFront(nil)
     }
 
+    /// 有箔片处于原生全屏时，其余箔片退出 all-spaces 常驻，避免浮在全屏箔的 Space 上方；
+    /// 全屏结束后恢复常驻。窗口增删与箔片进出全屏时都会调用。
+    func syncFoilSpaceJoining() {
+        windowControllers.forEach { $0.updateSpaceJoiningBehavior() }
+    }
+
     // 处理文件关联打开事件 (右键 "打开方式" 或者双击文件)
     public func application(_ sender: NSApplication, openFiles filenames: [String]) {
         didOpenFiles = true
@@ -117,6 +123,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // 2. 动态创建 macOS 菜单项 (延时到主线程下一个循环，确保在 SwiftUI 初始化菜单之后执行)
+        // 全局热键 ⌃⌥F 在启动时注册，浮箔未激活时也能唤起“显示所有箔片”。
+        FoilExposeController.shared.installGlobalHotKey()
         DispatchQueue.main.async {
             self.setupMainMenu()
             self.updateHistoryMenu()
@@ -181,10 +189,12 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     public func removeWindowController(_ controller: FloatingWindowController) {
         guard let index = windowControllers.firstIndex(where: { $0 === controller }) else { return }
         windowControllers.remove(at: index)
+        syncFoilSpaceJoining()
     }
 
     func addWindowController(_ controller: FloatingWindowController) {
         windowControllers.append(controller)
+        syncFoilSpaceJoining()
 
         // 内容在当前窗口内切换时（例如通过“打开”或拖放）也立即更新 PDF 专用菜单。
         controller.appState.$imageURL

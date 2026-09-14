@@ -1091,6 +1091,18 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         appState.isFullScreen ? shouldShowNavigatorPanel : navigatorPanelController.isVisible
     }
 
+    /// Space 归属策略：默认加入所有 Space 让箔片常驻浮显；其他箔片原生全屏期间退回所在
+    /// Space，避免浮在该全屏箔上方。自身全屏或切换中不处理（collectionBehavior 由全屏流程接管）。
+    func updateSpaceJoiningBehavior() {
+        guard let window, !appState.isFullScreen, !isTransitioningFullScreen else { return }
+        let otherFoilIsFullScreen = (NSApplication.shared.delegate as? AppDelegate)?
+            .windowControllers
+            .contains { $0 !== self && $0.appState.isFullScreen } == true
+        window.collectionBehavior = otherFoilIsFullScreen
+            ? [.fullScreenAuxiliary]
+            : [.canJoinAllSpaces, .fullScreenAuxiliary]
+    }
+
     /// 使用 AppKit 原生全屏 Space；每个箔片窗口独立切换，窗口态 frame 与边框偏好保持不变。
     public func toggleFullScreen() {
         guard let window, !isTransitioningFullScreen else { return }
@@ -1600,12 +1612,14 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         navigatorPanelController.hide()
         removeNavigatorHoverMonitors()
         window.hasShadow = false
+        (NSApplication.shared.delegate as? AppDelegate)?.syncFoilSpaceJoining()
     }
 
     public func windowDidEnterFullScreen(_ notification: Notification) {
         isTransitioningFullScreen = false
         appState.isFullScreen = true
         updateNavigatorPanelVisibility()
+        (NSApplication.shared.delegate as? AppDelegate)?.syncFoilSpaceJoining()
     }
 
     public func windowWillExitFullScreen(_ notification: Notification) {
@@ -1623,7 +1637,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         appState.isFullScreen = false
         window.hasShadow = true
         window.level = appState.isPinned ? .floating : .normal
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        // 其他箔片可能仍在全屏：按全局状态决定自身是否恢复加入所有 Space，并同步其余箔片。
+        (NSApplication.shared.delegate as? AppDelegate)?.syncFoilSpaceJoining()
         if let windowedFrameDescriptorBeforeFullScreen {
             appState.windowFrame = windowedFrameDescriptorBeforeFullScreen
         }
@@ -1636,7 +1651,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         appState.isFullScreen = false
         window.hasShadow = true
         window.level = appState.isPinned ? .floating : .normal
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        (NSApplication.shared.delegate as? AppDelegate)?.syncFoilSpaceJoining()
         windowedFrameDescriptorBeforeFullScreen = nil
         updateNavigatorPanelVisibility()
     }
@@ -1646,6 +1661,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         appState.isFullScreen = true
         window.hasShadow = false
         navigatorPanelController.hide()
+        (NSApplication.shared.delegate as? AppDelegate)?.syncFoilSpaceJoining()
     }
 
     public func windowWillStartLiveResize(_ notification: Notification) {

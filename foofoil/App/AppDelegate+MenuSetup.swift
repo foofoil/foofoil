@@ -483,6 +483,18 @@ extension AppDelegate {
 
         windowMenu.addItem(NSMenuItem.separator())
 
+        let showAllFoilsItem = NSMenuItem(
+            title: NSLocalizedString("Show All Foils", comment: ""),
+            action: #selector(showAllFoilsAction),
+            keyEquivalent: "f"
+        )
+        showAllFoilsItem.withSymbol("rectangle.grid.2x2")
+        showAllFoilsItem.keyEquivalentModifierMask = [.control, .option]
+        showAllFoilsItem.target = self
+        windowMenu.addItem(showAllFoilsItem)
+
+        windowMenu.addItem(NSMenuItem.separator())
+
         let moveToNextScreenItem = NSMenuItem(
             title: NSLocalizedString("Move to Next Screen", comment: ""),
             action: #selector(moveToNextScreenAction),

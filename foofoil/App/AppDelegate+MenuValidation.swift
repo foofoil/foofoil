@@ -181,6 +181,11 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             return NSScreen.screens.count > 1
         }
 
+        // 至少存在一个箔片窗口才启用；没有窗口时禁用但保留菜单项可见。
+        if menuItem.action == #selector(showAllFoilsAction) {
+            return windowControllers.contains { $0.window != nil }
+        }
+
         if menuItem.action == #selector(openInDefaultBrowserAction) {
             menuItem.title = defaultBrowserInfo().itemTitle
             return activeAppState?.webURL != nil
