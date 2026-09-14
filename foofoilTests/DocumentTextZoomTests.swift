@@ -176,6 +176,30 @@ struct DocumentTextZoomTests {
         #expect(fraction > 0.2, "fraction=\(fraction)")
     }
 
+    /// 箔片宽度变化引起重排后，视口顶端那一行文字应保持原位。
+    @Test func keepsTopLineAnchoredWhenWidthChanges() async throws {
+        let webView = try await makeLoadedWebView(html: tallHTML())
+        _ = try? await webView.evaluateJavaScript(DocumentScrollPersistence.hooksInstallScript)
+        _ = try? await webView.evaluateJavaScript("window.scrollTo(0, 800)")
+        // 滚动事件捕获锚点（前导节流立即执行）。
+        try await Task.sleep(for: .milliseconds(150))
+        let before = try #require(
+            (try? await webView.evaluateJavaScript("window.__foofoilReaderAnchorTop()")) as? Double
+        )
+
+        webView.setFrameSize(NSSize(width: 640, height: 300))
+        // resize 监听去抖 60ms 后回位；轮询等待生效。
+        var after = before
+        for _ in 0..<150 {
+            after = (try? await webView.evaluateJavaScript(
+                "window.__foofoilReaderAnchorTop()"
+            )) as? Double ?? before
+            if abs(after - before) < 2.0 { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(abs(after - before) < 2.0, "before=\(before) after=\(after)")
+    }
+
     private func waitForWebView(in view: NSView) async throws -> WKWebView {
         for _ in 0..<300 {
             if let webView = Self.firstWebView(in: view) { return webView }

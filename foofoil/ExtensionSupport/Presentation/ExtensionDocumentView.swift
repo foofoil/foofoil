@@ -220,17 +220,73 @@ enum DocumentScrollPersistence {
     JSON.stringify({file: location.pathname.split('/').pop(), y: window.scrollY, max: document.documentElement.scrollHeight - window.innerHeight});
     """
 
-    /// 滚动上报监听：前导 + 尾随节流 250ms，重复安装无害。
-    static let reporterInstallScript = """
+    /// 页面侧阅读钩子：滚动时上报 (文件名, 视口位置) 并维护"顶行锚点"，
+    /// 箔片宽度变化重排后按锚点回位，保证顶行文字不因换行重排而跳走。
+    /// 锚点逻辑与宿主 `DocumentTextZoom.captureAnchorScript` 一致，但状态留在
+    /// 页面 JS 变量里（元素引用跨重排稳定）；重复安装无害。
+    static let hooksInstallScript = """
     (function(){
-      if (window.__foofoilScrollReporter) { return; }
-      window.__foofoilScrollReporter = true;
+      if (window.__foofoilReaderHooks) { return; }
+      window.__foofoilReaderHooks = true;
       var timer = null;
       var pending = false;
-      function send() {
+      function post(payload) {
         var handlers = window.webkit && window.webkit.messageHandlers;
-        if (!handlers || !handlers.foofoilDocumentScroll) { return; }
-        handlers.foofoilDocumentScroll.postMessage({
+        if (handlers && handlers.foofoilDocumentScroll) { handlers.foofoilDocumentScroll.postMessage(payload); }
+      }
+      function anchorCharTop(a) {
+        if (!a || !a.block || !a.block.isConnected) { return null; }
+        var block = a.block;
+        var walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, null);
+        var total = 0, node = null, local = 0, current;
+        while ((current = walker.nextNode())) {
+          var length = current.textContent.length;
+          if (total + length >= a.offset) { node = current; local = a.offset - total; break; }
+          total += length;
+        }
+        var range = document.createRange();
+        try {
+          if (node && node.nodeType === 3 && node.textContent.length > 0) {
+            var start = Math.max(0, Math.min(local, node.textContent.length - 1));
+            range.setStart(node, start);
+            range.setEnd(node, start + 1);
+          } else {
+            range.selectNodeContents(block);
+          }
+          var rects = range.getClientRects();
+          if (rects.length > 0) { return rects[0].top; }
+        } catch (e) {}
+        return block.getBoundingClientRect().top;
+      }
+      function captureAnchor() {
+        var x = Math.max(12, Math.floor(window.innerWidth / 2));
+        for (var y = 2; y < 96; y += 6) {
+          var range = document.caretRangeFromPoint(x, y);
+          if (!range || !range.startContainer || range.startContainer.nodeType !== 3) { continue; }
+          var block = range.startContainer.parentElement;
+          while (block && block !== document.body) {
+            var display = block.ownerDocument.defaultView.getComputedStyle(block).display;
+            if (display !== 'inline') { break; }
+            block = block.parentElement;
+          }
+          if (!block || block === document.body) { continue; }
+          var walker = block.ownerDocument.createTreeWalker(block, NodeFilter.SHOW_TEXT, null);
+          var total = 0, offset = -1, n;
+          while ((n = walker.nextNode())) {
+            if (n === range.startContainer) { offset = total + range.startOffset; break; }
+            total += n.textContent.length;
+          }
+          if (offset < 0) { continue; }
+          range.setEnd(range.startContainer, Math.min(range.startOffset + 1, range.startContainer.textContent.length));
+          var rects = range.getClientRects();
+          var top = rects.length > 0 ? rects[0].top : block.getBoundingClientRect().top;
+          window.__foofoilReaderAnchor = { block: block, offset: offset, top: top };
+          return;
+        }
+      }
+      function send() {
+        captureAnchor();
+        post({
           file: location.pathname.split('/').pop(),
           y: window.scrollY,
           max: document.documentElement.scrollHeight - window.innerHeight
@@ -244,6 +300,32 @@ enum DocumentScrollPersistence {
           if (pending) { pending = false; send(); }
         }, 250);
       }, { passive: true });
+      var resizeQueued = false;
+      function correctAnchor() {
+        var a = window.__foofoilReaderAnchor;
+        if (!a) { return; }
+        var top = anchorCharTop(a);
+        if (top === null) { return; }
+        var delta = top - a.top;
+        if (Math.abs(delta) > 0.5) { window.scrollBy(0, delta); }
+      }
+      window.addEventListener('resize', function() {
+        // 同步回位：resize 处理器运行在本次绘制之前，重排导致的位移不会上屏；
+        // 事件先于新视口布局时由 rAF 兜底再修一次。
+        correctAnchor();
+        if (!resizeQueued) {
+          resizeQueued = true;
+          requestAnimationFrame(function() {
+            resizeQueued = false;
+            correctAnchor();
+          });
+        }
+      });
+      window.__foofoilReaderAnchorTop = function() {
+        var a = window.__foofoilReaderAnchor;
+        return a ? anchorCharTop(a) : null;
+      };
+      captureAnchor();
     })();
     """
 }
@@ -397,7 +479,8 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
             parent.loadFailed = true
         }
 
-        /// 纯文字缩放：以视口顶端可见文字块为锚点，改字号后回位，避免内容跳走。
+        /// 纯文字缩放：以视口顶边那一行为锚点；改字号与回位合并为一次脚本执行，
+        /// 中间不产生重排后未回位的可见帧。
         func applyTextScale(_ scale: Double, force: Bool = false) {
             guard force || scale != appliedTextScale else { return }
             appliedTextScale = scale
@@ -419,7 +502,7 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
                 await self.performTextScale(scale, force: true, generation: generation)
                 await self.restoreSavedScrollPosition()
                 _ = try? await self.webView?.evaluateJavaScript(
-                    DocumentScrollPersistence.reporterInstallScript
+                    DocumentScrollPersistence.hooksInstallScript
                 )
             }
         }
@@ -434,12 +517,12 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
                 )) as? Double
             }
             guard self.textScaleGeneration == generation else { return }
-            _ = try? await webView.evaluateJavaScript(DocumentTextZoom.styleScript(for: scale))
+            var script = DocumentTextZoom.styleScript(for: scale)
             if let anchorOffset {
-                _ = try? await webView.evaluateJavaScript(
-                    DocumentTextZoom.restoreAnchorScript(offset: anchorOffset)
-                )
+                // 单次求值内先改字号再回位，两者之间不会绘制中间帧。
+                script += "\n" + DocumentTextZoom.restoreAnchorScript(offset: anchorOffset)
             }
+            _ = try? await webView.evaluateJavaScript(script)
         }
 
         /// 恢复保存的阅读位置：仅当保存的章节与当前文件一致且 URL 未带锚点（锚点定位由 WebKit 完成）。
