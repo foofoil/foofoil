@@ -289,6 +289,8 @@ struct NavigatorPanelView: View {
                 systemImage: "sidebar.squares.leading"
             )
         }
+        // 挂在控件本身而非标题 Label 上，右键菜单才会渲染出快捷键提示。
+        .keyboardShortcut("l", modifiers: [.command, .shift])
     }
 
     /// 面板空白处与标题共用的右键菜单项：把面板挂到另一侧。
@@ -306,6 +308,7 @@ struct NavigatorPanelView: View {
                 systemImage: appState.navigatorPanelSide == .left ? "sidebar.right" : "sidebar.left"
             )
         }
+        .keyboardShortcut("l", modifiers: [.command, .option])
     }
 
     /// 与菜单栏“挂在左侧/右侧”动作一致：AppState 驱动重排，偏好同步持久化。

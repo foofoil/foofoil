@@ -1350,25 +1350,25 @@ struct FoofoilTests {
             return
         }
 
-        // 导航面板三项直接放在视图菜单一层，不再有子菜单。
+        // 导航面板两项直接放在视图菜单一层，不再有子菜单。
         #expect(viewMenu.items.contains { $0.submenu?.title == NSLocalizedString("Navigator", comment: "") } == false)
 
         let alwaysShow = try #require(viewMenu.items.first { $0.action == #selector(AppDelegate.toggleNavigatorPanelAction) })
         #expect(alwaysShow.title == NSLocalizedString("Always Show Navigator", comment: ""))
-        #expect(alwaysShow.keyEquivalent == "s")
-        #expect(alwaysShow.keyEquivalentModifierMask == [.command, .control])
+        #expect(alwaysShow.keyEquivalent == "l")
+        #expect(alwaysShow.keyEquivalentModifierMask == [.command, .shift])
         #expect(appDelegate.validateMenuItem(alwaysShow) == false)
         #expect(alwaysShow.state == .off)
 
-        let left = try #require(viewMenu.items.first { $0.action == #selector(AppDelegate.placeNavigatorOnLeftAction) })
-        #expect(left.title == NSLocalizedString("Place Navigator on Left", comment: ""))
-        let right = try #require(viewMenu.items.first { $0.action == #selector(AppDelegate.placeNavigatorOnRightAction) })
-        #expect(right.title == NSLocalizedString("Place Navigator on Right", comment: ""))
+        // 挂左/挂右两项合并为单个换边动作，⌘⌥L 触发。
+        let moveSide = try #require(viewMenu.items.first { $0.action == #selector(AppDelegate.moveNavigatorToOppositeSideAction) })
+        #expect(moveSide.keyEquivalent == "l")
+        #expect(moveSide.keyEquivalentModifierMask == [.command, .option])
 
-        // 侧挂项紧跟总显开关，中间不插分割线。
+        // 换边项紧跟总显开关，中间不插分割线。
         if let alwaysIndex = viewMenu.items.firstIndex(of: alwaysShow),
-           let leftIndex = viewMenu.items.firstIndex(of: left) {
-            #expect(leftIndex == alwaysIndex + 1)
+           let moveIndex = viewMenu.items.firstIndex(of: moveSide) {
+            #expect(moveIndex == alwaysIndex + 1)
         }
 
         #expect(viewMenu.items.contains { $0.title == NSLocalizedString("Toggle Navigator", comment: "") } == false)

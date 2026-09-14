@@ -310,34 +310,26 @@ extension AppDelegate {
         viewMenu.addItem(toggleFullScreenItem)
         viewMenu.addItem(NSMenuItem.separator())
 
-        // 导航面板的三项直接放在视图菜单一层，不再收入子菜单；侧挂项标题带主语。
+        // 导航面板两项直接放在视图菜单一层；换边项标题随当前侧动态更新（见 MenuValidation）。
         let alwaysShowNavigatorItem = NSMenuItem(
             title: NSLocalizedString("Always Show Navigator", comment: ""),
             action: #selector(toggleNavigatorPanelAction),
-            keyEquivalent: "s"
+            keyEquivalent: "l"
         )
         alwaysShowNavigatorItem.withSymbol("sidebar.squares.leading")
-        alwaysShowNavigatorItem.keyEquivalentModifierMask = [.command, .control]
+        alwaysShowNavigatorItem.keyEquivalentModifierMask = [.command, .shift]
         alwaysShowNavigatorItem.target = self
         viewMenu.addItem(alwaysShowNavigatorItem)
 
-        let navigatorLeftItem = NSMenuItem(
-            title: NSLocalizedString("Place Navigator on Left", comment: ""),
-            action: #selector(placeNavigatorOnLeftAction),
-            keyEquivalent: ""
+        let moveNavigatorSideItem = NSMenuItem(
+            title: NSLocalizedString("Move Navigator to Right Side", comment: ""),
+            action: #selector(moveNavigatorToOppositeSideAction),
+            keyEquivalent: "l"
         )
-        navigatorLeftItem.withSymbol("sidebar.left")
-        navigatorLeftItem.target = self
-        viewMenu.addItem(navigatorLeftItem)
-
-        let navigatorRightItem = NSMenuItem(
-            title: NSLocalizedString("Place Navigator on Right", comment: ""),
-            action: #selector(placeNavigatorOnRightAction),
-            keyEquivalent: ""
-        )
-        navigatorRightItem.withSymbol("sidebar.right")
-        navigatorRightItem.target = self
-        viewMenu.addItem(navigatorRightItem)
+        moveNavigatorSideItem.withSymbol("arrow.left.arrow.right")
+        moveNavigatorSideItem.keyEquivalentModifierMask = [.command, .option]
+        moveNavigatorSideItem.target = self
+        viewMenu.addItem(moveNavigatorSideItem)
 
         // Reload Page - 快捷键 Command + R
         let reloadPageItem = NSMenuItem(title: NSLocalizedString("Reload Page", comment: ""), action: #selector(reloadPageAction), keyEquivalent: "r")

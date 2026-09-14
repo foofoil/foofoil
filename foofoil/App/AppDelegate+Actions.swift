@@ -675,14 +675,12 @@ extension AppDelegate {
         }
     }
 
-    @objc func placeNavigatorOnLeftAction() {
-        activeAppState?.navigatorPanelSide = .left
-        SettingsStore.shared.navigatorPanelSide = .left
-    }
-
-    @objc func placeNavigatorOnRightAction() {
-        activeAppState?.navigatorPanelSide = .right
-        SettingsStore.shared.navigatorPanelSide = .right
+    /// 把导航面板移到另一侧；菜单栏 ⇧⌘L/⌥⌘L 家族中的换边动作，与面板右键菜单一致。
+    @objc func moveNavigatorToOppositeSideAction() {
+        guard let appState = activeAppState, !appState.navigatorContributions.isEmpty else { return }
+        let next: NavigatorPanelSide = appState.navigatorPanelSide == .left ? .right : .left
+        appState.navigatorPanelSide = next
+        SettingsStore.shared.navigatorPanelSide = next
     }
 
     @objc func reloadPageAction() {

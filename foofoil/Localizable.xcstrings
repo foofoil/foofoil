@@ -2792,40 +2792,6 @@
         }
       }
     },
-    "Place Navigator on Left" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Place Navigator on Left"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "导航面板挂在左侧"
-          }
-        }
-      }
-    },
-    "Place Navigator on Right" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Place Navigator on Right"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "导航面板挂在右侧"
-          }
-        }
-      }
-    },
     "Play" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -124,18 +124,16 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             setMenuItem(withAction: #selector(zoomOutWindowAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(zoomInWindowAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(toggleNavigatorPanelAction), in: menu, isHidden: true)
-            setMenuItem(withAction: #selector(placeNavigatorOnLeftAction), in: menu, isHidden: true)
-            setMenuItem(withAction: #selector(placeNavigatorOnRightAction), in: menu, isHidden: true)
+            setMenuItem(withAction: #selector(moveNavigatorToOppositeSideAction), in: menu, isHidden: true)
             return
         }
 
         let isImageMode = appState.imageURL != nil && appState.webURL == nil
         let isWebMode = appState.webURL != nil
-        // 子菜单已扁平进视图菜单，按 action 逐项控制导航面板三项的显隐。
+        // 子菜单已扁平进视图菜单，按 action 逐项控制导航面板两项的显隐。
         let navigatorItemsHidden = appState.navigatorContributions.isEmpty
         setMenuItem(withAction: #selector(toggleNavigatorPanelAction), in: menu, isHidden: navigatorItemsHidden)
-        setMenuItem(withAction: #selector(placeNavigatorOnLeftAction), in: menu, isHidden: navigatorItemsHidden)
-        setMenuItem(withAction: #selector(placeNavigatorOnRightAction), in: menu, isHidden: navigatorItemsHidden)
+        setMenuItem(withAction: #selector(moveNavigatorToOppositeSideAction), in: menu, isHidden: navigatorItemsHidden)
 
         // 1. 图片和网页模式均可切换视觉边框。
         setMenuItem(
@@ -264,17 +262,18 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             return true
         }
 
-        if menuItem.action == #selector(placeNavigatorOnLeftAction) {
+        // 换边单项：标题随当前侧动态显示目标侧，与面板右键菜单共用同一组文案键。
+        if menuItem.action == #selector(moveNavigatorToOppositeSideAction) {
             guard let appState = activeAppState, !appState.navigatorContributions.isEmpty else { return false }
-            menuItem.state = appState.navigatorPanelSide == .left ? .on : .off
+            menuItem.title = NSLocalizedString(
+                appState.navigatorPanelSide == .left
+                    ? "Move Navigator to Right Side"
+                    : "Move Navigator to Left Side",
+                comment: ""
+            )
             return true
         }
 
-        if menuItem.action == #selector(placeNavigatorOnRightAction) {
-            guard let appState = activeAppState, !appState.navigatorContributions.isEmpty else { return false }
-            menuItem.state = appState.navigatorPanelSide == .right ? .on : .off
-            return true
-        }
 
         if menuItem.action == #selector(fitWindowToImageAction) ||
             menuItem.action == #selector(fitImageToWindowWidthAction) {
