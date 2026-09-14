@@ -100,6 +100,11 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     /// 独占设备交接释放失败时的本地化提示；成功获取或切换内容后清除。
     @Published var extensionHandoffFailureMessage: String?
     var extensionStateReference: String?
+    /// 扩展文档最后阅读位置：章节文件名与滚动比例成对保存，随 WindowConfig 进历史；
+    /// 滚动回传高频，用普通属性避免触发 SwiftUI 失效，落盘由去抖任务统一执行。
+    var extensionDocumentScrollFile: String?
+    var extensionDocumentScrollFraction: Double?
+    var documentScrollSaveTask: Task<Void, Never>?
     var lastExtensionPlaybackCheckpoint = Date.distantPast
     var exclusivePlaybackGeneration: UInt64 = 0
     /// 媒体操作序号：每个会改变状态的媒体动作递增，用于丢弃过期回包，避免旧 seek/暂停覆盖新状态。
@@ -469,6 +474,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.extensionSession = nil
         self.extensionFallbackProviderID = nil
         self.extensionStateReference = config.extensionStateReference
+        self.extensionDocumentScrollFile = config.documentScrollFile
+        self.extensionDocumentScrollFraction = Self.clampScrollFraction(config.documentScrollFraction)
         self.navigatorPanelSide = config.navigatorPanelSide
         self.navigatorPanelVisibilityMode = config.navigatorPanelVisibilityMode
         self.navigatorPanelWidth = NavigatorPanelMetrics.clampWidth(config.navigatorPanelWidth)

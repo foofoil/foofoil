@@ -50,4 +50,39 @@ struct SessionLifecycleRequestTests {
         )
         #expect(ExtensionSessionLifecycle.restorationRequest(from: saved, in: other) == nil)
     }
+
+    /// 文档会话没有播放队列：恢复值回退到目录选中项，用于重开历史时回到阅读位置。
+    @Test func documentSessionsFallBackToNavigatorSelection() throws {
+        let fresh = try session()
+        var saved = fresh
+        saved.navigatorContributions = [
+            NavigatorContribution(
+                id: "ebook.toc",
+                titleLocalizationKey: "Table of Contents",
+                style: .outline,
+                items: [],
+                selectedItemIDs: ["spine:3"]
+            )
+        ]
+        let request = try #require(ExtensionSessionLifecycle.restorationRequest(from: saved, in: fresh))
+        try request.validate()
+        #expect(request.restoration?.currentItemID == "spine:3")
+        #expect(request.restoration?.position == nil)
+    }
+
+    @Test func emptyQueueAndSelectionRestoreWithoutItem() throws {
+        let fresh = try session()
+        var saved = fresh
+        saved.navigatorContributions = [
+            NavigatorContribution(
+                id: "ebook.toc",
+                titleLocalizationKey: "Table of Contents",
+                style: .outline,
+                items: []
+            )
+        ]
+        let request = try #require(ExtensionSessionLifecycle.restorationRequest(from: saved, in: fresh))
+        try request.validate()
+        #expect(request.restoration?.currentItemID == nil)
+    }
 }

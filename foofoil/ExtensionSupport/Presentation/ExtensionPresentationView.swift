@@ -23,7 +23,12 @@ struct ExtensionPresentationView: View {
                     ExtensionDocumentView(
                         url: url,
                         sessionID: session.id,
-                        textScale: appState.documentZoom
+                        textScale: appState.documentZoom,
+                        initialScrollFile: appState.extensionDocumentScrollFile,
+                        initialScrollFraction: appState.extensionDocumentScrollFraction,
+                        onScroll: { file, fraction in
+                            appState.noteExtensionDocumentScroll(file: file, fraction: fraction)
+                        }
                     )
                     .id(session.id)
                     .transition(.opacity)

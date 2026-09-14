@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 nonisolated final class HistoryDatabase {
-    static let schemaVersion = 11
+    static let schemaVersion = 12
 
     private let queue = DispatchQueue(label: "com.foofoil.history.database", qos: .utility)
     private var connection: OpaquePointer?
@@ -99,8 +99,9 @@ nonisolated final class HistoryDatabase {
                         source_fingerprint, index_status, index_version, video_looping, video_bookmark,
                         media_sidecar_bookmark, custom_cover_path,
                         extension_id, extension_state_reference, navigator_panel_side,
-                        navigator_panel_visibility, navigator_panel_width, file_list
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        navigator_panel_visibility, navigator_panel_width, file_list,
+                        document_zoom, document_scroll_file, document_scroll_fraction
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -122,7 +123,10 @@ nonisolated final class HistoryDatabase {
                         navigator_panel_side=excluded.navigator_panel_side,
                         navigator_panel_visibility=excluded.navigator_panel_visibility,
                         navigator_panel_width=excluded.navigator_panel_width,
-                        file_list=excluded.file_list
+                        file_list=excluded.file_list,
+                        document_zoom=excluded.document_zoom,
+                        document_scroll_file=excluded.document_scroll_file,
+                        document_scroll_fraction=excluded.document_scroll_fraction
                     """, bindings: [
                         config.id.uuidString, kind.rawValue, title, config.originalImageName,
                         config.imagePath, config.textPath, config.webURLString, config.actualWebURLString,
@@ -135,7 +139,10 @@ nonisolated final class HistoryDatabase {
                         config.extensionID,
                         config.extensionStateReference, config.navigatorPanelSide.rawValue,
                         config.navigatorPanelVisibilityMode.rawValue, config.navigatorPanelWidth,
-                        encodeFileList(config.fileList)
+                        encodeFileList(config.fileList),
+                        config.documentZoom,
+                        config.documentScrollFile,
+                        config.documentScrollFraction
                     ])
 
                 let metadata = (
@@ -317,7 +324,10 @@ nonisolated final class HistoryDatabase {
                 navigator_panel_side TEXT NOT NULL DEFAULT 'right',
                 navigator_panel_visibility TEXT NOT NULL DEFAULT 'onHover',
                 navigator_panel_width REAL NOT NULL DEFAULT 260.0,
-                file_list TEXT
+                file_list TEXT,
+                document_zoom REAL NOT NULL DEFAULT 1.0,
+                document_scroll_file TEXT,
+                document_scroll_fraction REAL
             );
             CREATE INDEX IF NOT EXISTS idx_history_last_opened ON history_items(last_opened_at DESC);
             CREATE INDEX IF NOT EXISTS idx_history_kind ON history_items(content_kind);
@@ -372,6 +382,11 @@ nonisolated final class HistoryDatabase {
         try addColumnIfMissing("media_sidecar_bookmark", definition: "media_sidecar_bookmark TEXT")
         // v11 用户拖入替换的音频封面缓存路径；重开历史时优先使用这份封面。
         try addColumnIfMissing("custom_cover_path", definition: "custom_cover_path TEXT")
+        // v12 扩展文档的正文缩放与阅读位置（章节文件名 + 滚动比例）；此前只存扩展状态引用，
+        // 章节能恢复但字号/滚动被静默丢弃。
+        try addColumnIfMissing("document_zoom", definition: "document_zoom REAL NOT NULL DEFAULT 1.0")
+        try addColumnIfMissing("document_scroll_file", definition: "document_scroll_file TEXT")
+        try addColumnIfMissing("document_scroll_fraction", definition: "document_scroll_fraction REAL")
         if previousVersion >= 1 && previousVersion < 9 {
             // v9：旧列表 video_looping=1 是单曲循环开关；迁成顺序循环，使列表能自动续播。
             try execute("""
@@ -567,6 +582,7 @@ nonisolated final class HistoryDatabase {
                     sourceFingerprint: optionalText(statement, columns["source_fingerprint"]!),
                     storedDisplayTitle: text(statement, columns["display_title"]!),
                     thumbnailPath: optionalText(statement, columns["thumbnail_path"]!),
+                    documentZoom: sqlite3_column_double(statement, columns["document_zoom"]!),
                     mediaPlaybackMode: MediaPlaybackMode(sqliteValue: Int(sqlite3_column_int(statement, columns["video_looping"]!))),
                     videoBookmark: optionalText(statement, columns["video_bookmark"]!).flatMap { Data(base64Encoded: $0) },
                     mediaSidecarBookmark: optionalText(statement, columns["media_sidecar_bookmark"]!).flatMap { Data(base64Encoded: $0) },
@@ -586,7 +602,13 @@ nonisolated final class HistoryDatabase {
                             storedDisplayTitle: text(statement, columns["display_title"]!),
                             originalFilename: optionalText(statement, columns["original_filename"]!)
                         )
-                    }
+                    },
+                    documentScrollFile: columns["document_scroll_file"].flatMap { optionalText(statement, $0) },
+                    documentScrollFraction: columns["document_scroll_fraction"].map {
+                        sqlite3_column_type(statement, $0) == SQLITE_NULL
+                            ? nil
+                            : sqlite3_column_double(statement, $0)
+                    } ?? nil
                 ))
             }
         }

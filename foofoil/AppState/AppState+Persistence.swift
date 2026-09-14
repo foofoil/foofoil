@@ -55,6 +55,8 @@ extension AppState {
             self.backgroundColorHex = config.backgroundColorHex
             self.mediaPlaybackMode = config.mediaPlaybackMode
             self.extensionStateReference = config.extensionStateReference
+            self.extensionDocumentScrollFile = config.documentScrollFile
+            self.extensionDocumentScrollFraction = Self.clampScrollFraction(config.documentScrollFraction)
             self.navigatorPanelSide = config.navigatorPanelSide
             self.navigatorPanelVisibilityMode = config.navigatorPanelVisibilityMode
             self.navigatorPanelWidth = NavigatorPanelMetrics.clampWidth(config.navigatorPanelWidth)
@@ -195,8 +197,38 @@ extension AppState {
                 navigatorPanelSide: navigatorPanelSide,
                 navigatorPanelVisibilityMode: navigatorPanelVisibilityMode,
                 navigatorPanelWidth: navigatorPanelWidth,
-                fileList: fileList?.isPresentable == true ? fileList : nil
+                fileList: fileList?.isPresentable == true ? fileList : nil,
+                documentScrollFile: extensionDocumentScrollFile,
+                documentScrollFraction: extensionDocumentScrollFraction
             )
+        }
+
+        /// 文档滚动位置回传：与章节文件名成对记录，去抖后落盘，避免滚动期间频繁写历史。
+        func noteExtensionDocumentScroll(file: String, fraction: Double) {
+            guard isExtensionDocument,
+                  !file.isEmpty,
+                  let clamped = Self.clampScrollFraction(fraction) else { return }
+            if extensionDocumentScrollFile == file,
+               let current = extensionDocumentScrollFraction,
+               abs(current - clamped) < 0.005 { return }
+            extensionDocumentScrollFile = file
+            extensionDocumentScrollFraction = clamped
+            scheduleDocumentScrollSave()
+        }
+
+        /// 滚动停止约一秒后保存；其它路径的 saveState 直接读取当前值，不会丢最后一次滚动。
+        func scheduleDocumentScrollSave() {
+            documentScrollSaveTask?.cancel()
+            documentScrollSaveTask = Task { @MainActor [weak self] in
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                self?.saveState()
+            }
+        }
+
+        static func clampScrollFraction(_ value: Double?) -> Double? {
+            guard let value, value.isFinite, value >= 0, value <= 1 else { return nil }
+            return value
         }
 
         /// 由 Core 保存完整的值类型 Session 快照；外部资源恢复时用原请求重建运行时 Session。

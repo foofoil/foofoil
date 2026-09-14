@@ -32,10 +32,15 @@ enum ExtensionDocumentURLPolicy {
 }
 
 /// 文档呈现：只读加载自包含 HTML，禁止脚本、持久化站点数据与新窗口。
+/// 阅读位置（章节内滚动比例）由宿主采集与恢复：页面脚本始终禁用，
+/// 滚动上报依赖宿主注入的监听与 script message 通道。
 struct ExtensionDocumentView: View {
     let url: URL
     let sessionID: UUID
     let textScale: Double
+    let initialScrollFile: String?
+    let initialScrollFraction: Double?
+    let onScroll: (_ file: String, _ fraction: Double) -> Void
 
     @State private var isLoading = true
     @State private var loadFailed = false
@@ -46,6 +51,9 @@ struct ExtensionDocumentView: View {
             ExtensionDocumentWebView(
                 url: url,
                 textScale: textScale,
+                initialScrollFile: initialScrollFile,
+                initialScrollFraction: initialScrollFraction,
+                onScroll: onScroll,
                 isLoading: $isLoading,
                 loadFailed: $loadFailed,
                 securityFailed: $securityFailed
@@ -144,6 +152,44 @@ enum DocumentTextZoom {
     }
 }
 
+/// 阅读位置采集：宿主注入的滚动监听经 script message 回传 (章节文件名, 视口位置)。
+/// 页面自身脚本仍被禁用；这里的注入代码由宿主发起，不受页面 CSP 约束。
+enum DocumentScrollPersistence {
+    static let messageHandlerName = "foofoilDocumentScroll"
+
+    /// 按 (文件名, scrollY, 最大滚动距离) 上报；file 用 location.pathname 推导。
+    static let positionScript = """
+    JSON.stringify({file: location.pathname.split('/').pop(), y: window.scrollY, max: document.documentElement.scrollHeight - window.innerHeight});
+    """
+
+    /// 滚动上报监听：前导 + 尾随节流 250ms，重复安装无害。
+    static let reporterInstallScript = """
+    (function(){
+      if (window.__foofoilScrollReporter) { return; }
+      window.__foofoilScrollReporter = true;
+      var timer = null;
+      var pending = false;
+      function send() {
+        var handlers = window.webkit && window.webkit.messageHandlers;
+        if (!handlers || !handlers.foofoilDocumentScroll) { return; }
+        handlers.foofoilDocumentScroll.postMessage({
+          file: location.pathname.split('/').pop(),
+          y: window.scrollY,
+          max: document.documentElement.scrollHeight - window.innerHeight
+        });
+      }
+      window.addEventListener('scroll', function() {
+        if (timer != null) { pending = true; return; }
+        send();
+        timer = setTimeout(function() {
+          timer = null;
+          if (pending) { pending = false; send(); }
+        }, 250);
+      }, { passive: true });
+    })();
+    """
+}
+
 /// 进程级内容规则表：加载前安装默认拒绝网络，编译失败不得降级为无规则加载。
 @MainActor
 enum DocumentContentRuleList {
@@ -181,6 +227,9 @@ enum DocumentContentRuleList {
 private struct ExtensionDocumentWebView: NSViewRepresentable {
     let url: URL
     let textScale: Double
+    let initialScrollFile: String?
+    let initialScrollFraction: Double?
+    let onScroll: (_ file: String, _ fraction: Double) -> Void
     @Binding var isLoading: Bool
     @Binding var loadFailed: Bool
     @Binding var securityFailed: Bool
@@ -195,6 +244,10 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
         webView.setValue(false, forKey: "drawsBackground")
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
+        // Coordinator 由 contentController 持有；销毁时必须移除，避免泄漏。
+        webView.configuration.userContentController.add(
+            context.coordinator, name: DocumentScrollPersistence.messageHandlerName
+        )
         context.coordinator.webView = webView
         context.coordinator.load(url: url)
         return webView
@@ -207,13 +260,16 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
+        webView.configuration.userContentController.removeScriptMessageHandler(
+            forName: DocumentScrollPersistence.messageHandlerName
+        )
         webView.stopLoading()
         webView.navigationDelegate = nil
         webView.uiDelegate = nil
         coordinator.invalidate()
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
         var parent: ExtensionDocumentWebView
         weak var webView: WKWebView?
         private var loadedURL: URL?
@@ -223,6 +279,9 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
         private var loadGeneration: UInt64 = 0
         private var appliedTextScale: Double = .nan
         private var textScaleGeneration: UInt64 = 0
+        /// 本次加载待恢复的保存位置；只在 URL 变化时从 parent 捕获一次。
+        private var pendingScrollFile: String?
+        private var pendingScrollFraction: Double?
 
         init(_ parent: ExtensionDocumentWebView) {
             self.parent = parent
@@ -231,6 +290,8 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
         func invalidate() {
             loadedURL = nil
             targetIdentity = nil
+            pendingScrollFile = nil
+            pendingScrollFraction = nil
             loadGeneration &+= 1
         }
 
@@ -245,6 +306,8 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
             loadedURL = url
             targetIdentity = ExtensionDocumentURLPolicy.fileIdentity(fileURL)
             hasReportedFailure = false
+            pendingScrollFile = parent.initialScrollFile
+            pendingScrollFraction = parent.initialScrollFraction
             parent.isLoading = true
             parent.loadFailed = false
             parent.securityFailed = false
@@ -282,23 +345,92 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
             appliedTextScale = scale
             textScaleGeneration &+= 1
             let generation = textScaleGeneration
-            guard let webView else { return }
             Task { @MainActor [weak self] in
-                guard let self, self.textScaleGeneration == generation else { return }
-                var anchorOffset: Double?
-                if !force {
-                    anchorOffset = (try? await webView.evaluateJavaScript(
-                        DocumentTextZoom.captureAnchorScript
-                    )) as? Double
-                }
-                guard self.textScaleGeneration == generation else { return }
-                _ = try? await webView.evaluateJavaScript(DocumentTextZoom.styleScript(for: scale))
-                if let anchorOffset {
-                    _ = try? await webView.evaluateJavaScript(
-                        DocumentTextZoom.restoreAnchorScript(offset: anchorOffset)
-                    )
-                }
+                await self?.performTextScale(scale, force: force, generation: generation)
             }
+        }
+
+        /// 加载完成后的按序收尾：文字缩放 → 恢复阅读位置 → 安装滚动上报。
+        func loadDidFinish() {
+            let scale = parent.textScale
+            appliedTextScale = scale
+            textScaleGeneration &+= 1
+            let generation = textScaleGeneration
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                await self.performTextScale(scale, force: true, generation: generation)
+                await self.restoreSavedScrollPosition()
+                _ = try? await self.webView?.evaluateJavaScript(
+                    DocumentScrollPersistence.reporterInstallScript
+                )
+            }
+        }
+
+        @MainActor
+        private func performTextScale(_ scale: Double, force: Bool, generation: UInt64) async {
+            guard textScaleGeneration == generation, let webView else { return }
+            var anchorOffset: Double?
+            if !force {
+                anchorOffset = (try? await webView.evaluateJavaScript(
+                    DocumentTextZoom.captureAnchorScript
+                )) as? Double
+            }
+            guard self.textScaleGeneration == generation else { return }
+            _ = try? await webView.evaluateJavaScript(DocumentTextZoom.styleScript(for: scale))
+            if let anchorOffset {
+                _ = try? await webView.evaluateJavaScript(
+                    DocumentTextZoom.restoreAnchorScript(offset: anchorOffset)
+                )
+            }
+        }
+
+        /// 恢复保存的阅读位置：仅当保存的章节与当前文件一致且 URL 未带锚点（锚点定位由 WebKit 完成）。
+        @MainActor
+        private func restoreSavedScrollPosition() async {
+            let savedFile = pendingScrollFile
+            let savedFraction = pendingScrollFraction
+            pendingScrollFile = nil
+            pendingScrollFraction = nil
+            guard let webView,
+                  savedFile == currentFileName(),
+                  webView.url?.fragment == nil,
+                  let savedFraction else {
+                await reportCurrentScrollPosition()
+                return
+            }
+            _ = try? await webView.evaluateJavaScript(
+                "window.scrollTo(0, \(savedFraction) * (document.documentElement.scrollHeight - window.innerHeight));"
+            )
+            await reportCurrentScrollPosition()
+        }
+
+        /// 主动上报一次当前位置；换章或恢复后由此把成对的 (文件, 比例) 写回宿主。
+        @MainActor
+        private func reportCurrentScrollPosition() async {
+            guard let webView,
+                  let raw = try? await webView.evaluateJavaScript(
+                      DocumentScrollPersistence.positionScript
+                  ) as? String,
+                  let data = raw.data(using: .utf8),
+                  let value = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return
+            }
+            deliverScrollPosition(value)
+        }
+
+        @MainActor
+        private func deliverScrollPosition(_ value: [String: Any]) {
+            guard let file = value["file"] as? String, file == currentFileName(),
+                  let y = (value["y"] as? NSNumber)?.doubleValue,
+                  let maxScroll = (value["max"] as? NSNumber)?.doubleValue,
+                  maxScroll.isFinite, maxScroll > 0 else { return }
+            let fraction = min(max(y / maxScroll, 0), 1)
+            parent.onScroll(file, fraction.isFinite ? fraction : 0)
+        }
+
+        private func currentFileName() -> String? {
+            guard let url = webView?.url ?? loadedURL else { return nil }
+            return ExtensionDocumentURLPolicy.fileURL(for: url)?.lastPathComponent
         }
 
         private func isCurrent(_ url: URL?) -> Bool {
@@ -306,6 +438,19 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
             return ExtensionDocumentURLPolicy.fileIdentity(
                 ExtensionDocumentURLPolicy.fileURL(for: url) ?? url
             ) == targetIdentity
+        }
+
+        // MARK: - WKScriptMessageHandler
+
+        func userContentController(
+            _ userContentController: WKUserContentController,
+            didReceive message: WKScriptMessage
+        ) {
+            guard message.name == DocumentScrollPersistence.messageHandlerName,
+                  let body = message.body as? [String: Any] else { return }
+            Task { @MainActor [weak self] in
+                self?.deliverScrollPosition(body)
+            }
         }
 
         // MARK: - WKNavigationDelegate
@@ -340,7 +485,7 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
             guard isCurrent(webView.url) else { return }
             parent.isLoading = false
             parent.loadFailed = false
-            applyTextScale(parent.textScale, force: true)
+            loadDidFinish()
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

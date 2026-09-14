@@ -650,6 +650,8 @@ extension AppState {
             extensionSession = nil
             extensionFallbackProviderID = nil
             extensionStateReference = nil
+            extensionDocumentScrollFile = nil
+            extensionDocumentScrollFraction = nil
             let closeTask = extensionSessionCloseTask
             Task { @MainActor [weak self] in
                 guard let self else { return }

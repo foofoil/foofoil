@@ -540,6 +540,59 @@ struct FoofoilTests {
         #expect(try JSONDecoder().decode(WindowConfig.self, from: data).customCoverPath == nil)
     }
 
+    /// 扩展文档的正文缩放与阅读位置必须经历史库往返；此前无对应列被静默丢弃，
+    /// 导致重开历史后字号回到默认、滚动位置丢失。
+    @Test func documentZoomAndScrollRoundTripThroughHistoryDatabase() throws {
+        let databaseDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-doc-scroll-db-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: databaseDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: databaseDirectory) }
+        let repository = HistoryRepository(databaseURL: databaseDirectory.appendingPathComponent("history.sqlite3"))
+
+        let id = UUID()
+        #expect(repository.upsert(WindowConfig(
+            id: id,
+            originalImageName: "book.epub",
+            contentKind: .extensionContent,
+            documentZoom: 1.5,
+            extensionID: "app.foofoil.extension.ebook",
+            documentScrollFile: "chapter-0003.html",
+            documentScrollFraction: 0.42
+        )))
+
+        var stored = try #require(repository.config(id: id))
+        #expect(stored.documentZoom == 1.5)
+        #expect(stored.documentScrollFile == "chapter-0003.html")
+        #expect(stored.documentScrollFraction == 0.42)
+
+        // 更新阅读进度后覆盖同一行。
+        #expect(repository.upsert(WindowConfig(
+            id: id,
+            originalImageName: "book.epub",
+            contentKind: .extensionContent,
+            documentZoom: 1.25,
+            extensionID: "app.foofoil.extension.ebook",
+            documentScrollFile: "chapter-0005.html",
+            documentScrollFraction: 0.1
+        )))
+        stored = try #require(repository.config(id: id))
+        #expect(stored.documentZoom == 1.25)
+        #expect(stored.documentScrollFile == "chapter-0005.html")
+        #expect(stored.documentScrollFraction == 0.1)
+
+        // 无阅读位置时字段为空，不影响读取。
+        let plain = UUID()
+        #expect(repository.upsert(WindowConfig(
+            id: plain,
+            originalImageName: "note.txt",
+            contentKind: .note
+        )))
+        let plainStored = try #require(repository.config(id: plain))
+        #expect(plainStored.documentZoom == 1.0)
+        #expect(plainStored.documentScrollFile == nil)
+        #expect(plainStored.documentScrollFraction == nil)
+    }
+
     @Test func testCanOpenFileAcceptsAudioCandidates() throws {
         let audioURL = FileManager.default.temporaryDirectory
             .appendingPathComponent("foofoil-canopen-\(UUID().uuidString).mp3")

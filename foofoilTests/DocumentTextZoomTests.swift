@@ -75,7 +75,14 @@ struct DocumentTextZoomTests {
             defer: false
         )
         let hosting = NSHostingView(
-            rootView: ExtensionDocumentView(url: fileURL, sessionID: UUID(), textScale: 1.0)
+            rootView: ExtensionDocumentView(
+                url: fileURL,
+                sessionID: UUID(),
+                textScale: 1.0,
+                initialScrollFile: nil,
+                initialScrollFraction: nil,
+                onScroll: { _, _ in }
+            )
         )
         window.contentView = hosting
         hosting.frame = window.contentView?.bounds ?? .zero
@@ -94,7 +101,14 @@ struct DocumentTextZoomTests {
             (try? await webView.evaluateJavaScript(DocumentTextZoom.captureAnchorScript)) as? Double
         )
 
-        hosting.rootView = ExtensionDocumentView(url: fileURL, sessionID: UUID(), textScale: 2.0)
+        hosting.rootView = ExtensionDocumentView(
+            url: fileURL,
+            sessionID: UUID(),
+            textScale: 2.0,
+            initialScrollFile: nil,
+            initialScrollFraction: nil,
+            onScroll: { _, _ in }
+        )
         var afterTop = before
         for _ in 0..<300 {
             let fontSize = (try? await webView.evaluateJavaScript("getComputedStyle(document.body).fontSize")) as? String
@@ -107,6 +121,57 @@ struct DocumentTextZoomTests {
             try await Task.sleep(for: .milliseconds(20))
         }
         #expect(abs(afterTop - before) < 3.0, "before=\(before) after=\(afterTop)")
+    }
+
+    /// 通过真实视图驱动阅读位置链路：加载后按保存比例定位，并把 (文件, 比例) 回传宿主。
+    @Test func documentViewRestoresAndReportsScrollPosition() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-doc-scroll-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appendingPathComponent("chapter.html")
+        try Data(tallHTML().utf8).write(to: fileURL)
+
+        let reports = ScrollReportCollector()
+        let window = NSWindow(
+            contentRect: NSRect(x: -2000, y: -2000, width: 400, height: 300),
+            styleMask: .borderless,
+            backing: .buffered,
+            defer: false
+        )
+        let hosting = NSHostingView(
+            rootView: ExtensionDocumentView(
+                url: fileURL,
+                sessionID: UUID(),
+                textScale: 1.0,
+                initialScrollFile: "chapter.html",
+                initialScrollFraction: 0.5,
+                onScroll: { file, fraction in
+                    reports.record(file: file, fraction: fraction)
+                }
+            )
+        )
+        window.contentView = hosting
+        hosting.frame = window.contentView?.bounds ?? .zero
+        defer { window.orderOut(nil) }
+
+        let webView = try await waitForWebView(in: hosting)
+        var scrollY = 0.0
+        for _ in 0..<300 {
+            scrollY = (try? await webView.evaluateJavaScript("window.scrollY")) as? Double ?? 0
+            if scrollY > 100 { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(scrollY > 100, "scrollY=\(scrollY)")
+        // 回传经异步 script message 到达；轮询等待，不能在恢复定位后立即断言。
+        var fraction = 0.0
+        for _ in 0..<300 {
+            fraction = reports.fraction
+            if reports.file == "chapter.html", fraction > 0.2 { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        #expect(reports.file == "chapter.html", "file=\(reports.file ?? "nil")")
+        #expect(fraction > 0.2, "fraction=\(fraction)")
     }
 
     private func waitForWebView(in view: NSView) async throws -> WKWebView {
@@ -130,9 +195,14 @@ struct DocumentTextZoomTests {
     }
 
     private func tallHTML() -> String {
+        // 与生产章节页一致的 CSP（script-src 'none'）：宿主注入的滚动监听与缩放脚本必须不受影响。
+        let csp = "default-src 'none'; script-src 'none'; style-src 'unsafe-inline'; img-src data:; "
+            + "font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; "
+            + "media-src 'none'; base-uri 'none'; form-action 'none'"
         let paragraph = String(repeating: "这是一段用于验证缩放锚点的正文，文字较多以便缩放时发生换行重排。", count: 6)
         let paragraphs = (0..<40).map { "<p>第 \($0) 段。\(paragraph)</p>" }.joined()
-        return "<html><body>\(paragraphs)</body></html>"
+        return "<html><head><meta http-equiv=\"Content-Security-Policy\" content=\"\(csp)\"></head>"
+            + "<body>\(paragraphs)</body></html>"
     }
 
     private func makeLoadedWebView(html: String? = nil) async throws -> WKWebView {
@@ -184,5 +254,31 @@ private final class ZoomNavigationWaiter: NSObject, WKNavigationDelegate {
     ) {
         continuation?.resume()
         continuation = nil
+    }
+}
+
+/// 线程安全收集文档视图回传的滚动位置，供测试断言。
+private final class ScrollReportCollector: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedFile: String?
+    private var storedFraction = 0.0
+
+    var file: String? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedFile
+    }
+
+    var fraction: Double {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedFraction
+    }
+
+    func record(file: String, fraction: Double) {
+        lock.lock()
+        defer { lock.unlock() }
+        storedFile = file
+        storedFraction = fraction
     }
 }
