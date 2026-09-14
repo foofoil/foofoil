@@ -33,8 +33,10 @@ struct DocumentTextZoomTests {
         #expect(try await computedBodyFontSize(webView) == "8px")
     }
 
-    /// 缩放前后，视口顶端可见文字块必须保持在原位置（以顶端行为基准）。
-    @Test func keepsTopVisibleBlockAnchoredWhenScaling() async throws {
+    /// 缩放前后，视口顶端可见的那行文字必须保持原位（同一行、同一视口位置）。
+    /// 放大后每行容纳的字符变少，行中心命中的字符会变，因此断言锚定字符所在行回位、
+    /// 且顶边可见文字仍属于锚定段落。
+    @Test func keepsTopLineAnchoredWhenScaling() async throws {
         let webView = try await makeLoadedWebView(html: tallHTML())
         _ = try? await webView.evaluateJavaScript("window.scrollTo(0, 800)")
         _ = try? await webView.evaluateJavaScript("document.body.offsetHeight")
@@ -50,13 +52,15 @@ struct DocumentTextZoomTests {
         )
 
         let restoredTop = (try? await webView.evaluateJavaScript(
-            "document.querySelector('[data-foofoil-zoom-anchor]').getBoundingClientRect().top"
+            DocumentTextZoom.anchorTopScript
         )) as? Double
         let top = try #require(restoredTop)
-        #expect(abs(top - anchorOffset) < 2.0)
-
         let scrollY = (try? await webView.evaluateJavaScript("window.scrollY")) as? Double ?? 0
-        #expect(scrollY > 0)
+        #expect(abs(top - anchorOffset) < 2.0, "top=\(top) anchorOffset=\(anchorOffset) scrollY=\(scrollY)")
+
+        // 顶边可见文字属于锚定段落（同一行文字仍在视口顶端）。
+        let topInAnchor = try await topEdgeHitsAnchorBlock(webView)
+        #expect(topInAnchor)
     }
 
     /// 通过真实 `ExtensionDocumentView` 驱动缩放，验证顶端可见行保持原位。
@@ -109,15 +113,13 @@ struct DocumentTextZoomTests {
             initialScrollFraction: nil,
             onScroll: { _, _ in }
         )
+        // 缩放 → 锚点回位是多步异步脚本；轮询直到顶行回到原位（或超时），不能在字号变化瞬间读数。
         var afterTop = before
         for _ in 0..<300 {
-            let fontSize = (try? await webView.evaluateJavaScript("getComputedStyle(document.body).fontSize")) as? String
-            if fontSize == "32px" {
-                afterTop = (try? await webView.evaluateJavaScript(
-                    "document.querySelector('[data-foofoil-zoom-anchor]').getBoundingClientRect().top"
-                )) as? Double ?? before
-                break
-            }
+            afterTop = (try? await webView.evaluateJavaScript(
+                DocumentTextZoom.anchorTopScript
+            )) as? Double ?? before
+            if abs(afterTop - before) < 3.0 { break }
             try await Task.sleep(for: .milliseconds(20))
         }
         #expect(abs(afterTop - before) < 3.0, "before=\(before) after=\(afterTop)")
@@ -192,6 +194,20 @@ struct DocumentTextZoomTests {
 
     private func computedBodyFontSize(_ webView: WKWebView) async throws -> String {
         try await webView.evaluateJavaScript("getComputedStyle(document.body).fontSize") as? String ?? ""
+    }
+
+    /// 视口顶边命中的文字是否位于锚定标记所在块内。
+    private func topEdgeHitsAnchorBlock(_ webView: WKWebView) async throws -> Bool {
+        let script = """
+        (function(){
+          var r = document.caretRangeFromPoint(Math.max(12, Math.floor(window.innerWidth / 2)), 8);
+          if (!r || !r.startContainer) { return false; }
+          var node = r.startContainer.parentElement;
+          var anchor = document.querySelector('[data-foofoil-zoom-anchor]');
+          return anchor != null && node != null && (node === anchor || anchor.contains(node));
+        })();
+        """
+        return try await webView.evaluateJavaScript(script) as? Bool ?? false
     }
 
     private func tallHTML() -> String {

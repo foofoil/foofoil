@@ -114,38 +114,96 @@ enum DocumentTextZoom {
             + "})();"
     }
 
-    /// 记录当前视口顶端可见的文字块及其相对视口偏移，缩放后据此回位。
+    /// 记录视口顶端可见的那一行文字，缩放后据此回位，避免内容跳走。
+    /// 锚定对象是"顶边命中的字符"（caretRangeFromPoint 自上而下探测），
+    /// 在其所在块内按字符偏移标记；块顶锚定在块上半截已滚出视口时会因行高变化跳行，
+    /// 字符锚定保证缩放前后顶部是同一行文字。
     static let captureAnchorScript = """
     (function(){
+      function textOffsetIn(block, node, offset) {
+        var walker = block.ownerDocument.createTreeWalker(block, NodeFilter.SHOW_TEXT, null);
+        var total = 0;
+        var current;
+        while ((current = walker.nextNode())) {
+          if (current === node) { return total + offset; }
+          total += current.textContent.length;
+        }
+        return -1;
+      }
+      function mark(block, charOffset, top) {
+        var previous = document.querySelectorAll('[data-foofoil-zoom-anchor]');
+        for (var i = 0; i < previous.length; i++) { previous[i].removeAttribute('data-foofoil-zoom-anchor'); }
+        block.setAttribute('data-foofoil-zoom-anchor', String(charOffset));
+        return top;
+      }
+      var x = Math.max(12, Math.floor(window.innerWidth / 2));
+      for (var y = 2; y < 96; y += 6) {
+        var range = document.caretRangeFromPoint(x, y);
+        if (!range || !range.startContainer || range.startContainer.nodeType !== 3) { continue; }
+        var block = range.startContainer.parentElement;
+        while (block && block !== document.body) {
+          var display = block.ownerDocument.defaultView.getComputedStyle(block).display;
+          if (display !== 'inline') { break; }
+          block = block.parentElement;
+        }
+        if (!block || block === document.body) { continue; }
+        var charOffset = textOffsetIn(block, range.startContainer, range.startOffset);
+        if (charOffset < 0) { continue; }
+        range.setEnd(range.startContainer, Math.min(range.startOffset + 1, range.startContainer.textContent.length));
+        var rects = range.getClientRects();
+        var top = rects.length > 0 ? rects[0].top : block.getBoundingClientRect().top;
+        return mark(block, charOffset, top);
+      }
       var nodes = document.body
         ? document.body.querySelectorAll('p,h1,h2,h3,h4,h5,h6,li,blockquote,pre,td,th,figure,img,section')
         : [];
-      var anchor = null;
-      var offset = 0;
       for (var i = 0; i < nodes.length; i++) {
         var rect = nodes[i].getBoundingClientRect();
-        if (rect.height > 0 && rect.bottom > 4) {
-          anchor = nodes[i];
-          offset = rect.top;
-          break;
-        }
+        if (rect.height > 0 && rect.bottom > 4) { return mark(nodes[i], 0, rect.top); }
       }
-      if (!anchor) { return null; }
-      var previous = document.querySelectorAll('[data-foofoil-zoom-anchor]');
-      for (var j = 0; j < previous.length; j++) {
-        previous[j].removeAttribute('data-foofoil-zoom-anchor');
-      }
-      anchor.setAttribute('data-foofoil-zoom-anchor', '1');
-      return offset;
+      return null;
     })();
+    """
+
+    /// 量取标记字符当前所在行的视口 top；无标记时返回 null。
+    static let anchorTopScript = "(\(anchorTopFunction))()"
+
+    private static let anchorTopFunction = """
+    function() {
+      var block = document.querySelector('[data-foofoil-zoom-anchor]');
+      if (!block) { return null; }
+      var target = parseInt(block.getAttribute('data-foofoil-zoom-anchor'), 10);
+      if (isNaN(target) || target < 0) { return block.getBoundingClientRect().top; }
+      var walker = document.createTreeWalker(block, NodeFilter.SHOW_TEXT, null);
+      var total = 0, node = null, local = 0, current;
+      while ((current = walker.nextNode())) {
+        var length = current.textContent.length;
+        if (total + length >= target) { node = current; local = target - total; break; }
+        total += length;
+      }
+      var range = document.createRange();
+      try {
+        if (node && node.nodeType === 3 && node.textContent.length > 0) {
+          var start = Math.max(0, Math.min(local, node.textContent.length - 1));
+          range.setStart(node, start);
+          range.setEnd(node, start + 1);
+        } else {
+          range.selectNodeContents(block);
+        }
+        var rects = range.getClientRects();
+        if (rects.length > 0) { return rects[0].top; }
+      } catch (e) {}
+      return block.getBoundingClientRect().top;
+    }
     """
 
     static func restoreAnchorScript(offset: Double) -> String {
         """
         (function(){
-          var el = document.querySelector('[data-foofoil-zoom-anchor]');
-          if (!el) { return; }
-          var delta = el.getBoundingClientRect().top - (\(offset));
+          var measure = \(anchorTopFunction);
+          var top = measure();
+          if (top === null) { return; }
+          var delta = top - (\(offset));
           if (Math.abs(delta) > 0.5) { window.scrollBy(0, delta); }
         })();
         """
