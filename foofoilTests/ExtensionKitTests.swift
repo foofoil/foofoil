@@ -729,6 +729,101 @@ struct ExtensionKitTests {
         #expect(state.fullScreenNavigatorInset == 0)
     }
 
+    @Test func fullScreenAlwaysModeSqueezesContentWhileHoverModeOverlays() {
+        let state = AppState()
+        state.builtInNavigatorContributions = [
+            NavigatorContribution(id: "test", titleLocalizationKey: "Navigator", style: .flat,
+                                  items: [NavigatorItem(id: "one", title: "One")])
+        ]
+        state.navigatorPanelWidth = 300
+        state.isFullScreen = true
+
+        // 始终显示：面板以分栏形式挤占内容空间，控制条不再重复让位。
+        state.navigatorPanelVisibilityMode = .always
+        #expect(state.fullScreenNavigatorContentInset == 300)
+        #expect(state.fullScreenNavigatorControlBarInset == 0)
+
+        // 悬停显示：面板覆盖在内容上，内容不被挤占，控制条单独让位。
+        state.navigatorPanelVisibilityMode = .onHover
+        #expect(state.fullScreenNavigatorContentInset == 0)
+        state.isNavigatorPanelHovered = true
+        #expect(state.fullScreenNavigatorControlBarInset == 300)
+        state.isNavigatorPanelHovered = false
+        #expect(state.fullScreenNavigatorControlBarInset == 0)
+
+        // 非嵌平态面板是伴随窗口，不挤占内容。
+        state.isFullScreen = false
+        state.navigatorPanelVisibilityMode = .always
+        #expect(state.fullScreenNavigatorContentInset == 0)
+    }
+
+    @Test func fullScreenNavigatorHoverStateCoversEdgeStripAndVisiblePanelColumn() {
+        // 左挂：左缘触发带唤出；面板可见时整个面板列保持显示，越过列即隐藏。
+        #expect(NavigatorPanelMetrics.fullScreenNavigatorHoverState(
+            x: 5, windowWidth: 1000, side: .left, panelWidth: 260, isPanelVisible: false
+        ) == (true, false))
+        #expect(NavigatorPanelMetrics.fullScreenNavigatorHoverState(
+            x: NavigatorPanelMetrics.edgeTriggerWidth + 1, windowWidth: 1000,
+            side: .left, panelWidth: 260, isPanelVisible: false
+        ) == (false, false))
+        #expect(NavigatorPanelMetrics.fullScreenNavigatorHoverState(
+            x: 200, windowWidth: 1000, side: .left, panelWidth: 260, isPanelVisible: true
+        ) == (true, true))
+        #expect(NavigatorPanelMetrics.fullScreenNavigatorHoverState(
+            x: 261, windowWidth: 1000, side: .left, panelWidth: 260, isPanelVisible: true
+        ) == (false, false))
+
+        // 右挂对称：面板列范围是 [windowWidth - panelWidth, windowWidth]。
+        #expect(NavigatorPanelMetrics.fullScreenNavigatorHoverState(
+            x: 995, windowWidth: 1000, side: .right, panelWidth: 260, isPanelVisible: false
+        ) == (true, false))
+        #expect(NavigatorPanelMetrics.fullScreenNavigatorHoverState(
+            x: 800, windowWidth: 1000, side: .right, panelWidth: 260, isPanelVisible: true
+        ) == (true, true))
+        #expect(NavigatorPanelMetrics.fullScreenNavigatorHoverState(
+            x: 739, windowWidth: 1000, side: .right, panelWidth: 260, isPanelVisible: true
+        ) == (false, false))
+    }
+
+    @Test func fullScreenNavigatorShowsOnEdgeHoverAndHidesPastPanelColumn() throws {
+        let state = AppState()
+        state.builtInNavigatorContributions = [
+            NavigatorContribution(id: "builtin.edge-test", titleLocalizationKey: "Navigator", style: .flat,
+                                  items: [NavigatorItem(id: "one", title: "One")])
+        ]
+        state.navigatorPanelVisibilityMode = .onHover
+        state.navigatorPanelSide = .left
+        state.navigatorPanelWidth = 260
+        state.isFullScreen = true
+        let controller = FloatingWindowController(appState: state)
+        defer { controller.close() }
+        let foilWindow = try #require(controller.window)
+
+        // 指针在内容区中部：不出现。
+        controller.updateNavigatorEdgeHover(at: NSPoint(x: foilWindow.frame.width / 2, y: 100))
+        #expect(!state.isNavigatorEdgeHovered)
+        #expect(!controller.isNavigatorPanelVisible)
+
+        // 左缘触发带：出现。
+        controller.updateNavigatorEdgeHover(at: NSPoint(x: 5, y: 100))
+        #expect(state.isNavigatorEdgeHovered)
+        #expect(controller.isNavigatorPanelVisible)
+
+        // 面板列内：保持显示。
+        controller.updateNavigatorEdgeHover(at: NSPoint(x: 200, y: 100))
+        #expect(state.isNavigatorEdgeHovered)
+        #expect(controller.isNavigatorPanelVisible)
+
+        // 越过面板列移入内容区：隐藏。
+        controller.updateNavigatorEdgeHover(at: NSPoint(x: 400, y: 100))
+        #expect(!state.isNavigatorEdgeHovered)
+        #expect(!controller.isNavigatorPanelVisible)
+
+        // 面板挂左时右缘不触发。
+        controller.updateNavigatorEdgeHover(at: NSPoint(x: foilWindow.frame.width - 5, y: 100))
+        #expect(!state.isNavigatorEdgeHovered)
+    }
+
     @Test func navigatorSlideCanReverseBeforeHideCompletes() async throws {
         let state = AppState()
         let parent = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 400, height: 300),

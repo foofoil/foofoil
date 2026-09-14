@@ -887,22 +887,44 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                 && point.x <= window.frame.width
                 && point.y <= window.frame.height
         } ?? false
-        var hoverRegion = window.frame
-        if navigatorPanelController.isVisible, let panel = navigatorPanelController.window {
-            hoverRegion = hoverRegion.union(panel.frame)
-        }
-        let inRegion = hoverRegion.contains(pointer)
-        let inPanel = navigatorPanelController.isVisible
-            && (navigatorPanelController.window?.frame.contains(pointer) ?? false)
-        let inside = inWindowEvent || inRegion
-
-        let wasInside = appState.isNavigatorEdgeHovered || appState.isNavigatorPanelHovered
-        appState.isNavigatorEdgeHovered = inside
-        appState.isNavigatorPanelHovered = inPanel
-        if wasInside != inside {
-            updateNavigatorPanelVisibility()
+        if appState.isFullScreen {
+            // 嵌平时箔窗覆盖整屏：指针移入面板一侧的边缘触发带才唤出面板；出现后指针仍在
+            // 面板列内保持显示，越过面板列移入内容区即隐藏。以面板列的可见状态判定，
+            // 滑出动画期间的指针事件不会让已隐藏的面板复活。
+            let pointerInWindow = windowPoint ?? window.convertPoint(fromScreen: pointer)
+            let hover = inWindowEvent || window.frame.contains(pointer)
+                ? NavigatorPanelMetrics.fullScreenNavigatorHoverState(
+                    x: pointerInWindow.x,
+                    windowWidth: window.frame.width,
+                    side: appState.navigatorPanelSide,
+                    panelWidth: CGFloat(NavigatorPanelMetrics.clampWidth(appState.navigatorPanelWidth)),
+                    isPanelVisible: appState.isFullScreenNavigatorVisible
+                )
+                : (triggered: false, isPanelHovered: false)
+            if appState.isNavigatorEdgeHovered != hover.triggered {
+                appState.isNavigatorEdgeHovered = hover.triggered
+            }
+            if appState.isNavigatorPanelHovered != hover.isPanelHovered {
+                appState.isNavigatorPanelHovered = hover.isPanelHovered
+            }
         } else {
-            updateNavigatorHoverMonitors()
+            var hoverRegion = window.frame
+            if navigatorPanelController.isVisible, let panel = navigatorPanelController.window {
+                hoverRegion = hoverRegion.union(panel.frame)
+            }
+            let inRegion = hoverRegion.contains(pointer)
+            let inPanel = navigatorPanelController.isVisible
+                && (navigatorPanelController.window?.frame.contains(pointer) ?? false)
+            let inside = inWindowEvent || inRegion
+
+            let wasInside = appState.isNavigatorEdgeHovered || appState.isNavigatorPanelHovered
+            appState.isNavigatorEdgeHovered = inside
+            appState.isNavigatorPanelHovered = inPanel
+            if wasInside != inside {
+                updateNavigatorPanelVisibility()
+            } else {
+                updateNavigatorHoverMonitors()
+            }
         }
         if appState.isAudioDocument {
             // 音频播放中从目录面板移出时没有箔窗事件可触发隐藏，由这里统一推导显隐。

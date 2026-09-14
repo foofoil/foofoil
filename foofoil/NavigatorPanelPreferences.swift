@@ -67,6 +67,30 @@ nonisolated enum NavigatorPanelMetrics {
         return current == .left ? .right : .left
     }
 
+    /// 嵌平悬停模式的显隐几何：`triggered` 表示指针处于“唤出/保持”区域
+    /// （面板一侧的边缘触发带，或已显示面板的列范围），`isPanelHovered` 表示指针
+    /// 是否落在可见面板列上。触发带唤出后，指针越过面板列移入内容区即隐藏。
+    static func fullScreenNavigatorHoverState(
+        x: CGFloat,
+        windowWidth: CGFloat,
+        side: NavigatorPanelSide,
+        panelWidth: CGFloat,
+        isPanelVisible: Bool
+    ) -> (triggered: Bool, isPanelHovered: Bool) {
+        let inEdgeZone: Bool
+        let inPanelColumn: Bool
+        switch side {
+        case .left:
+            inEdgeZone = x <= edgeTriggerWidth
+            inPanelColumn = x <= panelWidth
+        case .right:
+            inEdgeZone = x >= windowWidth - edgeTriggerWidth
+            inPanelColumn = x >= windowWidth - panelWidth
+        }
+        return (inEdgeZone || (isPanelVisible && inPanelColumn),
+                isPanelVisible && inPanelColumn)
+    }
+
     static func containsWidthResizeHandle(x: CGFloat, width: CGFloat, draggingLeftEdge: Bool) -> Bool {
         if draggingLeftEdge {
             return x <= widthResizeHandleThickness

@@ -167,6 +167,17 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         isFullScreenNavigatorVisible ? CGFloat(navigatorPanelWidth) : 0
     }
 
+    /// 嵌平“始终显示”时面板以分栏形式挤占内容空间；悬停模式面板覆盖在内容上，不挤占。
+    var fullScreenNavigatorContentInset: CGFloat {
+        navigatorPanelVisibilityMode == .always ? fullScreenNavigatorInset : 0
+    }
+
+    /// 嵌平时底部控制条相对内容区的额外让位：
+    /// 始终显示模式下内容已整体让位，控制条不再重复内缩；悬停模式面板覆盖内容，控制条单独让位。
+    var fullScreenNavigatorControlBarInset: CGFloat {
+        fullScreenNavigatorInset - fullScreenNavigatorContentInset
+    }
+
     @Published var activeNavigatorContributionID: String?
     @Published var expandedNavigatorItemIDs: Set<String> = []
     /// 导航列表搜索：仅当前会话有效，不持久化；⌘F 进入并聚焦，⌘G/⇧⌘G 定位匹配。

@@ -36,6 +36,8 @@ public struct ContentView: View {
         let isMarkdownPreview = appState.isMarkdownPreview && appState.isMarkdownDocument
         let contentPadding: CGFloat = isMarkdownPreview ? 0 : (appState.isPDFDocument && appState.effectiveShowBorder ? 12 : (shouldHideBorder ? 0 : 4))
         let backgroundColor = appState.backgroundColorHex.flatMap(NSColor.init(hex:)) ?? .windowBackgroundColor
+        // 嵌平“始终显示”时被导航面板挤占的内容宽度；其余情况为 0。
+        let navigatorContentInset = appState.fullScreenNavigatorContentInset
 
         ZStack {
             // 毛玻璃背景 (玻璃拟态效果)
@@ -109,6 +111,15 @@ public struct ContentView: View {
                 }
             }
             .padding(contentPadding)
+            // 嵌平“始终显示”时侧边栏以分栏形式挤占内容空间而不是盖在内容上；
+            // 悬停模式侧边栏覆盖内容，内容保持原位。拖拽调宽时跟随指针即时变化不动画。
+            .padding(appState.navigatorPanelSide == .left ? .leading : .trailing, navigatorContentInset)
+            .animation(
+                appState.isAdjustingNavigatorPanelWidth
+                    ? nil
+                    : .easeInOut(duration: 0.25),
+                value: navigatorContentInset
+            )
             .animation(
                 appState.fileList?.kind == .image ? ImageListSlideshow.transitionAnimation : nil,
                 value: appState.fileList?.currentID

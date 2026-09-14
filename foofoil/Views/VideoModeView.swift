@@ -64,8 +64,9 @@ struct VideoModeView: View {
                 // 整个控制条区域不触发窗口拖动，控制条以外区域拖拽仍可移动窗口。
                 MediaPlaybackBar(appState: appState, controller: controller)
                     // 只收窄控制条，视频画面保持原有全屏尺寸。
+                    // 始终显示模式下内容区已整体被面板挤占，这里只补覆盖模式的增量。
                     .padding(appState.navigatorPanelSide == .left ? .leading : .trailing,
-                             appState.fullScreenNavigatorInset)
+                             appState.fullScreenNavigatorControlBarInset)
                     .transition(.move(edge: .bottom))
                     .zIndex(1)
             }
@@ -81,7 +82,7 @@ struct VideoModeView: View {
         // 仅移动控制条自身高度，并裁剪窗口外的过渡内容。
         .clipped()
         .animation(.easeInOut(duration: 0.25), value: appState.isMediaPlaybackControlsVisible)
-        .animation(.easeInOut(duration: 0.25), value: appState.fullScreenNavigatorInset)
+        .animation(.easeInOut(duration: 0.25), value: appState.fullScreenNavigatorControlBarInset)
         // 与图片有边框模式保持一致的 8pt 内容边距
         .padding(shouldHideBorder ? 0 : 8)
         .onAppear {
