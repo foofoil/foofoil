@@ -643,6 +643,42 @@ struct ExtensionKitTests {
         controller.close()
     }
 
+    @Test func navigatorPanelShadowFollowsAlwaysShowModeOnDesktop() async throws {
+        let contribution = NavigatorContribution(
+            id: "builtin.shadow-test",
+            titleLocalizationKey: "Navigator",
+            style: .flat,
+            items: [NavigatorItem(id: "one", title: "One")]
+        )
+
+        // 始终显示：伴随面板带系统投影。
+        let alwaysState = AppState()
+        alwaysState.builtInNavigatorContributions = [contribution]
+        alwaysState.navigatorPanelVisibilityMode = .always
+        let alwaysController = FloatingWindowController(appState: alwaysState)
+        defer { alwaysController.close() }
+        let alwaysPanel = try #require(alwaysController.window?.childWindows?.first)
+        #expect(alwaysPanel.hasShadow)
+
+        // 悬停唤出：面板不带投影。
+        let hoverState = AppState()
+        hoverState.builtInNavigatorContributions = [contribution]
+        hoverState.navigatorPanelVisibilityMode = .onHover
+        let hoverController = FloatingWindowController(appState: hoverState)
+        defer { hoverController.close() }
+        let hoverWindow = try #require(hoverController.window)
+        hoverController.updateNavigatorEdgeHover(
+            at: NSPoint(x: hoverWindow.frame.width / 2, y: hoverWindow.frame.height / 2)
+        )
+        let hoverPanel = try #require(hoverWindow.childWindows?.first)
+        #expect(hoverPanel.hasShadow == false)
+
+        // 运行中切到始终显示：显隐刷新后跟随投影。
+        hoverState.navigatorPanelVisibilityMode = .always
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(hoverPanel.hasShadow)
+    }
+
     @Test func preparingApplicationHideOrdersOutAudioNavigatorCompanion() throws {
         let state = AppState()
         state.originalImageName = "hide-test.mp3"

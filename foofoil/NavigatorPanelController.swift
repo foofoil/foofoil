@@ -278,6 +278,9 @@ final class NavigatorPanelController: NSWindowController {
         panel.level = parent.level
         panel.alphaValue = parent.alphaValue
         panel.canHide = true
+        // 桌面态“始终显示”时给面板窗口投影，与箔片分层；悬停唤出保持无阴影，全屏覆盖层的
+        // 阴影由 SwiftUI 自绘、不经过这里。
+        panel.hasShadow = appState.navigatorPanelVisibilityMode == .always
     }
 
     func updateFrame(relativeTo parent: NSWindow) {
