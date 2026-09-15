@@ -103,17 +103,52 @@ final class FoilExposeController {
 
     var isShowing: Bool { model != nil }
 
-    /// 全局快捷键 ⌃⌥F：经 Carbon RegisterEventHotKey 注册，浮箔未激活时也能唤起覆盖层。
-    /// 不需要输入监控或辅助功能权限，进程退出时由系统自动注销。
+    /// 启动入口：安装事件处理器并按当前配置注册“显示所有箔片”的全局热键。
+    /// 经 Carbon RegisterEventHotKey，浮箔未激活时也能唤起覆盖层；不需要输入监控或辅助功能权限。
     func installGlobalHotKey() {
-        guard hotKeyRef == nil else { return }
+        installEventHandlerIfNeeded()
+        applyConfiguredGlobalHotKey()
+    }
 
+    /// 快捷键配置变更后重新注册全局热键。
+    /// 仅当组合键含 Control/Option 且能映射为 Carbon 键码时才全局注册，避免吞掉系统常用快捷键。
+    func applyConfiguredGlobalHotKey() {
+        installEventHandlerIfNeeded()
+        if let hotKeyRef {
+            _ = UnregisterEventHotKey(hotKeyRef)
+            self.hotKeyRef = nil
+        }
+        guard let definition = KeyboardShortcutCatalog.definition(withID: "window.showAllFoils"),
+              let shortcut = KeyboardShortcutStore.shared.shortcut(for: definition) else { return }
+        let modifiers = shortcut.modifiers
+        guard modifiers.contains(.control) || modifiers.contains(.option),
+              let keyCode = shortcut.carbonKeyCode else { return }
+
+        var hotKey: EventHotKeyRef?
+        let hotKeyID = EventHotKeyID(signature: OSType(0x464F_494C) /* 'FOIL' */, id: 1)
+        let status = RegisterEventHotKey(
+            keyCode,
+            shortcut.carbonModifiers,
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &hotKey
+        )
+        guard status == noErr else {
+            NSLog("显示所有箔片：全局热键注册失败（%d）", status)
+            return
+        }
+        hotKeyRef = hotKey
+    }
+
+    private func installEventHandlerIfNeeded() {
+        guard hotKeyHandler == nil else { return }
         var eventType = EventTypeSpec(
             eventClass: OSType(kEventClassKeyboard),
             eventKind: UInt32(kEventHotKeyPressed)
         )
         var handler: EventHandlerRef?
-        let installStatus = InstallEventHandler(
+        let status = InstallEventHandler(
             GetApplicationEventTarget(),
             { _, _, _ in
                 MainActor.assumeIsolated {
@@ -126,26 +161,10 @@ final class FoilExposeController {
             nil,
             &handler
         )
-        guard installStatus == noErr else {
-            NSLog("显示所有箔片：全局热键事件处理器安装失败（%d）", installStatus)
+        guard status == noErr else {
+            NSLog("显示所有箔片：全局热键事件处理器安装失败（%d）", status)
             return
         }
-
-        var hotKey: EventHotKeyRef?
-        let hotKeyID = EventHotKeyID(signature: OSType(0x464F_494C) /* 'FOIL' */, id: 1)
-        let registerStatus = RegisterEventHotKey(
-            UInt32(kVK_ANSI_F),
-            UInt32(controlKey | optionKey),
-            hotKeyID,
-            GetApplicationEventTarget(),
-            0,
-            &hotKey
-        )
-        guard registerStatus == noErr else {
-            NSLog("显示所有箔片：全局热键 ⌃⌥F 注册失败（%d）", registerStatus)
-            return
-        }
-        hotKeyRef = hotKey
         hotKeyHandler = handler
     }
 

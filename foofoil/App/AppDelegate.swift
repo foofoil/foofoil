@@ -114,6 +114,13 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil
         )
 
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleKeyboardShortcutsDidChange),
+            name: .keyboardShortcutsDidChange,
+            object: nil
+        )
+
         // 1. 启动时，如果尚未通过打开文件创建过窗口，且当前窗口列表为空，才显示一个默认尺寸的空白窗口
         if !didOpenFiles && windowControllers.isEmpty {
             let state = AppState()

@@ -276,17 +276,16 @@ extension AppDelegate {
         viewMenu.delegate = self
         self.viewMenu = viewMenu
 
-        // Toggle Pin - 快捷键 Command + T
-        let togglePinItem = NSMenuItem(title: NSLocalizedString("Toggle Pin", comment: ""), action: #selector(togglePinAction), keyEquivalent: "t")
+        // 视图菜单键位同样由快捷键配置提供，这里只登记稳定标识；见 applyConfiguredKeyboardShortcuts()。
+        let togglePinItem = NSMenuItem(title: NSLocalizedString("Toggle Pin", comment: ""), action: #selector(togglePinAction), keyEquivalent: "")
         togglePinItem.withSymbol("pin")
-        togglePinItem.keyEquivalentModifierMask = [.command]
+        togglePinItem.representedObject = "view.togglePin"
         togglePinItem.target = self
         viewMenu.addItem(togglePinItem)
 
-        // Toggle Border - 快捷键 Command + B
-        let toggleBorderItem = NSMenuItem(title: NSLocalizedString("Border", comment: ""), action: #selector(toggleShowBorderAction), keyEquivalent: "b")
+        let toggleBorderItem = NSMenuItem(title: NSLocalizedString("Border", comment: ""), action: #selector(toggleShowBorderAction), keyEquivalent: "")
         toggleBorderItem.withSymbol("rectangle")
-        toggleBorderItem.keyEquivalentModifierMask = [.command]
+        toggleBorderItem.representedObject = "view.toggleBorder"
         toggleBorderItem.target = self
         viewMenu.addItem(toggleBorderItem)
 
@@ -296,16 +295,17 @@ extension AppDelegate {
             keyEquivalent: ""
         )
         slideshowItem.withSymbol("play.rectangle")
+        slideshowItem.representedObject = "view.slideshow"
         slideshowItem.target = self
         viewMenu.addItem(slideshowItem)
 
         let toggleFullScreenItem = NSMenuItem(
             title: NSLocalizedString("Enter Full Screen", comment: ""),
             action: #selector(toggleFullScreenAction),
-            keyEquivalent: "f"
+            keyEquivalent: ""
         )
         toggleFullScreenItem.withSymbol("arrow.up.left.and.arrow.down.right")
-        toggleFullScreenItem.keyEquivalentModifierMask = [.command, .control]
+        toggleFullScreenItem.representedObject = "view.toggleFullScreen"
         toggleFullScreenItem.target = self
         viewMenu.addItem(toggleFullScreenItem)
         viewMenu.addItem(NSMenuItem.separator())
@@ -314,27 +314,26 @@ extension AppDelegate {
         let alwaysShowNavigatorItem = NSMenuItem(
             title: NSLocalizedString("Always Show Navigator", comment: ""),
             action: #selector(toggleNavigatorPanelAction),
-            keyEquivalent: "l"
+            keyEquivalent: ""
         )
         alwaysShowNavigatorItem.withSymbol("sidebar.squares.leading")
-        alwaysShowNavigatorItem.keyEquivalentModifierMask = [.command, .shift]
+        alwaysShowNavigatorItem.representedObject = "view.toggleNavigator"
         alwaysShowNavigatorItem.target = self
         viewMenu.addItem(alwaysShowNavigatorItem)
 
         let moveNavigatorSideItem = NSMenuItem(
             title: NSLocalizedString("Move Navigator to Right Side", comment: ""),
             action: #selector(moveNavigatorToOppositeSideAction),
-            keyEquivalent: "l"
+            keyEquivalent: ""
         )
         moveNavigatorSideItem.withSymbol("arrow.left.arrow.right")
-        moveNavigatorSideItem.keyEquivalentModifierMask = [.command, .option]
+        moveNavigatorSideItem.representedObject = "view.moveNavigatorSide"
         moveNavigatorSideItem.target = self
         viewMenu.addItem(moveNavigatorSideItem)
 
-        // Reload Page - 快捷键 Command + R
-        let reloadPageItem = NSMenuItem(title: NSLocalizedString("Reload Page", comment: ""), action: #selector(reloadPageAction), keyEquivalent: "r")
+        let reloadPageItem = NSMenuItem(title: NSLocalizedString("Reload Page", comment: ""), action: #selector(reloadPageAction), keyEquivalent: "")
         reloadPageItem.withSymbol("arrow.clockwise")
-        reloadPageItem.keyEquivalentModifierMask = [.command]
+        reloadPageItem.representedObject = "view.reloadPage"
         reloadPageItem.target = self
         viewMenu.addItem(reloadPageItem)
 
@@ -345,57 +344,59 @@ extension AppDelegate {
             keyEquivalent: ""
         )
         captureImageFoofoilItem.withSymbol("camera.viewfinder")
+        captureImageFoofoilItem.representedObject = "view.captureImage"
         captureImageFoofoilItem.target = self
         viewMenu.addItem(captureImageFoofoilItem)
 
         // Select Color - 选择颜色
         let selectColorItem = NSMenuItem(title: NSLocalizedString("Select Color", comment: ""), action: #selector(selectColorAction), keyEquivalent: "")
         selectColorItem.withSymbol("eyedropper")
+        selectColorItem.representedObject = "view.selectColor"
         selectColorItem.target = self
         viewMenu.addItem(selectColorItem)
 
         viewMenu.addItem(NSMenuItem.separator())
 
-        let zoomInItem = NSMenuItem(title: NSLocalizedString("Zoom In Content", comment: ""), action: #selector(zoomInAction), keyEquivalent: "+")
+        let zoomInItem = NSMenuItem(title: NSLocalizedString("Zoom In Content", comment: ""), action: #selector(zoomInAction), keyEquivalent: "")
         zoomInItem.withSymbol("plus.magnifyingglass")
-        zoomInItem.keyEquivalentModifierMask = [.command]
+        zoomInItem.representedObject = "view.zoomInContent"
         zoomInItem.target = self
         viewMenu.addItem(zoomInItem)
 
-        let zoomOutItem = NSMenuItem(title: NSLocalizedString("Zoom Out Content", comment: ""), action: #selector(zoomOutAction), keyEquivalent: "-")
+        let zoomOutItem = NSMenuItem(title: NSLocalizedString("Zoom Out Content", comment: ""), action: #selector(zoomOutAction), keyEquivalent: "")
         zoomOutItem.withSymbol("minus.magnifyingglass")
-        zoomOutItem.keyEquivalentModifierMask = [.command]
+        zoomOutItem.representedObject = "view.zoomOutContent"
         zoomOutItem.target = self
         viewMenu.addItem(zoomOutItem)
 
-        let actualSizeItem = NSMenuItem(title: NSLocalizedString("Actual Size", comment: ""), action: #selector(actualSizeAction), keyEquivalent: "0")
+        let actualSizeItem = NSMenuItem(title: NSLocalizedString("Actual Size", comment: ""), action: #selector(actualSizeAction), keyEquivalent: "")
         actualSizeItem.withSymbol("arrow.up.left.and.arrow.down.right")
-        actualSizeItem.keyEquivalentModifierMask = [.command]
+        actualSizeItem.representedObject = "view.actualSize"
         actualSizeItem.target = self
         viewMenu.addItem(actualSizeItem)
 
-        let fitWindowToImageItem = NSMenuItem(title: NSLocalizedString("Fit Window to Image", comment: ""), action: #selector(fitWindowToImageAction), keyEquivalent: "[")
+        let fitWindowToImageItem = NSMenuItem(title: NSLocalizedString("Fit Window to Image", comment: ""), action: #selector(fitWindowToImageAction), keyEquivalent: "")
         fitWindowToImageItem.withSymbol("rectangle.inset.filled")
-        fitWindowToImageItem.keyEquivalentModifierMask = [.command]
+        fitWindowToImageItem.representedObject = "view.fitWindowToImage"
         fitWindowToImageItem.target = self
         viewMenu.addItem(fitWindowToImageItem)
 
-        let fitImageToWidthItem = NSMenuItem(title: NSLocalizedString("Fit Image to Window Width", comment: ""), action: #selector(fitImageToWindowWidthAction), keyEquivalent: "]")
+        let fitImageToWidthItem = NSMenuItem(title: NSLocalizedString("Fit Image to Window Width", comment: ""), action: #selector(fitImageToWindowWidthAction), keyEquivalent: "")
         fitImageToWidthItem.withSymbol("arrow.left.and.right")
-        fitImageToWidthItem.keyEquivalentModifierMask = [.command]
+        fitImageToWidthItem.representedObject = "view.fitImageToWindowWidth"
         fitImageToWidthItem.target = self
         viewMenu.addItem(fitImageToWidthItem)
 
         // 增大/缩小箔使用 ⇧⌘+/-，避免 ⌘<（即 ⇧⌘,）与设置的 ⌘, 冲突。
-        let zoomOutWindowItem = NSMenuItem(title: NSLocalizedString("Zoom Out Window", comment: ""), action: #selector(zoomOutWindowAction), keyEquivalent: "-")
+        let zoomOutWindowItem = NSMenuItem(title: NSLocalizedString("Zoom Out Window", comment: ""), action: #selector(zoomOutWindowAction), keyEquivalent: "")
         zoomOutWindowItem.withSymbol("rectangle.compress.vertical")
-        zoomOutWindowItem.keyEquivalentModifierMask = [.command, .shift]
+        zoomOutWindowItem.representedObject = "view.zoomOutWindow"
         zoomOutWindowItem.target = self
         viewMenu.addItem(zoomOutWindowItem)
 
-        let zoomInWindowItem = NSMenuItem(title: NSLocalizedString("Zoom In Window", comment: ""), action: #selector(zoomInWindowAction), keyEquivalent: "+")
+        let zoomInWindowItem = NSMenuItem(title: NSLocalizedString("Zoom In Window", comment: ""), action: #selector(zoomInWindowAction), keyEquivalent: "")
         zoomInWindowItem.withSymbol("rectangle.expand.vertical")
-        zoomInWindowItem.keyEquivalentModifierMask = [.command, .shift]
+        zoomInWindowItem.representedObject = "view.zoomInWindow"
         zoomInWindowItem.target = self
         viewMenu.addItem(zoomInWindowItem)
 
@@ -404,24 +405,21 @@ extension AppDelegate {
         // Background Color - 同时设置窗体与 PDF 阅读区的背景色
         let backgroundColorItem = NSMenuItem(title: NSLocalizedString("Background Color", comment: ""), action: #selector(backgroundColorAction), keyEquivalent: "")
         backgroundColorItem.withSymbol("paintpalette")
+        backgroundColorItem.representedObject = "view.backgroundColor"
         backgroundColorItem.target = self
         viewMenu.addItem(backgroundColorItem)
 
         // Increase Opacity - 快捷键 Command + Shift + ↑
         let increaseOpacityItem = NSMenuItem(title: NSLocalizedString("Increase Opacity", comment: ""), action: #selector(increaseOpacityAction), keyEquivalent: "")
         increaseOpacityItem.withSymbol("sun.max")
-        // macOS AppKit 中，上箭头字符为 "\u{F700}" (NSUpArrowFunctionKey)
-        increaseOpacityItem.keyEquivalent = "\u{F700}"
-        increaseOpacityItem.keyEquivalentModifierMask = [.command, .shift]
+        increaseOpacityItem.representedObject = "view.increaseOpacity"
         increaseOpacityItem.target = self
         viewMenu.addItem(increaseOpacityItem)
 
         // Decrease Opacity - 快捷键 Command + Shift + ↓
         let decreaseOpacityItem = NSMenuItem(title: NSLocalizedString("Decrease Opacity", comment: ""), action: #selector(decreaseOpacityAction), keyEquivalent: "")
         decreaseOpacityItem.withSymbol("sun.min")
-        // macOS AppKit 中，下箭头字符为 "\u{F701}" (NSDownArrowFunctionKey)
-        decreaseOpacityItem.keyEquivalent = "\u{F701}"
-        decreaseOpacityItem.keyEquivalentModifierMask = [.command, .shift]
+        decreaseOpacityItem.representedObject = "view.decreaseOpacity"
         decreaseOpacityItem.target = self
         viewMenu.addItem(decreaseOpacityItem)
 
@@ -461,22 +459,23 @@ extension AppDelegate {
         let windowMenu = NSMenu(title: NSLocalizedString("Window", comment: ""))
         self.windowMenu = windowMenu
 
-        let windowPositionItems: [(title: String, action: Selector, key: String, symbol: String)] = [
-            (NSLocalizedString("Top-Left", comment: ""), #selector(moveToTopLeftAction), "q", "arrow.up.left"),
-            (NSLocalizedString("Top", comment: ""), #selector(moveToTopAction), "w", "arrow.up"),
-            (NSLocalizedString("Top-Right", comment: ""), #selector(moveToTopRightAction), "e", "arrow.up.right"),
-            (NSLocalizedString("Left", comment: ""), #selector(moveToLeftAction), "a", "arrow.left"),
-            (NSLocalizedString("Center", comment: ""), #selector(moveToCenterAction), "s", "scope"),
-            (NSLocalizedString("Right", comment: ""), #selector(moveToRightAction), "d", "arrow.right"),
-            (NSLocalizedString("Bottom-Left", comment: ""), #selector(moveToBottomLeftAction), "z", "arrow.down.left"),
-            (NSLocalizedString("Bottom", comment: ""), #selector(moveToBottomAction), "x", "arrow.down"),
-            (NSLocalizedString("Bottom-Right", comment: ""), #selector(moveToBottomRightAction), "c", "arrow.down.right")
+        // 键位统一由快捷键配置提供，这里只登记稳定标识；见 applyConfiguredKeyboardShortcuts()。
+        let windowPositionItems: [(id: String, title: String, action: Selector, symbol: String)] = [
+            ("window.moveTopLeft", NSLocalizedString("Top-Left", comment: ""), #selector(moveToTopLeftAction), "arrow.up.left"),
+            ("window.moveTop", NSLocalizedString("Top", comment: ""), #selector(moveToTopAction), "arrow.up"),
+            ("window.moveTopRight", NSLocalizedString("Top-Right", comment: ""), #selector(moveToTopRightAction), "arrow.up.right"),
+            ("window.moveLeft", NSLocalizedString("Left", comment: ""), #selector(moveToLeftAction), "arrow.left"),
+            ("window.moveCenter", NSLocalizedString("Center", comment: ""), #selector(moveToCenterAction), "scope"),
+            ("window.moveRight", NSLocalizedString("Right", comment: ""), #selector(moveToRightAction), "arrow.right"),
+            ("window.moveBottomLeft", NSLocalizedString("Bottom-Left", comment: ""), #selector(moveToBottomLeftAction), "arrow.down.left"),
+            ("window.moveBottom", NSLocalizedString("Bottom", comment: ""), #selector(moveToBottomAction), "arrow.down"),
+            ("window.moveBottomRight", NSLocalizedString("Bottom-Right", comment: ""), #selector(moveToBottomRightAction), "arrow.down.right")
         ]
 
         for itemInfo in windowPositionItems {
-            let item = NSMenuItem(title: itemInfo.title, action: itemInfo.action, keyEquivalent: itemInfo.key)
+            let item = NSMenuItem(title: itemInfo.title, action: itemInfo.action, keyEquivalent: "")
             item.withSymbol(itemInfo.symbol)
-            item.keyEquivalentModifierMask = [.control, .option]
+            item.representedObject = itemInfo.id
             item.target = self
             windowMenu.addItem(item)
         }
@@ -486,10 +485,10 @@ extension AppDelegate {
         let showAllFoilsItem = NSMenuItem(
             title: NSLocalizedString("Show All Foils", comment: ""),
             action: #selector(showAllFoilsAction),
-            keyEquivalent: "f"
+            keyEquivalent: ""
         )
         showAllFoilsItem.withSymbol("rectangle.grid.2x2")
-        showAllFoilsItem.keyEquivalentModifierMask = [.control, .option]
+        showAllFoilsItem.representedObject = "window.showAllFoils"
         showAllFoilsItem.target = self
         windowMenu.addItem(showAllFoilsItem)
 
@@ -498,12 +497,14 @@ extension AppDelegate {
         let moveToNextScreenItem = NSMenuItem(
             title: NSLocalizedString("Move to Next Screen", comment: ""),
             action: #selector(moveToNextScreenAction),
-            keyEquivalent: "\t"
+            keyEquivalent: ""
         )
         moveToNextScreenItem.withSymbol("display.2")
-        moveToNextScreenItem.keyEquivalentModifierMask = [.control, .option]
+        moveToNextScreenItem.representedObject = "window.moveToNextScreen"
         moveToNextScreenItem.target = self
         windowMenu.addItem(moveToNextScreenItem)
+
+        applyConfiguredKeyboardShortcuts()
 
         let windowMenuItem = NSMenuItem(title: NSLocalizedString("Window", comment: ""), action: nil, keyEquivalent: "")
         windowMenuItem.submenu = windowMenu

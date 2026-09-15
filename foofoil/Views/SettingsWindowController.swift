@@ -71,7 +71,7 @@ final class SettingsWindowController: NSWindowController {
                 identifier: "keyboardShortcuts",
                 title: NSLocalizedString("Keyboard Shortcuts", comment: ""),
                 symbolName: "keyboard",
-                rootView: EmptySettingsPane()
+                rootView: KeyboardShortcutsSettingsView()
             )
         )
         tabController.addTabViewItem(
@@ -171,24 +171,22 @@ protocol SettingsPaneHosting: AnyObject {
     func idealContentHeight(forWidth width: CGFloat) -> CGFloat
 }
 
-/// 用 NSScrollView 承载 SwiftUI 面板：按内容固有高度排版，超出最大高度后再滚动。
+/// 直接承载 SwiftUI 面板，由面板自身的滚动视图负责溢出滚动。
+/// 面板内容使用 `Form`，其自带滚动；外面再套一层 NSScrollView 会吞掉滚轮事件导致无法滚动。
 final class SettingsPaneViewController<Content: View>: NSViewController, SettingsPaneHosting {
     var onIdealHeightChange: (() -> Void)?
 
     private let hostingController: NSHostingController<AnyView>
-    private let scrollView = NSScrollView()
     private var lastReportedHeight: CGFloat = 0
 
     init(rootView: Content, title: String) {
         hostingController = NSHostingController(
-            rootView: AnyView(
-                rootView
-                    .frame(width: SettingsWindowMetrics.width, alignment: .top)
-                    .fixedSize(horizontal: false, vertical: true)
-            )
+            rootView: AnyView(rootView.frame(width: SettingsWindowMetrics.width, alignment: .top))
         )
         super.init(nibName: nil, bundle: nil)
         self.title = title
+        // 面板使用 Form（自带滚动视图），其 sizeThatFits(∞) 会返回无穷大；
+        // 需要 intrinsicContentSize 才能通过 fittingSize 拿到真实内容高度用于窗口自适应。
         hostingController.sizingOptions = [.intrinsicContentSize]
     }
 
@@ -198,45 +196,26 @@ final class SettingsPaneViewController<Content: View>: NSViewController, Setting
     }
 
     override func loadView() {
-        scrollView.borderType = .noBorder
-        scrollView.hasVerticalScroller = true
-        scrollView.hasHorizontalScroller = false
-        scrollView.autohidesScrollers = true
-        scrollView.horizontalScrollElasticity = .none
-        scrollView.drawsBackground = false
-        scrollView.automaticallyAdjustsContentInsets = false
-        hostingController.view.translatesAutoresizingMaskIntoConstraints = true
-        hostingController.view.autoresizingMask = [.width]
-        scrollView.documentView = hostingController.view
-        view = scrollView
+        let hosted = hostingController.view
+        // 交由 NSTabViewController 按窗口内容区设置 frame，面板内部自行滚动。
+        hosted.translatesAutoresizingMaskIntoConstraints = true
+        hosted.autoresizingMask = [.width, .height]
+        view = hosted
     }
 
     override func viewDidLayout() {
         super.viewDidLayout()
-        let height = fittedContentHeight()
-        hostingController.view.frame = NSRect(
-            x: 0,
-            y: 0,
-            width: SettingsWindowMetrics.width,
-            height: height
-        )
+        let height = idealContentHeight(forWidth: SettingsWindowMetrics.width)
         guard abs(height - lastReportedHeight) > 0.5 else { return }
         lastReportedHeight = height
         onIdealHeightChange?()
     }
 
+    /// 面板按内容排版所需高度；窗口会把它钳制到最大高度，超出部分由面板内部滚动。
+    /// Form 本身是滚动视图，`sizeThatFits` 在高度上无上界，因此改读 intrinsic 内容的 fittingSize。
     func idealContentHeight(forWidth width: CGFloat) -> CGFloat {
-        fittedContentHeight(forWidth: width)
-    }
-
-    private func fittedContentHeight(forWidth width: CGFloat = SettingsWindowMetrics.width) -> CGFloat {
-        let fitting = hostingController.sizeThatFits(
-            in: NSSize(width: width, height: CGFloat.greatestFiniteMagnitude)
-        ).height
-        if fitting > 1 { return fitting }
-        if let documentHeight = scrollView.documentView?.fittingSize.height, documentHeight > 1 {
-            return documentHeight
-        }
-        return hostingController.view.fittingSize.height
+        let fitting = hostingController.view.fittingSize.height
+        guard fitting > 1 else { return SettingsWindowMetrics.maxHeight }
+        return fitting
     }
 }

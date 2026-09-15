@@ -483,7 +483,7 @@ public class FloatingWindow: NSWindow {
         return super.validateMenuItem(menuItem)
     }
 
-    // 重写 performKeyEquivalent(with:)：内容缩放仍响应不带 Shift 的 ⌘=；增大/缩小箔走 ⇧⌘+/-；⌘, 始终打开设置。
+    // 重写 performKeyEquivalent(with:)：默认键位下保留既有的窗口直属处理；改键后的可配置命令统一走主菜单。
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
         // 列表切项必须赶在主菜单匹配 PDF 翻页方向键之前处理。
         if let controller = windowController as? FloatingWindowController,
@@ -494,11 +494,41 @@ public class FloatingWindow: NSWindow {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let delegate = NSApplication.shared.delegate as? AppDelegate
 
-        if modifiers == [.command, .control],
+        // 默认全屏键 ⌃⌘F：保持窗口直属切换，避免内容视图吞键。
+        if delegate?.isUsingDefaultShortcut("view.toggleFullScreen") == true,
+           modifiers == [.command, .control],
            event.charactersIgnoringModifiers?.lowercased() == "f",
            let controller = windowController as? FloatingWindowController {
             controller.toggleFullScreen()
             return true
+        }
+
+        // 默认增大箔键 ⇧⌘+：保持窗口直属处理，确保各内容模式都可响应。
+        if delegate?.isUsingDefaultShortcut("view.zoomInWindow") == true,
+           modifiers == [.command, .shift],
+           let chars = event.charactersIgnoringModifiers,
+           chars == "+" || chars == "=" {
+            delegate?.zoomInWindowAction()
+            return true
+        }
+
+        // 默认适配图片键 ⌘[ / ⌘]：仅在图片有边框时生效。
+        if modifiers == .command,
+           let chars = event.charactersIgnoringModifiers,
+           chars == "[" || chars == "]" {
+            let identifier = chars == "[" ? "view.fitWindowToImage" : "view.fitImageToWindowWidth"
+            if delegate?.isUsingDefaultShortcut(identifier) == true,
+               let controller = windowController as? FloatingWindowController {
+                let isImageMode = controller.appState.imageURL != nil && controller.appState.webURL == nil
+                if isImageMode && controller.appState.showBorder {
+                    if chars == "[" {
+                        controller.fitWindowToCurrentImageSize()
+                    } else {
+                        controller.fitImageToWindowWidth()
+                    }
+                    return true
+                }
+            }
         }
 
         // ⌘, 打开设置；内容视图（尤其是网页）不得吞掉该系统偏好快捷键。
@@ -508,56 +538,27 @@ public class FloatingWindow: NSWindow {
             return true
         }
 
-        // 快捷键 ⌃⌥ (Control + Option) 组合键（如 ⌃⌥q/w/e/a/s/d/z/x/c 窗口定位），优先交由主菜单处理。
-        if modifiers == [.control, .option] {
+        // 可配置的菜单快捷键优先交由主菜单处理，避免被网页等内容视图吞掉。
+        if delegate?.matchesConfigurableShortcut(event) == true {
             if let mainMenu = NSApplication.shared.mainMenu, mainMenu.performKeyEquivalent(with: event) {
                 return true
             }
         }
 
-        // ⇧⌘v 直接打开剪贴板内容；⇧⌘+/- 增大/缩小箔，确保各内容模式窗口都可响应。
+        // ⇧⌘v 直接打开剪贴板内容；不是可配置的菜单命令，保留窗口直属处理。
         if modifiers == [.command, .shift],
-           let chars = event.charactersIgnoringModifiers {
-            let key = chars.lowercased()
-            if key == "v" {
-                if delegate?.openClipboardContentInNewWindow() == true {
-                    return true
-                }
-            } else if key == "=" || key == "+" {
-                delegate?.zoomInWindowAction()
-                return true
-            } else if key == "-" {
-                delegate?.zoomOutWindowAction()
+           event.charactersIgnoringModifiers?.lowercased() == "v" {
+            if delegate?.openClipboardContentInNewWindow() == true {
                 return true
             }
         }
 
-        // 仅在修饰键恰好只有 Command 时进行拦截（不带 Shift）
-        if modifiers == .command {
-            if let chars = event.charactersIgnoringModifiers {
-                if chars == "=" {
-                    if let controller = self.windowController as? FloatingWindowController {
-                        controller.zoomIn()
-                        return true
-                    }
-                } else if chars == "[" {
-                    if let controller = self.windowController as? FloatingWindowController {
-                        let isImageMode = controller.appState.imageURL != nil && controller.appState.webURL == nil
-                        if isImageMode && controller.appState.showBorder {
-                            controller.fitWindowToCurrentImageSize()
-                            return true
-                        }
-                    }
-                } else if chars == "]" {
-                    if let controller = self.windowController as? FloatingWindowController {
-                        let isImageMode = controller.appState.imageURL != nil && controller.appState.webURL == nil
-                        if isImageMode && controller.appState.showBorder {
-                            controller.fitImageToWindowWidth()
-                            return true
-                        }
-                    }
-                }
-            }
+        // 内容放大同时接受不带 Shift 的 ⌘=，与菜单里的 ⌘+ 互补。
+        if modifiers == .command,
+           event.charactersIgnoringModifiers == "=",
+           let controller = windowController as? FloatingWindowController {
+            controller.zoomIn()
+            return true
         }
 
         return super.performKeyEquivalent(with: event)
