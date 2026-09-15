@@ -85,7 +85,7 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("window.moveBottomLeft", "Bottom-Left", "z"),
         definition("window.moveBottom", "Bottom", "x"),
         definition("window.moveBottomRight", "Bottom-Right", "c"),
-        definition("window.showAllFoils", "Show All Foils", "f"),
+        definition("window.showAllFoils", "Show All Foils", "\u{1B}", [.control, .shift]),
         definition("window.moveToNextScreen", "Move to Next Screen", "\t")
     ]
 
