@@ -2843,6 +2843,23 @@
         }
       }
     },
+    "Open Foils" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Foils"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开的箔片"
+          }
+        }
+      }
+    },
     "Open in %@" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3725,6 +3742,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "输入编号或点击选择，Esc 退出"
+          }
+        }
+      }
+    },
+    "Show History Foils" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show History Foils"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "显示历史箔片"
           }
         }
       }

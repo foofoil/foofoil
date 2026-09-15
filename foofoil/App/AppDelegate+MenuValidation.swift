@@ -181,9 +181,9 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             return NSScreen.screens.count > 1
         }
 
-        // 至少存在一个箔片窗口才启用；没有窗口时禁用但保留菜单项可见。
+        // 无箔片窗口时也保持可用：覆盖层会显示“新建空白箔”占位卡。
         if menuItem.action == #selector(showAllFoilsAction) {
-            return windowControllers.contains { $0.window != nil }
+            return true
         }
 
         if menuItem.action == #selector(openInDefaultBrowserAction) {

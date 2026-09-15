@@ -492,6 +492,16 @@ extension AppDelegate {
         showAllFoilsItem.target = self
         windowMenu.addItem(showAllFoilsItem)
 
+        let showHistoryFoilsItem = NSMenuItem(
+            title: NSLocalizedString("Show History Foils", comment: ""),
+            action: #selector(showHistoryFoilsAction),
+            keyEquivalent: ""
+        )
+        showHistoryFoilsItem.withSymbol("clock")
+        showHistoryFoilsItem.representedObject = "window.showHistoryFoils"
+        showHistoryFoilsItem.target = self
+        windowMenu.addItem(showHistoryFoilsItem)
+
         windowMenu.addItem(NSMenuItem.separator())
 
         let moveToNextScreenItem = NSMenuItem(
