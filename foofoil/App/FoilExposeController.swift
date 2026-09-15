@@ -21,9 +21,10 @@ enum FoilExposeShortcut {
 }
 
 /// 覆盖层中一个箔片的快照：收集自 AppDelegate.windowControllers，展示信息取自历史配置。
+/// controller 为 nil 表示“新建空白箔”占位卡（无任何箔窗口时显示）。
 struct FoilExposeItem: Identifiable {
     let id: UUID
-    let controller: FloatingWindowController
+    let controller: FloatingWindowController?
     let screen: NSScreen
     let title: String
     let symbolName: String
@@ -31,7 +32,8 @@ struct FoilExposeItem: Identifiable {
     let thumbnailPath: String?
     var shortcut: String?
 
-    var window: NSWindow? { controller.window }
+    var window: NSWindow? { controller?.window }
+    var isNewFoil: Bool { controller == nil }
 }
 
 /// 覆盖层的共享模型：每个屏幕一个面板视图，键盘监听与选择回调共用同一份条目。
@@ -182,9 +184,8 @@ final class FoilExposeController {
         guard !isShowing,
               let appDelegate = NSApplication.shared.delegate as? AppDelegate else { return }
         let items = Self.collectItems(from: appDelegate.windowControllers)
-        guard !items.isEmpty else { return }
-
-        let model = FoilExposeModel(items: items)
+        // 没有任何箔窗口时也展示覆盖层：每个屏幕放一张“新建空白箔”占位卡。
+        let model = FoilExposeModel(items: items.isEmpty ? Self.emptyStateItems() : items)
         model.onSelect = { [weak self] item in self?.select(item) }
         model.onDismiss = { [weak self] in self?.dismiss() }
         self.model = model
@@ -268,6 +269,24 @@ final class FoilExposeController {
         }
     }
 
+    /// 没有任何箔窗口时的覆盖层内容：每个屏幕一张“新建空白箔”占位卡，
+    /// 出现在第一个箔将显示的位置，编号固定为 1（点击或按 1 新建空白箔）。
+    private static func emptyStateItems() -> [FoilExposeItem] {
+        let screens = NSScreen.screens.isEmpty ? [NSScreen.main].compactMap { $0 } : NSScreen.screens
+        return screens.map { screen in
+            FoilExposeItem(
+                id: UUID(),
+                controller: nil,
+                screen: screen,
+                title: NSLocalizedString("Untitled Note", comment: ""),
+                symbolName: "plus",
+                contentKind: .text,
+                thumbnailPath: nil,
+                shortcut: FoilExposeShortcut.key(forIndex: 0)
+            )
+        }
+    }
+
     private static func makePanel(for screen: NSScreen, model: FoilExposeModel) -> FoilExposePanel {
         let panel = FoilExposePanel(
             contentRect: screen.frame,
@@ -287,15 +306,20 @@ final class FoilExposeController {
         return panel
     }
 
-    /// 选择箔片：覆盖层先退场，再把目标窗口调度到最前。
+    /// 选择箔片：覆盖层先退场，再把目标窗口调度到最前；占位卡则新建一张空白箔。
     private func select(_ item: FoilExposeItem) {
-        guard let window = item.window else { return }
+        guard let controller = item.controller, let window = item.window else {
+            dismiss()
+            NSApp.activate(ignoringOtherApps: true)
+            (NSApplication.shared.delegate as? AppDelegate)?.showNewWindow(with: AppState())
+            return
+        }
         dismiss()
         if window.isMiniaturized {
             window.deminiaturize(nil)
         }
         NSApp.activate(ignoringOtherApps: true)
-        item.controller.showWindow(nil)
+        controller.showWindow(nil)
         window.makeKeyAndOrderFront(nil)
         // 置顶箔片层级更高，兜底保证目标窗口可见。
         window.orderFrontRegardless()

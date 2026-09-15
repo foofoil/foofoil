@@ -339,7 +339,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
             return self.originalImageName ?? URL(fileURLWithPath: textPath).lastPathComponent
         } else if let originalImageName,
                   !originalImageName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            // 扩展内容（如 EPUB）没有 imagePath/textPath，但有原始文件名，不能落到“无标题笔记”。
+            // 扩展内容（如 EPUB）没有 imagePath/textPath，但有原始文件名，不能落到“空箔”。
             return originalImageName
         } else {
             let text = self.text.trimmingCharacters(in: .whitespacesAndNewlines)

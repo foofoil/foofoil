@@ -4396,13 +4396,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Untitled Note"
+            "value" : "Empty Foil"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "无标题笔记"
+            "value" : "空箔"
           }
         }
       }

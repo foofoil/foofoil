@@ -194,7 +194,12 @@ struct FoilExposeItemView: View {
         ZStack {
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color.white.opacity(0.08))
-            if let image = thumbnailLoader.image {
+            if item.isNewFoil {
+                // 无箔窗口时的占位卡：大号加号提示可新建空白箔。
+                Image(systemName: "plus")
+                    .font(.system(size: 44, weight: .light))
+                    .foregroundStyle(.white.opacity(0.7))
+            } else if let image = thumbnailLoader.image {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
@@ -210,11 +215,21 @@ struct FoilExposeItemView: View {
         .frame(maxWidth: .infinity)
         .aspectRatio(1, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(
+        .overlay(strokeOverlay)
+        .contentShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    /// 占位卡用虚线边框传达“新增”语义，其余卡片沿用实线描边。
+    @ViewBuilder
+    private var strokeOverlay: some View {
+        if item.isNewFoil {
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.white.opacity(isHovered ? 0.5 : 0.24),
+                        style: StrokeStyle(lineWidth: 1, dash: [6, 4]))
+        } else {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color.white.opacity(isHovered ? 0.5 : 0.16), lineWidth: 1)
-        )
-        .contentShape(RoundedRectangle(cornerRadius: 10))
+        }
     }
 
     /// 叠在已加载缩略图上的半透明类型标记，与 HistoryCardView 的音视频标记一致。
