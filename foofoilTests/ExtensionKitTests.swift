@@ -643,6 +643,62 @@ struct ExtensionKitTests {
         controller.close()
     }
 
+    @Test func commandScrollResizesNavigatorWhenPointerIsOverCompanionPanel() throws {
+        let state = AppState()
+        state.builtInNavigatorContributions = [
+            NavigatorContribution(
+                id: "builtin.panel-scroll",
+                titleLocalizationKey: "Navigator",
+                style: .flat,
+                items: [NavigatorItem(id: "one", title: "One")]
+            )
+        ]
+        state.navigatorPanelVisibilityMode = .always
+        state.navigatorPanelSide = .left
+
+        let controller = FloatingWindowController(appState: state)
+        defer { controller.close() }
+        let foilWindow = try #require(controller.window)
+        let panel = try #require(foilWindow.childWindows?.first)
+
+        // 指针落在伴随面板上：即便滚轮事件被投递给箔片窗口，也要改导航宽度。
+        #expect(controller.shouldCommandScrollResizeNavigator(
+            atScreenPoint: NSPoint(x: panel.frame.midX, y: panel.frame.midY)
+        ))
+
+        // 指针在箔片上：桌面态不触发导航宽度调整。
+        #expect(!controller.shouldCommandScrollResizeNavigator(
+            atScreenPoint: NSPoint(x: foilWindow.frame.midX, y: foilWindow.frame.midY)
+        ))
+    }
+
+    @Test func navigatorMagnificationGestureWidensPanel() throws {
+        let state = AppState()
+        state.builtInNavigatorContributions = [
+            NavigatorContribution(
+                id: "builtin.magnify-test",
+                titleLocalizationKey: "Navigator",
+                style: .flat,
+                items: [NavigatorItem(id: "one", title: "One")]
+            )
+        ]
+        state.navigatorPanelVisibilityMode = .always
+        state.navigatorPanelWidth = 300
+
+        let controller = FloatingWindowController(appState: state)
+        defer { controller.close() }
+
+        // Mac Mouse Fix 把 ⌘+滚轮转成 magnify：捏合放大应加宽面板。
+        controller.applyNavigatorWidthMagnification(magnification: 0.2, phase: .began)
+        controller.applyNavigatorWidthMagnification(magnification: 0.2, phase: .changed)
+        #expect(state.navigatorPanelWidth > 300)
+
+        // 反向捏合收窄。
+        let widened = state.navigatorPanelWidth
+        controller.applyNavigatorWidthMagnification(magnification: -0.4, phase: .changed)
+        #expect(state.navigatorPanelWidth < widened)
+    }
+
     @Test func navigatorPanelShadowFollowsAlwaysShowModeOnDesktop() async throws {
         let contribution = NavigatorContribution(
             id: "builtin.shadow-test",

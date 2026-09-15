@@ -195,9 +195,14 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     private let navigatorPanelController: NavigatorPanelController
     private var pendingNavigatorPanelHide: DispatchWorkItem?
     private var pendingNavigatorWidthCommit: DispatchWorkItem?
+    private var pendingNavigatorMagnifyCommit: DispatchWorkItem?
+    /// 捏合调宽的基准宽度与累积倍率；用于把 magnify 手势映射到导航面板宽度。
+    private var navigatorMagnifyBaseWidth: Double?
+    private var navigatorMagnifyAccumulated: CGFloat = 1
     private var pendingMediaPlaybackControlsHide: DispatchWorkItem?
     private var navigatorHoverLocalMonitor: Any?
     private var navigatorHoverGlobalMonitor: Any?
+    private var navigatorScrollLocalMonitor: Any?
     private var isTransitioningFullScreen = false
     private var windowedFrameDescriptorBeforeFullScreen: String?
     /// 置顶切换光晕的临时面板；仅在做提示动画时存在。
@@ -282,6 +287,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     public override func close() {
+        removeNavigatorScrollMonitor()
         navigatorPanelController.detachAndClose()
         super.close()
     }
@@ -292,6 +298,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         pendingNavigatorPanelHide = nil
         removePinGlowPanel()
         removeNavigatorHoverMonitors()
+        removeNavigatorScrollMonitor()
         navigatorPanelController.detachForApplicationHide()
     }
 
@@ -810,6 +817,20 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         return overlay.contains(pointInWindow)
     }
 
+    /// ⌘+滚轮改导航宽度，桌面态与全屏覆盖层共用一套判定。
+    /// Mac Mouse Fix 等工具会把滚轮投递给键盘焦点窗口（箔片）而非指针下的面板窗口；
+    /// 因此这里以屏幕坐标判断指针是否落在伴随面板上，不依赖事件归属哪个窗口。
+    func shouldCommandScrollResizeNavigator(atScreenPoint point: NSPoint) -> Bool {
+        if !appState.isFullScreen,
+           navigatorPanelController.isVisible,
+           let panel = navigatorPanelController.window,
+           panel.frame.contains(point) {
+            return true
+        }
+        guard let window else { return false }
+        return shouldCommandScrollResizeNavigator(at: window.convertPoint(fromScreen: point))
+    }
+
     func handleNavigatorCommandScroll(_ event: NSEvent) {
         let delta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.deltaY
         let next = NavigatorPanelMetrics.width(
@@ -831,7 +852,85 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: workItem)
     }
 
+    /// Mac Mouse Fix 等会把 ⌘+滚轮转换成捏合(magnify)手势；指针在导航栏上时按宽度调整处理。
+    func handleNavigatorWidthMagnification(_ event: NSEvent) {
+        applyNavigatorWidthMagnification(magnification: event.magnification, phase: event.phase)
+    }
+
+    /// 以手势起点宽度为基准按累积倍率缩放。部分工具不发送 ended，用去抖收尾并落盘。
+    func applyNavigatorWidthMagnification(magnification: CGFloat, phase: NSEvent.Phase) {
+        if phase.contains(.ended) || phase.contains(.cancelled) {
+            commitNavigatorMagnifyWidth()
+            return
+        }
+        if navigatorMagnifyBaseWidth == nil || phase.contains(.began) {
+            navigatorMagnifyBaseWidth = appState.navigatorPanelWidth
+            navigatorMagnifyAccumulated = 1
+            appState.isAdjustingNavigatorPanelWidth = true
+        }
+        navigatorMagnifyAccumulated += magnification
+        appState.navigatorPanelWidth = NavigatorPanelMetrics.clampWidth(
+            (navigatorMagnifyBaseWidth ?? appState.navigatorPanelWidth) * Double(navigatorMagnifyAccumulated)
+        )
+        pendingNavigatorMagnifyCommit?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in self?.commitNavigatorMagnifyWidth() }
+        pendingNavigatorMagnifyCommit = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: workItem)
+    }
+
+    private func commitNavigatorMagnifyWidth() {
+        pendingNavigatorMagnifyCommit?.cancel()
+        pendingNavigatorMagnifyCommit = nil
+        guard navigatorMagnifyBaseWidth != nil else { return }
+        navigatorMagnifyBaseWidth = nil
+        navigatorMagnifyAccumulated = 1
+        appState.isAdjustingNavigatorPanelWidth = false
+        SettingsStore.shared.navigatorPanelWidth = appState.navigatorPanelWidth
+        appState.saveState()
+    }
+
+    /// 本地事件监听先于窗口分发，按指针实际位置处理导航栏宽度：
+    /// 1. 不依赖事件归属窗口——Mac Mouse Fix 等会把滚轮投给键盘焦点窗口（箔片）；
+    /// 2. 同时覆盖 scrollWheel(⌘+滚轮) 与被转成的 magnify 手势。
+    private func updateNavigatorScrollMonitor() {
+        if NSApp.isHidden || appState.navigatorContributions.isEmpty {
+            removeNavigatorScrollMonitor()
+            return
+        }
+        guard navigatorScrollLocalMonitor == nil else { return }
+        navigatorScrollLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .magnify]) { [weak self] event in
+            guard let self, self.shouldResizeNavigatorWidthForPointer() else { return event }
+            if event.type == .scrollWheel {
+                guard event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.command) else { return event }
+                self.handleNavigatorCommandScroll(event)
+            } else {
+                self.handleNavigatorWidthMagnification(event)
+            }
+            return nil
+        }
+    }
+
+    private func removeNavigatorScrollMonitor() {
+        if let navigatorScrollLocalMonitor {
+            NSEvent.removeMonitor(navigatorScrollLocalMonitor)
+            self.navigatorScrollLocalMonitor = nil
+        }
+    }
+
+    /// 指针是否落在导航面板（桌面态伴随窗口）或全屏覆盖层上。
+    private func shouldResizeNavigatorWidthForPointer() -> Bool {
+        let pointer = NSEvent.mouseLocation
+        if navigatorPanelController.isVisible,
+           let panel = navigatorPanelController.window,
+           panel.frame.contains(pointer) {
+            return true
+        }
+        guard let window else { return false }
+        return shouldCommandScrollResizeNavigator(at: window.convertPoint(fromScreen: pointer))
+    }
+
     private func updateNavigatorPanelVisibility() {
+        updateNavigatorScrollMonitor()
         guard let window, !NSApp.isHidden else { return }
         if appState.isFullScreen || isTransitioningFullScreen {
             pendingNavigatorPanelHide?.cancel()
