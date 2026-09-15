@@ -398,15 +398,28 @@ struct FoilExposeItemView: View {
         }
     }
 
-    /// 叠在已加载缩略图上的半透明类型标记，与 HistoryCardView 的音视频标记一致。
+    /// 叠在缩略图上的播放标记：打开的音视频箔片正在播放时显示与音频列表当前曲目一致的
+    /// 动态频率柱状图（替换原静态图标）；暂停回退静态图标，历史条目等无窗口卡片保持静态。
     @ViewBuilder
     private var mediaKindOverlay: some View {
-        if thumbnailLoader.image != nil, item.contentKind == .audio || item.contentKind == .video {
-            Image(systemName: item.contentKind == .audio ? "music.note" : "play.fill")
-                .font(.system(size: 28, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.85))
-                .shadow(color: .black.opacity(0.5), radius: 3, y: 1)
+        if let appState = item.controller?.appState,
+           item.contentKind == .audio || item.contentKind == .video {
+            FoilExposeMediaBadge(
+                appState: appState,
+                contentKind: item.contentKind,
+                showsStaticIcon: thumbnailLoader.image != nil
+            )
+        } else if thumbnailLoader.image != nil,
+                  item.contentKind == .audio || item.contentKind == .video {
+            staticKindIcon
         }
+    }
+
+    private var staticKindIcon: some View {
+        Image(systemName: item.contentKind == .audio ? "music.note" : "play.fill")
+            .font(.system(size: 28, weight: .semibold))
+            .foregroundStyle(.white.opacity(0.85))
+            .shadow(color: .black.opacity(0.5), radius: 3, y: 1)
     }
 
     @ViewBuilder
@@ -442,5 +455,27 @@ private struct FoilExposeCardButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .animation(.interactiveSpring(response: 0.12, dampingFraction: 0.8), value: configuration.isPressed)
+    }
+}
+
+/// 打开的音视频箔片的播放标记：订阅 AppState 的播放状态，
+/// 播放时显示动态频率柱状图（与音频列表当前曲目一致），暂停时回退静态类型图标。
+private struct FoilExposeMediaBadge: View {
+    @ObservedObject var appState: AppState
+    let contentKind: HistoryContentKind
+    var showsStaticIcon: Bool
+
+    var body: some View {
+        if appState.isMediaPlaying {
+            MediaPlaybackBars(isPlaying: true)
+                // 覆盖层卡片远大于导航行，柱状图等比放大并加投影保证可读。
+                .scaleEffect(1.6)
+                .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
+        } else if showsStaticIcon {
+            Image(systemName: contentKind == .audio ? "music.note" : "play.fill")
+                .font(.system(size: 28, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.85))
+                .shadow(color: .black.opacity(0.5), radius: 3, y: 1)
+        }
     }
 }

@@ -454,7 +454,7 @@ struct NavigatorPanelView: View {
                         if showsPlaybackIndicator(for: contribution), row.item.isCurrent {
                             // 内置音视频与扩展播放队列的当前项用频率柱状图指示：播放时底部对齐的
                             // 柱高持续起伏；暂停时时间轴停走、冻结在最后变化时刻。
-                            NavigatorPlaybackBars(isPlaying: appState.isMediaPlaying)
+                            MediaPlaybackBars(isPlaying: appState.isMediaPlaying)
                                 .frame(width: 16)
                         } else {
                             Image(systemName: symbolName)
@@ -913,7 +913,8 @@ private struct NavigatorTitleWidthKey: PreferenceKey {
 /// “正在播放”频率柱状图：底部对齐的数根竖线按固定步进随机起伏。
 /// 时间轴在暂停时停走，柱形冻结在最后变化时刻；高度由（步数, 柱序号）
 /// 确定性生成，父视图重渲染也不会让冻结画面跳动。
-private struct NavigatorPlaybackBars: View {
+/// 供导航面板当前曲目与所有箔片覆盖层共用。
+struct MediaPlaybackBars: View {
     let isPlaying: Bool
 
     private static let barCount = 4
