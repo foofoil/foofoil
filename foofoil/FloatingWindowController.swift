@@ -785,6 +785,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         guard !appState.navigatorContributions.isEmpty,
               !appState.isNavigatorHiddenForVideoInactivity else { return false }
         if appState.navigatorPanelVisibilityMode == .always { return true }
+        // 调宽期间拖拽指针会随边缘移出面板，悬停判定会瞬时为 false；强制保持显示。
+        if appState.isAdjustingNavigatorPanelWidth { return true }
         return appState.isNavigatorPanelExplicitlyVisible
             || appState.isNavigatorPanelHovered
             || appState.isNavigatorEdgeHovered

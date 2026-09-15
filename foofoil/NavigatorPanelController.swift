@@ -255,6 +255,7 @@ final class NavigatorPanelController: NSWindowController {
 
     func detachAndClose() {
         guard let panel = window else { return }
+        appState.isAdjustingNavigatorPanelWidth = false
         hide()
         panel.parent?.removeChildWindow(panel)
         panel.orderOut(nil)
@@ -265,6 +266,7 @@ final class NavigatorPanelController: NSWindowController {
     /// hide: 读的是 ivar 不是 getter，不拆开会把宿主箔留在桌面上。
     func detachForApplicationHide() {
         guard let panel = window else { return }
+        appState.isAdjustingNavigatorPanelWidth = false
         pendingHide?.cancel()
         pendingHide = nil
         isHiding = false

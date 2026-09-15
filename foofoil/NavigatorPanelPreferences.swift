@@ -26,7 +26,7 @@ nonisolated public enum NavigatorPanelVisibilityMode: String, Codable, Sendable 
 nonisolated enum NavigatorPanelMetrics {
     static let defaultWidth = 260.0
     static let minimumWidth = 180.0
-    static let maximumWidth = 480.0
+    static let maximumWidth = 960.0
     static let attachmentGap = 8.0
     static let edgeTriggerWidth = 12.0
     static let widthResizeHandleThickness = 8.0

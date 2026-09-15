@@ -162,10 +162,12 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         set { navigatorHover.isPointerInside = newValue }
     }
     /// 覆盖层与播放控制条共用实际显隐条件，避免侧栏隐藏后仍预留空白。
+    /// 调宽期间强制可见：拖拽中指针会随边缘移出面板，否则悬停判定会误把面板收起。
     var isFullScreenNavigatorVisible: Bool {
         isFullScreen && !navigatorContributions.isEmpty && !isNavigatorHiddenForVideoInactivity
             && (navigatorPanelVisibilityMode == .always || isNavigatorPanelExplicitlyVisible
-                || isNavigatorPanelHovered || isNavigatorEdgeHovered || isNavigatorSearchActive)
+                || isNavigatorPanelHovered || isNavigatorEdgeHovered || isNavigatorSearchActive
+                || isAdjustingNavigatorPanelWidth)
     }
 
     var fullScreenNavigatorInset: CGFloat {
@@ -191,6 +193,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     @Published var navigatorSearchCurrentMatchID: String?
     /// 递增的聚焦请求；视图据此把焦点移回关键字输入框。
     @Published var navigatorSearchFocusRequest: UInt64 = 0
+    /// 宽度拖拽/⌘滚轮调整进行中：抑制面板自动隐藏，并让内容不跟随宽度做动画。
     var isAdjustingNavigatorPanelWidth = false
 
     @Published public var svgColor: String? {

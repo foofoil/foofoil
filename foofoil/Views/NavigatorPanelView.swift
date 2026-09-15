@@ -11,8 +11,6 @@ import FoofoilExtensionKit
 struct NavigatorPanelView: View {
     @ObservedObject var appState: AppState
     var isFullScreenOverlay = false
-    @State private var dragStartWidth: Double?
-    @State private var dragStartMouseX: CGFloat?
     @State private var draggedNavigatorContributionID: String?
     @State private var draggedNavigatorItemID: String?
     /// 当前鼠标悬停所在行的 ID，用于触发行内标题滚动。
@@ -656,38 +654,12 @@ struct NavigatorPanelView: View {
     private var resizeHandle: some View {
         HStack(spacing: 0) {
             if !isDraggingLeftEdge { Spacer() }
+            // 用原生视图接管鼠标事件：SwiftUI DragGesture 在面板非 key 时的首次点击会被
+            // 窗口激活吞掉，且拖拽中指针越出面板会命中悬停自动隐藏。原生视图可
+            // acceptsFirstMouse、持续跟踪到 mouseUp，并由 isAdjustingNavigatorPanelWidth 抑制隐藏。
             Color.clear
                 .frame(width: NavigatorPanelMetrics.widthResizeHandleThickness)
-                .background(NonMovableBackground())
-                .contentShape(Rectangle())
-                .onHover { hovering in
-                    if hovering { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
-                }
-                .gesture(
-                    DragGesture(minimumDistance: 1)
-                        .onChanged { _ in
-                            let mouseX = NSEvent.mouseLocation.x
-                            if dragStartWidth == nil {
-                                dragStartWidth = appState.navigatorPanelWidth
-                                dragStartMouseX = mouseX
-                                appState.isAdjustingNavigatorPanelWidth = true
-                            }
-                            let start = dragStartWidth ?? appState.navigatorPanelWidth
-                            let translation = Double(mouseX - (dragStartMouseX ?? mouseX))
-                            appState.navigatorPanelWidth = NavigatorPanelMetrics.width(
-                                afterDrag: start,
-                                translation: translation,
-                                draggingLeftEdge: isDraggingLeftEdge
-                            )
-                        }
-                        .onEnded { _ in
-                            dragStartWidth = nil
-                            dragStartMouseX = nil
-                            appState.isAdjustingNavigatorPanelWidth = false
-                            SettingsStore.shared.navigatorPanelWidth = appState.navigatorPanelWidth
-                            appState.saveState()
-                        }
-                )
+                .background(NavigatorResizeHandle(appState: appState, draggingLeftEdge: isDraggingLeftEdge))
             if isDraggingLeftEdge { Spacer() }
         }
     }
@@ -721,6 +693,131 @@ struct NavigatorPanelView: View {
         if !contributions.contains(where: { $0.id == appState.activeNavigatorContributionID }) {
             appState.activeNavigatorContributionID = contributions[0].id
         }
+    }
+}
+
+/// 用原生 NSView 处理面板宽度拖拽。相比 SwiftUI 手势，这里能：
+/// 1. 以 acceptsFirstMouse 让面板非 key 时首次点击即进入拖拽，不再先被窗口激活吞掉；
+/// 2. 从 mouseDown 一直跟踪到 mouseUp，指针越出手柄甚至面板也不会丢事件；
+/// 3. 通过 isAdjustingNavigatorPanelWidth 让面板在拖拽期间保持显示。
+private struct NavigatorResizeHandle: NSViewRepresentable {
+    @ObservedObject var appState: AppState
+    let draggingLeftEdge: Bool
+
+    func makeCoordinator() -> NavigatorResizeHandleCoordinator {
+        NavigatorResizeHandleCoordinator(appState: appState, draggingLeftEdge: draggingLeftEdge)
+    }
+
+    func makeNSView(context: Context) -> NavigatorResizeHandleView {
+        let view = NavigatorResizeHandleView()
+        view.coordinator = context.coordinator
+        return view
+    }
+
+    func updateNSView(_ nsView: NavigatorResizeHandleView, context: Context) {
+        context.coordinator.draggingLeftEdge = draggingLeftEdge
+    }
+}
+
+/// 拖拽会话状态：起点宽度在 mouseDown 时锁定，避免中途被其他宽度改动影响。
+private final class NavigatorResizeHandleCoordinator {
+    private let appState: AppState
+    var draggingLeftEdge: Bool
+    private var startWidth: Double?
+
+    init(appState: AppState, draggingLeftEdge: Bool) {
+        self.appState = appState
+        self.draggingLeftEdge = draggingLeftEdge
+    }
+
+    func begin() {
+        startWidth = appState.navigatorPanelWidth
+        appState.isAdjustingNavigatorPanelWidth = true
+    }
+
+    func update(translation: CGFloat) {
+        guard let start = startWidth else { return }
+        appState.navigatorPanelWidth = NavigatorPanelMetrics.width(
+            afterDrag: start,
+            translation: Double(translation),
+            draggingLeftEdge: draggingLeftEdge
+        )
+    }
+
+    func end() {
+        guard startWidth != nil else { return }
+        startWidth = nil
+        appState.isAdjustingNavigatorPanelWidth = false
+        SettingsStore.shared.navigatorPanelWidth = appState.navigatorPanelWidth
+        appState.saveState()
+    }
+}
+
+private final class NavigatorResizeHandleView: NSView {
+    weak var coordinator: NavigatorResizeHandleCoordinator?
+    private var startMouseX: CGFloat?
+    private var resizeTrackingArea: NSTrackingArea?
+
+    override var mouseDownCanMoveWindow: Bool { false }
+
+    /// 面板多为非 key 伴随窗口；没有它，第一次按下只会激活窗口、拖拽不生效。
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    /// cursor rect 只在 key 窗口生效，而伴随面板通常非 key；改用 activeAlways 的
+    /// tracking area 接收 cursorUpdate，鼠标在面板上也能稳定显示左右拖拽指针。
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let resizeTrackingArea { removeTrackingArea(resizeTrackingArea) }
+        let area = NSTrackingArea(
+            rect: .zero,
+            options: [.mouseEnteredAndExited, .cursorUpdate, .activeAlways, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(area)
+        resizeTrackingArea = area
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        addCursorRect(bounds, cursor: .resizeLeftRight)
+    }
+
+    override func cursorUpdate(with event: NSEvent) {
+        NSCursor.resizeLeftRight.set()
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        NSCursor.resizeLeftRight.set()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        // 拖拽中指针可能越出手柄，此时保留拖拽指针；离开后交回箭头，
+        // 若相邻控件有专属光标，其自身的 cursorUpdate 会随后覆盖。
+        guard startMouseX == nil else { return }
+        NSCursor.arrow.set()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        startMouseX = screenX(for: event)
+        coordinator?.begin()
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let startMouseX else { return }
+        coordinator?.update(translation: screenX(for: event) - startMouseX)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard startMouseX != nil else { return }
+        startMouseX = nil
+        coordinator?.end()
+    }
+
+    /// 以屏幕坐标计算位移：面板改宽时窗口自身也会移动，窗口内坐标会漂移。
+    private func screenX(for event: NSEvent) -> CGFloat {
+        guard let window = event.window else { return NSEvent.mouseLocation.x }
+        return window.convertPoint(toScreen: event.locationInWindow).x
     }
 }
 
