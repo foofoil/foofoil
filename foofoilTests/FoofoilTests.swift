@@ -2698,4 +2698,33 @@ struct ClipboardContentDetectionTests {
         #expect(!noteState.isMarkdownDocument)
         #expect(noteState.originalImageName == nil)
     }
+
+    @Test func markdownHistoryTitlePrefersFirstHeading() {
+        #expect(WindowConfig.markdownHistoryTitle(from: "# 我的标题\n\n正文内容") == "我的标题")
+        // 跳过围栏代码块内形似标题的行，取真正的首个标题。
+        #expect(WindowConfig.markdownHistoryTitle(from: "```\n# 代码注释\n```\n## 真实标题") == "真实标题")
+        // 去掉装饰性结尾 # 与行内标记。
+        #expect(WindowConfig.markdownHistoryTitle(from: "### **加粗** `代码` ###") == "加粗 代码")
+    }
+
+    @Test func markdownHistoryTitleFallsBackToContentLead() {
+        #expect(WindowConfig.markdownHistoryTitle(from: "今天买牛奶\n鸡蛋\n面包") == "今天买牛奶")
+        // 无标题时用开头文字并截断加省略号。
+        let long = String(repeating: "字", count: 40)
+        let title = WindowConfig.markdownHistoryTitle(from: long)
+        #expect(title.hasSuffix("..."))
+        #expect(title.count == 33)
+        // 只有围栏代码块时没有可用标题。
+        #expect(WindowConfig.markdownHistoryTitle(from: "```swift\nprint(\"hi\")\n```").isEmpty)
+    }
+
+    @Test func markdownHistoryDisplayNameUsesContentAndKeepsRename() {
+        let state = AppState()
+        state.openText("# 会议纪要\n\n讨论内容", isMarkdown: true)
+        #expect(state.toConfig().historyMenuDisplayName == "会议纪要")
+
+        var renamed = state.toConfig()
+        renamed.originalImageName = "自定义标题"
+        #expect(renamed.historyMenuDisplayName == "自定义标题")
+    }
 }

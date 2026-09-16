@@ -288,6 +288,13 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         isVideoLooping = mediaPlaybackMode == .singleLoop
     }
 
+    /// 是否为 Markdown 文档：需处于预览模式，且来源或原始名称带 Markdown 后缀。
+    private var isMarkdownDocument: Bool {
+        guard isMarkdownPreview else { return false }
+        let name = (originalImageName ?? textPath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "").lowercased()
+        return name.hasSuffix(".md") || name.hasSuffix(".markdown")
+    }
+
     public var historyMenuSymbolName: String {
         if let fileList, fileList.isPresentable {
             return fileList.kind.historySymbolName
@@ -303,20 +310,115 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         } else if self.originalImageName?.lowercased().hasSuffix(".csv") == true {
             return "tablecells"
         } else {
-            let isMarkdown: Bool
-            if let textPath = self.textPath {
-                let filename = self.originalImageName ?? URL(fileURLWithPath: textPath).lastPathComponent
-                isMarkdown = self.isMarkdownPreview && (filename.lowercased().hasSuffix(".md") == true || filename.lowercased().hasSuffix(".markdown") == true)
-            } else {
-                isMarkdown = self.isMarkdownPreview && (self.originalImageName?.lowercased().hasSuffix(".md") == true || self.originalImageName?.lowercased().hasSuffix(".markdown") == true)
-            }
-            return isMarkdown ? "arrow.down.document" : "note.text"
+            return isMarkdownDocument ? "arrow.down.document" : "note.text"
         }
+    }
+
+    /// Markdown 历史标题：优先用正文首个标题，否则用开头文字加省略号；用户改名后保留自定义标题。
+    private var markdownHistoryDisplayName: String {
+        if let name = originalImageName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !name.isEmpty,
+           !name.lowercased().hasSuffix(".md"),
+           !name.lowercased().hasSuffix(".markdown") {
+            return name
+        }
+        let title = Self.markdownHistoryTitle(from: text)
+        return title.isEmpty ? NSLocalizedString("Untitled Markdown", comment: "") : title
+    }
+
+    /// 从 Markdown 正文提取历史标题：首个 ATX 标题优先，否则取开头可读文字。
+    nonisolated static func markdownHistoryTitle(from text: String) -> String {
+        if let heading = firstMarkdownHeading(in: text), !heading.isEmpty { return heading }
+        let lead = markdownPlainLead(in: text)
+        return lead.count > 30 ? String(lead.prefix(30)) + "..." : lead
+    }
+
+    /// 跳过围栏代码块，返回正文中第一个 ATX 标题（`#` 至 `######`）。
+    nonisolated private static func firstMarkdownHeading(in text: String) -> String? {
+        var inFence = false
+        var fenceMarker: Character?
+        var fenceLength = 0
+        for rawLine in text.components(separatedBy: .newlines) {
+            let leadingSpaces = rawLine.prefix(while: { $0 == " " }).count
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("```") || line.hasPrefix("~~~") {
+                let marker = line.first!
+                let count = line.prefix(while: { $0 == marker }).count
+                if !inFence {
+                    inFence = true
+                    fenceMarker = marker
+                    fenceLength = count
+                } else if marker == fenceMarker, count >= fenceLength {
+                    inFence = false
+                    fenceMarker = nil
+                }
+                continue
+            }
+            guard !inFence, leadingSpaces < 4 else { continue }
+            let hashes = line.prefix(while: { $0 == "#" })
+            guard (1...6).contains(hashes.count) else { continue }
+            let remainder = line.dropFirst(hashes.count)
+            guard remainder.isEmpty || remainder.first == " " || remainder.first == "\t" else { continue }
+            var title = remainder.trimmingCharacters(in: .whitespaces)
+            while title.hasSuffix("#") { title.removeLast() }
+            let heading = stripInlineMarkdown(title.trimmingCharacters(in: .whitespaces))
+            if !heading.isEmpty { return heading }
+        }
+        return nil
+    }
+
+    /// 跳过围栏代码块与空行，取正文开头首个有内容的行作为回退标题。
+    nonisolated private static func markdownPlainLead(in text: String) -> String {
+        var inFence = false
+        var fenceMarker: Character?
+        var fenceLength = 0
+        for rawLine in text.components(separatedBy: .newlines) {
+            let line = rawLine.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("```") || line.hasPrefix("~~~") {
+                let marker = line.first!
+                let count = line.prefix(while: { $0 == marker }).count
+                if !inFence {
+                    inFence = true
+                    fenceMarker = marker
+                    fenceLength = count
+                } else if marker == fenceMarker, count >= fenceLength {
+                    inFence = false
+                    fenceMarker = nil
+                }
+                continue
+            }
+            guard !inFence else { continue }
+            var content = stripInlineMarkdown(line)
+            content = content.replacingOccurrences(of: "^[>\\s]+", with: "", options: .regularExpression)
+            content = content.replacingOccurrences(of: "^(?:[-+*]|\\d+\\.)\\s+", with: "", options: .regularExpression)
+            content = content.trimmingCharacters(in: .whitespaces)
+            if content.rangeOfCharacter(from: CharacterSet.alphanumerics) != nil { return content }
+        }
+        return ""
+    }
+
+    /// 去除常见行内 Markdown 标记，保留可读文字。
+    nonisolated private static func stripInlineMarkdown(_ text: String) -> String {
+        var result = text
+        let patterns = [
+            ("!\\[([^\\]]*)\\]\\([^)]*\\)", "$1"),
+            ("\\[([^\\]]*)\\]\\([^)]*\\)", "$1"),
+            ("(\\*\\*|__)(.+?)\\1", "$2"),
+            ("(\\*|_)(.+?)\\1", "$2"),
+            ("`([^`]*)`", "$1")
+        ]
+        for (pattern, template) in patterns {
+            result = result.replacingOccurrences(of: pattern, with: template, options: .regularExpression)
+        }
+        return result.trimmingCharacters(in: .whitespaces)
     }
 
     public var historyMenuDisplayName: String {
         if let fileList, fileList.isPresentable {
             return fileList.historyDisplayTitle
+        }
+        if isMarkdownDocument {
+            return markdownHistoryDisplayName
         }
         if let storedDisplayTitle, !storedDisplayTitle.isEmpty { return storedDisplayTitle }
         if let webURLString = self.webURLString {
@@ -345,8 +447,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
             let text = self.text.trimmingCharacters(in: .whitespacesAndNewlines)
             let displayName = text.count > 30 ? String(text.prefix(30)) + "..." : text
             if displayName.isEmpty {
-                let isMarkdown = self.isMarkdownPreview && (self.originalImageName?.lowercased().hasSuffix(".md") == true || self.originalImageName?.lowercased().hasSuffix(".markdown") == true)
-                return isMarkdown ? NSLocalizedString("Untitled Markdown", comment: "") : NSLocalizedString("Untitled Note", comment: "")
+                return isMarkdownDocument ? NSLocalizedString("Untitled Markdown", comment: "") : NSLocalizedString("Untitled Note", comment: "")
             } else {
                 return displayName
             }
