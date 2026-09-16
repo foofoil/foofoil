@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AppKit
 import Combine
 import FoofoilExtensionKit
 
@@ -310,6 +311,16 @@ public struct ContentView: View {
                 Label(NSLocalizedString("Close (ContextMenu)", comment: ""), systemImage: "xmark.circle")
             }
             .keyboardShortcut("w", modifiers: [.command])
+
+            Divider()
+
+            // 与系统 ⌘H 一致：隐藏整个应用，交给 AppDelegate 的 hide 生命周期收起箔片。
+            Button(action: {
+                NSApp.hide(nil)
+            }) {
+                Label(NSLocalizedString("Hide", comment: ""), systemImage: "eye.slash")
+            }
+            .keyboardShortcut("h", modifiers: [.command])
         }
     }
 

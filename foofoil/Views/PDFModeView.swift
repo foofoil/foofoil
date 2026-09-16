@@ -254,6 +254,18 @@ struct PDFModeView: NSViewRepresentable {
             closeItem.target = self
             menu.addItem(closeItem)
 
+            menu.addItem(NSMenuItem.separator())
+
+            // 与系统 ⌘H 一致：隐藏整个应用。
+            let hideItem = NSMenuItem(
+                title: NSLocalizedString("Hide", comment: ""),
+                action: #selector(NSApplication.hide(_:)),
+                keyEquivalent: "h"
+            )
+            hideItem.withSymbol("eye.slash")
+            hideItem.keyEquivalentModifierMask = [.command]
+            menu.addItem(hideItem)
+
             return menu
         }
 

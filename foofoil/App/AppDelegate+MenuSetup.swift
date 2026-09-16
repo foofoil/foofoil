@@ -482,6 +482,15 @@ extension AppDelegate {
 
         windowMenu.addItem(NSMenuItem.separator())
 
+        // 与系统 ⌘H 原生隐藏一致；不设 representedObject，避免被快捷键配置改写键位。
+        let hideAppItem = NSMenuItem(
+            title: NSLocalizedString("Hide", comment: ""),
+            action: #selector(NSApplication.hide(_:)),
+            keyEquivalent: "h"
+        )
+        hideAppItem.withSymbol("eye.slash")
+        windowMenu.addItem(hideAppItem)
+
         let showAllFoilsItem = NSMenuItem(
             title: NSLocalizedString("Show All Foils", comment: ""),
             action: #selector(showAllFoilsAction),
