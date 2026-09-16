@@ -324,11 +324,30 @@ extension AppState {
         }
 
         /// 音频箔收到拖入文件时，把其中的图片当作封面并从未处理列表中去掉。
-        func consumeDroppedImagesAsAudioCover(from urls: [URL]) -> [URL] {
+        /// 目录来源的批次里，与音频同目录的图片属于该目录自己的专辑封面，交给各目录分别展示，
+        /// 不能作为整箔封面互相覆盖；松散文件批次或与音频无目录关系的独立图片才走整箔封面替换。
+        func consumeDroppedImagesAsAudioCover(from urls: [URL], directorySourced: Bool = false) -> [URL] {
             guard isAudioDocument else { return urls }
             let images = urls.filter { FileListGrouper.classify(url: $0) == .listable(.image) }
-            guard let image = images.first else { return urls }
-            _ = applyAudioCover(from: image)
+            guard !images.isEmpty else { return urls }
+            let coverImage: URL?
+            if directorySourced {
+                let audioDirectoryKeys = Set(
+                    urls.filter { FileListGrouper.isAudioListItem($0) }.map {
+                        $0.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path
+                    }
+                )
+                coverImage = images.first(where: {
+                    !audioDirectoryKeys.contains(
+                        $0.deletingLastPathComponent().resolvingSymlinksInPath().standardizedFileURL.path
+                    )
+                })
+            } else {
+                coverImage = images.first
+            }
+            if let coverImage {
+                _ = applyAudioCover(from: coverImage)
+            }
             let imagePaths = Set(images.map { $0.resolvingSymlinksInPath().standardizedFileURL.path })
             return urls.filter {
                 !imagePaths.contains($0.resolvingSymlinksInPath().standardizedFileURL.path)
@@ -754,8 +773,10 @@ extension AppState {
 
         /// 视图已展示的封面落盘为历史缩略图。无 imagePath 的扩展音频不走后台索引，
         /// 这里是它们唯一的缩略图来源；已有缩略图时不再重复写入，除非强制覆盖。
+        /// 多分区列表的缩略图由后台索引按各分区封面拼成宫格，单曲封面不能覆盖它。
         func persistDisplayedArtworkForHistory(_ image: NSImage?, force: Bool = false) {
             guard let image else { return }
+            if (fileList?.sections.count ?? 0) >= 2 { return }
             let destination = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                 .appendingPathComponent("foofoil", isDirectory: true)
                 .appendingPathComponent("Thumbnails", isDirectory: true)

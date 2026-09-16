@@ -45,7 +45,7 @@ extension AppState {
                     : nil
                 scanDroppedDirectories(urls: fileURLs) { [weak self] result in
                     guard let self, self.isCurrentDrop(generation), !result.wasCancelled else { return }
-                    _ = self.processDroppedFileURLs(result.urls, fileListTitle: fileListTitle)
+                    _ = self.processDroppedFileURLs(result.urls, fileListTitle: fileListTitle, directorySourced: true)
                     if result.didReachLimit {
                         self.showDirectoryScanLimitAlert()
                     }
@@ -57,10 +57,14 @@ extension AppState {
         }
 
         @discardableResult
-        private func processDroppedFileURLs(_ fileURLs: [URL], fileListTitle: String? = nil) -> Bool {
+        private func processDroppedFileURLs(
+            _ fileURLs: [URL],
+            fileListTitle: String? = nil,
+            directorySourced: Bool = false
+        ) -> Bool {
             guard !fileURLs.isEmpty else { return false }
 
-            let remaining = consumeDroppedImagesAsAudioCover(from: fileURLs)
+            let remaining = consumeDroppedImagesAsAudioCover(from: fileURLs, directorySourced: directorySourced)
             let consumedCover = remaining.count < fileURLs.count
             if remaining.isEmpty {
                 return consumedCover
@@ -107,12 +111,12 @@ extension AppState {
 
             // 非空箔片的单文件拖放也先经过类型锁定，不能用其它类型替换当前内容。
             if appendToFileList || providers.count > 1 || currentDroppedFileKind != nil {
-                loadDroppedFileURLs(from: providers, generation: generation) { [weak self] urls in
+                loadDroppedFileURLs(from: providers, generation: generation) { [weak self] urls, directorySourced in
                     guard let self, self.isCurrentDrop(generation) else {
                         completion(false)
                         return
                     }
-                    let remaining = self.consumeDroppedImagesAsAudioCover(from: urls)
+                    let remaining = self.consumeDroppedImagesAsAudioCover(from: urls, directorySourced: directorySourced)
                     let consumedCover = remaining.count < urls.count
                     if remaining.isEmpty {
                         completion(consumedCover)
@@ -172,10 +176,11 @@ extension AppState {
             )
         }
 
+        /// 第二个参数标记批次是否来自目录扫描，供专辑封面归属判断使用。
         func loadDroppedFileURLs(
             from providers: [NSItemProvider],
             generation: UInt64,
-            completion: @escaping ([URL]) -> Void
+            completion: @escaping (_ urls: [URL], _ directorySourced: Bool) -> Void
         ) {
             var collected: [URL?] = Array(repeating: nil, count: providers.count)
             let group = DispatchGroup()
@@ -192,20 +197,20 @@ extension AppState {
             }
             group.notify(queue: .main) { [weak self] in
                 guard let self, self.isCurrentDrop(generation) else {
-                    completion([])
+                    completion([], false)
                     return
                 }
                 let urls = collected.compactMap { $0 }
                 guard DroppedFileResolver.containsDirectory(in: urls) else {
-                    completion(urls)
+                    completion(urls, false)
                     return
                 }
                 self.scanDroppedDirectories(urls: urls) { [weak self] result in
                     guard let self, self.isCurrentDrop(generation), !result.wasCancelled else {
-                        completion([])
+                        completion([], false)
                         return
                     }
-                    completion(result.urls)
+                    completion(result.urls, true)
                     if result.didReachLimit {
                         self.showDirectoryScanLimitAlert()
                     }

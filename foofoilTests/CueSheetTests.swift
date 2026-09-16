@@ -307,8 +307,195 @@ struct CueSheetTests {
         #expect(state.fileList?.soleContainerFormat == nil)
         let contribution = try #require(state.navigatorContributions.first)
         #expect(contribution.style == .outline)
-        #expect(contribution.items.map(\.title) == ["Album", "First", "Second", "extra.mp3"])
+        // 与 CUE 同目录的松散音频归属其直接目录，作为同级目录分区追加在容器分区之后。
+        #expect(contribution.items.map(\.title) == [
+            "Album", "First", "Second", directory.lastPathComponent, "extra.mp3"
+        ])
         #expect(contribution.items.first?.badge == "CUE")
+    }
+
+    @Test func appendingCueAndPlainAudioTogetherKeepsBothGroupedByDirectory() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-cue-plain-append-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let audio = directory.appendingPathComponent("disc.wav")
+        let extra = directory.appendingPathComponent("extra.mp3")
+        try Data().write(to: audio)
+        try Data().write(to: extra)
+        let cue = directory.appendingPathComponent("disc.cue")
+        try cueSheet(title: "Disc", performer: "Solo", fileName: "disc.wav", tracks: [
+            ("Intro", "00:00:00"),
+            ("Song", "01:00:00")
+        ]).write(to: cue, atomically: true, encoding: .utf8)
+
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.openAudio(url: extra)
+        #expect(state.appendToFileList(urls: [cue]).isEmpty)
+
+        let list = try #require(state.fileList)
+        #expect(list.sections.contains(where: { $0.resolvedFormat == .cue }))
+        #expect(list.sections.contains(where: { $0.isFolder && $0.title == directory.lastPathComponent }))
+        #expect(list.items.map(\.displayName).contains("Intro"))
+        #expect(list.items.map(\.displayName).contains("Song"))
+        #expect(list.items.contains(where: { $0.path == extra.path && $0.resolvedSectionID != nil }))
+    }
+
+    @Test func audioBatchKeepsCuesAndPlainAudioInOneList() {
+        let urls = [
+            URL(fileURLWithPath: "/tmp/album.cue"),
+            URL(fileURLWithPath: "/tmp/extra.mp3")
+        ]
+        let groups = FileListGrouper.groups(from: urls)
+        #expect(groups.count == 1)
+        #expect(groups[0].kind == .listable(.audio))
+        #expect(groups[0].urls.map(\.lastPathComponent) == ["album.cue", "extra.mp3"])
+    }
+
+    @Test func singleDirectoryPlainAudioBecomesOneFolderSection() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-flat-audio-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try Data().write(to: root.appendingPathComponent("a.mp3"))
+        try Data().write(to: root.appendingPathComponent("b.mp3"))
+
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        #expect(state.handleDroppedFileURLs([root]))
+        for _ in 0..<100 where state.fileList == nil {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+
+        let list = try #require(state.fileList)
+        // 单目录也建目录分区，只是一个分区时不再显示层级行，目录名作为列表标题。
+        #expect(list.sections.count == 1)
+        #expect(list.sections.first?.resolvedFormat == .folder)
+        #expect(list.items.map(\.displayName) == ["a.mp3", "b.mp3"])
+        #expect(list.items.allSatisfy { $0.resolvedSectionID == list.sections.first?.id })
+        #expect(list.isReorderable == true)
+        #expect(list.title == root.lastPathComponent)
+        #expect(state.navigatorContributions.first?.style == .flat)
+    }
+
+    @Test func directoryDropGroupsCueAndPlainAudioByDirectSubdirectory() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-grouped-audio-\(UUID().uuidString)", isDirectory: true)
+        let cueDirectory = root.appendingPathComponent("Cue Disc", isDirectory: true)
+        let bonusDirectory = root.appendingPathComponent("Bonus", isDirectory: true)
+        for directory in [root, cueDirectory, bonusDirectory] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+
+        try Data().write(to: root.appendingPathComponent("a.mp3"))
+        try Data().write(to: bonusDirectory.appendingPathComponent("b.mp3"))
+        let cueAudio = cueDirectory.appendingPathComponent("disc.wav")
+        try Data().write(to: cueAudio)
+        try cueSheet(title: "Cue Album", performer: "Artist", fileName: "disc.wav", tracks: [
+            ("One", "00:00:00"),
+            ("Two", "01:00:00")
+        ]).write(to: cueDirectory.appendingPathComponent("disc.cue"), atomically: true, encoding: .utf8)
+
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        #expect(state.handleDroppedFileURLs([root]))
+        for _ in 0..<100 where state.fileList == nil {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+
+        let list = try #require(state.fileList)
+        // 目录分区（根目录、Bonus）与 CUE 容器分区同属顶层。
+        #expect(list.sections.count == 3)
+        #expect(Set(list.sections.filter(\.isFolder).map(\.title)) == [root.lastPathComponent, "Bonus"])
+        #expect(list.sections.contains(where: { $0.resolvedFormat == .cue }) == true)
+        // CUE 已经生成的音轨不能被当成普通音频重复列入目录分区。
+        #expect(list.items.contains(where: { $0.path == cueAudio.path && $0.cue == nil }) == false)
+        #expect(list.items.map(\.displayName).contains("a.mp3"))
+        #expect(list.items.map(\.displayName).contains("b.mp3"))
+        #expect(list.items.map(\.displayName).contains("One"))
+        #expect(list.items.map(\.displayName).contains("Two"))
+    }
+
+    @Test func appendedAudioAcrossDirectoriesBecomesFolderSections() throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-append-dirs-\(UUID().uuidString)", isDirectory: true)
+        let firstDirectory = root.appendingPathComponent("First", isDirectory: true)
+        let secondDirectory = root.appendingPathComponent("Second", isDirectory: true)
+        for directory in [root, firstDirectory, secondDirectory] {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        defer { try? FileManager.default.removeItem(at: root) }
+        let first = firstDirectory.appendingPathComponent("a.mp3")
+        let second = secondDirectory.appendingPathComponent("b.mp3")
+        let third = firstDirectory.appendingPathComponent("c.mp3")
+        for url in [first, second, third] {
+            try Data().write(to: url)
+        }
+
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        let firstItem = state.makeFileListItem(url: first)
+        state.fileList = FileListState(kind: .audio, items: [firstItem], currentID: firstItem.id)
+
+        state.appendToFileList(urls: [second, third])
+
+        let list = try #require(state.fileList)
+        #expect(list.items.map(\.displayName) == ["a.mp3", "c.mp3", "b.mp3"])
+        #expect(Set(list.sections.filter(\.isFolder).map(\.title)) == ["First", "Second"])
+        #expect(list.items.allSatisfy { $0.resolvedSectionID != nil })
+    }
+
+    @Test func directoryCoverImageDoesNotBecomeFoilCover() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-dir-cover-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        try Data().write(to: root.appendingPathComponent("a.mp3"))
+        try Data().write(to: root.appendingPathComponent("b.mp3"))
+        let cover = try writeDummyPNG(in: root)
+
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        #expect(state.handleDroppedFileURLs([root]))
+        for _ in 0..<100 where state.fileList == nil {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+
+        // 目录里的封面归该目录自己的专辑；不能变成整箔封面，也不应触发替换询问。
+        #expect(state.customCoverURL == nil)
+        #expect(state.fileList?.items.count == 2)
+        #expect(state.fileList?.items.contains(where: { $0.path == cover.path }) == false)
+    }
+
+    @Test func historyGridThumbnailComposesSectionCovers() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-grid-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+
+        func makeImage(_ color: NSColor) -> NSImage {
+            let image = NSImage(size: NSSize(width: 8, height: 8))
+            image.lockFocus()
+            color.setFill()
+            NSRect(x: 0, y: 0, width: 8, height: 8).fill()
+            image.unlockFocus()
+            return image
+        }
+
+        let destination = directory.appendingPathComponent("grid.heic")
+        let images = [makeImage(.red), makeImage(.green), makeImage(.blue)]
+        #expect(HistoryThumbnailGenerator.generateGridThumbnail(images: images, destinationURL: destination))
+
+        let grid = try #require(NSImage(contentsOf: destination))
+        let rep = try #require(grid.representations.first)
+        // 两列 128 点单元格 + 4 点间隔 = 260；三张封面排成两行。
+        #expect(rep.pixelsWide == 260)
+        #expect(rep.pixelsHigh == 260)
+
+        // 少于两张封面时不生成宫格，交给调用方回退单封面。
+        #expect(!HistoryThumbnailGenerator.generateGridThumbnail(images: [makeImage(.red)], destinationURL: destination))
     }
 
     @Test func navigatorShowsCueSegmentDurationInsteadOfTrackNumber() async throws {

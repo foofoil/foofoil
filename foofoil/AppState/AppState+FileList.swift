@@ -103,13 +103,10 @@ extension AppState {
             installCueSheets(urls: group.urls, preservesIdentity: preservesIdentity)
         case .listable(let kind) where group.urls.count >= 2:
             if kind == .audio {
-                let sacd = group.urls.filter { FileListGrouper.isSACDISOFile($0) }
-                if sacd.count == group.urls.count, let url = sacd.first {
-                    openFile(url: url)
-                    return
-                }
+                installAudioList(urls: group.urls, preservesIdentity: preservesIdentity, title: title)
+            } else {
+                installFileList(kind: kind, urls: group.urls, preservesIdentity: preservesIdentity, title: title)
             }
-            installFileList(kind: kind, urls: group.urls, preservesIdentity: preservesIdentity, title: title)
         case .listable, .other:
             if let url = group.urls.first {
                 openFile(url: url)
@@ -136,7 +133,7 @@ extension AppState {
             id = UUID()
         }
         clearCustomCover()
-        let items = unique.map(makeFileListItem)
+        let items = unique.map { makeFileListItem(url: $0) }
         fileList = FileListState(kind: kind, items: items, currentID: items[0].id, title: title)
         sourceFingerprint = nil
         mediaPlaybackMode = .sequentialLoop
@@ -144,15 +141,97 @@ extension AppState {
         presentFileListItem(id: items[0].id, rotatesIdentity: false)
     }
 
+    /// 安装音频列表：CUE 与 SACD ISO 各自成容器分区，普通音频按直接父目录成目录分区，
+    /// 三类分区同属顶层；只有单个目录时目录分区会平铺显示，目录名作为列表标题。
+    /// SACD ISO 先以占位项加入，再按容器会话异步展开成分区。
+    func installAudioList(urls: [URL], preservesIdentity: Bool, title: String? = nil) {
+        let unique = uniqueExistingURLs(urls)
+        guard unique.count >= 2 else {
+            if let url = unique.first {
+                if FileListGrouper.isCueFile(url) {
+                    installCueSheets(urls: [url], preservesIdentity: preservesIdentity)
+                } else {
+                    openFile(url: url)
+                }
+            }
+            return
+        }
+
+        let cueURLs = unique.filter { FileListGrouper.isCueFile($0) }
+        let sacdURLs = unique.filter { FileListGrouper.isSACDISOFile($0) }
+        var plainURLs = unique.filter { url in
+            !FileListGrouper.isCueFile(url)
+                && !FileListGrouper.isSACDISOFile(url)
+                && FileListGrouper.classify(url: url) == .listable(.audio)
+        }
+        let sheets = loadedCueSheets(from: cueURLs)
+        // CUE 谱表已经生成的音轨不能被当成普通音频再列一次。
+        let cueReferenced = Set(sheets.flatMap { $0.items }.map {
+            $0.url.resolvingSymlinksInPath().standardizedFileURL.path
+        })
+        plainURLs.removeAll { cueReferenced.contains($0.resolvingSymlinksInPath().standardizedFileURL.path) }
+
+        let directoryGroups = FileListGrouper.groupedByParentDirectory(plainURLs)
+        guard !directoryGroups.isEmpty || !sheets.isEmpty || !sacdURLs.isEmpty else { return }
+
+        isBatchUpdating = true
+        if !preservesIdentity, hasOpenedContent {
+            id = UUID()
+        }
+        clearCustomCover()
+
+        var sections: [FileListSection] = []
+        var items: [FileListItem] = []
+        var pendingSACD: [URL] = []
+
+        for group in directoryGroups {
+            let section = FileListSection(
+                id: UUID().uuidString.lowercased(),
+                title: group.directory.lastPathComponent,
+                format: .folder,
+                directoryPath: group.directory.path
+            )
+            sections.append(section)
+            items.append(contentsOf: group.urls.map { makeFileListItem(url: $0, sectionID: section.id) })
+        }
+        for sheet in sheets {
+            sections.append(sheet.section)
+            items.append(contentsOf: sheet.items)
+        }
+        for url in sacdURLs {
+            items.append(makeFileListItem(url: url))
+            pendingSACD.append(url)
+        }
+
+        let resolvedTitle = FileListState.normalizedTitle(title) ?? sheets.first?.section.title
+        fileList = FileListState(kind: .audio, items: items, currentID: items[0].id, title: resolvedTitle, sections: sections)
+        sourceFingerprint = nil
+        mediaPlaybackMode = .sequentialLoop
+        isBatchUpdating = false
+        presentFileListItem(id: items[0].id, rotatesIdentity: false)
+        // 正在呈现的容器由播放会话自行安装分区；不要同文件再开临时会话展开，避免并发会话/设备争用。
+        if let presented = pendingSACD.firstIndex(where: {
+            $0.resolvingSymlinksInPath().standardizedFileURL.path
+                == items[0].url.resolvingSymlinksInPath().standardizedFileURL.path
+        }) {
+            pendingSACD.remove(at: presented)
+        }
+        if !pendingSACD.isEmpty {
+            expandAppendedSACDContainers(urls: pendingSACD)
+        }
+    }
+
     /// 将同类型文件追加到当前列表；单文件箔片会就地升级为列表并保留窗口 id。
+    /// 音频批次里的 CUE 先安装为容器分区，其余普通音频继续按直接目录追加，不能因含 CUE 丢弃。
     @discardableResult
     func appendToFileList(urls: [URL]) -> [URL] {
         guard let kind = listableKind else { return urls }
+        var pendingURLs = urls
         if kind == .audio {
             let cueURLs = uniqueExistingURLs(urls).filter { FileListGrouper.isCueFile($0) }
             if !cueURLs.isEmpty {
                 appendCueSheets(urls: cueURLs)
-                return urls.filter { url in
+                pendingURLs = urls.filter { url in
                     !cueURLs.contains(where: {
                         $0.resolvingSymlinksInPath().standardizedFileURL.path
                             == url.resolvingSymlinksInPath().standardizedFileURL.path
@@ -160,12 +239,12 @@ extension AppState {
                 }
             }
         }
-        let incoming = uniqueExistingURLs(urls).filter { FileListGrouper.classify(url: $0) == .listable(kind) }
-        let leftover = urls.filter { url in
+        let incoming = uniqueExistingURLs(pendingURLs).filter { FileListGrouper.classify(url: $0) == .listable(kind) }
+        let leftover = pendingURLs.filter { url in
             !incoming.contains(where: { $0.resolvingSymlinksInPath().standardizedFileURL.path == url.resolvingSymlinksInPath().standardizedFileURL.path })
         }
 
-        guard !incoming.isEmpty else { return leftover }
+        guard !incoming.isEmpty || kind == .audio else { return leftover }
 
         var list = fileList ?? FileListState(kind: kind, items: [], currentID: "")
         if list.items.isEmpty, let currentURL = currentListableFileURL() {
@@ -175,19 +254,29 @@ extension AppState {
         }
 
         let existingPaths = Set(list.items.map { URL(fileURLWithPath: $0.path).resolvingSymlinksInPath().standardizedFileURL.path })
+        let newIncoming = incoming.filter {
+            !existingPaths.contains($0.resolvingSymlinksInPath().standardizedFileURL.path)
+        }
+
+        let previousID = id
         var appendedSACDURLs: [URL] = []
-        for url in incoming {
-            let key = url.resolvingSymlinksInPath().standardizedFileURL.path
-            if existingPaths.contains(key) { continue }
-            list.items.append(makeFileListItem(url: url))
-            if kind == .audio, FileListGrouper.isSACDISOFile(url) {
-                appendedSACDURLs.append(url)
+        if kind == .audio {
+            // 普通音频始终按直接父目录归组；已有 CUE / SACD 分区保持不变。
+            // 只装了 CUE 时也要归组历史遗留的未分组项，保证目录归属一致。
+            let hasUngroupedItems = list.items.contains { $0.cue == nil && $0.resolvedSectionID == nil }
+            guard !newIncoming.isEmpty || hasUngroupedItems else { return leftover }
+            let grouped = appendWithDirectoryGrouping(list, appending: newIncoming)
+            list = grouped.list
+            appendedSACDURLs = grouped.sacdURLs
+        } else {
+            guard !newIncoming.isEmpty else { return leftover }
+            for url in newIncoming {
+                list.items.append(makeFileListItem(url: url))
             }
         }
 
         guard list.items.count >= 2 else { return leftover }
 
-        let previousID = id
         fileList = list
         sourceFingerprint = nil
         id = previousID
@@ -195,6 +284,103 @@ extension AppState {
         saveState()
         expandAppendedSACDContainers(urls: appendedSACDURLs)
         return leftover
+    }
+
+    /// 追加音频时按直接父目录重建普通音频分区；已有 CUE / SACD 容器分区及其曲目顺序保持不变。
+    /// SACD ISO 以未分组占位项加入，返回后由调用方异步展开。
+    private func appendWithDirectoryGrouping(
+        _ list: FileListState,
+        appending incoming: [URL]
+    ) -> (list: FileListState, sacdURLs: [URL]) {
+        func normalized(_ path: String) -> String {
+            URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
+        }
+        let containerSectionIDs = Set(list.sections.filter { !$0.isFolder }.map(\.id))
+        func isContainerItem(_ item: FileListItem) -> Bool {
+            guard let sectionID = item.resolvedSectionID else { return false }
+            return containerSectionIDs.contains(sectionID)
+        }
+
+        var order: [String] = []
+        var directoryURLs: [String: URL] = [:]
+        var existingByDirectory: [String: [FileListItem]] = [:]
+        var newByDirectory: [String: [URL]] = [:]
+        func ensureDirectory(_ url: URL) -> String {
+            let directory = url.deletingLastPathComponent()
+            let key = normalized(directory.path)
+            if directoryURLs[key] == nil {
+                directoryURLs[key] = directory
+                order.append(key)
+            }
+            return key
+        }
+
+        for item in list.items where !isContainerItem(item) {
+            existingByDirectory[ensureDirectory(item.url), default: []].append(item)
+        }
+        var sacdURLs: [URL] = []
+        for url in incoming {
+            if FileListGrouper.isSACDISOFile(url) {
+                sacdURLs.append(url)
+                continue
+            }
+            newByDirectory[ensureDirectory(url), default: []].append(url)
+        }
+
+        func assigning(_ item: FileListItem, to sectionID: String) -> FileListItem {
+            var copy = item
+            copy.sectionID = sectionID
+            return copy
+        }
+
+        var sections: [FileListSection] = []
+        var items: [FileListItem] = []
+        // 先按原分区顺序输出；目录分区原位重建，其它分区及曲目顺序不变。
+        for section in list.sections {
+            if section.isFolder {
+                guard let path = section.directoryPath else { continue }
+                let key = normalized(path)
+                guard existingByDirectory[key] != nil || newByDirectory[key] != nil else { continue }
+                sections.append(section)
+                items.append(contentsOf: (existingByDirectory[key] ?? []).map { assigning($0, to: section.id) })
+                items.append(contentsOf: (newByDirectory[key] ?? []).map {
+                    makeFileListItem(url: $0, sectionID: section.id)
+                })
+                existingByDirectory[key] = nil
+                newByDirectory[key] = nil
+            } else {
+                sections.append(section)
+                items.append(contentsOf: list.items.filter { $0.resolvedSectionID == section.id })
+            }
+        }
+        // 新目录按首次出现顺序追加。
+        for key in order {
+            let existingItems = existingByDirectory[key]
+            let newItems = newByDirectory[key]
+            guard existingItems != nil || newItems != nil else { continue }
+            let section = FileListSection(
+                id: UUID().uuidString.lowercased(),
+                title: directoryURLs[key]?.lastPathComponent ?? "",
+                format: .folder,
+                directoryPath: directoryURLs[key]?.path
+            )
+            sections.append(section)
+            items.append(contentsOf: (existingItems ?? []).map { assigning($0, to: section.id) })
+            items.append(contentsOf: (newItems ?? []).map {
+                makeFileListItem(url: $0, sectionID: section.id)
+            })
+        }
+        for url in sacdURLs {
+            items.append(makeFileListItem(url: url))
+        }
+
+        var updated = list
+        updated.sections = sections
+        updated.items = items
+        if !items.contains(where: { $0.id == updated.currentID }), let first = items.first {
+            updated.currentID = first.id
+        }
+        return (updated, sacdURLs)
     }
 
     /// 已有列表接收容器 ISO 后，用临时会话读取曲目队列再展开。阶段 3 改为扩展探测，不再为此开完整播放会话。
@@ -229,14 +415,18 @@ extension AppState {
         }
     }
 
-    /// 已显示可列表内容时，拖放只接收当前类型；混入的其它文件直接忽略。批次含 CUE 时只收 CUE。
+    /// 已显示可列表内容时，拖放只接收当前类型；混入的其它文件直接忽略。
+    /// 音频列表接收整批音频（CUE / SACD ISO / 普通音频），不再因含 CUE 丢弃普通音频。
     @discardableResult
     func appendMatchingDroppedFiles(urls: [URL]) -> Bool {
         guard let kind = listableKind else { return false }
-        let preferred = FileListGrouper.preferredOpenableURLs(from: urls.filter { canOpenFile(url: $0) })
-        let matching = preferred.filter { url in
-            if kind == .audio, FileListGrouper.isCueFile(url) { return true }
-            return FileListGrouper.classify(url: url) == .listable(kind)
+        let openable = urls.filter { canOpenFile(url: $0) }
+        let matching: [URL]
+        if kind == .audio {
+            matching = openable.filter { FileListGrouper.isAudioListItem($0) }
+        } else {
+            let preferred = FileListGrouper.preferredOpenableURLs(from: openable)
+            matching = preferred.filter { FileListGrouper.classify(url: $0) == .listable(kind) }
         }
         guard !matching.isEmpty else { return false }
         appendToFileList(urls: matching)
@@ -245,11 +435,15 @@ extension AppState {
 
     func matchingDroppedFiles(urls: [URL]) -> [URL] {
         let openable = urls.filter { canOpenFile(url: $0) }
-        let preferred = FileListGrouper.preferredOpenableURLs(from: openable)
         guard let kind = currentDroppedFileKind else {
-            return preferred
+            // 空白箔片交给类型分组统一选择；含 CUE 时也要保留普通音频，由音频列表按分区呈现。
+            return openable
         }
-        return preferred.filter { FileListGrouper.dropKind(url: $0) == kind }
+        if kind == .audio {
+            return openable.filter { FileListGrouper.isAudioListItem($0) }
+        }
+        return FileListGrouper.preferredOpenableURLs(from: openable)
+            .filter { FileListGrouper.dropKind(url: $0) == kind }
     }
 
     func presentFileListItem(id: String, rotatesIdentity: Bool) {
@@ -474,7 +668,7 @@ extension AppState {
         switch action.kind {
         case .activate:
             if let id = action.itemIDs.first {
-                if let first = fileList?.items.first(where: { $0.cue?.sectionID == id }) {
+                if let first = fileList?.items.first(where: { $0.resolvedSectionID == id }) {
                     presentFileListItem(id: first.id, rotatesIdentity: false)
                 } else {
                     presentFileListItem(id: id, rotatesIdentity: false)
@@ -484,7 +678,7 @@ extension AppState {
             var ids = action.itemIDs
             if let list = fileList {
                 for id in action.itemIDs where list.sections.contains(where: { $0.id == id }) {
-                    ids.append(contentsOf: list.items.compactMap { $0.cue?.sectionID == id ? $0.id : nil })
+                    ids.append(contentsOf: list.items.compactMap { $0.resolvedSectionID == id ? $0.id : nil })
                 }
             }
             removeFileListItems(ids: ids)
@@ -534,10 +728,10 @@ extension AppState {
         list.sections = remainingSections
         let sectionIDs = Set(remainingSections.map(\.id))
         let groupedItems = remainingSections.flatMap { section in
-            list.items.filter { $0.cue?.sectionID == section.id }
+            list.items.filter { $0.resolvedSectionID == section.id }
         }
         let ungroupedItems = list.items.filter { item in
-            guard let sectionID = item.cue?.sectionID else { return true }
+            guard let sectionID = item.resolvedSectionID else { return true }
             return !sectionIDs.contains(sectionID)
         }
         list.items = groupedItems + ungroupedItems
@@ -585,7 +779,7 @@ extension AppState {
         let removedCurrent = removing.contains(list.currentID)
         recordExtensionRemovals(in: list.items.filter { removing.contains($0.id) })
         list.items.removeAll { removing.contains($0.id) }
-        let remainingSectionIDs = Set(list.items.compactMap(\.cue?.sectionID))
+        let remainingSectionIDs = Set(list.items.compactMap(\.resolvedSectionID))
         list.sections.removeAll { !remainingSectionIDs.contains($0.id) }
 
         if list.items.count < 2 {
@@ -689,13 +883,13 @@ extension AppState {
         let items: [NavigatorItem]
         if useOutline {
             var rows: [NavigatorItem] = []
-            let grouped = Dictionary(grouping: list.items, by: { $0.cue?.sectionID })
+            let grouped = Dictionary(grouping: list.items, by: { $0.resolvedSectionID })
             for section in list.sections {
                 rows.append(
                     NavigatorItem(
                         id: section.id,
                         title: section.title,
-                        symbolName: "opticaldisc",
+                        symbolName: section.isFolder ? "folder" : "opticaldisc",
                         badge: section.resolvedFormat.badgeLocalizationKey.map { NSLocalizedString($0, comment: "") },
                         isEnabled: true,
                         isCurrent: false
@@ -705,7 +899,7 @@ extension AppState {
                     rows.append(makeNavigatorItem(for: item, in: list, parentID: section.id))
                 }
             }
-            for item in list.items where item.cue?.sectionID == nil {
+            for item in list.items where item.resolvedSectionID == nil {
                 rows.append(makeNavigatorItem(for: item, in: list, parentID: nil))
             }
             items = rows
@@ -818,7 +1012,7 @@ extension AppState {
         builtInNavigatorContributions = [contribution]
     }
 
-    func makeFileListItem(url: URL) -> FileListItem {
+    func makeFileListItem(url: URL, sectionID: String? = nil) -> FileListItem {
         let accessed = url.startAccessingSecurityScopedResource()
         let bookmark = Self.makeSecurityScopedBookmark(for: url)
         if accessed {
@@ -828,7 +1022,8 @@ extension AppState {
             id: UUID().uuidString.lowercased(),
             path: url.path,
             bookmark: bookmark,
-            displayName: url.lastPathComponent
+            displayName: url.lastPathComponent,
+            sectionID: sectionID
         )
     }
 
@@ -924,7 +1119,7 @@ extension AppState {
                 // 被替换分段在 sections 中的原槽位：替换后保持容器位置，避免切歌时整张专辑跳到列表末尾。
                 let replacedSectionIndex = matching.sorted().compactMap { index -> Int? in
                     guard list.items.indices.contains(index),
-                          let sectionID = list.items[index].cue?.sectionID else { return nil }
+                          let sectionID = list.items[index].resolvedSectionID else { return nil }
                     return list.sections.firstIndex(where: { $0.id == sectionID })
                 }.min()
                 // 占位文件或宿主已展开的 CUE 曲目都只替换本容器，混合列表里的其它音频必须保留。
@@ -941,7 +1136,7 @@ extension AppState {
                     }
                 }
                 list.items = replacement
-                let remainingSectionIDs = Set(list.items.compactMap(\.cue?.sectionID))
+                let remainingSectionIDs = Set(list.items.compactMap(\.resolvedSectionID))
                 list.sections.removeAll { !remainingSectionIDs.contains($0.id) }
                 if !list.sections.contains(where: { $0.id == section.id }) {
                     let insertIndex = min(replacedSectionIndex ?? list.sections.endIndex, list.sections.endIndex)
@@ -1001,8 +1196,8 @@ extension AppState {
               let currentIndex = list.items.firstIndex(where: { $0.id == list.currentID }) else {
             return []
         }
-        if let sectionID = list.items[currentIndex].cue?.sectionID {
-            return Set(list.items.indices.filter { list.items[$0].cue?.sectionID == sectionID })
+        if let sectionID = list.items[currentIndex].resolvedSectionID {
+            return Set(list.items.indices.filter { list.items[$0].resolvedSectionID == sectionID })
         }
         return [currentIndex]
     }

@@ -443,8 +443,8 @@ nonisolated final class HistoryDatabase {
             let storedTitle = FileListState.normalizedTitle(storedDisplayTitle)
             let originalTitle = FileListState.normalizedTitle(originalFilename)
 
-            // 兼容旧记录：CUE 分区已经保存专辑标题；旧版改名则可能留在展示标题或原始文件名中。
-            if list.isCueBased, let cueTitle = list.sections.first.flatMap({ FileListState.normalizedTitle($0.title) }) {
+            // 兼容旧记录：CUE / SACD 分区已经保存专辑标题；旧版改名则可能留在展示标题或原始文件名中。
+            if list.isCueBased, let cueTitle = list.firstContainerTitle {
                 list.title = cueTitle
             } else if let storedTitle, storedTitle != fallback {
                 list.title = storedTitle

@@ -438,7 +438,10 @@ extension AppDelegate {
         }
 
         if target.listableKind != nil {
-            let remaining = target.consumeDroppedImagesAsAudioCover(from: urls)
+            let remaining = target.consumeDroppedImagesAsAudioCover(
+                from: urls,
+                directorySourced: DroppedFileResolver.containsDirectory(in: urls)
+            )
             let consumedCover = remaining.count < urls.count
             if remaining.isEmpty {
                 if consumedCover, let controller = windowControllers.first(where: { $0.appState === target }) {

@@ -95,22 +95,63 @@ public enum HistoryThumbnailGenerator {
         }
 
         guard let image = finalImage else { return false }
+        return write(image, to: destinationURL)
+    }
 
+    /// 多分区音频列表的历史缩略图：按分区顺序把各分区封面铺成两列宫格（最多四张）。
+    /// 少于两张封面时不生成，由调用方回退到单封面缩略图。
+    public static func generateGridThumbnail(images: [NSImage], destinationURL: URL) -> Bool {
+        let limited = Array(images.prefix(4))
+        guard limited.count >= 2 else { return false }
+
+        let columns = 2
+        let rows = (limited.count + columns - 1) / columns
+        let cellSize = 128
+        let gap = 4
+        let width = columns * cellSize + (columns - 1) * gap
+        let height = rows * cellSize + (rows - 1) * gap
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+        ) else { return false }
+        context.interpolationQuality = .high
+        context.setFillColor(CGColor(gray: 0.1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+
+        for (index, image) in limited.enumerated() {
+            guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
+                  let cell = cropAndResize(cgImage, to: cellSize) else { continue }
+            let column = index % columns
+            let row = index / columns
+            // CGContext 原点在左下角，按视觉顺序自上而下摆放。
+            let x = column * (cellSize + gap)
+            let y = height - cellSize - row * (cellSize + gap)
+            context.draw(cell, in: CGRect(x: x, y: y, width: cellSize, height: cellSize))
+        }
+
+        guard let grid = context.makeImage() else { return false }
+        return write(grid, to: destinationURL)
+    }
+
+    /// 以 HEIC 格式写入目标文件（质量 70%）。
+    private static func write(_ image: CGImage, to destinationURL: URL) -> Bool {
         // 确保目标的父级目录存在
         let directory = destinationURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        // 使用 HEIC 格式写入目标文件
         guard let destination = CGImageDestinationCreateWithURL(destinationURL as CFURL, "public.heic" as CFString, 1, nil) else {
             return false
         }
-
-        // 设置 HEIC 质量为 70%
-        let options: [CFString: Any] = [
-            kCGImageDestinationLossyCompressionQuality: 0.70
-        ]
-
-        CGImageDestinationAddImage(destination, image, options as CFDictionary)
+        CGImageDestinationAddImage(
+            destination,
+            image,
+            [kCGImageDestinationLossyCompressionQuality: 0.70] as CFDictionary
+        )
         return CGImageDestinationFinalize(destination)
     }
 

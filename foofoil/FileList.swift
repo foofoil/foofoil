@@ -86,11 +86,17 @@ public nonisolated struct FileListItem: Codable, Equatable, Identifiable, Sendab
     public var displayName: String
     /// CUE 曲目分段信息；普通文件列表项为空。
     public var cue: FileListCueInfo?
+    /// 顶层分区归属，目录分区与 CUE / SACD 容器分区共用。容器曲目沿用 `cue.sectionID`，
+    /// 目录分组写在这里，避免把普通音频伪装成带时间轴的 CUE 曲目。
+    public var sectionID: String?
     /// 扩展队列项目 ID，对宿主不透明。只在当前会话到宿主列表的映射内有效，属于会话内状态，
     /// 不写入持久化；新会话建立后按资源对应关系重新盖章，不能因旧值恰好存在而复用。
     public var extensionItemID: String?
 
     public var url: URL { URL(fileURLWithPath: path) }
+
+    /// 分区归属统一解析：目录分区看 `sectionID`，CUE / SACD 曲目回退到 `cue.sectionID`。
+    public var resolvedSectionID: String? { sectionID ?? cue?.sectionID }
 
     /// 会话盖章（extensionItemID）只影响队列映射，不改变内容身份；
     /// 元数据缓存失效与重探测判断必须忽略它，否则每次换会话都会把整张列表重新读一遍。
@@ -108,6 +114,7 @@ public nonisolated struct FileListItem: Codable, Equatable, Identifiable, Sendab
         bookmark: Data? = nil,
         displayName: String,
         cue: FileListCueInfo? = nil,
+        sectionID: String? = nil,
         extensionItemID: String? = nil
     ) {
         self.id = id
@@ -115,11 +122,12 @@ public nonisolated struct FileListItem: Codable, Equatable, Identifiable, Sendab
         self.bookmark = bookmark
         self.displayName = displayName
         self.cue = cue
+        self.sectionID = sectionID
         self.extensionItemID = extensionItemID
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, path, bookmark, displayName, cue
+        case id, path, bookmark, displayName, cue, sectionID
     }
 
     public init(from decoder: Decoder) throws {
@@ -129,6 +137,7 @@ public nonisolated struct FileListItem: Codable, Equatable, Identifiable, Sendab
         bookmark = try container.decodeIfPresent(Data.self, forKey: .bookmark)
         displayName = try container.decode(String.self, forKey: .displayName)
         cue = try container.decodeIfPresent(FileListCueInfo.self, forKey: .cue)
+        sectionID = try container.decodeIfPresent(String.self, forKey: .sectionID)
         // 旧的持久化盖章不再跨会话复用；由新会话重新映射。
         extensionItemID = nil
     }
@@ -140,12 +149,15 @@ public nonisolated struct FileListItem: Codable, Equatable, Identifiable, Sendab
         try container.encodeIfPresent(bookmark, forKey: .bookmark)
         try container.encode(displayName, forKey: .displayName)
         try container.encodeIfPresent(cue, forKey: .cue)
+        try container.encodeIfPresent(sectionID, forKey: .sectionID)
     }
 }
 
 public nonisolated enum FileListContainerFormat: String, Codable, Equatable, Sendable {
     case cue
     case sacd
+    /// 目录分区：按文件直接父目录分组，和 CUE / SACD 分区同属顶层，不显示格式徽标。
+    case folder
     /// 未知扩展容器使用通用样式，不显示具体格式徽标。
     case generic
 
@@ -153,6 +165,7 @@ public nonisolated enum FileListContainerFormat: String, Codable, Equatable, Sen
         switch self {
         case .cue: "Navigator CUE Badge"
         case .sacd: "Navigator SACD Badge"
+        case .folder: nil
         case .generic: nil
         }
     }
@@ -165,19 +178,23 @@ public nonisolated struct FileListSection: Codable, Equatable, Identifiable, Sen
     public var cueSheetPath: String?
     public var cueSheetBookmark: Data?
     public var format: FileListContainerFormat?
+    /// 目录分区对应的直接父目录路径；CUE / SACD 分区为空。
+    public var directoryPath: String?
 
     public init(
         id: String,
         title: String,
         cueSheetPath: String? = nil,
         cueSheetBookmark: Data? = nil,
-        format: FileListContainerFormat? = nil
+        format: FileListContainerFormat? = nil,
+        directoryPath: String? = nil
     ) {
         self.id = id
         self.title = title
         self.cueSheetPath = cueSheetPath
         self.cueSheetBookmark = cueSheetBookmark
         self.format = format
+        self.directoryPath = directoryPath
     }
 
     /// 旧版持久化数据没有格式字段，可由容器扩展名无损恢复。
@@ -185,6 +202,9 @@ public nonisolated struct FileListSection: Codable, Equatable, Identifiable, Sen
         if let format { return format }
         return URL(fileURLWithPath: cueSheetPath ?? "").pathExtension.lowercased() == "iso" ? .sacd : .cue
     }
+
+    /// 目录分区不带格式徽标、不参与专辑标题回退。
+    public var isFolder: Bool { resolvedFormat == .folder }
 }
 
 /// 播放区间：CUE 帧计数（1 秒 = 75 帧）。seek 时转成 CMTime(timescale: 75)。
@@ -330,16 +350,19 @@ public nonisolated struct FileListState: Codable, Equatable, Sendable {
 
     public var isPresentable: Bool { items.count >= 2 }
 
-    /// CUE 曲目顺序由谱表时间轴决定，不能像普通文件列表一样重排。
+    /// CUE / SACD 曲目顺序由容器时间轴或队列决定，不能像普通文件列表一样重排；
+    /// 纯目录分区（普通音频）不占用时间轴语义，单目录时仍可重排。
     public var isCueBased: Bool {
-        !sections.isEmpty || items.contains(where: { $0.cue != nil })
+        items.contains(where: { $0.cue != nil })
+            || sections.contains(where: { !$0.isFolder })
     }
 
     /// 纯单 CUE / SACD 列表在标题上显示格式；混合列表改由子目录显示。
+    /// 单目录分区也返回 `.folder`，用于判断不必进入层级显示。
     public var soleContainerFormat: FileListContainerFormat? {
         guard sections.count == 1, let section = sections.first,
               !items.isEmpty,
-              items.allSatisfy({ $0.cue?.sectionID == section.id }) else { return nil }
+              items.allSatisfy({ $0.resolvedSectionID == section.id }) else { return nil }
         return section.resolvedFormat
     }
 
@@ -347,6 +370,11 @@ public nonisolated struct FileListState: Codable, Equatable, Sendable {
 
     public var currentItem: FileListItem? {
         items.first(where: { $0.id == currentID }) ?? items.first
+    }
+
+    /// 首个真正的容器分区（CUE / SACD）标题；目录分区不参与专辑标题回退。
+    public var firstContainerTitle: String? {
+        sections.first(where: { !$0.isFolder }).flatMap { Self.normalizedTitle($0.title) }
     }
 
     /// 与历史记录一致的列表展示标题：自定义（或 CUE 专辑）标题附项数，
@@ -578,6 +606,22 @@ public enum FileListGrouper {
         return .other
     }
 
+    /// 按文件直接父目录归组，保持首次出现顺序。只取一层目录，不展开多级结构。
+    nonisolated static func groupedByParentDirectory(_ urls: [URL]) -> [(directory: URL, urls: [URL])] {
+        var order: [String] = []
+        var groups: [String: (directory: URL, urls: [URL])] = [:]
+        for url in urls {
+            let directory = url.deletingLastPathComponent()
+            let key = directory.resolvingSymlinksInPath().standardizedFileURL.path
+            if groups[key] == nil {
+                order.append(key)
+                groups[key] = (directory, [])
+            }
+            groups[key]?.urls.append(url)
+        }
+        return order.compactMap { groups[$0] }
+    }
+
     nonisolated static func uniqued(_ urls: [URL]) -> [URL] {
         var seenPaths = Set<String>()
         var unique: [URL] = []
@@ -601,8 +645,18 @@ public enum FileListGrouper {
         return unique
     }
 
+    /// 判断文件是否属于同一份音频列表：CUE、SACD ISO 与普通音频可以共存并按分区呈现。
+    static func isAudioListItem(_ url: URL) -> Bool {
+        isCueFile(url) || isSACDISOFile(url) || classify(url: url) == .listable(.audio)
+    }
+
     /// 一次批次只选择一种内容：CUE、音频、视频、图片依次优先；其它类型按数量最多者选择。
+    /// 整批都是音频类时合并为一组，交给列表按直接目录与 CUE / SACD 容器分区。
     static func groups(from urls: [URL]) -> [FileListGroup] {
+        let all = uniqued(urls)
+        if !all.isEmpty, all.allSatisfy(isAudioListItem) {
+            return [FileListGroup(kind: .listable(.audio), urls: all)]
+        }
         let unique = preferredOpenableURLs(from: urls)
         let cues = unique.filter { isCueFile($0) }
         if !cues.isEmpty {
