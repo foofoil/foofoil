@@ -24,6 +24,8 @@ struct ImageModeView: View {
                 )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipped()
+                    // 无边框图片铺满窗口：整块画面即拖拽区域，双击缩放等父级手势仍可识别。
+                    .gesture(WindowDragGesture())
             } else {
                 let layoutSize = AudioMetadataLoader.layoutSize(nsImage) ?? nsImage.size
                 ScrollView([.horizontal, .vertical], showsIndicators: true) {

@@ -53,12 +53,15 @@ public struct ContentView: View {
                     Color(backgroundColor).opacity(0.6) // 叠加半透明窗口背景色以降低背景透明度，提升内容清晰度
                 }
                 .cornerRadius(12)
+                // 毛玻璃背景是可拖拽区域；内容层上的控件仍优先处理事件。
+                .gesture(WindowDragGesture())
             } else if appState.webURL != nil {
                 // 网页视图关闭了 WebKit 自身背景；无边框时仍保留与有边框模式一致的毛玻璃背景，避免透明区域直接露出桌面。
                 ZStack {
                     VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
                     Color(backgroundColor).opacity(0.6)
                 }
+                .gesture(WindowDragGesture())
             }
 
             // 内容区域

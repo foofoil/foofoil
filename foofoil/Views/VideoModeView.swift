@@ -59,6 +59,9 @@ struct VideoModeView: View {
         ZStack(alignment: .bottom) {
             PlayerView(player: controller.player)
 
+            // 视频画面不是交互控件，整块画面作为拖拽区域；底部控制条仍优先处理事件。
+            WindowDragArea()
+
             if appState.isMediaPlaybackControlsVisible {
                 // 底部控制条：播放/暂停 + 时间 + 进度条 + 静音 + 播放模式。
                 // 整个控制条区域不触发窗口拖动，控制条以外区域拖拽仍可移动窗口。

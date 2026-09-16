@@ -28,8 +28,8 @@ struct TextEditorModeView: View {
 
                 VStack(alignment: .leading, spacing: 0) {
                     ZStack(alignment: .topLeading) {
-                        // 编辑器外侧的留白是真实窗口背景，交由 AppKit 原生处理窗口移动。
-                        MovableBackground()
+                        // 编辑器外侧的留白是真实窗口背景，用原生手势移动窗口。
+                        WindowDragArea()
 
                         if appState.isMarkdownPreview && appState.isMarkdownDocument && !appState.text.isEmpty {
                             MarkdownTextView(attributedText: appState.renderedMarkdown, calculatedHeight: $textHeight)

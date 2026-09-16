@@ -12,6 +12,9 @@ struct AudioPresentationView<Controller: MediaTransportControlling>: View {
         ZStack {
             backgroundLayer
 
+            // 封面与曲目信息不是交互控件，整块内容作为拖拽区域；底部播放条仍优先处理事件。
+            WindowDragArea()
+
             metadataBlock
                 .padding(.horizontal, shouldHideBorder ? 20 : 16)
                 .padding(.top, 12)
@@ -22,6 +25,7 @@ struct AudioPresentationView<Controller: MediaTransportControlling>: View {
                     alignment: info.artwork == nil ? .center : .bottomLeading
                 )
                 .clipped()
+                .allowsHitTesting(false)
 
             if appState.isMediaPlaybackControlsVisible {
                 VStack {
