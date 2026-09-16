@@ -413,19 +413,19 @@
         }
       }
     },
-    "Bottom Progress Bar Footer" : {
+    "Bottom Progress Bar Note" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Show a slim playback progress line along the bottom edge of the foil, regardless of the controls."
+            "value" : "Slim progress line along the foil's bottom edge."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在箔片底部边缘常显一条纤细的播放进度线，与控制条显隐无关。"
+            "value" : "箔片底部常显的纤细进度线。"
           }
         }
       }
@@ -3064,19 +3064,19 @@
         }
       }
     },
-    "Playback Controls Hide Delay Footer" : {
+    "Playback Controls Hide Delay Note" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Video controls hide after the pointer stays still and reappear once it moves. Audio controls stay visible while hovering the window or outline, or while paused."
+            "value" : "Hide video controls after the pointer rests."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "视频控制条在鼠标静止达到设定时间后隐藏，移动时立即重新显示；音频控制条在悬停窗口或目录、暂停时保持显示。"
+            "value" : "视频控制条在鼠标静止后隐藏。"
           }
         }
       }
@@ -3610,6 +3610,57 @@
         }
       }
     },
+    "Seek Step" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seek Step"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "快进快退步长"
+          }
+        }
+      }
+    },
+    "Seek Step Note" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seconds skipped by the Left and Right arrow keys."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "左右方向键快退或快进的秒数。"
+          }
+        }
+      }
+    },
+    "Seek Step Seconds Format" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d seconds"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%d 秒"
+          }
+        }
+      }
+    },
     "Select All" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3848,19 +3899,19 @@
         }
       }
     },
-    "Slideshow Interval Footer" : {
+    "Slideshow Interval Note" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "How long each image stays on screen before the next one."
+            "value" : "How long each image stays on screen."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "每张图片显示这么久后，再切换到下一张。"
+            "value" : "每张图片的显示时长。"
           }
         }
       }

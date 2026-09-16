@@ -31,6 +31,14 @@ nonisolated struct KeyboardShortcut: Codable, Equatable, Hashable {
         return String(UnicodeScalar(scalar.value + 32)!)
     }
 
+    /// 事件的有效修饰键：方向键的 modifierFlags 恒带 .function 与 .numericPad，
+    /// 按“无修饰键”判断时必须剔除，否则物理方向键会被误认为组合键而无法触发。
+    static func effectiveModifiers(for event: NSEvent) -> NSEvent.ModifierFlags {
+        event.modifierFlags
+            .intersection(.deviceIndependentFlagsMask)
+            .subtracting([.function, .numericPad])
+    }
+
     /// 是否包含菜单快捷键必需的修饰键；无修饰键会吞掉普通输入。
     var hasRequiredModifiers: Bool {
         let flags = modifiers

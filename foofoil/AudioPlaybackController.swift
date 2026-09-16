@@ -120,6 +120,21 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 }
             }
         )
+        // 窗口级左右方向键在此按设置步长快退/快进。
+        observers.append(
+            NotificationCenter.default.addObserver(
+                forName: .shouldSeekMediaPlayback,
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                MainActor.assumeIsolated {
+                    guard let self,
+                          notification.userInfo?["id"] as? UUID == self.appStateID,
+                          let delta = notification.userInfo?["delta"] as? Double else { return }
+                    self.adjustTime(by: delta)
+                }
+            }
+        )
         // 系统默认输出在 Audio MIDI Setup 改采样率等硬件重配会让引擎停止但通知不经过 CoreAudio 设备监听；
         // 这里兜底重建并续播，避免界面仍显示播放而进度停滞。
         observers.append(

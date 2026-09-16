@@ -74,11 +74,18 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
     }
 
     /// AppKit 会在窗口 `keyDown` 之前匹配菜单快捷键；禁用项仍会吞掉对应按键。
-    /// PDF 翻页与文件列表切项共用方向键，因此只给当前内容模式绑定。
+    /// PDF 翻页用左右键；文件列表切项的主键位是上下键（音视频的左右键留给快退/快进），因此只给当前内容模式绑定。
     func syncGoMenuKeyEquivalents() {
         guard let menu = goMenu else { return }
-        let isPDFDocument = activeAppState?.isPDFDocument == true
-        let hasFileList = activeAppState?.fileList?.isPresentable == true
+        Self.syncGoMenuKeyEquivalents(
+            in: menu,
+            isPDFDocument: activeAppState?.isPDFDocument == true,
+            hasFileList: activeAppState?.fileList?.isPresentable == true
+        )
+    }
+
+    /// 独立成静态方法便于直接验证键位策略：主键位（菜单里展示的那个）与隐藏备用键位一起刷新。
+    static func syncGoMenuKeyEquivalents(in menu: NSMenu, isPDFDocument: Bool, hasFileList: Bool) {
         let left = String(UnicodeScalar(NSLeftArrowFunctionKey)!)
         let right = String(UnicodeScalar(NSRightArrowFunctionKey)!)
         let up = String(UnicodeScalar(NSUpArrowFunctionKey)!)
@@ -93,17 +100,14 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
                 item.keyEquivalent = isPDFDocument ? right : ""
                 item.keyEquivalentModifierMask = []
             case GoMenuItemTag.fileListPrevious:
-                item.keyEquivalent = hasFileList ? left : ""
+                item.keyEquivalent = hasFileList ? up : ""
                 item.keyEquivalentModifierMask = []
             case GoMenuItemTag.fileListNext:
-                item.keyEquivalent = hasFileList ? right : ""
+                item.keyEquivalent = hasFileList ? down : ""
                 item.keyEquivalentModifierMask = []
             case GoMenuItemTag.fileListExtra:
                 let assigned = item.representedObject as? String ?? ""
                 item.keyEquivalent = hasFileList ? assigned : ""
-                if assigned == up || assigned == down {
-                    item.keyEquivalentModifierMask = []
-                }
             default:
                 break
             }

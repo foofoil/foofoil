@@ -2072,9 +2072,9 @@ struct FoofoilTests {
             )!
         }
 
-        #expect(state.handleFileListKeyDown(keyEvent(keyCode: 124)))
+        #expect(state.handleFileListKeyDown(keyEvent(keyCode: 124, modifiers: [.function, .numericPad])))
         #expect(state.fileList?.currentID != firstID)
-        #expect(state.handleFileListKeyDown(keyEvent(keyCode: 126)))
+        #expect(state.handleFileListKeyDown(keyEvent(keyCode: 126, modifiers: [.function, .numericPad])))
         #expect(state.fileList?.currentID == firstID)
         #expect(state.handleFileListKeyDown(keyEvent(keyCode: 45, characters: "n", modifiers: .control)))
         #expect(state.fileList?.currentID != firstID)
@@ -2084,10 +2084,61 @@ struct FoofoilTests {
         #expect(state.fileList?.currentID != firstID)
         #expect(state.handleFileListKeyDown(keyEvent(keyCode: 11, characters: "b", modifiers: .control)))
         #expect(state.fileList?.currentID == firstID)
-        #expect(state.handleFileListKeyDown(keyEvent(keyCode: 125)))
+        #expect(state.handleFileListKeyDown(keyEvent(keyCode: 125, modifiers: [.function, .numericPad])))
         #expect(state.fileList?.currentID != firstID)
-        #expect(state.handleFileListKeyDown(keyEvent(keyCode: 123)))
+        #expect(state.handleFileListKeyDown(keyEvent(keyCode: 123, modifiers: [.function, .numericPad])))
         #expect(state.fileList?.currentID == firstID)
+    }
+
+    /// 方向键的 modifierFlags 恒带 .function/.numericPad，判断“无修饰键”时必须剔除。
+    @Test func arrowKeyEventsKeepFunctionAndNumericPadFlags() {
+        func arrowEvent(_ flags: NSEvent.ModifierFlags) -> NSEvent {
+            NSEvent.keyEvent(
+                with: .keyDown,
+                location: .zero,
+                modifierFlags: flags,
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                characters: "",
+                charactersIgnoringModifiers: "",
+                isARepeat: false,
+                keyCode: 124
+            )!
+        }
+
+        #expect(KeyboardShortcut.effectiveModifiers(for: arrowEvent([.function, .numericPad])).isEmpty)
+        #expect(KeyboardShortcut.effectiveModifiers(for: arrowEvent([.function, .numericPad, .control])) == [.control])
+        #expect(KeyboardShortcut.effectiveModifiers(for: arrowEvent([.command])) == [.command])
+    }
+
+    /// 音视频列表：左右键留给窗口级快退/快进（返回 false），上下键仍切换曲目。
+    @Test func mediaFileListLeavesLeftRightKeysForSeeking() {
+        let first = FileListItem(id: "a", path: "/tmp/foofoil-key-a.flac", bookmark: nil, displayName: "a.flac")
+        let second = FileListItem(id: "b", path: "/tmp/foofoil-key-b.flac", bookmark: nil, displayName: "b.flac")
+        let state = AppState()
+        state.fileList = FileListState(kind: .audio, items: [first, second], currentID: first.id)
+
+        func keyEvent(keyCode: UInt16) -> NSEvent {
+            NSEvent.keyEvent(
+                with: .keyDown,
+                location: .zero,
+                modifierFlags: [.function, .numericPad],
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                characters: "",
+                charactersIgnoringModifiers: "",
+                isARepeat: false,
+                keyCode: keyCode
+            )!
+        }
+
+        #expect(state.isExternalMediaDocument)
+        #expect(!state.handleFileListKeyDown(keyEvent(keyCode: 123)))
+        #expect(!state.handleFileListKeyDown(keyEvent(keyCode: 124)))
+        #expect(state.handleFileListKeyDown(keyEvent(keyCode: 126)))
+        #expect(state.handleFileListKeyDown(keyEvent(keyCode: 125)))
     }
 
     @Test func switchingFileListItemsPreservesBorder() throws {
@@ -2174,6 +2225,22 @@ struct FoofoilTests {
         #expect(store.imageListSlideshowInterval == 12)
     }
 
+    @Test func settingsStoreClampsMediaSeekStepInterval() {
+        let store = SettingsStore.shared
+        let previous = store.mediaSeekStepInterval
+        defer { store.mediaSeekStepInterval = previous }
+
+        #expect(MediaSeekStep.defaultInterval == 5)
+        store.mediaSeekStepInterval = MediaSeekStep.defaultInterval
+        #expect(store.mediaSeekStepInterval == MediaSeekStep.defaultInterval)
+        store.mediaSeekStepInterval = 0
+        #expect(store.mediaSeekStepInterval == MediaSeekStep.minInterval)
+        store.mediaSeekStepInterval = 600
+        #expect(store.mediaSeekStepInterval == MediaSeekStep.maxInterval)
+        store.mediaSeekStepInterval = 15
+        #expect(store.mediaSeekStepInterval == 15)
+    }
+
     @Test func imageListSlideshowDecodesLegacyFileListWithoutSlideshowKeys() throws {
         let first = FileListItem(id: "a", path: "/tmp/a.png", bookmark: nil, displayName: "a.png")
         let second = FileListItem(id: "b", path: "/tmp/b.png", bookmark: nil, displayName: "b.png")
@@ -2207,7 +2274,9 @@ struct FoofoilTests {
         #expect(item?.isHidden == true)
     }
 
-    @Test func goMenuArrowKeysAreNotBoundUntilContentOwnsThem() {
+    /// 前往菜单主键位：文件列表切项用上下（菜单里显示的那个），PDF 翻页用左右；
+    /// 音视频的左右键留给窗口级快退/快进，不再作为列表快捷键。
+    @Test func goMenuArrowKeysFollowCurrentContentMode() {
         let appDelegate = AppDelegate()
         appDelegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))
         guard let goMenu = NSApplication.shared.mainMenu?.items.first(where: {
@@ -2219,6 +2288,8 @@ struct FoofoilTests {
 
         let left = String(UnicodeScalar(NSLeftArrowFunctionKey)!)
         let right = String(UnicodeScalar(NSRightArrowFunctionKey)!)
+        let up = String(UnicodeScalar(NSUpArrowFunctionKey)!)
+        let down = String(UnicodeScalar(NSDownArrowFunctionKey)!)
         let pdfPrevious = goMenu.items.first { $0.action == #selector(AppDelegate.previousPDFPageAction) }
         let pdfNext = goMenu.items.first { $0.action == #selector(AppDelegate.nextPDFPageAction) }
         let listPrevious = goMenu.items.first {
@@ -2230,13 +2301,31 @@ struct FoofoilTests {
                 && $0.tag == GoMenuItemTag.fileListNext
         }
 
-        appDelegate.updateGoMenuVisibility()
-        #expect(pdfPrevious?.keyEquivalent != left)
-        #expect(pdfNext?.keyEquivalent != right)
+        AppDelegate.syncGoMenuKeyEquivalents(in: goMenu, isPDFDocument: false, hasFileList: false)
+        #expect(pdfPrevious?.keyEquivalent == "")
+        #expect(pdfNext?.keyEquivalent == "")
+        #expect(listPrevious?.keyEquivalent == "")
+        #expect(listNext?.keyEquivalent == "")
+
+        AppDelegate.syncGoMenuKeyEquivalents(in: goMenu, isPDFDocument: false, hasFileList: true)
+        #expect(listPrevious?.keyEquivalent == up)
+        #expect(listNext?.keyEquivalent == down)
+        #expect(listPrevious?.keyEquivalentModifierMask == [])
+        #expect(listNext?.keyEquivalentModifierMask == [])
         #expect(listPrevious?.keyEquivalent != left)
         #expect(listNext?.keyEquivalent != right)
-        #expect(pdfPrevious?.keyEquivalent == "")
+
+        AppDelegate.syncGoMenuKeyEquivalents(in: goMenu, isPDFDocument: true, hasFileList: false)
+        #expect(pdfPrevious?.keyEquivalent == left)
+        #expect(pdfNext?.keyEquivalent == right)
         #expect(listPrevious?.keyEquivalent == "")
+
+        // 隐藏备用键位只保留 ⌃ 组合，不再重复绑定上下方向键。
+        let arrowExtras = goMenu.items.filter { item in
+            item.tag == GoMenuItemTag.fileListExtra
+                && ((item.representedObject as? String) == up || (item.representedObject as? String) == down)
+        }
+        #expect(arrowExtras.isEmpty)
     }
 
     @Test func windowConfigAndHistoryRoundTripFileList() throws {

@@ -93,7 +93,7 @@ public class FloatingWindow: NSWindow {
     }
 
     public override func sendEvent(_ event: NSEvent) {
-        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let modifiers = KeyboardShortcut.effectiveModifiers(for: event)
 
         if event.type == .flagsChanged {
             let isCommandPressed = modifiers.contains(.command)
@@ -191,6 +191,16 @@ public class FloatingWindow: NSWindow {
                 object: nil,
                 userInfo: ["id": controller.appState.id]
             )
+            return
+        }
+
+        // 音视频模式左右方向键按设置步长快退/快进；上/下仍由列表切项处理。
+        if event.type == .keyDown,
+           modifiers.isEmpty,
+           (event.keyCode == 123 || event.keyCode == 124),
+           let controller = self.windowController as? FloatingWindowController,
+           controller.appState.isExternalMediaDocument {
+            postMediaSeek(keyCode: event.keyCode, for: controller.appState)
             return
         }
 
@@ -314,6 +324,19 @@ public class FloatingWindow: NSWindow {
         }
 
         super.sendEvent(event)
+    }
+
+    /// 左右方向键快退/快进：步长实时读取设置，通知由当前窗口的媒体控制器消费。
+    private func postMediaSeek(keyCode: UInt16, for appState: AppState) {
+        let step = SettingsStore.shared.mediaSeekStepInterval
+        NotificationCenter.default.post(
+            name: .shouldSeekMediaPlayback,
+            object: nil,
+            userInfo: [
+                "id": appState.id,
+                "delta": keyCode == 123 ? -step : step
+            ]
+        )
     }
 
     /// 边缘缩放只拦截 cursorUpdate。进入/移动事件交给视图，否则离开箔再进入后 hover 会失效。
@@ -491,8 +514,17 @@ public class FloatingWindow: NSWindow {
             return true
         }
 
-        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let modifiers = KeyboardShortcut.effectiveModifiers(for: event)
         let delegate = NSApplication.shared.delegate as? AppDelegate
+
+        // 音视频左右方向键先于主菜单与内容视图处理；图片等列表类型仍走上面的左右翻页。
+        if let controller = windowController as? FloatingWindowController,
+           controller.appState.isExternalMediaDocument,
+           modifiers.isEmpty,
+           event.keyCode == 123 || event.keyCode == 124 {
+            postMediaSeek(keyCode: event.keyCode, for: controller.appState)
+            return true
+        }
 
         // 默认全屏键 ⌃⌘F：保持窗口直属切换，避免内容视图吞键。
         if delegate?.isUsingDefaultShortcut("view.toggleFullScreen") == true,

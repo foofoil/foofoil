@@ -225,18 +225,6 @@ extension AppDelegate {
         addFileListShortcut(
             title: NSLocalizedString("Previous Item", comment: ""),
             action: #selector(previousFileListItemAction),
-            keyEquivalent: String(UnicodeScalar(NSUpArrowFunctionKey)!),
-            modifiers: []
-        )
-        addFileListShortcut(
-            title: NSLocalizedString("Next Item", comment: ""),
-            action: #selector(nextFileListItemAction),
-            keyEquivalent: String(UnicodeScalar(NSDownArrowFunctionKey)!),
-            modifiers: []
-        )
-        addFileListShortcut(
-            title: NSLocalizedString("Previous Item", comment: ""),
-            action: #selector(previousFileListItemAction),
             keyEquivalent: "p",
             modifiers: [.control]
         )

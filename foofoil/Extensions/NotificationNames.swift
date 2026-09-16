@@ -29,6 +29,8 @@ extension Notification.Name {
     public static let shouldMatchPDFWindowAspectRatio = Notification.Name("shouldMatchPDFWindowAspectRatio")
     public static let shouldApplyPDFScaleToWindow = Notification.Name("shouldApplyPDFScaleToWindow")
     public static let shouldToggleVideoPlayback = Notification.Name("shouldToggleVideoPlayback")
+    /// userInfo: ["id": 窗口 AppState.id, "delta": 快退/快进秒数（可为负）]。
+    public static let shouldSeekMediaPlayback = Notification.Name("shouldSeekMediaPlayback")
     public static let mediaPlaybackDidFinish = Notification.Name("mediaPlaybackDidFinish")
     public static let mediaPresentationSizeDidChange = Notification.Name("mediaPresentationSizeDidChange")
     public static let openGroupedFiles = Notification.Name("openGroupedFiles")

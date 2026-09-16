@@ -110,6 +110,15 @@ final class VideoPlayerController: ObservableObject, MediaTransportControlling {
                 self.togglePlayPause()
             }
         })
+        // 窗口级左右方向键在此按设置步长快退/快进。
+        observers.append(center.addObserver(forName: .shouldSeekMediaPlayback, object: nil, queue: .main) { [weak self] notification in
+            MainActor.assumeIsolated {
+                guard let self,
+                      notification.userInfo?["id"] as? UUID == self.appStateID,
+                      let delta = notification.userInfo?["delta"] as? Double else { return }
+                self.adjustTime(by: delta)
+            }
+        })
 
         seek(to: 0)
     }

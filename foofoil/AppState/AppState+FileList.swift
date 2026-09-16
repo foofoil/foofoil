@@ -381,7 +381,8 @@ extension AppState {
         DispatchQueue.main.asyncAfter(deadline: .now() + interval, execute: workItem)
     }
 
-    /// 右/下/⌃N/⌃F 下一项，左/上/⌃P/⌃B 上一项；搜索快捷键先于播放列表切换处理。
+    /// 上/⌃P/⌃B 上一项，下/⌃N/⌃F 下一项；左右键仅图片等类型翻页，音视频留给快退/快进；
+    /// 搜索快捷键先于播放列表切换处理。
     @discardableResult
     func handleFileListKeyDown(_ event: NSEvent) -> Bool {
         if handleNavigatorSearchKey(event) { return true }
@@ -391,8 +392,11 @@ extension AppState {
             return true
         }
         guard fileList?.isPresentable == true, !isPDFDocument else { return false }
-        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let modifiers = KeyboardShortcut.effectiveModifiers(for: event)
         if modifiers.isEmpty {
+            if event.keyCode == 123 || event.keyCode == 124, isExternalMediaDocument {
+                return false
+            }
             switch event.keyCode {
             case 123, 126:
                 activateAdjacentFileListItem(delta: -1)

@@ -94,6 +94,17 @@ public nonisolated enum MediaPlaybackControlsAutoHide {
     }
 }
 
+/// 音视频左右方向键快退/快进步长；全局偏好统一钳制，避免异常值造成过大跳转。
+public nonisolated enum MediaSeekStep {
+    public static let defaultInterval: TimeInterval = 5
+    public static let minInterval: TimeInterval = 1
+    public static let maxInterval: TimeInterval = 60
+
+    public static func clampInterval(_ value: TimeInterval) -> TimeInterval {
+        min(max(value, minInterval), maxInterval)
+    }
+}
+
 nonisolated public struct WindowConfig: Codable, Identifiable {
     public let id: UUID
     public var imagePath: String?
@@ -487,6 +498,7 @@ public class SettingsStore {
             Keys.extensionAutoInstallCompatibleMinorUpdates: false,
             Keys.imageListSlideshowInterval: ImageListSlideshow.defaultInterval,
             Keys.mediaPlaybackControlsAutoHideInterval: MediaPlaybackControlsAutoHide.defaultInterval,
+            Keys.mediaSeekStepInterval: MediaSeekStep.defaultInterval,
             Keys.showsMediaBottomProgressBar: true
         ])
     }
@@ -508,6 +520,7 @@ public class SettingsStore {
         static let extensionAutoInstallCompatibleMinorUpdates = "extensionAutoInstallCompatibleMinorUpdates"
         static let imageListSlideshowInterval = "imageListSlideshowInterval"
         static let mediaPlaybackControlsAutoHideInterval = "mediaPlaybackControlsAutoHideInterval"
+        static let mediaSeekStepInterval = "mediaSeekStepInterval"
         static let showsMediaBottomProgressBar = "showsMediaBottomProgressBar"
     }
 
@@ -590,6 +603,21 @@ public class SettingsStore {
             guard abs(mediaPlaybackControlsAutoHideInterval - clamped) > 0.001 else { return }
             userDefaults.set(clamped, forKey: Keys.mediaPlaybackControlsAutoHideInterval)
             NotificationCenter.default.post(name: .mediaPlaybackControlsAutoHideIntervalDidChange, object: nil)
+        }
+    }
+
+    /// 音视频左右方向键快退/快进步长（秒）；全局偏好，默认 5 秒，按键时实时读取。
+    var mediaSeekStepInterval: TimeInterval {
+        get {
+            guard userDefaults.object(forKey: Keys.mediaSeekStepInterval) != nil else {
+                return MediaSeekStep.defaultInterval
+            }
+            return MediaSeekStep.clampInterval(userDefaults.double(forKey: Keys.mediaSeekStepInterval))
+        }
+        set {
+            let clamped = MediaSeekStep.clampInterval(newValue)
+            guard abs(mediaSeekStepInterval - clamped) > 0.001 else { return }
+            userDefaults.set(clamped, forKey: Keys.mediaSeekStepInterval)
         }
     }
 

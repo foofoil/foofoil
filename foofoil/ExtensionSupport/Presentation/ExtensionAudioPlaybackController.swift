@@ -29,6 +29,7 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
     private let notePlaybackIntent: @MainActor (Bool) -> Void
     private var mediaTitle: String
     private var observer: NSObjectProtocol?
+    private var seekObserver: NSObjectProtocol?
     private var systemDevicesListener: AudioObjectPropertyListenerBlock?
     private var systemDefaultListener: AudioObjectPropertyListenerBlock?
     private var currentSession: ContentSession?
@@ -74,6 +75,19 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
                 self.togglePlayPause()
             }
         }
+        // 窗口级左右方向键在此按设置步长快退/快进。
+        seekObserver = NotificationCenter.default.addObserver(
+            forName: .shouldSeekMediaPlayback,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            MainActor.assumeIsolated {
+                guard let self,
+                      notification.userInfo?["id"] as? UUID == self.appStateID,
+                      let delta = notification.userInfo?["delta"] as? Double else { return }
+                self.adjustTime(by: delta)
+            }
+        }
         if ExtensionPlaybackSupport.usesDeviceService(session) {
             startSystemDeviceObservation()
         }
@@ -81,6 +95,7 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
 
     deinit {
         if let observer { NotificationCenter.default.removeObserver(observer) }
+        if let seekObserver { NotificationCenter.default.removeObserver(seekObserver) }
         // CoreAudio 监听的移除必须与添加使用相同的 selector；此处直接重建 address 即可。
         var devicesAddress = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
