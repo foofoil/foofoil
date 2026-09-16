@@ -137,6 +137,22 @@ final class FoilExposeModel: ObservableObject {
         selectedIndex = min(max(0, selectedIndex + delta), currentItems.count - 1)
     }
 
+    /// Ctrl+A：高亮移到当前行首。行号 = 当前下标 / 列数，行首 = 行号 × 列数。
+    func moveSelectionToRowStart() {
+        guard !currentItems.isEmpty else { return }
+        let columns = max(1, columnCount)
+        let row = selectedIndex / columns
+        selectedIndex = min(row * columns, currentItems.count - 1)
+    }
+
+    /// Ctrl+E：高亮移到当前行尾；末行可能不满一整行，夹紧到最后一个条目。
+    func moveSelectionToRowEnd() {
+        guard !currentItems.isEmpty else { return }
+        let columns = max(1, columnCount)
+        let row = selectedIndex / columns
+        selectedIndex = min(row * columns + columns - 1, currentItems.count - 1)
+    }
+
     /// 面板视图回填本屏可见条目；随滚动实时更新。
     func setVisibleIDs(_ ids: [UUID], for screen: NSScreen) {
         visibleIDsByScreen[ObjectIdentifier(screen)] = ids
@@ -488,7 +504,22 @@ final class FoilExposeController {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, let model = self.model else { return event }
             let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            // 带命令/选项修饰键的按键放行，让菜单快捷键（含再次触发的 ⌃⇧⎋ / ⌥⇧⎋）继续工作。
+            let key = event.charactersIgnoringModifiers?.lowercased()
+            let onlyCommand = modifiers.contains(.command)
+                && !modifiers.contains(.control) && !modifiers.contains(.option) && !modifiers.contains(.shift)
+            let commandShift = modifiers.contains(.command) && modifiers.contains(.shift)
+                && !modifiers.contains(.control) && !modifiers.contains(.option)
+            // ⌘O/⌘P/⌘L/⌘⇧V 会打开文件对话框、历史搜索等新视图：先收起覆盖层再放行给菜单，
+            // 避免打开的内容被覆盖层挡住。
+            if onlyCommand, key == "o" || key == "p" || key == "l" {
+                self.dismiss()
+                return event
+            }
+            if commandShift, key == "v" {
+                self.dismiss()
+                return event
+            }
+            // 其余带命令/选项修饰键的按键放行，让菜单快捷键（含再次触发的 ⌃⇧⎋ / ⌥⇧⎋）继续工作。
             if modifiers.contains(.command) || modifiers.contains(.option) {
                 return event
             }
@@ -496,10 +527,12 @@ final class FoilExposeController {
                 self.dismiss()
                 return nil
             }
-            // Ctrl+P/N/F/B：emacs 风格移动高亮；其余带 Control 的组合放行给菜单快捷键。
+            // Ctrl+A/E 移到行首/行尾，Ctrl+P/N/F/B 上下左右；其余带 Control 的组合放行给菜单快捷键。
             if modifiers.contains(.control) {
                 guard let key = event.charactersIgnoringModifiers?.lowercased() else { return event }
                 switch key {
+                case "a": model.moveSelectionToRowStart()
+                case "e": model.moveSelectionToRowEnd()
                 case "p": model.moveSelection(.up)
                 case "n": model.moveSelection(.down)
                 case "b": model.moveSelection(.left)

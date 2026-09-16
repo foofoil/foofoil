@@ -310,7 +310,8 @@ extension AppDelegate {
     }
 
     @objc func openFileAction() {
-        guard let appState = activeAppState else { return }
+        // 无箔窗口时同样弹出选择面板；选中的文件在确认后由 openGroupedFiles 落入新开的箔片。
+        let appState = activeAppState
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false

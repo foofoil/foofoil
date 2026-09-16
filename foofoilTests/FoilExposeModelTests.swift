@@ -52,6 +52,23 @@ struct FoilExposeModelTests {
         #expect(model.selectedIndex == 0)
     }
 
+    @Test func rowEdgeJumpsFollowColumnCount() {
+        let model = makeModel()
+        model.columnCount = 4
+        // 第二行（下标 4-5，不满一整行）：行首 4，行尾夹紧到 5。
+        model.selectedIndex = 5
+        model.moveSelectionToRowStart()
+        #expect(model.selectedIndex == 4)
+        model.moveSelectionToRowEnd()
+        #expect(model.selectedIndex == 5)
+        // 第一行：行首 0，行尾 3。
+        model.selectedIndex = 2
+        model.moveSelectionToRowStart()
+        #expect(model.selectedIndex == 0)
+        model.moveSelectionToRowEnd()
+        #expect(model.selectedIndex == 3)
+    }
+
     @Test func switchTabResetsHighlightAndSwapsItems() {
         let model = makeModel()
         model.selectedIndex = 3
