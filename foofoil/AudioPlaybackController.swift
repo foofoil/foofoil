@@ -232,6 +232,15 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             activeLeaseClientID?.uuidString ?? "-", sampleRate
         )
         if ExtensionHost.shared.isAudioDeviceServiceAvailable {
+            // 同一独占租约内切歌直接重排：跳过异步设备命令与协调器往返，缩短曲间间隙；
+            // 采样率变化或租约不在时仍走完整准备流程。
+            if let deviceID = selectedOutputDeviceID,
+               isLeaseReusable(deviceID: deviceID),
+               engineStorage != nil {
+                routeGeneration &+= 1
+                schedule(from: currentTime, play: true, keepsLeaseOnFailure: true)
+                return
+            }
             routeGeneration &+= 1
             let generation = routeGeneration
             Task { await preparePreferredRouteAndPlay(generation: generation) }
@@ -442,15 +451,17 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                 ? file.processingFormat.sampleRate
                 : file.fileFormat.sampleRate
             let nextChannels = Int(file.processingFormat.channelCount)
-            let formatChanged = abs(nextRate - sampleRate) > 0.5 || nextChannels != sourceChannelCount
+            let rateChanged = abs(nextRate - sampleRate) > 0.5
+            let formatChanged = rateChanged || nextChannels != sourceChannelCount
             audioFile = file
             currentFileAccess = access
             currentFileURL = url
             loadedContentIdentity = identity
             sampleRate = nextRate
             sourceChannelCount = nextChannels
-            // 切歌后仍要能复用独占租约：仅在采样率或声道变化时才作废。
-            if formatChanged {
+            // 切歌后仍要能复用独占租约：只有采样率变化才必须重设设备格式；
+            // 声道数变化只影响引擎连线，沿用同一租约可避免 DAC 无谓重锁与重配间隙。
+            if rateChanged {
                 preparedSourceSampleRate = nil
             }
             if formatChanged {
