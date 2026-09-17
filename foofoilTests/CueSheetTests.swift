@@ -375,7 +375,8 @@ struct CueSheetTests {
         #expect(list.items.map(\.displayName) == ["a.mp3", "b.mp3"])
         #expect(list.items.allSatisfy { $0.resolvedSectionID == list.sections.first?.id })
         #expect(list.isReorderable == true)
-        #expect(list.title == root.lastPathComponent)
+        #expect(list.title == nil)
+        #expect(list.displayTitle == root.lastPathComponent)
         #expect(state.navigatorContributions.first?.style == .flat)
     }
 
@@ -494,6 +495,17 @@ struct CueSheetTests {
         #expect(rep.pixelsWide == 260)
         #expect(rep.pixelsHigh == 260)
 
+        // 两张封面同样保持方形四宫格（下方留空），不能横向铺开超出边界。
+        let twoDestination = directory.appendingPathComponent("grid-two.heic")
+        #expect(HistoryThumbnailGenerator.generateGridThumbnail(
+            images: [makeImage(.red), makeImage(.green)],
+            destinationURL: twoDestination
+        ))
+        let twoGrid = try #require(NSImage(contentsOf: twoDestination))
+        let twoRep = try #require(twoGrid.representations.first)
+        #expect(twoRep.pixelsWide == 260)
+        #expect(twoRep.pixelsHigh == 260)
+
         // 少于两张封面时不生成宫格，交给调用方回退单封面。
         #expect(!HistoryThumbnailGenerator.generateGridThumbnail(images: [makeImage(.red)], destinationURL: destination))
     }
@@ -515,8 +527,9 @@ struct CueSheetTests {
         let state = AppState()
         defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
         #expect(state.handleDroppedFileURLs([cue]))
-        #expect(state.fileList?.title == "Disc")
-        // 自定义（专辑）标题同样展示项数；CUE 列表标题与历史记录保持一致。
+        #expect(state.fileList?.title == nil)
+        #expect(state.fileList?.displayTitle == "Disc")
+        // 专辑标题由分区推导，附带项数；CUE 列表标题与历史记录保持一致。
         let displayTitle = state.toConfig().historyMenuDisplayName
         #expect(displayTitle.contains("Disc"))
         #expect(displayTitle.contains("2"))
@@ -755,7 +768,8 @@ struct CueSheetTests {
         #expect(state.fileList?.isCueBased == true)
         #expect(state.fileList?.isReorderable == false)
         #expect(state.fileList?.soleContainerFormat == .generic)
-        #expect(state.fileList?.title == "Symphony No. 5")
+        #expect(state.fileList?.title == nil)
+        #expect(state.fileList?.displayTitle == "Symphony No. 5")
         #expect(state.fileList?.items.map(\.displayName) == ["Allegro", "Andante"])
         #expect(state.fileList?.items.map(\.path) == [url.path, url.path])
         #expect(state.fileList?.items.map(\.cue?.containerTrackID) == ["track:stereo:01", "track:stereo:02"])

@@ -104,6 +104,8 @@ public final class HistoryManager: ObservableObject {
            var fileList = state.fileList,
            fileList.isPresentable {
             fileList.title = FileListState.normalizedTitle(newTitle)
+            // 只有用户改名才允许覆盖分区推导标题。
+            fileList.isCustomTitle = fileList.title != nil
             state.fileList = fileList
         }
         repository.rename(id: configId, title: newTitle)

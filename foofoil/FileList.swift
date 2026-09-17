@@ -339,8 +339,11 @@ public nonisolated struct FileListState: Codable, Equatable, Sendable {
     public var kind: FileListKind
     public var items: [FileListItem]
     public var currentID: String
-    /// 用户设置的列表标题；为空时展示本地化的“类型 + 项数”回退标题。
+    /// 用户设置的列表标题；自动标题不入库，由分区实时推导。
     public var title: String?
+    /// 标记 `title` 是否来自用户改名。只有用户标题才能覆盖分区推导结果，
+    /// 避免追加目录后历史标题仍停留在首个目录名。
+    public var isCustomTitle: Bool
     /// 仅图片列表使用；默认关闭，随列表一起持久化。
     public var isSlideshowEnabled: Bool
     /// 轮播间隔秒数快照；实际计时以 SettingsStore 全局偏好为准。
@@ -372,32 +375,49 @@ public nonisolated struct FileListState: Codable, Equatable, Sendable {
         items.first(where: { $0.id == currentID }) ?? items.first
     }
 
-    /// 首个真正的容器分区（CUE / SACD）标题；目录分区不参与专辑标题回退。
-    public var firstContainerTitle: String? {
-        sections.first(where: { !$0.isFolder }).flatMap { Self.normalizedTitle($0.title) }
-    }
-
-    /// 与历史记录一致的列表展示标题：自定义（或 CUE 专辑）标题附项数，
-    /// 无标题时回退为本地化的“类型（项数）”。
-    public var historyDisplayTitle: String {
-        if let title = Self.normalizedTitle(self.title) {
+    /// 面板与历史共用的展示标题：用户改名优先，其次按分区推导（单分区用分区名，
+    /// 多分区用首个分区名 + “等 N 个”），再回退到旧的自定义标题与本地化类型名。
+    public var displayTitle: String {
+        if isCustomTitle, let title = Self.normalizedTitle(title) {
+            return title
+        }
+        if sections.count == 1, let title = Self.normalizedTitle(sections[0].title) {
+            return title
+        }
+        if sections.count >= 2, let first = Self.normalizedTitle(sections[0].title) {
+            let truncated = first.count > Self.maximumDerivedTitleLength
+                ? String(first.prefix(Self.maximumDerivedTitleLength)) + "…"
+                : first
             return String(
-                format: NSLocalizedString("File List Custom Title Format", comment: ""),
-                title,
-                items.count
+                format: NSLocalizedString("File List Multi Title Format", comment: ""),
+                truncated,
+                sections.count
             )
         }
-        return String(
-            format: NSLocalizedString(kind.historyTitleFormatKey, comment: ""),
+        if let title = Self.normalizedTitle(title) {
+            return title
+        }
+        return NSLocalizedString(kind.navigatorTitleKey, comment: "")
+    }
+
+    /// 与历史记录一致的列表展示标题：展示标题附项数。
+    public var historyDisplayTitle: String {
+        String(
+            format: NSLocalizedString("File List Custom Title Format", comment: ""),
+            displayTitle,
             items.count
         )
     }
+
+    /// 多分区派生标题里首个分区名的最大长度，超出截断，避免历史菜单过长。
+    static let maximumDerivedTitleLength = 40
 
     public init(
         kind: FileListKind,
         items: [FileListItem],
         currentID: String,
         title: String? = nil,
+        isCustomTitle: Bool = false,
         isSlideshowEnabled: Bool = false,
         slideshowInterval: TimeInterval = ImageListSlideshow.defaultInterval,
         sections: [FileListSection] = []
@@ -406,13 +426,14 @@ public nonisolated struct FileListState: Codable, Equatable, Sendable {
         self.items = items
         self.currentID = currentID
         self.title = Self.normalizedTitle(title)
+        self.isCustomTitle = isCustomTitle
         self.isSlideshowEnabled = isSlideshowEnabled
         self.slideshowInterval = ImageListSlideshow.clampInterval(slideshowInterval)
         self.sections = sections
     }
 
     private enum CodingKeys: String, CodingKey {
-        case kind, items, currentID, title, isSlideshowEnabled, slideshowInterval, sections
+        case kind, items, currentID, title, isCustomTitle, isSlideshowEnabled, slideshowInterval, sections
     }
 
     public init(from decoder: Decoder) throws {
@@ -421,6 +442,7 @@ public nonisolated struct FileListState: Codable, Equatable, Sendable {
         items = try container.decode([FileListItem].self, forKey: .items)
         currentID = try container.decode(String.self, forKey: .currentID)
         title = Self.normalizedTitle(try container.decodeIfPresent(String.self, forKey: .title))
+        isCustomTitle = try container.decodeIfPresent(Bool.self, forKey: .isCustomTitle) ?? false
         isSlideshowEnabled = try container.decodeIfPresent(Bool.self, forKey: .isSlideshowEnabled) ?? false
         slideshowInterval = ImageListSlideshow.clampInterval(
             try container.decodeIfPresent(TimeInterval.self, forKey: .slideshowInterval) ?? ImageListSlideshow.defaultInterval

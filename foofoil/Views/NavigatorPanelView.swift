@@ -331,19 +331,19 @@ struct NavigatorPanelView: View {
         alert.addButton(withTitle: NSLocalizedString("OK", comment: ""))
         alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
-        field.stringValue = FileListState.normalizedTitle(appState.fileList?.title) ?? ""
+        // 预填当前展示标题（用户标题或分区推导名），用户可在此基础上修改。
+        field.stringValue = appState.fileList?.displayTitle ?? ""
         alert.accessoryView = field
         alert.window.initialFirstResponder = field
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         HistoryManager.shared.updateHistoryTitle(configId: appState.id, newTitle: field.stringValue)
     }
 
-    /// 内置文件列表显示自定义/专辑标题（不附数量）；无自定义标题时回退到类型名称。
+    /// 内置文件列表显示用户标题或分区推导标题（不附数量）；无列表时回退到类型名称。
     private func headerTitle(for contribution: NavigatorContribution) -> String {
         if contribution.id == AppState.fileListNavigatorID,
-           let list = appState.fileList, list.isPresentable,
-           let title = FileListState.normalizedTitle(list.title) {
-            return title
+           let list = appState.fileList, list.isPresentable {
+            return list.displayTitle
         }
         return localizedTitle(for: contribution)
     }

@@ -1431,6 +1431,23 @@
         }
       }
     },
+    "File List Multi Title Format" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ and %2$d more"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 等 %2$d 个"
+          }
+        }
+      }
+    },
     "Fit Image to Window Width" : {
       "extractionState" : "manual",
       "localizations" : {

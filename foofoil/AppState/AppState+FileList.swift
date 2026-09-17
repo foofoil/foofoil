@@ -103,7 +103,8 @@ extension AppState {
             installCueSheets(urls: group.urls, preservesIdentity: preservesIdentity)
         case .listable(let kind) where group.urls.count >= 2:
             if kind == .audio {
-                installAudioList(urls: group.urls, preservesIdentity: preservesIdentity, title: title)
+                // 音频标题由分区推导，目录名不需要再存成自定义标题。
+                installAudioList(urls: group.urls, preservesIdentity: preservesIdentity)
             } else {
                 installFileList(kind: kind, urls: group.urls, preservesIdentity: preservesIdentity, title: title)
             }
@@ -142,9 +143,9 @@ extension AppState {
     }
 
     /// 安装音频列表：CUE 与 SACD ISO 各自成容器分区，普通音频按直接父目录成目录分区，
-    /// 三类分区同属顶层；只有单个目录时目录分区会平铺显示，目录名作为列表标题。
+    /// 三类分区同属顶层；只有单个目录时目录分区会平铺显示，目录名由分区推导为展示标题。
     /// SACD ISO 先以占位项加入，再按容器会话异步展开成分区。
-    func installAudioList(urls: [URL], preservesIdentity: Bool, title: String? = nil) {
+    func installAudioList(urls: [URL], preservesIdentity: Bool) {
         let unique = uniqueExistingURLs(urls)
         guard unique.count >= 2 else {
             if let url = unique.first {
@@ -203,8 +204,7 @@ extension AppState {
             pendingSACD.append(url)
         }
 
-        let resolvedTitle = FileListState.normalizedTitle(title) ?? sheets.first?.section.title
-        fileList = FileListState(kind: .audio, items: items, currentID: items[0].id, title: resolvedTitle, sections: sections)
+        fileList = FileListState(kind: .audio, items: items, currentID: items[0].id, sections: sections)
         sourceFingerprint = nil
         mediaPlaybackMode = .sequentialLoop
         isBatchUpdating = false
@@ -1151,7 +1151,6 @@ extension AppState {
                     kind: .audio,
                     items: items,
                     currentID: currentID,
-                    title: album,
                     sections: [section]
                 )
             }
@@ -1160,7 +1159,6 @@ extension AppState {
                 kind: .audio,
                 items: items,
                 currentID: currentID,
-                title: album,
                 sections: [section]
             )
         }
@@ -1215,7 +1213,6 @@ extension AppState {
             kind: .audio,
             items: items,
             currentID: items[0].id,
-            title: sheets.first?.section.title,
             sections: sheets.map(\.section)
         )
         sourceFingerprint = nil

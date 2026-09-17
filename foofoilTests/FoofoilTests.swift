@@ -1664,9 +1664,11 @@ struct FoofoilTests {
         #expect(state.fileList?.kind == .audio)
         #expect(state.fileList?.items.map(\.displayName) == ["01.mp3", "02.mp3"])
         #expect(state.fileList?.items.contains(where: { $0.path == unsupported.path }) == false)
-        #expect(state.fileList?.title == directory.lastPathComponent)
-        #expect(state.toConfig().historyMenuDisplayName.contains(directory.lastPathComponent))
-        #expect(state.toConfig().historyMenuDisplayName.contains("2"))
+        // 多目录列表不再保存首个目录名，标题由分区推导：首目录名（超长截断）+ 等 N 个。
+        #expect(state.fileList?.title == nil)
+        let historyTitle = state.toConfig().historyMenuDisplayName
+        #expect(historyTitle.contains(String(directory.lastPathComponent.prefix(20))))
+        #expect(historyTitle.contains("2"))
     }
 
     @Test func directoryScanStopsAtLimitAndSupportsCancellation() throws {
@@ -2442,6 +2444,49 @@ struct FoofoilTests {
         #expect(cueList.isCueBased)
         #expect(cueList.historyDisplayTitle.contains("专辑"))
         #expect(cueList.historyDisplayTitle == config(for: cueList).historyMenuDisplayName)
+    }
+
+    @Test func multiSectionFileListDerivesTitleFromSections() {
+        let firstSection = FileListSection(id: "a", title: "Album A", format: .folder, directoryPath: "/tmp/a")
+        let secondSection = FileListSection(id: "b", title: "Album B", format: .folder, directoryPath: "/tmp/b")
+        let items = [
+            FileListItem(id: "1", path: "/tmp/a/01.flac", displayName: "01.flac", sectionID: "a"),
+            FileListItem(id: "2", path: "/tmp/b/01.flac", displayName: "01.flac", sectionID: "b")
+        ]
+        let list = FileListState(kind: .audio, items: items, currentID: "1", sections: [firstSection, secondSection])
+
+        // 多分区不再沿用首个目录的自动标题，而是推导“首分区 + 等 N 个”。
+        #expect(list.title == nil)
+        #expect(list.displayTitle.contains("Album A"))
+        #expect(list.displayTitle.contains("2"))
+        #expect(list.historyDisplayTitle.contains("2"))
+
+        // 用户改名后始终优先展示自定义标题。
+        var renamed = list
+        renamed.title = "我的合集"
+        renamed.isCustomTitle = true
+        #expect(renamed.displayTitle == "我的合集")
+        #expect(renamed.historyDisplayTitle.contains("我的合集"))
+        #expect(renamed.historyDisplayTitle.contains("2"))
+
+        // 单分区直接用分区名；超长分区名在派生标题里截断。
+        let single = FileListState(kind: .audio, items: [items[0]], currentID: "1", sections: [firstSection])
+        #expect(single.displayTitle == "Album A")
+
+        let longSection = FileListSection(
+            id: "c",
+            title: "This Is A Very Long Album Name That Exceeds The Display Limit",
+            format: .folder,
+            directoryPath: "/tmp/c"
+        )
+        let longList = FileListState(
+            kind: .audio,
+            items: [items[0], items[1]],
+            currentID: "1",
+            sections: [longSection, secondSection]
+        )
+        #expect(longList.displayTitle.contains("…"))
+        #expect(!longList.displayTitle.contains("That Exceeds The Display Limit"))
     }
 
     @Test func mediaPlaybackModeCyclesAndAdvancesFileList() throws {

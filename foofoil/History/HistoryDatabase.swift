@@ -199,6 +199,7 @@ nonisolated final class HistoryDatabase {
                 if var fileList = config.fileList, fileList.isPresentable {
                     // 列表标题属于列表本身，不能覆盖会随当前项切换的原始文件名。
                     fileList.title = FileListState.normalizedTitle(title)
+                    fileList.isCustomTitle = fileList.title != nil
                     config.fileList = fileList
                 } else {
                     config.originalImageName = FileListState.normalizedTitle(title)
@@ -435,7 +436,8 @@ nonisolated final class HistoryDatabase {
               var list = try? JSONDecoder().decode(FileListState.self, from: data),
               list.isPresentable else { return nil }
 
-        if list.title == nil {
+        // 分区列表的标题由分区实时推导，不再回填空洞的自动标题。
+        if list.title == nil, list.sections.isEmpty {
             let fallback = String(
                 format: NSLocalizedString(list.kind.historyTitleFormatKey, comment: ""),
                 list.items.count
@@ -443,10 +445,8 @@ nonisolated final class HistoryDatabase {
             let storedTitle = FileListState.normalizedTitle(storedDisplayTitle)
             let originalTitle = FileListState.normalizedTitle(originalFilename)
 
-            // 兼容旧记录：CUE / SACD 分区已经保存专辑标题；旧版改名则可能留在展示标题或原始文件名中。
-            if list.isCueBased, let cueTitle = list.firstContainerTitle {
-                list.title = cueTitle
-            } else if let storedTitle, storedTitle != fallback {
+            // 兼容旧记录：旧版改名可能留在展示标题或原始文件名中。
+            if let storedTitle, storedTitle != fallback {
                 list.title = storedTitle
             } else if let originalTitle,
                       !list.items.contains(where: { $0.displayName == originalTitle }) {

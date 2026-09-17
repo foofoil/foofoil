@@ -98,14 +98,15 @@ public enum HistoryThumbnailGenerator {
         return write(image, to: destinationURL)
     }
 
-    /// 多分区音频列表的历史缩略图：按分区顺序把各分区封面铺成两列宫格（最多四张）。
+    /// 多分区音频列表的历史缩略图：按分区顺序把各分区封面铺进固定四宫格（最多四张）。
+    /// 不足四张时右下留空，画布始终保持方形，避免横向图片被历史卡片裁切。
     /// 少于两张封面时不生成，由调用方回退到单封面缩略图。
     public static func generateGridThumbnail(images: [NSImage], destinationURL: URL) -> Bool {
         let limited = Array(images.prefix(4))
         guard limited.count >= 2 else { return false }
 
         let columns = 2
-        let rows = (limited.count + columns - 1) / columns
+        let rows = 2
         let cellSize = 128
         let gap = 4
         let width = columns * cellSize + (columns - 1) * gap
