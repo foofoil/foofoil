@@ -550,7 +550,7 @@ extension AppDelegate {
                 return true
             }
             if let html = clipboardHTML(from: pasteboard) ?? (AppState.looksLikeHTML(text) ? text : nil) {
-                return openClipboardHTML(html)
+                return openClipboardHTML(html, plainText: text)
             }
             let target = clipboardContentTarget()
             target.state.openText(text, isMarkdown: false)
@@ -560,12 +560,15 @@ extension AppDelegate {
 
         // 只有 HTML 表示、没有可读纯文本时仍按网页打开。
         guard let html = clipboardHTML(from: pasteboard) else { return false }
-        return openClipboardHTML(html)
+        return openClipboardHTML(html, plainText: nil)
     }
 
-    private func openClipboardHTML(_ html: String) -> Bool {
+    private func openClipboardHTML(_ html: String, plainText: String?) -> Bool {
         let target = clipboardContentTarget()
-        guard target.state.openHTML(html, originalName: NSLocalizedString("Clipboard Web Page", comment: "")) else {
+        // HTML 片段没有可靠网页标题，历史标题取粘贴文本开头的摘要。
+        let fallbackName = NSLocalizedString("Clipboard Web Page", comment: "")
+        let title = AppState.clipboardHTMLTitle(html: html, plainText: plainText) ?? fallbackName
+        guard target.state.openHTML(html, originalName: title) else {
             return false
         }
         presentClipboardTarget(target)

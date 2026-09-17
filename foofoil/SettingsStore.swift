@@ -465,6 +465,16 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         }
     }
 
+    /// 历史提示中展示的网页地址：只有远程 http(s) 网页才有参考价值，
+    /// 剪贴板 HTML 等本地缓存页不应暴露无意义的 file:// 路径。
+    public var historyWebURLDisplayString: String? {
+        guard let candidate = actualWebURLString ?? webURLString,
+              let url = URL(string: candidate),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else { return nil }
+        return candidate
+    }
+
     public var historyMenuTitle: String {
         let emoji: String
         switch historyMenuSymbolName {

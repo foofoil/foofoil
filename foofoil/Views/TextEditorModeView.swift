@@ -156,7 +156,7 @@ struct TextEditorModeView: View {
                             Group {
                                 if let config = historyManager.historyConfigs.prefix(30).first(where: { $0.id == hoveredHistoryID }) {
                                     let title = config.historyMenuDisplayName
-                                    let url = config.actualWebURLString ?? config.webURLString
+                                    let url = config.historyWebURLDisplayString
                                     HStack(spacing: 4) {
                                         Image(systemName: config.historyMenuSymbolName)
                                         if let url = url {

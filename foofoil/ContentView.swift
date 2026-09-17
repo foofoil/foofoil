@@ -78,7 +78,7 @@ public struct ContentView: View {
                 } else if let webURL = appState.webURL {
                     // 网页支持内容缩放；调整窗口大小只改变可视区域。
                     WebContainerView(url: webURL, zoom: appState.webZoom, appState: appState, onTitleChange: { title in
-                        appState.originalImageName = title
+                        appState.applyWebDocumentTitle(title)
                     }, onScreenshotTaken: { image in
                         appState.saveWebScreenshot(image)
                     }, shouldHideBorder: shouldHideBorder)

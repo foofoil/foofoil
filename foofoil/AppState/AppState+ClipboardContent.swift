@@ -76,6 +76,47 @@ extension AppState {
             || trimmed.range(of: "<body") != nil
     }
 
+    /// 剪贴板 HTML 片段通常没有可用的 `<title>`，历史标题改用粘贴文本开头的摘要。
+    nonisolated static func clipboardHTMLTitle(html: String, plainText: String?) -> String? {
+        if let plainText, let title = plainTextHistoryTitle(from: plainText) { return title }
+        return plainTextFromHTML(html).flatMap { plainTextHistoryTitle(from: $0) }
+    }
+
+    /// 折叠空白后截取开头，作为无标题内容的可读历史标题。
+    nonisolated static func plainTextHistoryTitle(from text: String, limit: Int = 30) -> String? {
+        let collapsed = text
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard !collapsed.isEmpty else { return nil }
+        return collapsed.count > limit ? String(collapsed.prefix(limit)) + "..." : collapsed
+    }
+
+    /// 借助系统 HTML 导入器提取片段正文，供只有 HTML 表示、没有纯文本时生成标题。
+    nonisolated static func plainTextFromHTML(_ html: String) -> String? {
+        guard let data = html.data(using: .utf8),
+              let attributed = try? NSAttributedString(
+                  data: data,
+                  options: [.documentType: NSAttributedString.DocumentType.html, .characterEncoding: String.Encoding.utf8.rawValue],
+                  documentAttributes: nil
+              ) else { return nil }
+        return attributed.string
+    }
+
+    /// 网页标题回填：本地缓存页（如剪贴板 HTML）没有 `<title>` 时 WebKit 会把 URL/路径当作标题，
+    /// 那不是有效标题，保留打开时由内容推导的名称。
+    func applyWebDocumentTitle(_ title: String) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if webURL?.isFileURL == true, Self.looksLikeURLLikeWebTitle(trimmed) { return }
+        originalImageName = trimmed
+    }
+
+    nonisolated static func looksLikeURLLikeWebTitle(_ title: String) -> Bool {
+        if title.contains("://") || title.hasPrefix("/") { return true }
+        return URL(string: title)?.scheme != nil
+    }
+
     /// 打开剪贴板等无来源文件的文本；`isMarkdown` 决定进入 Markdown 预览还是普通笔记。
     public func openText(_ content: String, isMarkdown: Bool) {
         resetFileList()

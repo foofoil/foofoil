@@ -2815,6 +2815,40 @@ struct ClipboardContentDetectionTests {
         #expect(!AppState.looksLikeHTML("just <b>bold</b> text"))
     }
 
+    @Test func prefersPastedTextExcerptForHTMLClipboardTitle() {
+        #expect(AppState.clipboardHTMLTitle(html: "<p>Hello world</p>", plainText: "Hello world") == "Hello world")
+        // 纯文本不可用时从 HTML 正文提取。
+        #expect(AppState.clipboardHTMLTitle(html: "<p>Hello <b>world</b></p>", plainText: nil) == "Hello world")
+        #expect(AppState.clipboardHTMLTitle(html: "<p>   </p>", plainText: "  ") == nil)
+        let long = String(repeating: "字", count: 40)
+        #expect(AppState.clipboardHTMLTitle(html: "<p>\(long)</p>", plainText: long) == String(long.prefix(30)) + "...")
+        // 折叠换行与多余空白。
+        #expect(AppState.clipboardHTMLTitle(html: "", plainText: "第一行\n\n第二行") == "第一行 第二行")
+    }
+
+    @Test func ignoresURLLikeTitlesForLocalWebContent() {
+        let state = AppState()
+        state.openHTML("<p>正文内容</p>", originalName: "正文内容")
+        #expect(state.webURL?.isFileURL == true)
+        state.applyWebDocumentTitle("file:///tmp/abc.html")
+        #expect(state.originalImageName == "正文内容")
+        state.applyWebDocumentTitle("/tmp/abc.html")
+        #expect(state.originalImageName == "正文内容")
+        // 真正的网页标题仍回填。
+        state.applyWebDocumentTitle("真实标题")
+        #expect(state.originalImageName == "真实标题")
+    }
+
+    @Test func historyWebURLDisplayHidesLocalCachedPages() {
+        let remote = WindowConfig(id: UUID(), webURLString: "https://example.com/a", actualWebURLString: "https://example.com/b")
+        #expect(remote.historyWebURLDisplayString == "https://example.com/b")
+        let cached = WindowConfig(id: UUID(), webURLString: "file:///tmp/cache/web.html", actualWebURLString: "file:///tmp/cache/web.html")
+        #expect(cached.historyWebURLDisplayString == nil)
+        let fileOnly = WindowConfig(id: UUID(), webURLString: "file:///tmp/cache/web.html")
+        #expect(fileOnly.historyWebURLDisplayString == nil)
+        #expect(WindowConfig(id: UUID(), text: "note").historyWebURLDisplayString == nil)
+    }
+
     @Test func openTextAppliesMarkdownAndNoteState() {
         let markdownState = AppState()
         markdownState.openText("# 标题", isMarkdown: true)
