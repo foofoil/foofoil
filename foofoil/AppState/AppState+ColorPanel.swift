@@ -19,6 +19,9 @@ extension AppState {
 
         public func showColorPanel() {
             let panel = NSColorPanel.shared
+            // 面板是应用级单例：先摘掉上一扇箔的回包，避免下面同步色板颜色时把颜色写回旧窗口。
+            (NSApplication.shared.delegate as? AppDelegate)?.colorPanelOwner = self
+            panel.setAction(nil)
             panel.showsAlpha = true
             if let hex = svgColor, let nsColor = NSColor(hex: hex) {
                 panel.color = nsColor
@@ -37,9 +40,12 @@ extension AppState {
             panel.makeKeyAndOrderFront(nil)
         }
 
-        /// 打开窗体与 PDF 共用的背景色选择器，支持设置颜色透明度。
+        /// 打开文档内容背景色选择器，支持设置颜色透明度；仅文档箔可见该入口。
         public func showBackgroundColorPanel() {
             let panel = NSColorPanel.shared
+            // 面板是应用级单例：先摘掉上一扇箔的回包，避免下面同步色板颜色时把颜色写回旧窗口。
+            (NSApplication.shared.delegate as? AppDelegate)?.colorPanelOwner = self
+            panel.setAction(nil)
             panel.showsAlpha = true
             if let hex = backgroundColorHex, let color = NSColor(hex: hex) {
                 panel.color = color
@@ -62,16 +68,17 @@ extension AppState {
             panel.makeKeyAndOrderFront(nil)
         }
 
-        @objc func colorPanelChanged(_ sender: NSColorPanel) {
-            // 确保应用处于活动状态，且颜色面板当前是可见的
-            guard NSApplication.shared.isActive else { return }
-            guard sender.isVisible else { return }
+        /// 取色面板是应用级单例：只有它仍属于本箔、且本箔窗口仍打开时才接受取色，
+        /// 面板被其他窗口接管或本箔已关闭后，取色不再落到任何窗口。
+        /// 归属判定取代了原先的“前台窗口”推断：面板对谁可见，取色就只作用于谁。
+        private var ownsColorPanel: Bool {
+            guard let appDelegate = NSApplication.shared.delegate as? AppDelegate,
+                  appDelegate.colorPanelOwner === self else { return false }
+            return appDelegate.windowControllers.contains { $0.appState === self }
+        }
 
-            // 确保只有当前处于主窗口（mainWindow）或关键窗口（keyWindow）状态的 AppState 才接受颜色面板的修改事件
-            guard let appDelegate = NSApplication.shared.delegate as? AppDelegate else { return }
-            let activeWindow = NSApplication.shared.mainWindow ?? NSApplication.shared.keyWindow
-            let activeState = appDelegate.windowControllers.first(where: { $0.window == activeWindow })?.appState
-            guard activeState === self else { return }
+        @objc func colorPanelChanged(_ sender: NSColorPanel) {
+            guard sender.isVisible, ownsColorPanel else { return }
 
             if let hex = sender.color.toHex() {
                 self.svgColor = hex
@@ -79,18 +86,15 @@ extension AppState {
         }
 
         @objc func backgroundColorPanelChanged(_ sender: NSColorPanel) {
-            // 将色板颜色以 sRGB（含 Alpha）保存，供窗体背景与 PDFView 共用。
-            guard NSApplication.shared.isActive, sender.isVisible else { return }
-            guard let appDelegate = NSApplication.shared.delegate as? AppDelegate else { return }
-            let activeWindow = NSApplication.shared.mainWindow ?? NSApplication.shared.keyWindow
-            let activeState = appDelegate.windowControllers.first(where: { $0.window == activeWindow })?.appState
-            guard activeState === self,
+            // 将色板颜色以 sRGB（含 Alpha）保存，供文档内容背景与 PDFView 共用。
+            guard sender.isVisible, ownsColorPanel,
                   let color = sender.color.usingColorSpace(.sRGB) else { return }
 
             backgroundColorHex = color.toHex()
         }
 
         @objc func resetBackgroundColorFromPanel() {
+            guard ownsColorPanel else { return }
             backgroundColorHex = nil
 
             // 避免为同步色板颜色而再次触发颜色回调，导致默认状态被覆盖。
@@ -101,6 +105,7 @@ extension AppState {
         }
 
         @objc func resetColorFromPanel() {
+            guard ownsColorPanel else { return }
             self.svgColor = nil
             // 同步把调色盘重设为某个默认值，防止用户误以为没生效，不过其实重置为原色后，调色盘里的颜色本身没有硬性规定
         }

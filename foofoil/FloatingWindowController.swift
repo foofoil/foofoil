@@ -1906,6 +1906,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
         // 自动从 AppDelegate 的 windowControllers 列表中移除，避免内存泄漏
         if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
+            // 取色面板是应用级单例：箔窗关闭后必须收起，否则残留的取色会落到其他窗口。
+            appDelegate.dismissColorPanel(ownedBy: appState)
             appDelegate.removeWindowController(self)
         }
     }

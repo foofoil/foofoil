@@ -199,6 +199,20 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
         syncFoilSpaceJoining()
     }
 
+    /// 取色面板是应用级单例：记录它当前服务的那扇箔，关闭该箔时一并收起，避免取色落到其他窗口。
+    weak var colorPanelOwner: AppState?
+
+    /// 收起属于该箔的取色面板；面板不属于它时不动（可能正被另一扇箔使用）。
+    func dismissColorPanel(ownedBy appState: AppState) {
+        guard colorPanelOwner === appState else { return }
+        colorPanelOwner = nil
+        let panel = NSColorPanel.shared
+        panel.setTarget(nil)
+        panel.setAction(nil)
+        panel.accessoryView = nil
+        panel.close()
+    }
+
     func addWindowController(_ controller: FloatingWindowController) {
         windowControllers.append(controller)
         syncFoilSpaceJoining()
