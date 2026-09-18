@@ -27,4 +27,15 @@ extension AppState {
     var contentBackgroundColor: NSColor? {
         contentBackgroundHex.flatMap(NSColor.init(hex:))
     }
+
+    /// 系统明暗切换后，把与目标主题明显不符的自选背景色换成同色相的深浅版本，
+    /// 让内容文字（跟随系统外观）始终落在可读的背景上；中间色与已相符的颜色保持不变。
+    func adaptContentBackgroundColor(toDarkAppearance isDark: Bool) {
+        guard let hex = contentBackgroundHex,
+              let color = NSColor(hex: hex),
+              let adapted = DocumentBackgroundColorAdapter.adaptedColor(color, forDarkAppearance: isDark),
+              let adaptedHex = adapted.toHex(),
+              adaptedHex != hex else { return }
+        backgroundColorHex = adaptedHex
+    }
 }

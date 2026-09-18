@@ -181,6 +181,63 @@ struct ContentBackgroundTests {
         try data.write(to: url)
     }
 
+    /// 视图层真的接到了明暗切换：内容背景色随外观环境变化自动适配。
+    @Test func contentViewAdaptsBackgroundOnAppearanceChange() throws {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.originalImageName = "notes.txt"
+        state.textURL = URL(fileURLWithPath: "/tmp/notes.txt")
+        state.backgroundColorHex = "#F5EFE0"
+
+        let hosting = NSHostingView(
+            rootView: ContentView(appState: state).environment(\.colorScheme, .light)
+        )
+        hosting.frame = NSRect(x: 0, y: 0, width: 400, height: 400)
+        hosting.layoutSubtreeIfNeeded()
+
+        hosting.rootView = ContentView(appState: state).environment(\.colorScheme, .dark)
+        hosting.layoutSubtreeIfNeeded()
+        // 外观变化的回调在渲染之后派发，跑几轮 runloop 等它落地。
+        for _ in 0..<20 where state.backgroundColorHex == "#F5EFE0" {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        }
+
+        let adapted = try #require(state.backgroundColorHex)
+        #expect(adapted != "#F5EFE0", "深色外观下浅色背景未被适配")
+    }
+
+    /// 系统明暗切换时，只有文档箔把不符主题的自选背景色换成同色相的深浅版本。
+    @Test func backgroundAdaptsToSystemAppearance() throws {
+        var states: [AppState] = []
+        defer { states.forEach { HistoryManager.shared.removeFromHistory($0.toConfig()) } }
+        func makeState() -> AppState {
+            let state = AppState()
+            states.append(state)
+            return state
+        }
+
+        let document = makeState()
+        document.backgroundColorHex = "#F5EFE0"
+        document.adaptContentBackgroundColor(toDarkAppearance: true)
+        let darkHex = try #require(document.backgroundColorHex)
+        #expect(darkHex != "#F5EFE0", "浅色背景未随深色主题适配")
+        #expect(NSColor(hex: darkHex)?.usingColorSpace(.sRGB)?.toHex() == darkHex)
+        // 匹配主题的颜色与中间色都不改。
+        document.adaptContentBackgroundColor(toDarkAppearance: true)
+        #expect(document.backgroundColorHex == darkHex)
+        document.backgroundColorHex = "#808080"
+        document.adaptContentBackgroundColor(toDarkAppearance: true)
+        #expect(document.backgroundColorHex == "#808080")
+
+        // 图片箔不使用内容背景色，历史里带着的浅色也不会被改写。
+        let image = makeState()
+        image.originalImageName = "photo.png"
+        image.imageURL = URL(fileURLWithPath: "/tmp/photo.png")
+        image.backgroundColorHex = "#F5EFE0"
+        image.adaptContentBackgroundColor(toDarkAppearance: true)
+        #expect(image.backgroundColorHex == "#F5EFE0")
+    }
+
     /// 离屏渲染真实视图：窗口毛玻璃在无窗口环境下透明，内容背景仍按所选颜色绘制。
     private func render(_ view: some View, size: CGSize) throws -> NSBitmapImageRep {
         let hosting = NSHostingView(rootView: view)

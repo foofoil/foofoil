@@ -12,6 +12,7 @@ import FoofoilExtensionKit
 
 public struct ContentView: View {
     @ObservedObject var appState: AppState
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isResizingWindowWithPinch = false
     @State private var pdfPageIndicator: String?
     @State private var pdfPageIndicatorDismissTask: DispatchWorkItem?
@@ -164,6 +165,10 @@ public struct ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.18), value: pdfPageIndicator)
+        // 系统明暗切换后，把与目标主题明显不符的自定义背景色换成同色相的深浅版本。
+        .onChange(of: colorScheme) { _, newScheme in
+            appState.adaptContentBackgroundColor(toDarkAppearance: newScheme == .dark)
+        }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("flashWindow_\(appState.id.uuidString)"))) { _ in
             // 瞬间变白（0.85 不透明度）
             flashOpacity = 0.85
