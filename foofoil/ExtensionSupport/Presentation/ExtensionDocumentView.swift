@@ -38,6 +38,7 @@ struct ExtensionDocumentView: View {
     let url: URL
     let sessionID: UUID
     let textScale: Double
+    let documentBackgroundHex: String?
     let initialScrollFile: String?
     let initialScrollFraction: Double?
     let onScroll: (_ file: String, _ fraction: Double) -> Void
@@ -51,6 +52,7 @@ struct ExtensionDocumentView: View {
             ExtensionDocumentWebView(
                 url: url,
                 textScale: textScale,
+                documentBackgroundHex: documentBackgroundHex,
                 initialScrollFile: initialScrollFile,
                 initialScrollFraction: initialScrollFraction,
                 onScroll: onScroll,
@@ -367,6 +369,7 @@ enum DocumentContentRuleList {
 private struct ExtensionDocumentWebView: NSViewRepresentable {
     let url: URL
     let textScale: Double
+    let documentBackgroundHex: String?
     let initialScrollFile: String?
     let initialScrollFraction: Double?
     let onScroll: (_ file: String, _ fraction: Double) -> Void
@@ -397,6 +400,7 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
         context.coordinator.parent = self
         context.coordinator.load(url: url)
         context.coordinator.applyTextScale(textScale)
+        context.coordinator.applyDocumentBackgroundIfNeeded()
     }
 
     static func dismantleNSView(_ webView: WKWebView, coordinator: Coordinator) {
@@ -419,6 +423,8 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
         private var loadGeneration: UInt64 = 0
         private var appliedTextScale: Double = .nan
         private var textScaleGeneration: UInt64 = 0
+        /// 上一次注入到文档的背景色；换章会重建 DOM，加载完成后无条件重注入。
+        private var appliedBackgroundHex: String?
         /// 本次加载待恢复的保存位置；只在 URL 变化时从 parent 捕获一次。
         private var pendingScrollFile: String?
         private var pendingScrollFraction: Double?
@@ -491,7 +497,8 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
             }
         }
 
-        /// 加载完成后的按序收尾：文字缩放 → 恢复阅读位置 → 安装滚动上报。
+        /// 加载完成后的按序收尾：内容背景 → 文字缩放 → 恢复阅读位置 → 安装滚动上报。
+        /// 背景色可能切换页面外观（`prefers-color-scheme`）并引起重排，先于缩放锚点确定。
         func loadDidFinish() {
             let scale = parent.textScale
             appliedTextScale = scale
@@ -499,12 +506,32 @@ private struct ExtensionDocumentWebView: NSViewRepresentable {
             let generation = textScaleGeneration
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                await self.applyDocumentBackground(force: true)
                 await self.performTextScale(scale, force: true, generation: generation)
                 await self.restoreSavedScrollPosition()
                 _ = try? await self.webView?.evaluateJavaScript(
                     DocumentScrollPersistence.hooksInstallScript
                 )
             }
+        }
+
+        /// 宿主侧记录背景色变化，随下一次视图更新注入；页面尚未加载时由加载完成路径重注入。
+        func applyDocumentBackgroundIfNeeded() {
+            guard appliedBackgroundHex != parent.documentBackgroundHex else { return }
+            Task { @MainActor [weak self] in
+                await self?.applyDocumentBackground()
+            }
+        }
+
+        /// 内容背景：只写 html/body 的内联样式（CSSOM 不受页面 CSP 限制），
+        /// 并把页面外观切到与自选背景对比的一侧，使正文文字与背景保持可读对比。
+        @MainActor
+        private func applyDocumentBackground(force: Bool = false) async {
+            let hex = parent.documentBackgroundHex
+            guard let webView, force || appliedBackgroundHex != hex else { return }
+            appliedBackgroundHex = hex
+            webView.appearance = DocumentBackgroundInjection.appearance(hex: hex)
+            _ = try? await webView.evaluateJavaScript(DocumentBackgroundInjection.script(hex: hex))
         }
 
         @MainActor

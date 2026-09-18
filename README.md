@@ -19,7 +19,7 @@ Built with SwiftUI and AppKit, foofoil favors native macOS capabilities, fast in
 - Open images, videos, audio, PDFs, plain text, Markdown, CSV, HTML, and web URLs.
 - Paste or open an image directly from the clipboard.
 - Preview Markdown, browse CSV data as a table, and navigate PDF pages.
-- Zoom images and web content, fit images to a window, and customize SVG or window background colors.
+- Zoom images and web content, fit images to a window, and customize SVG colors or the background of an open document.
 - Save, copy, share, or capture displayed content using native macOS workflows.
 - Restore window state and keep a local content history.
 - Search history by title and content, including on-device OCR for images and extracted text from PDFs and web pages.

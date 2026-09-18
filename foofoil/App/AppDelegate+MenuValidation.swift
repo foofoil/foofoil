@@ -162,8 +162,8 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         let isSVG = isImageMode && appState.isSVG
         setMenuItem(withAction: #selector(selectColorAction), in: menu, isHidden: !isSVG)
 
-        // 2.5 Background Color 菜单项可用于所有浮箔模式。
-        setMenuItem(withAction: #selector(backgroundColorAction), in: menu, isHidden: false)
+        // 2.5 Background Color 菜单项 - 仅文档箔（纯文本/Markdown/CSV/PDF/网页/电子书）可用，作用于内容背景。
+        setMenuItem(withAction: #selector(backgroundColorAction), in: menu, isHidden: !appState.supportsContentBackgroundColor)
 
         // 3. Fit Window to Image & Fit Image to Window Width 菜单项 - 仅图片且有边框时可见
         let showFitOptions = isImageMode && appState.effectiveShowBorder
@@ -220,7 +220,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         }
 
         if menuItem.action == #selector(backgroundColorAction) {
-            return activeAppState != nil
+            return activeAppState?.supportsContentBackgroundColor == true
         }
 
         if menuItem.action == #selector(openClipboardContentAction) {

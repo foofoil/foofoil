@@ -77,6 +77,7 @@ struct WebView: NSViewRepresentable {
                 nsView.load(request)
             }
         }
+        context.coordinator.applyDocumentBackgroundIfNeeded(to: nsView)
     }
 
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
@@ -101,6 +102,8 @@ struct WebView: NSViewRepresentable {
         """
         var parent: WebView
         var lastLoadedURL: URL?
+        /// 上一次注入到页面的背景色；导航后 DOM 重置，didFinish 会无条件重注入。
+        private var appliedDocumentBackgroundHex: String?
         private var titleObservation: NSKeyValueObservation?
         private var progressObservation: NSKeyValueObservation?
         private var loadingObservation: NSKeyValueObservation?
@@ -110,6 +113,18 @@ struct WebView: NSViewRepresentable {
 
         init(_ parent: WebView) {
             self.parent = parent
+        }
+
+        /// 把内容背景色写进页面 html/body：CSSOM 写入不触发页面重载（也不受页面 CSP 的 style-src 限制），
+        /// 同时把页面外观切到与自选背景对比的一侧，避免页面文字沿用系统外观后与背景撞色。
+        func applyDocumentBackgroundIfNeeded(to webView: WKWebView, force: Bool = false) {
+            let hex = parent.appState.contentBackgroundHex
+            guard force || appliedDocumentBackgroundHex != hex else { return }
+            appliedDocumentBackgroundHex = hex
+            webView.appearance = DocumentBackgroundInjection.appearance(hex: hex)
+            Task { @MainActor in
+                _ = try? await webView.evaluateJavaScript(DocumentBackgroundInjection.script(hex: hex))
+            }
         }
 
         func userContentController(
@@ -262,6 +277,7 @@ struct WebView: NSViewRepresentable {
                     self.parent.appState.actualWebURL = currentURL
                 }
             }
+            applyDocumentBackgroundIfNeeded(to: webView, force: true)
             // 网页可见正文与截图相互独立；正文失败不会影响现有截图流程。
             webView.evaluateJavaScript("document.body ? document.body.innerText : ''") { [weak self] value, _ in
                 guard let self, let text = value as? String else { return }

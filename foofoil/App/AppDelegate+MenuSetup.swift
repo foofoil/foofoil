@@ -390,7 +390,7 @@ extension AppDelegate {
 
         viewMenu.addItem(NSMenuItem.separator())
 
-        // Background Color - 同时设置窗体与 PDF 阅读区的背景色
+        // Background Color - 文档箔的内容背景色（纯文本/Markdown/CSV/PDF/网页/电子书）
         let backgroundColorItem = NSMenuItem(title: NSLocalizedString("Background Color", comment: ""), action: #selector(backgroundColorAction), keyEquivalent: "")
         backgroundColorItem.withSymbol("paintpalette")
         backgroundColorItem.representedObject = "view.backgroundColor"

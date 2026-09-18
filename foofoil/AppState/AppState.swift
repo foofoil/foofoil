@@ -202,7 +202,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         }
     }
 
-    /// 窗体与 PDF 阅读区共用的背景色；为空时沿用系统默认背景。
+    /// 文档箔的内容背景色；为空时内容沿用窗口毛玻璃外观，非文档箔不使用该值。
     @Published public var backgroundColorHex: String? {
         didSet {
             saveState()

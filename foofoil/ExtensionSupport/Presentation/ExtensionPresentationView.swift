@@ -24,6 +24,7 @@ struct ExtensionPresentationView: View {
                         url: url,
                         sessionID: session.id,
                         textScale: appState.documentZoom,
+                        documentBackgroundHex: appState.contentBackgroundHex,
                         initialScrollFile: appState.extensionDocumentScrollFile,
                         initialScrollFraction: appState.extensionDocumentScrollFraction,
                         onScroll: { file, fraction in

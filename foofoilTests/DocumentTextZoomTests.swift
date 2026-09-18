@@ -83,6 +83,7 @@ struct DocumentTextZoomTests {
                 url: fileURL,
                 sessionID: UUID(),
                 textScale: 1.0,
+                documentBackgroundHex: nil,
                 initialScrollFile: nil,
                 initialScrollFraction: nil,
                 onScroll: { _, _ in }
@@ -109,6 +110,7 @@ struct DocumentTextZoomTests {
             url: fileURL,
             sessionID: UUID(),
             textScale: 2.0,
+            documentBackgroundHex: nil,
             initialScrollFile: nil,
             initialScrollFraction: nil,
             onScroll: { _, _ in }
@@ -146,6 +148,7 @@ struct DocumentTextZoomTests {
                 url: fileURL,
                 sessionID: UUID(),
                 textScale: 1.0,
+                documentBackgroundHex: nil,
                 initialScrollFile: "chapter.html",
                 initialScrollFraction: 0.5,
                 onScroll: { file, fraction in

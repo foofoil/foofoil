@@ -54,7 +54,7 @@ struct PDFModeView: NSViewRepresentable {
     }
 
     private func applyBackgroundColor(to pdfView: PDFView, defaultColor: NSColor?) {
-        if let hex = appState.backgroundColorHex,
+        if let hex = appState.contentBackgroundHex,
            let color = NSColor(hex: hex) {
             pdfView.backgroundColor = color
         } else if let defaultColor {

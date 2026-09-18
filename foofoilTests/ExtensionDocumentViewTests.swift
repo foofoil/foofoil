@@ -5,6 +5,7 @@
 //
 
 import Foundation
+import SwiftUI
 import WebKit
 import Testing
 @testable import foofoil
@@ -94,10 +95,88 @@ struct ExtensionDocumentViewTests {
         )
         #expect(scrollY > 100, "scrollY=\(scrollY)")
     }
+
+    /// 扩展文档（电子书等）的正文背景由宿主注入，清除后恢复页面自有背景。
+    @Test func documentViewAppliesAndClearsHostBackgroundColor() async throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-document-background-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let fileURL = directory.appendingPathComponent("chapter.html")
+        // 与电子书章节页同构：正文容器的背景由 id 选择器给出，宿主必须压过它。
+        let html = """
+        <html><head><style>
+        html, body { margin: 0; background: rgb(255, 255, 255); }
+        #foofoil-reader { max-width: 44em; margin: 0 auto; background: rgb(0, 128, 0); }
+        </style></head>
+        <body id="foofoil-reader"><p>正文</p></body></html>
+        """
+        try Data(html.utf8).write(to: fileURL)
+
+        let window = NSWindow(
+            contentRect: NSRect(x: -2000, y: -2000, width: 400, height: 300),
+            styleMask: .borderless,
+            backing: .buffered,
+            defer: false
+        )
+        let hosting = NSHostingView(rootView: makeDocumentView(url: fileURL, backgroundHex: "#123456"))
+        window.contentView = hosting
+        hosting.frame = window.contentView?.bounds ?? .zero
+        defer { window.orderOut(nil) }
+
+        let webView = try await waitForWebView(in: hosting)
+        let injected = await bodyBackground(of: webView, until: "rgb(18, 52, 86)")
+        #expect(injected == "rgb(18, 52, 86)", "正文背景未被宿主背景色覆盖：\(injected ?? "nil")")
+
+        hosting.rootView = makeDocumentView(url: fileURL, backgroundHex: nil)
+        let restored = await bodyBackground(of: webView, until: "rgb(0, 128, 0)")
+        #expect(restored == "rgb(0, 128, 0)", "清除背景色后未恢复页面自有背景：\(restored ?? "nil")")
+    }
+
+    private func makeDocumentView(url: URL, backgroundHex: String?) -> ExtensionDocumentView {
+        ExtensionDocumentView(
+            url: url,
+            sessionID: UUID(),
+            textScale: 1.0,
+            documentBackgroundHex: backgroundHex,
+            initialScrollFile: nil,
+            initialScrollFraction: nil,
+            onScroll: { _, _ in }
+        )
+    }
+
+    private func waitForWebView(in view: NSView) async throws -> WKWebView {
+        for _ in 0..<300 {
+            if let webView = Self.firstWebView(in: view) { return webView }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        throw CancellationError()
+    }
+
+    private static func firstWebView(in view: NSView) -> WKWebView? {
+        if let webView = view as? WKWebView { return webView }
+        for subview in view.subviews {
+            if let found = firstWebView(in: subview) { return found }
+        }
+        return nil
+    }
+
+    /// 注入发生在加载完成后的异步收尾里，轮询到目标值或超时；返回最后一次读数。
+    private func bodyBackground(of webView: WKWebView, until expected: String) async -> String? {
+        var latest: String?
+        for _ in 0..<300 {
+            latest = (try? await webView.evaluateJavaScript(
+                "getComputedStyle(document.body).backgroundColor"
+            )) as? String
+            if latest == expected { return latest }
+            try? await Task.sleep(for: .milliseconds(20))
+        }
+        return latest
+    }
 }
 
 @MainActor
-private final class NavigationWaiter: NSObject, WKNavigationDelegate {
+final class NavigationWaiter: NSObject, WKNavigationDelegate {
     private var continuation: CheckedContinuation<Void, Never>?
 
     func waitForFinish() async {

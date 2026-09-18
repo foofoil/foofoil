@@ -36,7 +36,10 @@ public struct ContentView: View {
         // PDF 显示边框时，四周保留 12pt 的边框区域。
         let isMarkdownPreview = appState.isMarkdownPreview && appState.isMarkdownDocument
         let contentPadding: CGFloat = isMarkdownPreview ? 0 : (appState.isPDFDocument && appState.effectiveShowBorder ? 12 : (shouldHideBorder ? 0 : 4))
-        let backgroundColor = appState.backgroundColorHex.flatMap(NSColor.init(hex:)) ?? .windowBackgroundColor
+        // 内容背景色：只作用于文档箔的内容，窗口毛玻璃不再随之着色。
+        let contentBackgroundColor = appState.contentBackgroundColor
+        // 与毛玻璃圆角同心的内缩圆角：内容越贴边，圆角越接近窗口的 12pt 圆角。
+        let contentBackgroundCornerRadius: CGFloat = shouldHideBorder ? 0 : max(0, 12 - contentPadding)
         // 嵌平“始终显示”时被导航面板挤占的内容宽度；其余情况为 0。
         let navigatorContentInset = appState.fullScreenNavigatorContentInset
 
@@ -44,25 +47,16 @@ public struct ContentView: View {
             // 毛玻璃背景 (玻璃拟态效果)
             if appState.isFullScreen {
                 // 全屏统一使用无圆角的整屏背景，不继承窗口态的有/无边框外观。
-                ZStack {
-                    VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
-                    Color(backgroundColor).opacity(0.6)
-                }
+                VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
             } else if !shouldHideBorder {
-                ZStack {
-                    VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
-                    Color(backgroundColor).opacity(0.6) // 叠加半透明窗口背景色以降低背景透明度，提升内容清晰度
-                }
-                .cornerRadius(12)
-                // 毛玻璃背景是可拖拽区域；内容层上的控件仍优先处理事件。
-                .gesture(WindowDragGesture())
+                VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+                    .cornerRadius(12)
+                    // 毛玻璃背景是可拖拽区域；内容层上的控件仍优先处理事件。
+                    .gesture(WindowDragGesture())
             } else if appState.webURL != nil {
                 // 网页视图关闭了 WebKit 自身背景；无边框时仍保留与有边框模式一致的毛玻璃背景，避免透明区域直接露出桌面。
-                ZStack {
-                    VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
-                    Color(backgroundColor).opacity(0.6)
-                }
-                .gesture(WindowDragGesture())
+                VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
+                    .gesture(WindowDragGesture())
             }
 
             // 内容区域
@@ -112,6 +106,18 @@ public struct ContentView: View {
                     // 文字模式
                     TextEditorModeView(appState: appState)
                         .transition(.opacity)
+                }
+            }
+            // 文档内容背景：只铺在内容之下，窗口毛玻璃与窗口边缘的留白不随之变色。
+            .background {
+                if let contentBackgroundColor {
+                    Color(contentBackgroundColor)
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: contentBackgroundCornerRadius,
+                                style: .continuous
+                            )
+                        )
                 }
             }
             .padding(contentPadding)
