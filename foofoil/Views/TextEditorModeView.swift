@@ -10,7 +10,7 @@ import SwiftUI
 struct TextEditorModeView: View {
     @ObservedObject var appState: AppState
     @ObservedObject private var historyManager = HistoryManager.shared
-    @State private var textHeight: CGFloat = 40 // 动态高度
+    @State private var textHeight: CGFloat = 68 // 动态高度，初始为单行行高加上下文档内边距
     @State private var hoveredHistoryID: UUID? = nil
     @State private var isSearchCardHovered = false
     @State private var showRenameAlert = false
@@ -28,7 +28,7 @@ struct TextEditorModeView: View {
 
                 VStack(alignment: .leading, spacing: 0) {
                     ZStack(alignment: .topLeading) {
-                        // 编辑器外侧的留白是真实窗口背景，用原生手势移动窗口。
+                        // 文本留白在可滚动文档内，滚动条贴边；剩余区域为真实窗口背景，用原生手势移动窗口。
                         WindowDragArea()
 
                         if appState.isMarkdownPreview && appState.isMarkdownDocument && !appState.text.isEmpty {
@@ -36,7 +36,6 @@ struct TextEditorModeView: View {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if appState.textURL != nil && !appState.isMarkdownDocument {
                             ReadOnlyTextView(text: appState.text, fontSize: appState.textFontSize)
-                                .padding(8)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else {
                             CustomTextEditor(
@@ -45,12 +44,11 @@ struct TextEditorModeView: View {
                                 fontSize: appState.textFontSize,
                                 shouldMaintainFocus: isBlank
                             )
-                                .padding(8)
                                 .frame(
                                     maxWidth: .infinity,
                                     maxHeight: appState.text.isEmpty ? nil : .infinity
                                 )
-                                .frame(height: appState.text.isEmpty ? min(textHeight, max(0, geometry.size.height - 8)) : nil)
+                                .frame(height: appState.text.isEmpty ? min(textHeight, geometry.size.height) : nil)
                         }
                     }
 

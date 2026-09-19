@@ -20,6 +20,8 @@ struct ReadOnlyTextView: View {
 struct ReadOnlyTextNSView: NSViewRepresentable {
     let text: String
     let fontSize: Double
+    // 与 Markdown 预览一致的文档内边距，保证滚动条贴边且首尾留白随内容滚动。
+    private let documentPadding: CGFloat = 24
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
@@ -56,7 +58,8 @@ struct ReadOnlyTextNSView: NSViewRepresentable {
         }
         textView.textColor = .labelColor
 
-        textView.textContainerInset = .zero
+        // 留白属于可滚动文档，让滚动条贴近窗口边缘，首尾留白随内容一起滚动。
+        textView.textContainerInset = NSSize(width: documentPadding, height: documentPadding)
 
         scrollView.documentView = textView
         return scrollView
