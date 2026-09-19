@@ -238,14 +238,30 @@ extension AppState {
                 """
 
                 await MainActor.run {
+                    guard !Task.isCancelled else { return }
                     if let data = htmlContent.data(using: .utf8),
                        let attr = try? NSAttributedString(
                            data: data,
                            options: [.documentType: NSAttributedString.DocumentType.html, .characterEncoding: String.Encoding.utf8.rawValue],
                            documentAttributes: nil
                        ) {
+                        // 已取消则跳过后续昂贵的样式应用，避免过期结果占用主线程。
+                        guard !Task.isCancelled else { return }
                         // HTML 导入器不会稳定保留普通段落行高；仅修正常规段落，避免覆盖引用、代码块、列表和表格的独立布局。
                         let mutableAttr = NSMutableAttributedString(attributedString: attr)
+
+                        // 将 HTML 导入固化的纯黑/纯白前景色替换为语义 labelColor，使文本随系统明暗外观切换。
+                        // 放在渲染流程内，避免 MarkdownTextView 每次更新都全量枚举前景色。
+                        let colorRange = NSRange(location: 0, length: mutableAttr.length)
+                        mutableAttr.enumerateAttribute(.foregroundColor, in: colorRange, options: []) { value, range, _ in
+                            guard let color = value as? NSColor,
+                                  let rgb = color.usingColorSpace(.deviceRGB) else { return }
+                            let isBlack = rgb.redComponent < 0.02 && rgb.greenComponent < 0.02 && rgb.blueComponent < 0.02 && rgb.alphaComponent > 0.95
+                            let isWhite = rgb.redComponent > 0.98 && rgb.greenComponent > 0.98 && rgb.blueComponent > 0.98 && rgb.alphaComponent > 0.95
+                            if isBlack || isWhite {
+                                mutableAttr.addAttribute(.foregroundColor, value: NSColor.labelColor, range: range)
+                            }
+                        }
 
                         let fullRange = NSRange(location: 0, length: mutableAttr.length)
                         mutableAttr.enumerateAttribute(.paragraphStyle, in: fullRange, options: []) { value, range, _ in
@@ -308,6 +324,73 @@ extension AppState {
             }
         }
 
+        /// 单次线性扫描收集成对标记的范围。
+        /// 逐次调用 `attributedString.string.range(of:)` 会反复复制整段文本，大文档下退化为 O(n²)；
+        /// 这里只读取一次字符串快照，之后按原始索引逆序处理，保证前序范围不被后序修改影响。
+        nonisolated private static func markerPairs(
+            in string: NSString,
+            start: String,
+            end: String
+        ) -> [(start: NSRange, end: NSRange)] {
+            var pairs: [(start: NSRange, end: NSRange)] = []
+            var location = 0
+            while location < string.length {
+                let startMatch = string.range(
+                    of: start,
+                    options: [],
+                    range: NSRange(location: location, length: string.length - location)
+                )
+                guard startMatch.location != NSNotFound else { break }
+                let afterStart = NSMaxRange(startMatch)
+                guard afterStart <= string.length else { break }
+                let endMatch = string.range(
+                    of: end,
+                    options: [],
+                    range: NSRange(location: afterStart, length: string.length - afterStart)
+                )
+                guard endMatch.location != NSNotFound else { break }
+                pairs.append((startMatch, endMatch))
+                location = NSMaxRange(endMatch)
+            }
+            return pairs
+        }
+
+        /// 单次线性扫描收集代码块标记三元组（起始、语言结束、结束）。
+        /// 与 `markerPairs` 同理，避免逐块复制整段文本导致的 O(n²) 退化。
+        nonisolated private static func codeBlockMarkers(
+            in string: NSString
+        ) -> [(start: NSRange, languageEnd: NSRange, end: NSRange)] {
+            var triples: [(start: NSRange, languageEnd: NSRange, end: NSRange)] = []
+            var location = 0
+            while location < string.length {
+                let startMatch = string.range(
+                    of: MarkdownRenderMarker.codeBlockStart,
+                    options: [],
+                    range: NSRange(location: location, length: string.length - location)
+                )
+                guard startMatch.location != NSNotFound else { break }
+                let afterStart = NSMaxRange(startMatch)
+                guard afterStart <= string.length else { break }
+                let languageEndMatch = string.range(
+                    of: MarkdownRenderMarker.codeBlockLanguageEnd,
+                    options: [],
+                    range: NSRange(location: afterStart, length: string.length - afterStart)
+                )
+                guard languageEndMatch.location != NSNotFound else { break }
+                let afterLanguage = NSMaxRange(languageEndMatch)
+                guard afterLanguage <= string.length else { break }
+                let endMatch = string.range(
+                    of: MarkdownRenderMarker.codeBlockEnd,
+                    options: [],
+                    range: NSRange(location: afterLanguage, length: string.length - afterLanguage)
+                )
+                guard endMatch.location != NSNotFound else { break }
+                triples.append((startMatch, languageEndMatch, endMatch))
+                location = NSMaxRange(endMatch)
+            }
+            return triples
+        }
+
         /// 删除隐藏标记，并在其包围的原生段落上应用样式。
         private static func applyMarkedParagraphStyle(
             to attributedString: NSMutableAttributedString,
@@ -315,13 +398,14 @@ extension AppState {
             endMarker: String,
             update: (NSMutableParagraphStyle) -> Void
         ) {
-            while let start = attributedString.string.range(of: startMarker),
-                  let end = attributedString.string.range(
-                      of: endMarker,
-                      range: start.upperBound..<attributedString.string.endIndex
-                  ) {
-                let startRange = NSRange(start, in: attributedString.string)
-                let endRange = NSRange(end, in: attributedString.string)
+            let pairs = markerPairs(
+                in: attributedString.string as NSString,
+                start: startMarker,
+                end: endMarker
+            )
+            for pair in pairs.reversed() {
+                let startRange = pair.start
+                let endRange = pair.end
                 attributedString.deleteCharacters(in: endRange)
                 attributedString.deleteCharacters(in: startRange)
 
@@ -375,25 +459,24 @@ extension AppState {
             to attributedString: NSMutableAttributedString,
             inlineBackground: NSColor
         ) {
-            while let start = attributedString.string.range(of: MarkdownRenderMarker.codeBlockStart),
-                  let languageEnd = attributedString.string.range(
-                      of: MarkdownRenderMarker.codeBlockLanguageEnd,
-                      range: start.upperBound..<attributedString.string.endIndex
-                  ),
-                  let end = attributedString.string.range(
-                      of: MarkdownRenderMarker.codeBlockEnd,
-                      range: languageEnd.upperBound..<attributedString.string.endIndex
-                  ) {
-                let language = String(attributedString.string[start.upperBound..<languageEnd.lowerBound])
-                let startRange = NSRange(start, in: attributedString.string)
-                let languageEndRange = NSRange(languageEnd, in: attributedString.string)
-                let endRange = NSRange(end, in: attributedString.string)
+            // 一次性读取原始字符串快照，逆序处理标记，保证前序范围索引不被后序修改影响。
+            let source = attributedString.string as NSString
+            let codeBlocks = codeBlockMarkers(in: source)
+            for markers in codeBlocks.reversed() {
+                let startRange = markers.start
+                let languageEndRange = markers.languageEnd
+                let endRange = markers.end
+                let language = source.substring(
+                    with: NSRange(
+                        location: NSMaxRange(startRange),
+                        length: languageEndRange.location - NSMaxRange(startRange)
+                    )
+                )
                 let prefixRange = NSRange(
                     location: startRange.location,
                     length: NSMaxRange(languageEndRange) - startRange.location
                 )
 
-                let originalCodeLength = endRange.location - NSMaxRange(languageEndRange)
                 let label = language.uppercased()
                 let blockSpacer = "\u{200B}\n"
                 let blockSpacerLength = (blockSpacer as NSString).length
@@ -406,11 +489,11 @@ extension AppState {
 
                 let blockLocation = prefixRange.location + blockSpacerLength
                 let codeLocation = blockLocation + labelLineLength
-                var codeLength = originalCodeLength
+                var codeLength = endRange.location - NSMaxRange(languageEndRange)
                 // cmark 会在 fenced code 末尾保留换行；不把它纳入边框范围，避免底部出现一整行空白。
-                let renderedString = attributedString.string as NSString
+                // 从原始快照读取代码尾部，避免每次复制当前富文本字符串。
                 while codeLength > 0 {
-                    let finalCharacter = renderedString.character(at: codeLocation + codeLength - 1)
+                    let finalCharacter = source.character(at: NSMaxRange(languageEndRange) + codeLength - 1)
                     guard finalCharacter == 0x0A || finalCharacter == 0x0D else { break }
                     codeLength -= 1
                 }
@@ -494,13 +577,15 @@ extension AppState {
                 }
             }
 
-            while let start = attributedString.string.range(of: MarkdownRenderMarker.inlineCodeStart),
-                  let end = attributedString.string.range(
-                      of: MarkdownRenderMarker.inlineCodeEnd,
-                      range: start.upperBound..<attributedString.string.endIndex
-                  ) {
-                let startRange = NSRange(start, in: attributedString.string)
-                let endRange = NSRange(end, in: attributedString.string)
+            // 代码块处理会改变字符串长度，行内标记需基于当前状态重新采集范围。
+            let inlinePairs = markerPairs(
+                in: attributedString.string as NSString,
+                start: MarkdownRenderMarker.inlineCodeStart,
+                end: MarkdownRenderMarker.inlineCodeEnd
+            )
+            for pair in inlinePairs.reversed() {
+                let startRange = pair.start
+                let endRange = pair.end
                 attributedString.deleteCharacters(in: endRange)
                 attributedString.deleteCharacters(in: startRange)
 

@@ -254,20 +254,8 @@ struct MarkdownTextView: NSViewRepresentable {
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         if let textView = nsView.documentView as? MarkdownNSTextView {
-            // 将 HTML 解析固化的纯黑/纯白前景色转换为语义化的 labelColor，使文本颜色随系统明暗外观自动切换
-            // 即使 AppState 尚未完成重新渲染，也能保证暗色模式下文本可读
-            let mutable = NSMutableAttributedString(attributedString: attributedText)
-            let fullRange = NSRange(location: 0, length: mutable.length)
-            mutable.enumerateAttribute(.foregroundColor, in: fullRange, options: []) { value, range, _ in
-                guard let color = value as? NSColor,
-                      let rgb = color.usingColorSpace(.deviceRGB) else { return }
-                let isBlack = rgb.redComponent < 0.02 && rgb.greenComponent < 0.02 && rgb.blueComponent < 0.02 && rgb.alphaComponent > 0.95
-                let isWhite = rgb.redComponent > 0.98 && rgb.greenComponent > 0.98 && rgb.blueComponent > 0.98 && rgb.alphaComponent > 0.95
-                if isBlack || isWhite {
-                    mutable.addAttribute(.foregroundColor, value: NSColor.labelColor, range: range)
-                }
-            }
-            textView.layoutManager?.replaceTextStorage(NSTextStorage(attributedString: mutable))
+            // 颜色语义化已在 AppState 渲染阶段完成，这里直接替换文本存储，避免每次更新全量复制与枚举。
+            textView.layoutManager?.replaceTextStorage(NSTextStorage(attributedString: attributedText))
             textView.resetCodeBlockHover()
             context.coordinator.updateHeight(nsView)
         }
