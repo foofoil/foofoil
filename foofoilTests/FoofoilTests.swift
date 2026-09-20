@@ -1660,6 +1660,56 @@ struct FoofoilTests {
         #expect(attr.length > 0)
     }
 
+    @Test func largeMarkdownRendersWithoutMarkersAndLinearly() async throws {
+        // 大文档渲染曾是 O(n²)：逐块复制整段富文本导致 1000 段落需数秒。
+        // 此测试以含代码块与行内代码的大文档覆盖该路径，并防御性限制耗时。
+        var body = ""
+        for index in 0..<1200 {
+            if index % 25 == 0 {
+                body += "# Heading \(index)\n\n"
+            }
+            body += "Paragraph \(index) with **bold** and `inline_code_\(index)` text.\n\n"
+            if index % 30 == 0 {
+                body += "```swift\nfunc f\(index)() {\n    print(\"\(index)\")\n}\n```\n\n"
+            }
+        }
+
+        let state = AppState()
+        state.originalImageName = "large.md"
+        state.text = body
+        state.isMarkdownPreview = true
+
+        let clock = ContinuousClock()
+        let startedAt = clock.now
+        for _ in 0..<200 where state.renderedMarkdown.string.isEmpty {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        let elapsed = startedAt.duration(to: clock.now)
+
+        let rendered = state.renderedMarkdown.string
+        #expect(!rendered.isEmpty)
+        // 全部内部标记必须被清除，不能泄漏到可见文本。
+        for marker in ["\u{F0010}", "\u{F0011}", "\u{F0012}", "\u{F0013}", "\u{F0014}", "\u{F0015}", "\u{F0016}", "\u{F0017}", "\u{F0018}"] {
+            #expect(!rendered.contains(marker))
+        }
+        #expect(rendered.contains("Heading 0"))
+        #expect(rendered.contains("inline_code_1199"))
+        #expect(elapsed < .seconds(10))
+
+        // 代码块与行内代码的样式必须仍然落在正确范围上。
+        var codeBlockCount = 0
+        var inlineCodeCount = 0
+        let fullRange = NSRange(location: 0, length: state.renderedMarkdown.length)
+        state.renderedMarkdown.enumerateAttribute(.markdownCodeBlockLanguage, in: fullRange) { value, _, _ in
+            if value is String { codeBlockCount += 1 }
+        }
+        state.renderedMarkdown.enumerateAttribute(.markdownInlineCodeBackground, in: fullRange) { value, _, _ in
+            if value is NSColor { inlineCodeCount += 1 }
+        }
+        #expect(codeBlockCount > 0)
+        #expect(inlineCodeCount > 0)
+    }
+
     @Test func groupedDropChoosesOneTypeByMediaPriority() {
         let urls = [
             URL(fileURLWithPath: "/tmp/a.jpg"),

@@ -61,6 +61,8 @@ enum DocumentTextSpacing {
 // 自定义文本编辑器，支持随着输入文本区域自动扩展高度
 struct CustomTextEditor: NSViewRepresentable {
     private static let minimumEditorHeight: CGFloat = 40
+    // 与 Markdown 预览一致的文档内边距，保证滚动条贴边且首尾留白随内容滚动。
+    private static let documentPadding: CGFloat = 24
 
     @Binding var text: String
     @Binding var calculatedHeight: CGFloat
@@ -127,9 +129,13 @@ struct CustomTextEditor: NSViewRepresentable {
             fontSize: CGFloat(fontSize)
         )
 
-        textView.textContainerInset = .zero
-        textView.minSize = NSSize(width: 0, height: Self.minimumEditorHeight)
-        textView.frame.size.height = Self.minimumEditorHeight
+        // 留白属于可滚动文档，让滚动条贴近窗口边缘，首尾留白随内容一起滚动。
+        textView.textContainerInset = NSSize(width: Self.documentPadding, height: Self.documentPadding)
+        // 空文本仍需保留一行行高加上下留白，保证插入光标完整可见。
+        let initialLineHeight = textView.layoutManager?.defaultLineHeight(for: textView.font ?? NSFont.systemFont(ofSize: 14)) ?? Self.minimumEditorHeight
+        let initialHeight = max(Self.minimumEditorHeight, initialLineHeight + Self.documentPadding * 2)
+        textView.minSize = NSSize(width: 0, height: initialHeight)
+        textView.frame.size.height = initialHeight
 
         textView.delegate = context.coordinator
 
@@ -258,9 +264,13 @@ struct CustomTextEditor: NSViewRepresentable {
             layoutManager.ensureLayout(for: textContainer)
 
             let usedRect = layoutManager.usedRect(for: textContainer)
-            // 空文本的已用区域高度为 0，仍需保留稳定的编辑区域以完整显示插入光标。
+            // 空文本的已用区域高度为 0，仍需保留一行行高加上下留白以完整显示插入光标。
             let lineHeight = layoutManager.defaultLineHeight(for: textView.font ?? NSFont.systemFont(ofSize: CGFloat(parent.fontSize)))
-            let neededHeight = max(usedRect.height, lineHeight, CustomTextEditor.minimumEditorHeight)
+            let neededHeight = max(
+                usedRect.height + CustomTextEditor.documentPadding * 2,
+                lineHeight + CustomTextEditor.documentPadding * 2,
+                CustomTextEditor.minimumEditorHeight
+            )
             textView.frame.size.height = neededHeight
 
             DispatchQueue.main.async { [weak self] in
