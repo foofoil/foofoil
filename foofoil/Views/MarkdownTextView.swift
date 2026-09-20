@@ -220,6 +220,8 @@ private final class MarkdownNSTextView: NSTextView {
 struct MarkdownTextView: NSViewRepresentable {
     let attributedText: NSAttributedString
     @Binding var calculatedHeight: CGFloat
+    /// 箔上自选的文字颜色；正文固化为黑白灰时据此跳过，保留用户选择。
+    let customTextColor: NSColor?
     private let documentPadding: CGFloat = 24
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -261,6 +263,8 @@ struct MarkdownTextView: NSViewRepresentable {
             mutable.enumerateAttribute(.foregroundColor, in: fullRange, options: []) { value, range, _ in
                 guard let color = value as? NSColor,
                       let rgb = color.usingColorSpace(.deviceRGB) else { return }
+                // 自选的文字颜色可能是近黑/近白，不能被当作主题固化的颜色改写
+                if let customTextColor, Self.isSameColor(color, customTextColor) { return }
                 let isBlack = rgb.redComponent < 0.02 && rgb.greenComponent < 0.02 && rgb.blueComponent < 0.02 && rgb.alphaComponent > 0.95
                 let isWhite = rgb.redComponent > 0.98 && rgb.greenComponent > 0.98 && rgb.blueComponent > 0.98 && rgb.alphaComponent > 0.95
                 if isBlack || isWhite {
@@ -275,6 +279,15 @@ struct MarkdownTextView: NSViewRepresentable {
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
+    }
+
+    /// 按 8 位 sRGB 分量比较颜色，容忍 HTML 导入与颜色空间转换产生的 1-2 级误差。
+    private static func isSameColor(_ lhs: NSColor, _ rhs: NSColor) -> Bool {
+        guard let a = lhs.usingColorSpace(.sRGB), let b = rhs.usingColorSpace(.sRGB) else { return false }
+        func byte(_ value: CGFloat) -> Int { Int((value * 255).rounded()) }
+        return abs(byte(a.redComponent) - byte(b.redComponent)) <= 2
+            && abs(byte(a.greenComponent) - byte(b.greenComponent)) <= 2
+            && abs(byte(a.blueComponent) - byte(b.blueComponent)) <= 2
     }
 
     class Coordinator: NSObject {

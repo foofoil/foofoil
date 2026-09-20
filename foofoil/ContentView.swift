@@ -165,9 +165,9 @@ public struct ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.18), value: pdfPageIndicator)
-        // 系统明暗切换后，把与目标主题明显不符的自定义背景色换成同色相的深浅版本。
+        // 系统明暗切换后，把与目标主题明显不符的自定义背景色、文字颜色换成同色相的深浅版本。
         .onChange(of: colorScheme) { _, newScheme in
-            appState.adaptContentBackgroundColor(toDarkAppearance: newScheme == .dark)
+            appState.adaptDocumentColorsToAppearanceChange(toDarkAppearance: newScheme == .dark)
         }
         .onReceive(NotificationCenter.default.publisher(for: Notification.Name("flashWindow_\(appState.id.uuidString)"))) { _ in
             // 瞬间变白（0.85 不透明度）

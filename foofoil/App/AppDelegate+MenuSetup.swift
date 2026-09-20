@@ -390,12 +390,13 @@ extension AppDelegate {
 
         viewMenu.addItem(NSMenuItem.separator())
 
-        // Background Color - 文档箔的内容背景色（纯文本/Markdown/CSV/PDF/网页/电子书）
-        let backgroundColorItem = NSMenuItem(title: NSLocalizedString("Background Color", comment: ""), action: #selector(backgroundColorAction), keyEquivalent: "")
-        backgroundColorItem.withSymbol("paintpalette")
-        backgroundColorItem.representedObject = "view.backgroundColor"
-        backgroundColorItem.target = self
-        viewMenu.addItem(backgroundColorItem)
+        // Document Style - 背景颜色、文字颜色、字体与间距（纯文本/Markdown/CSV/PDF/网页/电子书）
+        let documentStyleItem = NSMenuItem(title: NSLocalizedString("Document Style", comment: ""), action: #selector(documentStyleAction), keyEquivalent: "i")
+        documentStyleItem.keyEquivalentModifierMask = [.command]
+        documentStyleItem.withSymbol("textformat")
+        documentStyleItem.representedObject = "view.documentStyle"
+        documentStyleItem.target = self
+        viewMenu.addItem(documentStyleItem)
 
         // Increase Opacity - 快捷键 Command + Shift + ↑
         let increaseOpacityItem = NSMenuItem(title: NSLocalizedString("Increase Opacity", comment: ""), action: #selector(increaseOpacityAction), keyEquivalent: "")

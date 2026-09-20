@@ -121,7 +121,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             setMenuItem(withAction: #selector(toggleImageListSlideshowAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(reloadPageAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(captureImageFoofoilAction), in: menu, isHidden: true)
-            setMenuItem(withAction: #selector(backgroundColorAction), in: menu, isHidden: true)
+            setMenuItem(withAction: #selector(documentStyleAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(selectColorAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(fitWindowToImageAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(fitImageToWindowWidthAction), in: menu, isHidden: true)
@@ -162,8 +162,13 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         let isSVG = isImageMode && appState.isSVG
         setMenuItem(withAction: #selector(selectColorAction), in: menu, isHidden: !isSVG)
 
-        // 2.5 Background Color 菜单项 - 仅文档箔（纯文本/Markdown/CSV/PDF/网页/电子书）可用，作用于内容背景。
-        setMenuItem(withAction: #selector(backgroundColorAction), in: menu, isHidden: !appState.supportsContentBackgroundColor)
+        // 2.5 Document Style 菜单项 - 有可调样式的文档箔可用：文字颜色/字体/间距只对无排版文档内容开放，
+        // 面板内部按同一组判定逐段显隐。
+        setMenuItem(
+            withAction: #selector(documentStyleAction),
+            in: menu,
+            isHidden: !(appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling)
+        )
 
         // 3. Fit Window to Image & Fit Image to Window Width 菜单项 - 仅图片且有边框时可见
         let showFitOptions = isImageMode && appState.effectiveShowBorder
@@ -219,8 +224,9 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             return activeAppState?.isSVG == true
         }
 
-        if menuItem.action == #selector(backgroundColorAction) {
-            return activeAppState?.supportsContentBackgroundColor == true
+        if menuItem.action == #selector(documentStyleAction) {
+            guard let appState = activeAppState else { return false }
+            return appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling
         }
 
         if menuItem.action == #selector(openClipboardContentAction) {

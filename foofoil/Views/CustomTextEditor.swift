@@ -8,6 +8,56 @@
 import SwiftUI
 import AppKit
 
+/// 箔自选的行距/段距 → 原生段落样式；编辑与只读文本通道共用。
+enum DocumentTextSpacing {
+    /// 把行距/段距落到 NSTextView：默认段落样式让新输入跟随，文本存储让已有内容跟随，
+    /// 布局管理器据此计算行高，自动高度也跟着对。未自选时为 0，即 NSTextView 的默认排版。
+    static func apply(
+        to textView: NSTextView,
+        lineHeightMultiple: Double?,
+        paragraphSpacingMultiple: Double?,
+        fontSize: CGFloat
+    ) {
+        let targetLineHeightMultiple = lineHeightMultiple ?? 0
+        // 段距是相对字号的倍数，原生以点为单位。
+        let targetParagraphSpacing = paragraphSpacingMultiple.map { $0 * fontSize } ?? 0
+
+        // 只在数值变化时重设，避免每次更新都重置输入属性（影响输入法与撤销）。
+        if let current = textView.defaultParagraphStyle {
+            if current.lineHeightMultiple != targetLineHeightMultiple || current.paragraphSpacing != targetParagraphSpacing {
+                let style = (current.mutableCopy() as? NSMutableParagraphStyle) ?? NSMutableParagraphStyle()
+                style.lineHeightMultiple = targetLineHeightMultiple
+                style.paragraphSpacing = targetParagraphSpacing
+                textView.defaultParagraphStyle = style
+            }
+        } else if targetLineHeightMultiple != 0 || targetParagraphSpacing != 0 {
+            let style = NSMutableParagraphStyle()
+            style.lineHeightMultiple = targetLineHeightMultiple
+            style.paragraphSpacing = targetParagraphSpacing
+            textView.defaultParagraphStyle = style
+        }
+
+        // 已有文本不会因为默认段落样式而改变，需要显式覆盖；取消自选时同样靠这里归零。
+        guard let textStorage = textView.textStorage, textStorage.length > 0 else { return }
+        var updates: [(range: NSRange, style: NSMutableParagraphStyle)] = []
+        textStorage.enumerateAttribute(
+            .paragraphStyle,
+            in: NSRange(location: 0, length: textStorage.length)
+        ) { value, range, _ in
+            let current = (value as? NSParagraphStyle) ?? NSParagraphStyle.default
+            guard current.lineHeightMultiple != targetLineHeightMultiple
+                || current.paragraphSpacing != targetParagraphSpacing else { return }
+            let style = (current.mutableCopy() as? NSMutableParagraphStyle) ?? NSMutableParagraphStyle()
+            style.lineHeightMultiple = targetLineHeightMultiple
+            style.paragraphSpacing = targetParagraphSpacing
+            updates.append((range, style))
+        }
+        for update in updates {
+            textStorage.addAttribute(.paragraphStyle, value: update.style, range: update.range)
+        }
+    }
+}
+
 // 自定义文本编辑器，支持随着输入文本区域自动扩展高度
 struct CustomTextEditor: NSViewRepresentable {
     private static let minimumEditorHeight: CGFloat = 40
@@ -15,7 +65,32 @@ struct CustomTextEditor: NSViewRepresentable {
     @Binding var text: String
     @Binding var calculatedHeight: CGFloat
     let fontSize: Double
+    let font: NSFont
+    let textColor: NSColor?
+    let lineHeightMultiple: Double?
+    let paragraphSpacingMultiple: Double?
     let shouldMaintainFocus: Bool
+
+    /// 字体、文字颜色、行距/段距来自箔的文档样式；省略字体时沿用通道默认：圆体系统字体、字号取 fontSize。
+    init(
+        text: Binding<String>,
+        calculatedHeight: Binding<CGFloat>,
+        fontSize: Double,
+        font: NSFont? = nil,
+        textColor: NSColor? = nil,
+        lineHeightMultiple: Double? = nil,
+        paragraphSpacingMultiple: Double? = nil,
+        shouldMaintainFocus: Bool
+    ) {
+        self._text = text
+        self._calculatedHeight = calculatedHeight
+        self.fontSize = fontSize
+        self.font = font ?? DocumentFontCatalog.defaultFont(size: CGFloat(fontSize))
+        self.textColor = textColor
+        self.lineHeightMultiple = lineHeightMultiple
+        self.paragraphSpacingMultiple = paragraphSpacingMultiple
+        self.shouldMaintainFocus = shouldMaintainFocus
+    }
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
@@ -42,14 +117,15 @@ struct CustomTextEditor: NSViewRepresentable {
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.lineFragmentPadding = 0
 
-        // 字体样式（圆角设计）
-        let systemFont = NSFont.systemFont(ofSize: CGFloat(fontSize))
-        if let roundedDescriptor = systemFont.fontDescriptor.withDesign(.rounded) {
-            textView.font = NSFont(descriptor: roundedDescriptor, size: CGFloat(fontSize))
-        } else {
-            textView.font = systemFont
-        }
-        textView.textColor = .labelColor
+        // 字体、文字颜色与行距/段距由箔的文档样式决定；未自选颜色时跟随系统外观
+        textView.font = font
+        textView.textColor = textColor ?? .labelColor
+        DocumentTextSpacing.apply(
+            to: textView,
+            lineHeightMultiple: lineHeightMultiple,
+            paragraphSpacingMultiple: paragraphSpacingMultiple,
+            fontSize: CGFloat(fontSize)
+        )
 
         textView.textContainerInset = .zero
         textView.minSize = NSSize(width: 0, height: Self.minimumEditorHeight)
@@ -68,13 +144,20 @@ struct CustomTextEditor: NSViewRepresentable {
             if textView.string != text {
                 textView.string = text
             }
-            let systemFont = NSFont.systemFont(ofSize: CGFloat(fontSize))
-            let updatedFont = systemFont.fontDescriptor.withDesign(.rounded).flatMap {
-                NSFont(descriptor: $0, size: CGFloat(fontSize))
-            } ?? systemFont
-            if textView.font?.pointSize != CGFloat(fontSize) {
-                textView.font = updatedFont
+            // 仅在字体或颜色变化时重设，避免每次更新都重置输入属性（影响输入法与撤销）
+            if textView.font?.fontName != font.fontName || textView.font?.pointSize != font.pointSize {
+                textView.font = font
             }
+            let resolvedTextColor = textColor ?? .labelColor
+            if textView.textColor?.isEqual(resolvedTextColor) != true {
+                textView.textColor = resolvedTextColor
+            }
+            DocumentTextSpacing.apply(
+                to: textView,
+                lineHeightMultiple: lineHeightMultiple,
+                paragraphSpacingMultiple: paragraphSpacingMultiple,
+                fontSize: CGFloat(fontSize)
+            )
             // 更新高度
             context.coordinator.updateHeight(nsView)
             context.coordinator.configureFocus(for: textView)
@@ -176,7 +259,7 @@ struct CustomTextEditor: NSViewRepresentable {
 
             let usedRect = layoutManager.usedRect(for: textContainer)
             // 空文本的已用区域高度为 0，仍需保留稳定的编辑区域以完整显示插入光标。
-            let lineHeight = layoutManager.defaultLineHeight(for: textView.font ?? NSFont.systemFont(ofSize: 14))
+            let lineHeight = layoutManager.defaultLineHeight(for: textView.font ?? NSFont.systemFont(ofSize: CGFloat(parent.fontSize)))
             let neededHeight = max(usedRect.height, lineHeight, CustomTextEditor.minimumEditorHeight)
             textView.frame.size.height = neededHeight
 

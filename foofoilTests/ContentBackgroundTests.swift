@@ -100,6 +100,84 @@ struct ContentBackgroundTests {
         #expect(image.contentBackgroundColor == nil)
     }
 
+    /// 文字颜色与字体只对无排版文档内容开放：纯文本/笔记、Markdown、扩展文档（电子书）。
+    @Test func textStylingScopeFollowsUnstyledDocuments() {
+        var states: [AppState] = []
+        defer { states.forEach { HistoryManager.shared.removeFromHistory($0.toConfig()) } }
+        func makeState() -> AppState {
+            let state = AppState()
+            states.append(state)
+            return state
+        }
+
+        // 空白箔与纯文本、Markdown：由宿主排版，可改文字颜色与字体。
+        #expect(makeState().supportsDocumentTextStyling)
+        for name in ["notes.txt", "notes.md"] {
+            let state = makeState()
+            state.originalImageName = name
+            state.textURL = URL(fileURLWithPath: "/tmp/\(name)")
+            #expect(state.supportsDocumentTextStyling, "\(name)")
+        }
+
+        // PDF 自带版式、CSV 是表格、网页有站点自己的排版：都不参与。
+        let pdf = makeState()
+        pdf.originalImageName = "paper.pdf"
+        pdf.imageURL = URL(fileURLWithPath: "/tmp/paper.pdf")
+        #expect(!pdf.supportsDocumentTextStyling)
+
+        let csv = makeState()
+        csv.originalImageName = "table.csv"
+        csv.textURL = URL(fileURLWithPath: "/tmp/table.csv")
+        #expect(!csv.supportsDocumentTextStyling)
+
+        let web = makeState()
+        web.webURL = URL(string: "https://example.com")!
+        #expect(!web.supportsDocumentTextStyling)
+
+        for name in ["photo.png", "clip.mp4", "song.mp3"] {
+            let state = makeState()
+            state.originalImageName = name
+            state.imageURL = URL(fileURLWithPath: "/tmp/\(name)")
+            #expect(!state.supportsDocumentTextStyling, "\(name)")
+        }
+
+        // 文字颜色同样只对这类内容生效。
+        let text = makeState()
+        text.textColorHex = "#123456"
+        text.documentFontName = "Songti SC"
+        text.documentLineSpacing = 1.8
+        #expect(text.documentTextColorHex == "#123456")
+        #expect(text.documentFontFamily?.contains("Songti SC") == true)
+        #expect(text.documentLineHeightMultiple == 1.8)
+        let styled = makeState()
+        styled.originalImageName = "table.csv"
+        styled.textURL = URL(fileURLWithPath: "/tmp/table.csv")
+        styled.textColorHex = "#123456"
+        styled.documentFontName = "Songti SC"
+        styled.documentLineSpacing = 1.8
+        #expect(styled.documentTextColorHex == nil)
+        #expect(styled.documentFontFamily == nil)
+        #expect(styled.documentLineHeightMultiple == nil)
+    }
+
+    /// 文字颜色的明暗适配方向与背景相反：深色主题下深色文字换成浅色。
+    @Test func textColorAdaptsOppositeToBackground() {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+
+        state.textColorHex = "#1C1C1E"
+        state.adaptDocumentColorsToAppearanceChange(toDarkAppearance: true)
+        #expect(state.textColorHex != "#1C1C1E", "深色文字在深色主题下未换成浅色")
+
+        state.textColorHex = "#F5EFE0"
+        state.adaptDocumentColorsToAppearanceChange(toDarkAppearance: true)
+        #expect(state.textColorHex == "#F5EFE0", "浅色文字在深色主题下被改动")
+
+        state.backgroundColorHex = "#F5EFE0"
+        state.adaptDocumentColorsToAppearanceChange(toDarkAppearance: true)
+        #expect(state.backgroundColorHex != "#F5EFE0", "浅色背景在深色主题下未换成深色")
+    }
+
     /// 内容背景真的落在内容上，而不是给整个窗口着色。
     @Test func contentBackgroundRendersBehindDocumentContent() throws {
         let state = AppState()
@@ -218,15 +296,15 @@ struct ContentBackgroundTests {
 
         let document = makeState()
         document.backgroundColorHex = "#F5EFE0"
-        document.adaptContentBackgroundColor(toDarkAppearance: true)
+        document.adaptDocumentColorsToAppearanceChange(toDarkAppearance: true)
         let darkHex = try #require(document.backgroundColorHex)
         #expect(darkHex != "#F5EFE0", "浅色背景未随深色主题适配")
         #expect(NSColor(hex: darkHex)?.usingColorSpace(.sRGB)?.toHex() == darkHex)
         // 匹配主题的颜色与中间色都不改。
-        document.adaptContentBackgroundColor(toDarkAppearance: true)
+        document.adaptDocumentColorsToAppearanceChange(toDarkAppearance: true)
         #expect(document.backgroundColorHex == darkHex)
         document.backgroundColorHex = "#808080"
-        document.adaptContentBackgroundColor(toDarkAppearance: true)
+        document.adaptDocumentColorsToAppearanceChange(toDarkAppearance: true)
         #expect(document.backgroundColorHex == "#808080")
 
         // 图片箔不使用内容背景色，历史里带着的浅色也不会被改写。
@@ -234,7 +312,7 @@ struct ContentBackgroundTests {
         image.originalImageName = "photo.png"
         image.imageURL = URL(fileURLWithPath: "/tmp/photo.png")
         image.backgroundColorHex = "#F5EFE0"
-        image.adaptContentBackgroundColor(toDarkAppearance: true)
+        image.adaptDocumentColorsToAppearanceChange(toDarkAppearance: true)
         #expect(image.backgroundColorHex == "#F5EFE0")
     }
 

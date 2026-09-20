@@ -61,6 +61,13 @@ extension AppState {
             let fontSize = self.textFontSize
             // 在主线程捕获当前外观，避免后台任务无法正确获取有效外观
             let isDark = Self.isDarkMode()
+            // 自选文字颜色与字体同样在主线程捕获，供后台渲染生成 CSS
+            let customTextColorHex = self.documentTextColorHex
+            let customFontFamily = self.documentFontFamily
+            // CSS 的 font-family 带引号，NSFontManager 要的是纯字族名，这里一并捕获。
+            let customFontFamilyName = self.documentStylingFontName.flatMap { NSFont(name: $0, size: fontSize)?.familyName }
+            let lineHeightMultiple = self.documentLineHeightMultiple
+            let paragraphSpacingMultiple = self.documentParagraphSpacingMultiple
 
             renderTask = Task.detached(priority: .userInitiated) {
                 if Task.isCancelled { return }
@@ -69,7 +76,12 @@ extension AppState {
                 if Task.isCancelled { return }
 
                 // 根据当前明暗外观显式生成对应配色的 CSS，避免依赖 @media 查询导致 NSAttributedString 在后台解析时颜色固化
-                let textColor = isDark ? "#F0F3F6" : "#24292F"
+                let textColor = customTextColorHex ?? (isDark ? "#F0F3F6" : "#24292F")
+                // 正文字体族：未自选时保留系统默认字体栈；代码块仍用自己的等宽栈。
+                let bodyFontFamily = customFontFamily ?? "-apple-system, BlinkMacSystemFont, \"Helvetica Neue\", sans-serif"
+                // 行高与段距：未自选时保留通道默认（1.45 行高、0.8em 段距）。
+                let bodyLineHeight = lineHeightMultiple.map(Self.cssNumber) ?? "1.45"
+                let bodyParagraphSpacing = paragraphSpacingMultiple.map { "\(Self.cssNumber($0))em" } ?? "0.8em"
                 let secondaryTextColor = isDark ? "#AAB4C0" : "#57606A"
                 let accentColor = isDark ? "#58A6FF" : "#0969DA"
                 let borderColor = isDark ? "#3D444D" : "#D0D7DE"
@@ -98,9 +110,9 @@ extension AppState {
                 <head>
                 <style>
                 html, body {
-                    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+                    font-family: \(bodyFontFamily);
                     font-size: \(fontSize)px;
-                    line-height: 1.45;
+                    line-height: \(bodyLineHeight);
                     color: \(textColor);
                     background-color: transparent;
                 }
@@ -115,7 +127,7 @@ extension AppState {
                 }
                 p {
                     margin-top: 0;
-                    margin-bottom: 0.8em;
+                    margin-bottom: \(bodyParagraphSpacing);
                 }
                 h1, h2, h3, h4, h5, h6 {
                     color: \(textColor);
@@ -273,12 +285,111 @@ extension AppState {
                             to: mutableAttr,
                             inlineBackground: NSColor(hex: inlineCodeBackground) ?? .quaternaryLabelColor
                         )
+
+                        // CSS 的 font-family / line-height / margin 在 HTML 导入时不一定落到原生属性上，
+                        // 自选时再按原生属性固化一次；顺序在代码样式之后，代码块保持自己的等宽字体与紧凑行高。
+                        Self.applyDocumentSpacingStyles(
+                            to: mutableAttr,
+                            lineHeightMultiple: lineHeightMultiple,
+                            paragraphSpacingPoints: paragraphSpacingMultiple.map { fontSize * $0 }
+                        )
+                        if let customFontFamilyName {
+                            Self.applyDocumentFontStyles(to: mutableAttr, family: customFontFamilyName)
+                        }
+
                         self.renderedMarkdown = mutableAttr
                     } else {
                         self.renderedMarkdown = NSAttributedString(string: textToRender)
                     }
                 }
             }
+        }
+
+        /// 自选行距/段距落到原生段落样式上，绕过 HTML 导入器对 CSS 行高与外边距的不稳定支持。
+        private static func applyDocumentSpacingStyles(
+            to attributedString: NSMutableAttributedString,
+            lineHeightMultiple: Double?,
+            paragraphSpacingPoints: CGFloat?
+        ) {
+            guard lineHeightMultiple != nil || paragraphSpacingPoints != nil else { return }
+
+            let string = attributedString.string as NSString
+            var location = 0
+            while location < string.length {
+                let paragraphRange = string.paragraphRange(for: NSRange(location: location, length: 0))
+                guard paragraphRange.length > 0 else { break }
+                location = NSMaxRange(paragraphRange)
+
+                let current = (attributedString.attribute(
+                    .paragraphStyle,
+                    at: paragraphRange.location,
+                    effectiveRange: nil
+                ) as? NSParagraphStyle) ?? .default
+                // 代码块与它前面的间隔行自带紧凑行高，保持原样。
+                guard !hasCodeBlockAttribute(attributedString, in: paragraphRange),
+                      current.maximumLineHeight == 0 else { continue }
+
+                let style = (current.mutableCopy() as? NSMutableParagraphStyle) ?? NSMutableParagraphStyle()
+                if let lineHeightMultiple {
+                    style.lineHeightMultiple = lineHeightMultiple
+                }
+                if let paragraphSpacingPoints {
+                    style.paragraphSpacing = paragraphSpacingPoints
+                }
+                attributedString.addAttribute(.paragraphStyle, value: style, range: paragraphRange)
+            }
+        }
+
+        /// 自选字体补一次原生替换：只换字族，保留粗体/斜体等字型与字号；
+        /// 代码块与行内代码维持自己的等宽字体。
+        private static func applyDocumentFontStyles(
+            to attributedString: NSMutableAttributedString,
+            family: String
+        ) {
+            let fullRange = NSRange(location: 0, length: attributedString.length)
+            var replacements: [(range: NSRange, font: NSFont)] = []
+            // 同一字型的转换开销不小，按字体描述符缓存一次。
+            var convertedFonts: [NSFontDescriptor: NSFont] = [:]
+
+            attributedString.enumerateAttribute(.font, in: fullRange, options: []) { value, range, _ in
+                guard let font = value as? NSFont, !hasCodeAttribute(attributedString, in: range) else { return }
+                let converted: NSFont
+                if let cached = convertedFonts[font.fontDescriptor] {
+                    converted = cached
+                } else {
+                    // convert 保留原字体的字型（粗体/斜体），字族换成自选字体。
+                    let familyFont = NSFontManager.shared.convert(font, toFamily: family)
+                    converted = NSFont(descriptor: familyFont.fontDescriptor, size: font.pointSize) ?? familyFont
+                    convertedFonts[font.fontDescriptor] = converted
+                }
+                replacements.append((range, converted))
+            }
+            for replacement in replacements {
+                attributedString.addAttribute(.font, value: replacement.font, range: replacement.range)
+            }
+        }
+
+        /// 范围是否落在代码块上；代码块由 applyCodeRangeStyles 单独排版。
+        private static func hasCodeBlockAttribute(_ attributedString: NSAttributedString, in range: NSRange) -> Bool {
+            range.length > 0
+                && attributedString.attribute(.markdownCodeBlockLanguage, at: range.location, effectiveRange: nil) != nil
+        }
+
+        /// 范围是否落在代码上（代码块或行内代码）；两者都保持自己的等宽字体。
+        private static func hasCodeAttribute(_ attributedString: NSAttributedString, in range: NSRange) -> Bool {
+            guard range.length > 0 else { return false }
+            for location in [range.location, NSMaxRange(range) - 1] {
+                if attributedString.attribute(.markdownCodeBlockLanguage, at: location, effectiveRange: nil) != nil { return true }
+                if attributedString.attribute(.markdownInlineCodeBackground, at: location, effectiveRange: nil) != nil { return true }
+            }
+            return false
+        }
+
+        /// 数值转 CSS：去掉多余的尾随零，避免 1.6000000000000001 这类浮点噪声进入样式。
+        nonisolated private static func cssNumber(_ value: Double) -> String {
+            String(format: "%.2f", value)
+                .replacingOccurrences(of: "0+$", with: "", options: .regularExpression)
+                .replacingOccurrences(of: "\\.$", with: "", options: .regularExpression)
         }
 
         /// 为正文和引用建立精确范围，避免两端对齐误用于标题、表格与代码块。

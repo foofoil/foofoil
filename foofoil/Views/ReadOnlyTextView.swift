@@ -10,16 +10,28 @@ import AppKit
 
 struct ReadOnlyTextView: View {
     let text: String
-    let fontSize: Double
+    let font: NSFont
+    let textColor: NSColor?
+    let lineHeightMultiple: Double?
+    let paragraphSpacingMultiple: Double?
 
     var body: some View {
-        ReadOnlyTextNSView(text: text, fontSize: fontSize)
+        ReadOnlyTextNSView(
+            text: text,
+            font: font,
+            textColor: textColor,
+            lineHeightMultiple: lineHeightMultiple,
+            paragraphSpacingMultiple: paragraphSpacingMultiple
+        )
     }
 }
 
 struct ReadOnlyTextNSView: NSViewRepresentable {
     let text: String
-    let fontSize: Double
+    let font: NSFont
+    let textColor: NSColor?
+    let lineHeightMultiple: Double?
+    let paragraphSpacingMultiple: Double?
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
@@ -47,14 +59,15 @@ struct ReadOnlyTextNSView: NSViewRepresentable {
         textView.textContainer?.widthTracksTextView = true
         textView.textContainer?.lineFragmentPadding = 0
 
-        // 字体样式（圆角设计）
-        let systemFont = NSFont.systemFont(ofSize: CGFloat(fontSize))
-        if let roundedDescriptor = systemFont.fontDescriptor.withDesign(.rounded) {
-            textView.font = NSFont(descriptor: roundedDescriptor, size: CGFloat(fontSize))
-        } else {
-            textView.font = systemFont
-        }
-        textView.textColor = .labelColor
+        // 字体、文字颜色、行距/段距由箔的文档样式决定；未自选颜色时跟随系统外观
+        textView.font = font
+        textView.textColor = textColor ?? .labelColor
+        DocumentTextSpacing.apply(
+            to: textView,
+            lineHeightMultiple: lineHeightMultiple,
+            paragraphSpacingMultiple: paragraphSpacingMultiple,
+            fontSize: font.pointSize
+        )
 
         textView.textContainerInset = .zero
 
@@ -67,13 +80,20 @@ struct ReadOnlyTextNSView: NSViewRepresentable {
             if textView.string != text {
                 textView.string = text
             }
-            let systemFont = NSFont.systemFont(ofSize: CGFloat(fontSize))
-            let updatedFont = systemFont.fontDescriptor.withDesign(.rounded).flatMap {
-                NSFont(descriptor: $0, size: CGFloat(fontSize))
-            } ?? systemFont
-            if textView.font?.pointSize != CGFloat(fontSize) {
-                textView.font = updatedFont
+            // 仅在字体或颜色变化时重设，避免每次更新都重置输入属性（影响输入法与撤销）
+            if textView.font?.fontName != font.fontName || textView.font?.pointSize != font.pointSize {
+                textView.font = font
             }
+            let resolvedTextColor = textColor ?? .labelColor
+            if textView.textColor?.isEqual(resolvedTextColor) != true {
+                textView.textColor = resolvedTextColor
+            }
+            DocumentTextSpacing.apply(
+                to: textView,
+                lineHeightMultiple: lineHeightMultiple,
+                paragraphSpacingMultiple: paragraphSpacingMultiple,
+                fontSize: font.pointSize
+            )
         }
     }
 }

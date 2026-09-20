@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 nonisolated final class HistoryDatabase {
-    static let schemaVersion = 12
+    static let schemaVersion = 14
 
     private let queue = DispatchQueue(label: "com.foofoil.history.database", qos: .utility)
     private var connection: OpaquePointer?
@@ -95,13 +95,15 @@ nonisolated final class HistoryDatabase {
                         id, content_kind, display_title, original_filename, image_path, text_path,
                         web_url, actual_web_url, image_source, inline_text, is_pinned, opacity,
                         window_frame, show_border, image_scale, text_font_size, is_markdown_preview,
-                        svg_color, background_color_hex, created_at, updated_at, last_opened_at,
+                        svg_color, background_color_hex, text_color_hex,
+                        document_font_name, document_line_spacing, document_paragraph_spacing,
+                        created_at, updated_at, last_opened_at,
                         source_fingerprint, index_status, index_version, video_looping, video_bookmark,
                         media_sidecar_bookmark, custom_cover_path,
                         extension_id, extension_state_reference, navigator_panel_side,
                         navigator_panel_visibility, navigator_panel_width, file_list,
                         document_zoom, document_scroll_file, document_scroll_fraction
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -112,7 +114,12 @@ nonisolated final class HistoryDatabase {
                         show_border=excluded.show_border, image_scale=excluded.image_scale,
                         text_font_size=excluded.text_font_size,
                         is_markdown_preview=excluded.is_markdown_preview, svg_color=excluded.svg_color,
-                        background_color_hex=excluded.background_color_hex, updated_at=excluded.updated_at,
+                        background_color_hex=excluded.background_color_hex,
+                        text_color_hex=excluded.text_color_hex,
+                        document_font_name=excluded.document_font_name,
+                        document_line_spacing=excluded.document_line_spacing,
+                        document_paragraph_spacing=excluded.document_paragraph_spacing,
+                        updated_at=excluded.updated_at,
                         last_opened_at=excluded.last_opened_at,
                         source_fingerprint=excluded.source_fingerprint,
                         video_looping=excluded.video_looping, video_bookmark=excluded.video_bookmark,
@@ -133,6 +140,8 @@ nonisolated final class HistoryDatabase {
                         config.imageSource?.rawValue, config.text, config.isPinned, config.opacity,
                         config.windowFrame, config.showBorder, config.imageScale, config.textFontSize,
                         config.isMarkdownPreview, config.svgColor, config.backgroundColorHex,
+                        config.textColorHex,
+                        config.documentFontName, config.documentLineSpacing, config.documentParagraphSpacing,
                         createdAt, now, now, config.sourceFingerprint, 0, 1, config.mediaPlaybackMode.sqliteValue,
                         config.videoBookmark?.base64EncodedString(), config.mediaSidecarBookmark?.base64EncodedString(),
                         config.customCoverPath,
@@ -316,6 +325,8 @@ nonisolated final class HistoryDatabase {
                 opacity REAL NOT NULL DEFAULT 1.0, window_frame TEXT, show_border INTEGER NOT NULL DEFAULT 1,
                 image_scale REAL NOT NULL DEFAULT 1.0, text_font_size REAL NOT NULL DEFAULT 16.0,
                 is_markdown_preview INTEGER NOT NULL DEFAULT 0, svg_color TEXT, background_color_hex TEXT,
+                text_color_hex TEXT, document_font TEXT NOT NULL DEFAULT 'system',
+                document_font_name TEXT, document_line_spacing REAL, document_paragraph_spacing REAL,
                 created_at REAL NOT NULL, updated_at REAL NOT NULL, last_opened_at REAL NOT NULL,
                 source_fingerprint TEXT, index_status INTEGER NOT NULL DEFAULT 0,
                 index_version INTEGER NOT NULL DEFAULT 0, index_error TEXT, thumbnail_path TEXT,
@@ -388,6 +399,14 @@ nonisolated final class HistoryDatabase {
         try addColumnIfMissing("document_zoom", definition: "document_zoom REAL NOT NULL DEFAULT 1.0")
         try addColumnIfMissing("document_scroll_file", definition: "document_scroll_file TEXT")
         try addColumnIfMissing("document_scroll_fraction", definition: "document_scroll_fraction REAL")
+        // v13 无排版文档内容的文字颜色与字体选择；旧记录沿用跟随系统、通道默认字体。
+        try addColumnIfMissing("text_color_hex", definition: "text_color_hex TEXT")
+        try addColumnIfMissing("document_font", definition: "document_font TEXT NOT NULL DEFAULT 'system'")
+        // v14 文档样式面板：字体名（PostScript）、行间距倍数、段落间距倍数；
+        // v13 的 document_font 曾存 3 个预设枚举值，已不再写入，读取时忽略。
+        try addColumnIfMissing("document_font_name", definition: "document_font_name TEXT")
+        try addColumnIfMissing("document_line_spacing", definition: "document_line_spacing REAL")
+        try addColumnIfMissing("document_paragraph_spacing", definition: "document_paragraph_spacing REAL")
         if previousVersion >= 1 && previousVersion < 9 {
             // v9：旧列表 video_looping=1 是单曲循环开关；迁成顺序循环，使列表能自动续播。
             try execute("""
@@ -577,6 +596,10 @@ nonisolated final class HistoryDatabase {
                     createdAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, columns["created_at"]!)),
                     svgColor: optionalText(statement, columns["svg_color"]!),
                     backgroundColorHex: optionalText(statement, columns["background_color_hex"]!),
+                    textColorHex: columns["text_color_hex"].flatMap { optionalText(statement, $0) },
+                    documentFontName: columns["document_font_name"].flatMap { optionalText(statement, $0) },
+                    documentLineSpacing: columns["document_line_spacing"].flatMap { optionalReal(statement, $0) },
+                    documentParagraphSpacing: columns["document_paragraph_spacing"].flatMap { optionalReal(statement, $0) },
                     textPath: optionalText(statement, columns["text_path"]!),
                     contentKind: kind,
                     sourceFingerprint: optionalText(statement, columns["source_fingerprint"]!),
@@ -672,6 +695,11 @@ nonisolated final class HistoryDatabase {
     private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
     private func text(_ statement: OpaquePointer, _ column: Int32) -> String { sqlite3_column_text(statement, column).map { String(cString: $0) } ?? "" }
     private func optionalText(_ statement: OpaquePointer, _ column: Int32) -> String? { sqlite3_column_type(statement, column) == SQLITE_NULL ? nil : text(statement, column) }
+
+    /// 可空 REAL 列：NULL 表示用户没有自选该样式，保留为 nil 而不是 0。
+    private func optionalReal(_ statement: OpaquePointer, _ column: Int32) -> Double? {
+        sqlite3_column_type(statement, column) == SQLITE_NULL ? nil : sqlite3_column_double(statement, column)
+    }
     private func columnMap(_ statement: OpaquePointer) -> [String: Int32] {
         Dictionary(uniqueKeysWithValues: (0..<sqlite3_column_count(statement)).map { (String(cString: sqlite3_column_name(statement, $0)), $0) })
     }

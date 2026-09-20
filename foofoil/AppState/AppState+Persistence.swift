@@ -17,7 +17,7 @@ import FoofoilExtensionKit
 
 extension AppState {
         public func saveState() {
-            guard !isBatchUpdating else { return }
+            guard !isBatchUpdating, !isAdjustingDocumentStyling else { return }
             let config = toConfig()
             let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
             if imageURL != nil || webURL != nil || textURL != nil || extensionSession != nil || !trimmedText.isEmpty {
@@ -53,6 +53,10 @@ extension AppState {
             self.createdAt = config.createdAt
             self.svgColor = config.svgColor
             self.backgroundColorHex = config.backgroundColorHex
+            self.textColorHex = config.textColorHex
+            self.documentFontName = config.documentFontName
+            self.documentLineSpacing = config.documentLineSpacing
+            self.documentParagraphSpacing = config.documentParagraphSpacing
             self.mediaPlaybackMode = config.mediaPlaybackMode
             self.extensionStateReference = config.extensionStateReference
             self.extensionDocumentScrollFile = config.documentScrollFile
@@ -173,6 +177,10 @@ extension AppState {
                 createdAt: createdAt,
                 svgColor: svgColor,
                 backgroundColorHex: backgroundColorHex,
+                textColorHex: textColorHex,
+                documentFontName: documentFontName,
+                documentLineSpacing: documentLineSpacing,
+                documentParagraphSpacing: documentParagraphSpacing,
                 textPath: textURL?.path,
                 contentKind: HistoryContentKind.infer(from: WindowConfig(
                     id: id,

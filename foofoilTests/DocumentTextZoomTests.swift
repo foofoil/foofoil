@@ -84,6 +84,10 @@ struct DocumentTextZoomTests {
                 sessionID: UUID(),
                 textScale: 1.0,
                 documentBackgroundHex: nil,
+                documentTextColorHex: nil,
+                documentFontFamily: nil,
+                documentLineHeightMultiple: nil,
+                documentParagraphSpacingMultiple: nil,
                 initialScrollFile: nil,
                 initialScrollFraction: nil,
                 onScroll: { _, _ in }
@@ -111,6 +115,10 @@ struct DocumentTextZoomTests {
             sessionID: UUID(),
             textScale: 2.0,
             documentBackgroundHex: nil,
+            documentTextColorHex: nil,
+            documentFontFamily: nil,
+            documentLineHeightMultiple: nil,
+            documentParagraphSpacingMultiple: nil,
             initialScrollFile: nil,
             initialScrollFraction: nil,
             onScroll: { _, _ in }
@@ -149,6 +157,10 @@ struct DocumentTextZoomTests {
                 sessionID: UUID(),
                 textScale: 1.0,
                 documentBackgroundHex: nil,
+                documentTextColorHex: nil,
+                documentFontFamily: nil,
+                documentLineHeightMultiple: nil,
+                documentParagraphSpacingMultiple: nil,
                 initialScrollFile: "chapter.html",
                 initialScrollFraction: 0.5,
                 onScroll: { file, fraction in

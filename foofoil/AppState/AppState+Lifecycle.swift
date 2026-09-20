@@ -17,8 +17,9 @@ import FoofoilExtensionKit
 
 extension AppState {
         public func resetContent() {
-            // 重置后的箔片是全新文档：先收起属于本箔的取色面板，避免残留面板继续把取色写回。
+            // 重置后的箔片是全新文档：先收起属于本箔的取色面板与样式面板，避免残留面板继续写回。
             (NSApplication.shared.delegate as? AppDelegate)?.dismissColorPanel(ownedBy: self)
+            (NSApplication.shared.delegate as? AppDelegate)?.dismissDocumentStylePanel(ownedBy: self)
             currentMediaRouteGeneration &+= 1
             NotificationCenter.default.post(
                 name: .willResetContent,
@@ -38,8 +39,12 @@ extension AppState {
             self.id = UUID()
             self.createdAt = Date()
             self.svgColor = nil
-            // 重置按新窗口处理：内容背景色不带到新的空白箔上（取色面板已在上方收起）。
+            // 重置按新窗口处理：内容背景色、文字颜色与字体都不带到新的空白箔上（取色面板已在上方收起）。
             self.backgroundColorHex = nil
+            self.textColorHex = nil
+            self.documentFontName = nil
+            self.documentLineSpacing = nil
+            self.documentParagraphSpacing = nil
             self.mediaPlaybackMode = .sequentialLoop
             self.videoBookmarkData = nil
             self.mediaSidecarBookmarkData = nil

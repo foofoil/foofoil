@@ -209,6 +209,37 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         }
     }
 
+    /// 无排版文档内容的文字颜色；为空时文字跟随系统外观。
+    @Published public var textColorHex: String? {
+        didSet {
+            saveState()
+        }
+    }
+
+    /// 无排版文档内容的字体（PostScript 名）；为空时沿用各通道自己的默认字体。
+    @Published public var documentFontName: String? {
+        didSet {
+            saveState()
+        }
+    }
+
+    /// 无排版文档内容的行间距倍数；为空时沿用各通道自己的默认行高。
+    @Published public var documentLineSpacing: Double? {
+        didSet {
+            saveState()
+        }
+    }
+
+    /// 无排版文档内容的段落间距（相对字号的倍数）；为空时沿用各通道自己的默认段距。
+    @Published public var documentParagraphSpacing: Double? {
+        didSet {
+            saveState()
+        }
+    }
+
+    /// 拖动样式滑杆期间不为每一帧写历史；松手后由面板收尾保存。
+    var isAdjustingDocumentStyling = false
+
     @Published public var originalImageName: String? {
         didSet {
             saveState()
@@ -473,6 +504,10 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.createdAt = config.createdAt
         self.svgColor = config.svgColor
         self.backgroundColorHex = config.backgroundColorHex
+        self.textColorHex = config.textColorHex
+        self.documentFontName = config.documentFontName
+        self.documentLineSpacing = config.documentLineSpacing
+        self.documentParagraphSpacing = config.documentParagraphSpacing
         self.mediaPlaybackMode = config.mediaPlaybackMode
         self.extensionSession = nil
         self.extensionFallbackProviderID = nil
@@ -582,6 +617,10 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.createdAt = Date()
         self.svgColor = nil
         self.backgroundColorHex = nil
+        self.textColorHex = nil
+        self.documentFontName = nil
+        self.documentLineSpacing = nil
+        self.documentParagraphSpacing = nil
         self.mediaPlaybackMode = .sequentialLoop
         self.extensionSession = nil
         self.extensionFallbackProviderID = nil

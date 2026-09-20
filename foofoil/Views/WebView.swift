@@ -121,9 +121,11 @@ struct WebView: NSViewRepresentable {
             let hex = parent.appState.contentBackgroundHex
             guard force || appliedDocumentBackgroundHex != hex else { return }
             appliedDocumentBackgroundHex = hex
-            webView.appearance = DocumentBackgroundInjection.appearance(hex: hex)
+            webView.appearance = DocumentPageInjection.appearance(hex: hex)
             Task { @MainActor in
-                _ = try? await webView.evaluateJavaScript(DocumentBackgroundInjection.script(hex: hex))
+                _ = try? await webView.evaluateJavaScript(
+                    DocumentPageInjection.script(DocumentPageInjection.Overrides(backgroundColorHex: hex))
+                )
             }
         }
 

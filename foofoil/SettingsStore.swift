@@ -124,6 +124,14 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     public var svgColor: String?
     /// 用户选择的窗体与 PDF 共用背景色；为空时使用各自的系统默认背景。
     public var backgroundColorHex: String?
+    /// 无排版文档内容的文字颜色；为空时文字跟随系统外观。
+    public var textColorHex: String?
+    /// 无排版文档内容的字体（PostScript 名）；为空时沿用通道默认字体。
+    public var documentFontName: String?
+    /// 无排版文档内容的行间距倍数；为空时沿用通道默认行高。
+    public var documentLineSpacing: Double?
+    /// 无排版文档内容的段落间距（相对字号的倍数）；为空时沿用通道默认段距。
+    public var documentParagraphSpacing: Double?
     public var textPath: String?
     /// SQLite 历史记录保存的真实内容类型；旧 DTO 解码时允许为空并按来源推断。
     public var contentKind: HistoryContentKind?
@@ -179,6 +187,10 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         createdAt: Date? = nil,
         svgColor: String? = nil,
         backgroundColorHex: String? = nil,
+        textColorHex: String? = nil,
+        documentFontName: String? = nil,
+        documentLineSpacing: Double? = nil,
+        documentParagraphSpacing: Double? = nil,
         textPath: String? = nil,
         contentKind: HistoryContentKind? = nil,
         sourceFingerprint: String? = nil,
@@ -217,6 +229,10 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.createdAt = createdAt ?? Date()
         self.svgColor = svgColor
         self.backgroundColorHex = backgroundColorHex
+        self.textColorHex = textColorHex
+        self.documentFontName = documentFontName
+        self.documentLineSpacing = documentLineSpacing
+        self.documentParagraphSpacing = documentParagraphSpacing
         self.textPath = textPath
         self.contentKind = contentKind
         self.sourceFingerprint = sourceFingerprint
@@ -240,7 +256,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textPath, contentKind, sourceFingerprint, storedDisplayTitle, thumbnailPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction
+        case id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, textPath, contentKind, sourceFingerprint, storedDisplayTitle, thumbnailPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction
     }
 
     public init(from decoder: Decoder) throws {
@@ -262,6 +278,10 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
         svgColor = try container.decodeIfPresent(String.self, forKey: .svgColor)
         backgroundColorHex = try container.decodeIfPresent(String.self, forKey: .backgroundColorHex)
+        textColorHex = try container.decodeIfPresent(String.self, forKey: .textColorHex)
+        documentFontName = try container.decodeIfPresent(String.self, forKey: .documentFontName)
+        documentLineSpacing = try container.decodeIfPresent(Double.self, forKey: .documentLineSpacing)
+        documentParagraphSpacing = try container.decodeIfPresent(Double.self, forKey: .documentParagraphSpacing)
         textPath = try container.decodeIfPresent(String.self, forKey: .textPath)
         contentKind = try container.decodeIfPresent(HistoryContentKind.self, forKey: .contentKind)
         sourceFingerprint = try container.decodeIfPresent(String.self, forKey: .sourceFingerprint)
@@ -532,6 +552,19 @@ public class SettingsStore {
         static let mediaPlaybackControlsAutoHideInterval = "mediaPlaybackControlsAutoHideInterval"
         static let mediaSeekStepInterval = "mediaSeekStepInterval"
         static let showsMediaBottomProgressBar = "showsMediaBottomProgressBar"
+        static let documentFontsChineseOnly = "documentFontsChineseOnly"
+    }
+
+    /// 文档样式面板的字体列表是否只显示中文字体；未设置表示按系统语言与正文内容自动判定。
+    var documentFontsChineseOnly: Bool? {
+        get { userDefaults.object(forKey: Keys.documentFontsChineseOnly) as? Bool }
+        set {
+            if let newValue {
+                userDefaults.set(newValue, forKey: Keys.documentFontsChineseOnly)
+            } else {
+                userDefaults.removeObject(forKey: Keys.documentFontsChineseOnly)
+            }
+        }
     }
 
     var navigatorPanelSide: NavigatorPanelSide {

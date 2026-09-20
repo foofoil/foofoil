@@ -1,4 +1,4 @@
-//  DocumentBackgroundColorAdapter.swift
+//  DocumentColorAdapter.swift
 //  foofoil
 //
 //  Created by tolg on 2026/9/18.
@@ -6,9 +6,11 @@
 
 import AppKit
 
-/// 文档内容背景色的明暗镜像：系统外观切换时，把与目标主题明显不符的自选背景色换成同色相的深浅版本。
+/// 文档内容颜色的明暗镜像：系统外观切换时，把与目标主题明显不符的自选颜色换成同色相的深浅版本。
 /// 只翻 HSL 明度（L' = 1 - L），色相、饱和度与透明度都不变，因此来回切换是同一个变换、互为逆运算。
-enum DocumentBackgroundColorAdapter {
+/// 背景色与文字颜色的判定方向相反：背景要求「深色主题配深色背景」，文字要求「深色主题配浅色文字」，
+/// 调用方通过 `forDarkAppearance` 传入该颜色期望配合的主题。
+enum DocumentColorAdapter {
     /// 「明显偏亮 / 明显偏暗」的 HSL 明度阈值；中间色对明暗主题都可读，不做改动。
     static let lightThreshold: CGFloat = 0.7
     static let darkThreshold: CGFloat = 0.3

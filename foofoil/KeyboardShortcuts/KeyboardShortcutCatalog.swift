@@ -69,7 +69,7 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("view.fitImageToWindowWidth", "Fit Image to Window Width", "]", [.command], "Shortcut Scope Images"),
         definition("view.zoomOutWindow", "Zoom Out Window", "-", [.command, .shift]),
         definition("view.zoomInWindow", "Zoom In Window", "+", [.command, .shift]),
-        definition("view.backgroundColor", "Background Color", nil, []),
+        definition("view.documentStyle", "Document Style", "i", [.command]),
         definition("view.increaseOpacity", "Increase Opacity", "\u{F700}", [.command, .shift]),
         definition("view.decreaseOpacity", "Decrease Opacity", "\u{F701}", [.command, .shift])
     ]

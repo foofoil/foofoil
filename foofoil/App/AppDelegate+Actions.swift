@@ -752,8 +752,9 @@ extension AppDelegate {
         activeAppState?.showColorPanel()
     }
 
-    @objc func backgroundColorAction() {
-        activeAppState?.showBackgroundColorPanel()
+    @objc func documentStyleAction() {
+        guard let appState = activeAppState else { return }
+        DocumentStylePanelController.shared.show(for: appState)
     }
 
     @objc func previousPDFPageAction() {

@@ -1392,6 +1392,65 @@ struct FoofoilTests {
         #expect(zoomOutContentItem?.keyEquivalentModifierMask == [.command])
     }
 
+    /// 文档样式面板默认 ⌘I，并且这条命令能在设置里改键（改键后即失效/生效）。
+    @Test func documentStyleShortcutDefaultsToCommandIAndIsConfigurable() throws {
+        let definition = try #require(KeyboardShortcutCatalog.definition(withID: "view.documentStyle"))
+        #expect(definition.defaultShortcut?.keyEquivalent == "i")
+        #expect(definition.defaultShortcut?.modifiers == [.command])
+
+        // 覆盖值存在共享 UserDefaults 里：先记录用户现状，结束时原样还原。
+        let previousOverride = KeyboardShortcutStore.shared.isCustomized(definition)
+            ? KeyboardShortcutStore.shared.shortcut(for: definition)
+            : nil
+        defer {
+            if let previousOverride {
+                KeyboardShortcutStore.shared.setShortcut(previousOverride, for: definition)
+            } else {
+                KeyboardShortcutStore.shared.reset(definition)
+            }
+        }
+
+        let appDelegate = AppDelegate()
+        let commandI = try #require(shortcutEvent("i", modifiers: [.command]))
+        let commandShiftY = try #require(shortcutEvent("y", modifiers: [.command, .shift]))
+
+        // 默认：⌘I 命中这条命令，⌘⇧Y 不命中。
+        KeyboardShortcutStore.shared.reset(definition)
+        #expect(appDelegate.isUsingDefaultShortcut("view.documentStyle"))
+        #expect(appDelegate.matchesConfigurableShortcut(commandI))
+        #expect(!appDelegate.matchesConfigurableShortcut(commandShiftY))
+
+        // 设置里改成 ⌘⇧Y：新键位命中，旧键位不再命中。
+        KeyboardShortcutStore.shared.setShortcut(
+            KeyboardShortcut(keyEquivalent: "y", modifiers: [.command, .shift]),
+            for: definition
+        )
+        #expect(!appDelegate.isUsingDefaultShortcut("view.documentStyle"))
+        #expect(appDelegate.matchesConfigurableShortcut(commandShiftY))
+        #expect(!appDelegate.matchesConfigurableShortcut(commandI))
+
+        // 恢复默认后回到 ⌘I。
+        KeyboardShortcutStore.shared.reset(definition)
+        #expect(appDelegate.matchesConfigurableShortcut(commandI))
+        #expect(!appDelegate.matchesConfigurableShortcut(commandShiftY))
+    }
+
+    /// 合成按键事件，用于核对键位匹配。
+    private func shortcutEvent(_ characters: String, modifiers: NSEvent.ModifierFlags) -> NSEvent? {
+        NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: modifiers,
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: characters,
+            charactersIgnoringModifiers: characters,
+            isARepeat: false,
+            keyCode: 0
+        )
+    }
+
     @Test func navigatorMenuUsesAlwaysShowToggle() throws {
         let appDelegate = AppDelegate()
         appDelegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))

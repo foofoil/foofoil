@@ -18,6 +18,11 @@ struct TextEditorModeView: View {
     @State private var targetRenameConfig: WindowConfig? = nil
     @Environment(\.colorScheme) private var colorScheme
 
+    /// 文本通道（编辑、只读、Markdown）共用的字体：跟随箔的文档字体与字号。
+    private var documentTextFont: NSFont {
+        appState.documentFont(size: CGFloat(appState.textFontSize))
+    }
+
     var body: some View {
         GeometryReader { geometry in
             if geometry.size.width < 100 || geometry.size.height < 100 {
@@ -32,10 +37,20 @@ struct TextEditorModeView: View {
                         WindowDragArea()
 
                         if appState.isMarkdownPreview && appState.isMarkdownDocument && !appState.text.isEmpty {
-                            MarkdownTextView(attributedText: appState.renderedMarkdown, calculatedHeight: $textHeight)
+                            MarkdownTextView(
+                                attributedText: appState.renderedMarkdown,
+                                calculatedHeight: $textHeight,
+                                customTextColor: appState.documentTextColor
+                            )
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else if appState.textURL != nil && !appState.isMarkdownDocument {
-                            ReadOnlyTextView(text: appState.text, fontSize: appState.textFontSize)
+                            ReadOnlyTextView(
+                                text: appState.text,
+                                font: documentTextFont,
+                                textColor: appState.documentTextColor,
+                                lineHeightMultiple: appState.documentLineHeightMultiple,
+                                paragraphSpacingMultiple: appState.documentParagraphSpacingMultiple
+                            )
                                 .padding(8)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                         } else {
@@ -43,6 +58,10 @@ struct TextEditorModeView: View {
                                 text: $appState.text,
                                 calculatedHeight: $textHeight,
                                 fontSize: appState.textFontSize,
+                                font: documentTextFont,
+                                textColor: appState.documentTextColor,
+                                lineHeightMultiple: appState.documentLineHeightMultiple,
+                                paragraphSpacingMultiple: appState.documentParagraphSpacingMultiple,
                                 shouldMaintainFocus: isBlank
                             )
                                 .padding(8)
@@ -201,6 +220,27 @@ struct TextEditorModeView: View {
         }
         // 暗色/亮色切换时重新生成 markdown 富文本，使颜色跟随系统外观
         .onChange(of: colorScheme) { _, _ in
+            if appState.isMarkdownPreview && appState.isMarkdownDocument {
+                appState.refreshMarkdownRendering()
+            }
+        }
+        // 自选文字颜色、字体与行距/段距同样写进富文本，改动后立即重渲染预览
+        .onChange(of: appState.textColorHex) { _, _ in
+            if appState.isMarkdownPreview && appState.isMarkdownDocument {
+                appState.refreshMarkdownRendering()
+            }
+        }
+        .onChange(of: appState.documentFontName) { _, _ in
+            if appState.isMarkdownPreview && appState.isMarkdownDocument {
+                appState.refreshMarkdownRendering()
+            }
+        }
+        .onChange(of: appState.documentLineSpacing) { _, _ in
+            if appState.isMarkdownPreview && appState.isMarkdownDocument {
+                appState.refreshMarkdownRendering()
+            }
+        }
+        .onChange(of: appState.documentParagraphSpacing) { _, _ in
             if appState.isMarkdownPreview && appState.isMarkdownDocument {
                 appState.refreshMarkdownRendering()
             }

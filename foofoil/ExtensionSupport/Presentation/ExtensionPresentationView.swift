@@ -25,6 +25,10 @@ struct ExtensionPresentationView: View {
                         sessionID: session.id,
                         textScale: appState.documentZoom,
                         documentBackgroundHex: appState.contentBackgroundHex,
+                        documentTextColorHex: appState.documentTextColorHex,
+                        documentFontFamily: appState.documentFontFamily,
+                        documentLineHeightMultiple: appState.documentLineHeightMultiple,
+                        documentParagraphSpacingMultiple: appState.documentParagraphSpacingMultiple,
                         initialScrollFile: appState.extensionDocumentScrollFile,
                         initialScrollFraction: appState.extensionDocumentScrollFraction,
                         onScroll: { file, fraction in

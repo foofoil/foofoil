@@ -139,6 +139,10 @@ struct ExtensionDocumentViewTests {
             sessionID: UUID(),
             textScale: 1.0,
             documentBackgroundHex: backgroundHex,
+            documentTextColorHex: nil,
+            documentFontFamily: nil,
+            documentLineHeightMultiple: nil,
+            documentParagraphSpacingMultiple: nil,
             initialScrollFile: nil,
             initialScrollFraction: nil,
             onScroll: { _, _ in }

@@ -1908,6 +1908,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         if let appDelegate = NSApplication.shared.delegate as? AppDelegate {
             // 取色面板是应用级单例：箔窗关闭后必须收起，否则残留的取色会落到其他窗口。
             appDelegate.dismissColorPanel(ownedBy: appState)
+            // 文档样式面板绑定当前箔，箔窗关闭后一并收起。
+            appDelegate.dismissDocumentStylePanel(ownedBy: appState)
             appDelegate.removeWindowController(self)
         }
     }
