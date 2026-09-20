@@ -120,7 +120,7 @@ struct DocumentStyleView: View {
                         select(family: family)
                     } label: {
                         HStack(spacing: 6) {
-                            Text(family.name)
+                            Text(family.displayName)
                                 .lineLimit(1)
                                 .font(previewFont(for: family))
                             Spacer(minLength: 0)
@@ -280,7 +280,11 @@ struct DocumentStyleView: View {
         let families = catalog.families(chineseOnly: chineseOnly)
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return families }
-        return families.filter { $0.name.localizedCaseInsensitiveContains(trimmed) }
+        // 中文字体显示中文名，搜索时同时匹配中文显示名与系统字族名。
+        return families.filter {
+            $0.displayName.localizedCaseInsensitiveContains(trimmed)
+                || $0.name.localizedCaseInsensitiveContains(trimmed)
+        }
     }
 
     private var selectedFamilyMembers: [DocumentFontCatalog.Member] {

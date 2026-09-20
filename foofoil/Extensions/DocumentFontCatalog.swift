@@ -9,12 +9,16 @@ import CoreText
 
 /// 系统已安装字体的目录，供文档样式面板选择。
 /// 列表按字族给出，字族内的字型（Regular/Bold/…）来自 `NSFontManager.availableMembersOfFontFamily`；
+/// 中文字体优先显示中文名（如「苹方-简」），其余沿用字族名；
 /// 「只显示中文字体」按字体是否覆盖常用汉字筛选，而不是只看字体自称的语言。
 @MainActor
 enum DocumentFontCatalog {
     /// 一个字族及其可选字型。
     struct Family: Identifiable, Hashable {
+        /// 系统字族名：用于标识与持久化，不随界面语言变化。
         let name: String
+        /// 显示名：中文字体在有中文名时用中文名（如「苹方-简」），其余沿用字族名。
+        let displayName: String
         let members: [Member]
 
         var id: String { name }
@@ -39,17 +43,20 @@ enum DocumentFontCatalog {
         }
     }
 
-    /// 枚举系统字体；汉字覆盖判定放到后台线程，避免面板打开时卡主线程。
+    /// 枚举系统字体；汉字覆盖判定与中文名解析放到后台线程，避免面板打开时卡主线程。
     static func load() async -> Catalog {
         if let cachedCatalog { return cachedCatalog }
         let enumerated = NSFontManager.shared.availableFontFamilies.map { family in
-            Family(name: family, members: members(of: family))
+            Family(name: family, displayName: family, members: members(of: family))
         }
         let catalog = await Task.detached(priority: .userInitiated) {
-            Catalog(
-                families: enumerated,
-                chineseFamilyNames: Set(enumerated.filter { supportsChinese($0.members) }.map(\.name))
-            )
+            let chineseFamilyNames = Set(enumerated.filter { supportsChinese($0.members) }.map(\.name))
+            let families = enumerated.map { family -> Family in
+                guard chineseFamilyNames.contains(family.name),
+                      let displayName = chineseFamilyName(family.members) else { return family }
+                return Family(name: family.name, displayName: displayName, members: family.members)
+            }
+            return Catalog(families: families, chineseFamilyNames: chineseFamilyNames)
         }.value
         cachedCatalog = catalog
         return catalog
@@ -112,6 +119,23 @@ enum DocumentFontCatalog {
             }
             return glyphs.allSatisfy { $0 != 0 }
         }
+    }
+
+    /// 中文字体的本地化中文名（如「苹方-简」）。
+    /// 只有字体自身带中文本地化、且当前语言列表含中文时才返回中文名；否则返回 nil，由调用方沿用字族名。
+    nonisolated private static func chineseFamilyName(_ members: [Member]) -> String? {
+        for member in members {
+            guard let font = NSFont(name: member.postScriptName, size: 12) else { continue }
+            var language: Unmanaged<CFString>?
+            guard let name = CTFontDescriptorCopyLocalizedAttribute(
+                font.fontDescriptor as CTFontDescriptor,
+                kCTFontFamilyNameAttribute,
+                &language
+            ) as? String else { continue }
+            let tag = language?.takeRetainedValue() as String?
+            if let tag, tag.hasPrefix("zh") { return name }
+        }
+        return nil
     }
 
     private static var cachedCatalog: Catalog?

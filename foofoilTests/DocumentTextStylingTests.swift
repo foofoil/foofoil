@@ -78,16 +78,24 @@ struct DocumentTextStylingTests {
         let catalog = await DocumentFontCatalog.load()
         #expect(catalog.families.count > 20, "字族列表过少：\(catalog.families.count)")
         #expect(catalog.families.contains { $0.members.isEmpty } == false, "存在没有字型的字族")
+        #expect(catalog.families.allSatisfy { !$0.displayName.isEmpty }, "存在空的字体显示名")
 
         let chinese = catalog.families(chineseOnly: true)
         #expect(!chinese.isEmpty, "没有筛出中文字体")
         #expect(chinese.count < catalog.families.count, "中文字体筛选没有生效")
+        // 系统语言含中文时，带中文本地化的中文字体显示中文名，而不是英文字族名。
+        let prefersChinese = Locale.preferredLanguages.contains { $0.hasPrefix("zh") }
         for family in chinese.prefix(5) {
             let font = try #require(NSFont(name: family.members[0].postScriptName, size: 12))
             var characters: [UniChar] = Array("汉字".utf16)
             var glyphs = [CGGlyph](repeating: 0, count: characters.count)
             #expect(CTFontGetGlyphsForCharacters(font as CTFont, &characters, &glyphs, characters.count))
             #expect(glyphs.allSatisfy { $0 != 0 }, "\(family.name) 不含汉字字形")
+
+            if prefersChinese, family.displayName != family.name {
+                let hasHan = family.displayName.unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) }
+                #expect(hasHan, "\(family.name) 的显示名不是中文：\(family.displayName)")
+            }
         }
     }
 
