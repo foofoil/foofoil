@@ -676,7 +676,7 @@ public enum FileListGrouper {
     /// 整批都是音频类时合并为一组，交给列表按直接目录与 CUE / SACD 容器分区。
     static func groups(from urls: [URL]) -> [FileListGroup] {
         let all = uniqued(urls)
-        if !all.isEmpty, all.allSatisfy(isAudioListItem) {
+        if !all.isEmpty, all.allSatisfy({ isAudioListItem($0) }) {
             return [FileListGroup(kind: .listable(.audio), urls: all)]
         }
         let unique = preferredOpenableURLs(from: urls)

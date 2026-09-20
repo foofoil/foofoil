@@ -150,7 +150,7 @@ struct FoilExposeView: View {
                     .onPreferenceChange(ItemFramesPreference.self) { frames in
                         updateVisibleEntries(entries: entries, frames: frames, viewport: geo.frame(in: .global))
                     }
-                    .onChange(of: model.selectedIndex) { newIndex in
+                    .onChange(of: model.selectedIndex) { _, newIndex in
                         // 高亮已在屏内（如翻页重定位）就不滚动，避免打断浏览位置。
                         guard model.currentItems.indices.contains(newIndex),
                               !visibleIndices.contains(newIndex) else { return }
@@ -170,7 +170,7 @@ struct FoilExposeView: View {
                             repositionToFirstVisible()
                         }
                     }
-                    .onChange(of: model.selectedTab) { _ in
+                    .onChange(of: model.selectedTab) { _, _ in
                         scrollPosition.scrollTo(edge: .top)
                         visibleIndices = []
                     }
