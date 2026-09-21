@@ -184,6 +184,11 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     private var isRestoringSavedImageFrame = false
     /// 正在恢复历史窗口框：跳过初始自适应，保留已保存的位置与大小。
     private var pendingSavedFrameRestore = false
+    /// 正在程序化应用历史窗口框：`setFrame(from:)` 会回调 windowWillResize，期间不套用面向拖拽的约束规则。
+    private var isApplyingRestoredFrame = false
+    /// 正在应用的历史窗口框尺寸：`setFrame(from:)` 在从空白箔复用窗口恢复时会向
+    /// windowWillResize 回传非有限尺寸（实测高度为 NaN），此时用保存的尺寸兜底而不是当前窗口尺寸。
+    private var restoringFrameSize: NSSize?
     private var isFirstWebURLChange = true
     private var isRestoringSavedWebFrame = false
     private var pinchResizeInitialSize: NSSize?
@@ -526,18 +531,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                     self.isRestoringFrame = true
                     self.pendingSavedFrameRestore = true
                     DispatchQueue.main.async {
-                        if let window = self.window {
-                            window.setFrame(from: frameString)
-                            // AppKit 从描述符恢复时可能沿用空白视图的高度；显式恢复尺寸，
-                            // 同时保留原生恢复计算出的屏幕位置与窗口顶部。
-                            let values = frameString.split(whereSeparator: { $0.isWhitespace }).prefix(4).compactMap { Double($0) }
-                            if values.count == 4, values.allSatisfy({ $0.isFinite }), values[2] > 0, values[3] > 0 {
-                                var frame = window.frame
-                                frame.origin.y = frame.maxY - values[3]
-                                frame.size = NSSize(width: values[2], height: values[3])
-                                window.setFrame(window.constrainFrameRect(frame, to: window.screen), display: true)
-                            }
-                        }
+                        self.applyRestoredWindowFrame(from: frameString)
                         // 在主线程下一个循环中重置标志位，确保只屏蔽本次因历史记录载入触发的 imageURL 自动大小调整
                         DispatchQueue.main.async {
                             self.isRestoringFrame = false
@@ -1789,6 +1783,15 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     public func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
         guard !appState.isFullScreen, !isTransitioningFullScreen else { return frameSize }
+        // 程序化恢复窗口框（`setFrame(from:)` 也会回调这里）不套用面向拖拽的比例与尺寸规则。
+        if isApplyingRestoredFrame {
+            guard frameSize.width.isFinite, frameSize.height.isFinite,
+                  frameSize.width > 0, frameSize.height > 0 else {
+                // 不能用当前窗口尺寸兜底：那正是“空白箔恢复历史后沿用空白高度”的来源。
+                return restoringFrameSize ?? sender.frame.size
+            }
+            return frameSize
+        }
         return constrainedLiveResizeSize(frameSize, sender: sender, referenceSize: sender.frame.size)
     }
 
@@ -1996,18 +1999,66 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         initializeImageLayout(imageSize: size, animated: animated)
     }
 
+    /// 从历史 `frameDescriptor` 恢复窗口框。
+    ///
+    /// 不能只调用 `setFrame(from:)`：它会把描述符交给 AppKit 的窗口框 + 内容尺寸约束通道——按窗口
+    /// 当时的 `contentMinSize`/`contentMaxSize` 夹取尺寸（从空白箔载入历史时这些约束仍来自空白视图），
+    /// 并向 `windowWillResize` 回传非有限尺寸。因此先让原生恢复算出屏幕位置，再用不受内容约束的
+    /// `setFrame(_:display:)` 显式落回保存的宽高；位置沿用原生结果的顶部与左右边，
+    /// 并夹到窗口最小尺寸与当前屏幕内。
+    /// 两次 setFrame 都会触发 windowDidResize，窗口框保存带 0.2s 去抖，不会额外落盘。
+    private func applyRestoredWindowFrame(from descriptor: String) {
+        guard let window else { return }
+        let savedRect = NSWindow.frameRect(fromDescriptor: descriptor)
+        isApplyingRestoredFrame = true
+        restoringFrameSize = savedRect?.size
+        defer {
+            isApplyingRestoredFrame = false
+            restoringFrameSize = nil
+        }
+
+        window.setFrame(from: descriptor)
+        guard let savedRect else { return }
+
+        var target = window.frame
+        let minSize = minimumWindowSize()
+        target.size = NSSize(
+            width: max(savedRect.size.width, minSize.width),
+            height: max(savedRect.size.height, minSize.height)
+        )
+        // 顶部沿用原生恢复的位置，避免描述符里的屏幕坐标系与当前屏幕不一致时窗口跑出屏幕。
+        target.origin.y = window.frame.maxY - target.height
+
+        guard let screen = targetScreen(for: target) else {
+            window.setFrame(target, display: true)
+            return
+        }
+        window.setFrame(window.constrainFrameRect(target, to: screen), display: true)
+    }
+
+    /// 恢复窗口框时用于约束的屏幕：优先包含目标框顶部左角的屏幕，其次窗口当前屏幕与主屏。
+    private func targetScreen(for frame: NSRect) -> NSScreen? {
+        let topLeft = NSPoint(x: frame.minX, y: frame.maxY)
+        return NSScreen.screens.first { $0.frame.contains(topLeft) }
+            ?? window?.screen
+            ?? NSScreen.main
+    }
+
     /// 历史窗口框已经 setFrame 之后，仅在比例明显不对时按已保存尺寸就近校正。
     private func correctRestoredContentWindowAspect() {
         if appState.isExternalMediaDocument {
+            // 媒体展示尺寸异步读取，等尺寸到达后由 applyMediaPresentationSize 完成校正。
             if let size = currentMediaSize {
                 pendingSavedFrameRestore = false
                 restoreSavedMediaFrameIfNeeded(contentSize: size)
             }
             return
         }
+        // 文本、网页、PDF 与空白箔没有内容尺寸校正，恢复到此结束；残留标记会让后续拖入的图片
+        // 被误判成“仍在恢复历史窗口框”而跳过自动布局。
+        pendingSavedFrameRestore = false
         guard isImageMode, !appState.isPDFDocument, let url = appState.imageURL,
               let size = imageContentSize(at: url) else { return }
-        pendingSavedFrameRestore = false
         restoreSavedMediaFrameIfNeeded(contentSize: size)
     }
 

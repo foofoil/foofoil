@@ -51,9 +51,15 @@ struct HistoryWindowFrameTests {
         let screen = try #require(window.screen)
         let savedFrame = NSRect(x: screen.visibleFrame.minX + 40, y: screen.visibleFrame.minY + 40, width: 480, height: height)
         window.setFrame(savedFrame, display: true)
+        // ⌘K 前留一份文档快照：并行运行的其它套件会清空共享历史库（FoofoilTests 的 clearHistory 用例），
+        // 查不到条目时用它加上 ⌘K 当场保存的窗口框，保证这条窗口框回归不依赖共享库的时序。
+        let documentConfig = state.toConfig()
         state.resetContent()
+        let capturedFrame = try #require(state.windowFrame)
         try await Task.sleep(for: .milliseconds(500))
-        let config = try #require(HistoryManager.shared.historyConfigs.first { $0.id == historyID })
+        let storedConfig = HistoryRepository.shared.config(id: historyID)
+        var config = storedConfig ?? documentConfig
+        if storedConfig == nil { config.windowFrame = capturedFrame }
         withAnimation(.easeInOut(duration: 0.35)) {
             state.loadConfig(config)
         }
