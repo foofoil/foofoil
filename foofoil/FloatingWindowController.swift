@@ -526,7 +526,18 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                     self.isRestoringFrame = true
                     self.pendingSavedFrameRestore = true
                     DispatchQueue.main.async {
-                        self.window?.setFrame(from: frameString)
+                        if let window = self.window {
+                            window.setFrame(from: frameString)
+                            // AppKit 从描述符恢复时可能沿用空白视图的高度；显式恢复尺寸，
+                            // 同时保留原生恢复计算出的屏幕位置与窗口顶部。
+                            let values = frameString.split(whereSeparator: { $0.isWhitespace }).prefix(4).compactMap { Double($0) }
+                            if values.count == 4, values.allSatisfy({ $0.isFinite }), values[2] > 0, values[3] > 0 {
+                                var frame = window.frame
+                                frame.origin.y = frame.maxY - values[3]
+                                frame.size = NSSize(width: values[2], height: values[3])
+                                window.setFrame(window.constrainFrameRect(frame, to: window.screen), display: true)
+                            }
+                        }
                         // 在主线程下一个循环中重置标志位，确保只屏蔽本次因历史记录载入触发的 imageURL 自动大小调整
                         DispatchQueue.main.async {
                             self.isRestoringFrame = false
