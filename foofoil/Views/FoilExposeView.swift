@@ -452,7 +452,7 @@ struct FoilExposeItemView: View {
     var isHighlighted: Bool = false
     /// 动态编号：随滚动实时变化，只有当前可见项才有编号。
     var shortcut: String?
-    /// 搜索输入状态：编号直选需要 ⌥，角标同步显示修饰键。
+    /// 搜索输入状态：编号直选需要 ⌃，角标同步显示修饰键。
     var showsSearchModifier: Bool = false
     var onSelect: () -> Void
 
@@ -488,7 +488,7 @@ struct FoilExposeItemView: View {
 
     private var accessibilityLabel: String {
         guard let shortcut else { return item.title }
-        return "\(showsSearchModifier ? "⌥" : "")\(shortcut) \(item.title)"
+        return "\(showsSearchModifier ? "⌃" : "")\(shortcut) \(item.title)"
     }
 
     private var thumbnail: some View {
@@ -575,7 +575,7 @@ struct FoilExposeItemView: View {
         if let shortcut {
             VStack {
                 HStack {
-                    Text(showsSearchModifier ? "⌥\(shortcut)" : shortcut)
+                    Text(showsSearchModifier ? "⌃\(shortcut)" : shortcut)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                         .padding(.horizontal, 7)

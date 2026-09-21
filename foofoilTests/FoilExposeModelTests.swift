@@ -39,7 +39,6 @@ struct FoilExposeModelTests {
         #expect(model.currentItems.count == 8)
         #expect(model.currentItems.prefix(6).allSatisfy { !$0.isHistoryEntry })
         #expect(model.currentItems.suffix(2).allSatisfy { $0.isHistoryEntry })
-        #expect(model.historyStartIndex == 6)
     }
 
     @Test func historyEntriesAlreadyOpenAreNotShownTwice() {
@@ -53,7 +52,6 @@ struct FoilExposeModelTests {
         )
         #expect(model.currentItems.count == 2)
         #expect(model.currentItems.filter { $0.id == openID }.count == 1)
-        #expect(model.historyStartIndex == 1)
         #expect(model.currentItems.last?.title == "Archive")
     }
 
@@ -104,7 +102,6 @@ struct FoilExposeModelTests {
         model.searchText = "alphab"
         #expect(model.selectedIndex == 0)
         #expect(model.currentItems.map(\.title) == ["Alphabet"])
-        #expect(model.historyStartIndex == 0)
     }
 
     @Test func searchIsCaseAndWhitespaceInsensitive() {
@@ -138,22 +135,6 @@ struct FoilExposeModelTests {
         #expect(model.searchQuery.isEmpty)
         #expect(model.currentItems.count == 8)
         #expect(model.selectedIndex == 0)
-    }
-
-    @Test func focusFirstHistoryEntryMovesHighlightToHistory() {
-        let model = makeModel()
-        #expect(model.focusFirstHistoryEntry())
-        #expect(model.selectedIndex == 6)
-        #expect(model.highlightedItem?.isHistoryEntry == true)
-    }
-
-    @Test func focusFirstHistoryEntryFailsWhenFilteredOut() {
-        let model = FoilExposeModel(
-            items: [makeItem(title: "Open")],
-            historyItems: [makeItem(title: "Archive", isHistoryEntry: true)]
-        )
-        model.searchText = "open"
-        #expect(model.focusFirstHistoryEntry() == false)
     }
 
     @Test func itemForKeyOnlyMatchesVisibleEntries() {

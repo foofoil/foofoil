@@ -481,7 +481,7 @@ extension AppDelegate {
         windowMenu.addItem(hideAppItem)
 
         let showAllFoilsItem = NSMenuItem(
-            title: NSLocalizedString("Show All Foils", comment: ""),
+            title: NSLocalizedString("Foil Overview", comment: ""),
             action: #selector(showAllFoilsAction),
             keyEquivalent: ""
         )
@@ -489,16 +489,6 @@ extension AppDelegate {
         showAllFoilsItem.representedObject = "window.showAllFoils"
         showAllFoilsItem.target = self
         windowMenu.addItem(showAllFoilsItem)
-
-        let showHistoryFoilsItem = NSMenuItem(
-            title: NSLocalizedString("Show History Foils", comment: ""),
-            action: #selector(showHistoryFoilsAction),
-            keyEquivalent: ""
-        )
-        showHistoryFoilsItem.withSymbol("clock")
-        showHistoryFoilsItem.representedObject = "window.showHistoryFoils"
-        showHistoryFoilsItem.target = self
-        windowMenu.addItem(showHistoryFoilsItem)
 
         windowMenu.addItem(NSMenuItem.separator())
 

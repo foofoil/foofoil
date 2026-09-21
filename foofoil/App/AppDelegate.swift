@@ -130,7 +130,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         // 2. 动态创建 macOS 菜单项 (延时到主线程下一个循环，确保在 SwiftUI 初始化菜单之后执行)
-        // 全局热键 ⌃⌥F 在启动时注册，浮箔未激活时也能唤起“显示所有箔片”。
+        // 全局热键 ⌃⇧⎋ 在启动时注册，浮箔未激活时也能唤起“浮箔总览”。
         FoilExposeController.shared.installGlobalHotKey()
         DispatchQueue.main.async {
             self.setupMainMenu()

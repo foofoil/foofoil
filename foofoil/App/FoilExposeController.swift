@@ -100,11 +100,6 @@ final class FoilExposeModel: ObservableObject {
         return combined.filter { $0.matches(query: searchQuery) }
     }
 
-    /// 当前列表里第一条历史记录的下标；没有可见历史条目时为 nil。
-    var historyStartIndex: Int? {
-        currentItems.firstIndex { $0.isHistoryEntry }
-    }
-
     /// 高亮条目：越界时回退到第一项。
     var highlightedItem: FoilExposeItem? {
         let items = currentItems
@@ -131,14 +126,6 @@ final class FoilExposeModel: ObservableObject {
         searchText = ""
         isSearching = false
         selectedIndex = 0
-    }
-
-    /// “显示历史箔片”入口：把高亮移到第一条历史记录；没有可见历史条目时返回 false。
-    @discardableResult
-    func focusFirstHistoryEntry() -> Bool {
-        guard let index = historyStartIndex else { return false }
-        selectedIndex = index
-        return true
     }
 
     /// 移动键盘高亮，左右逐项、上下跨一行，越界时夹紧。
@@ -209,7 +196,7 @@ final class FoilExposePanel: NSPanel {
 
 /// 自建 App Exposé：为每个屏幕铺一块覆盖层，打开的箔片在前、历史记录另起一行在后（半透明区分）。
 /// 打开的箔片展示各窗口的历史缩略图；历史记录展示全部历史配置，选中即恢复为新箔片。
-/// 支持 “/” 进入的关键字搜索，搜索输入时数字/字母直选改用 ⌥ 修饰。
+/// 支持 “/” 进入的关键字搜索，搜索输入时数字/字母直选改用 ⌃ 修饰。
 /// 只复用历史缩略图，不抓新截图；不使用屏幕录制、辅助功能、输入监控或私有 API。
 @MainActor
 final class FoilExposeController {
@@ -219,7 +206,6 @@ final class FoilExposeController {
     private var model: FoilExposeModel?
     private var keyMonitor: Any?
     private var showAllHotKeyRef: EventHotKeyRef?
-    private var showHistoryHotKeyRef: EventHotKeyRef?
     private var hotKeyHandler: EventHandlerRef?
 
     private init() {
@@ -240,7 +226,7 @@ final class FoilExposeController {
 
     var isShowing: Bool { model != nil }
 
-    /// 启动入口：安装事件处理器并按当前配置注册“显示所有箔片/历史箔片”的全局热键。
+    /// 启动入口：安装事件处理器并按当前配置注册“浮箔总览”的全局热键。
     /// 经 Carbon RegisterEventHotKey，浮箔未激活时也能唤起覆盖层；不需要输入监控或辅助功能权限。
     func installGlobalHotKey() {
         installEventHandlerIfNeeded()
@@ -255,12 +241,7 @@ final class FoilExposeController {
             _ = UnregisterEventHotKey(showAllHotKeyRef)
             self.showAllHotKeyRef = nil
         }
-        if let showHistoryHotKeyRef {
-            _ = UnregisterEventHotKey(showHistoryHotKeyRef)
-            self.showHistoryHotKeyRef = nil
-        }
         showAllHotKeyRef = registerGlobalHotKey(definitionID: "window.showAllFoils", id: 1)
-        showHistoryHotKeyRef = registerGlobalHotKey(definitionID: "window.showHistoryFoils", id: 2)
     }
 
     private func registerGlobalHotKey(definitionID: String, id: UInt32) -> EventHotKeyRef? {
@@ -281,7 +262,7 @@ final class FoilExposeController {
             &hotKey
         )
         guard status == noErr else {
-            NSLog("显示所有箔片：全局热键注册失败（%d，命令 %@）", status, definitionID)
+            NSLog("浮箔总览：全局热键注册失败（%d，命令 %@）", status, definitionID)
             return nil
         }
         return hotKey
@@ -296,23 +277,9 @@ final class FoilExposeController {
         var handler: EventHandlerRef?
         let status = InstallEventHandler(
             GetApplicationEventTarget(),
-            { _, event, _ in
-                var hotKeyID = EventHotKeyID()
-                GetEventParameter(
-                    event,
-                    EventParamName(kEventParamDirectObject),
-                    EventParamType(typeEventHotKeyID),
-                    nil,
-                    MemoryLayout<EventHotKeyID>.size,
-                    nil,
-                    &hotKeyID
-                )
+            { _, _, _ in
                 MainActor.assumeIsolated {
-                    if hotKeyID.id == 2 {
-                        FoilExposeController.shared.handleHistoryHotKey()
-                    } else {
-                        FoilExposeController.shared.handleGlobalHotKey()
-                    }
+                    FoilExposeController.shared.handleGlobalHotKey()
                 }
                 return noErr
             },
@@ -322,7 +289,7 @@ final class FoilExposeController {
             &handler
         )
         guard status == noErr else {
-            NSLog("显示所有箔片：全局热键事件处理器安装失败（%d）", status)
+            NSLog("浮箔总览：全局热键事件处理器安装失败（%d）", status)
             return
         }
         hotKeyHandler = handler
@@ -333,24 +300,12 @@ final class FoilExposeController {
         toggle()
     }
 
-    /// “显示历史箔片”入口：未展示时打开覆盖层并高亮第一条历史记录；已展示时移向历史区，
-    /// 已在历史区时再按一次退出。
-    func handleHistoryHotKey() {
-        if isShowing, let model {
-            if model.highlightedItem?.isHistoryEntry == true || !model.focusFirstHistoryEntry() {
-                dismiss()
-            }
-        } else {
-            show(focusingHistory: true)
-        }
-    }
-
     /// 菜单入口：未展示时打开覆盖层，已展示时关闭。
     func toggle() {
         isShowing ? dismiss() : show()
     }
 
-    func show(focusingHistory: Bool = false) {
+    func show() {
         guard !isShowing,
               let appDelegate = NSApplication.shared.delegate as? AppDelegate else { return }
         // 没有任何箔窗口时也展示覆盖层：每个屏幕放一张“新建空白箔”占位卡。
@@ -358,9 +313,6 @@ final class FoilExposeController {
             items: Self.collectItems(from: appDelegate.windowControllers),
             historyItems: Self.collectHistoryItems()
         )
-        if focusingHistory {
-            model.focusFirstHistoryEntry()
-        }
         model.onSelect = { [weak self] item in self?.select(item) }
         model.onDismiss = { [weak self] in self?.dismiss() }
         self.model = model
@@ -535,14 +487,8 @@ final class FoilExposeController {
             if hasCommand {
                 return event
             }
-            // 搜索输入状态下，数字/字母直选改为 ⌥ 修饰；未命中条目的 ⌥ 组合仍放行给菜单快捷键。
+            // 带 ⌥ 的按键放行给菜单快捷键（如再次触发的 ⌥⇧⎋）。
             if hasOption {
-                if model.isSearching, !hasControl,
-                   let key = event.charactersIgnoringModifiers,
-                   let item = model.item(forKey: key) {
-                    self.select(item)
-                    return nil
-                }
                 return event
             }
             if event.keyCode == 53 { // Esc：搜索状态下只退出搜索输入，否则关闭覆盖层
@@ -554,9 +500,17 @@ final class FoilExposeController {
                 self.dismiss()
                 return nil
             }
-            // 搜索输入时 Ctrl 组合交给输入框做文本编辑（如 Ctrl+A/E）；非搜索状态沿用行首/行尾与方向移动。
+            // 搜索输入时 ⌃ 组合优先用于数字/字母直选；未命中条目的 ⌃ 组合交给输入框做文本编辑（如 ⌃A/E），
+            // 非搜索状态沿用行首/行尾与方向移动。
             if hasControl {
-                if model.isSearching { return event }
+                if model.isSearching {
+                    if let key = event.charactersIgnoringModifiers,
+                       let item = model.item(forKey: key) {
+                        self.select(item)
+                        return nil
+                    }
+                    return event
+                }
                 guard let key = event.charactersIgnoringModifiers?.lowercased() else { return event }
                 switch key {
                 case "a": model.moveSelectionToRowStart()
@@ -621,13 +575,8 @@ final class FoilExposeController {
 }
 
 extension AppDelegate {
-    /// “窗口”菜单的 Exposé 动作入口。
+    /// “窗口”菜单的浮箔总览动作入口。
     @objc func showAllFoilsAction() {
         FoilExposeController.shared.toggle()
-    }
-
-    /// “窗口”菜单的“显示历史箔片”动作入口。
-    @objc func showHistoryFoilsAction() {
-        FoilExposeController.shared.handleHistoryHotKey()
     }
 }
