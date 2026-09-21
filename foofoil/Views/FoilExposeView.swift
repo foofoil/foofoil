@@ -100,32 +100,34 @@ private struct ItemFrameReporter: View {
     }
 }
 
-/// 覆盖层主体：深色半透明背景 + 标题/标签页 + 自适应网格缩略图；点击背景关闭。
-/// 两个标签页：打开的箔片 / 历史记录；编号随滚动实时重排，保证可见项都有编号。
+/// 覆盖层主体：深色半透明背景 + 标题/搜索控件 + 自适应网格缩略图；点击背景关闭。
+/// 只在当前活跃显示器上展示，包含全部打开的箔片；历史记录另起一行在后（半透明区分）。
+/// 编号随滚动实时重排，保证可见项都有编号。
 struct FoilExposeView: View {
     @ObservedObject var model: FoilExposeModel
-    let screen: NSScreen
 
     private static let gridColumns = [
         GridItem(.adaptive(minimum: 232, maximum: 300), spacing: 18)
     ]
 
-    /// 本屏当前可见条目的全局下标（显示顺序）；编号与编号直选都据此实时计算。
+    /// 当前可见条目的下标（显示顺序）；编号与编号直选都据此实时计算。
     @State private var visibleIndices: [Int] = []
     @State private var repositionAfterPageScroll = false
     @State private var scrollPosition = ScrollPosition()
     @State private var contentOffsetY: CGFloat = 0
     @State private var headerHeight: CGFloat = 0
+    @FocusState private var isSearchFieldFocused: Bool
 
     var body: some View {
-        let entries = model.currentEntries(for: screen)
+        let entries: [(offset: Int, item: FoilExposeItem)] = model.currentItems.enumerated()
+            .map { (offset: $0.offset, item: $0.element) }
         let shortcutByID = Self.shortcutByID(for: entries, visibleIndices: visibleIndices)
         ZStack {
             Rectangle().fill(.ultraThinMaterial)
             Rectangle().fill(Color.black.opacity(0.42))
 
             GeometryReader { geo in
-                // 标题/标签页固定在顶部，不随内容多少或滚动而移动；只有网格区域滚动。
+                // 标题/搜索控件固定在顶部，不随内容多少或滚动而移动；只有网格区域滚动。
                 let scrollAreaHeight = max(0, geo.size.height - headerHeight)
                 VStack(spacing: 0) {
                     header
@@ -157,8 +159,7 @@ struct FoilExposeView: View {
                         scrollPosition.scrollTo(id: model.currentItems[newIndex].id, anchor: .center)
                     }
                     .onChange(of: model.pageScrollRequest) {
-                        guard let request = model.pageScrollRequest,
-                              request.screenID == ObjectIdentifier(screen) else { return }
+                        guard let request = model.pageScrollRequest else { return }
                         // 整页滚动按网格区域高度（留出边距）计算。
                         let page = max(160, scrollAreaHeight - 160)
                         let target = contentOffsetY + (request.direction == .down ? page : -page)
@@ -170,15 +171,30 @@ struct FoilExposeView: View {
                             repositionToFirstVisible()
                         }
                     }
-                    .onChange(of: model.selectedTab) { _, _ in
+                    .onChange(of: model.searchText) { _, _ in
+                        // 关键字变化后结果集重排，回到顶部；可见编号由外框回调自然重算。
+                        repositionAfterPageScroll = false
                         scrollPosition.scrollTo(edge: .top)
-                        visibleIndices = []
                     }
                 }
             }
         }
-        // 卡片按钮在自己的命中区内优先生效；落在空白处的点击交给背景关闭覆盖层。
-        .onTapGesture { model.onDismiss() }
+        // 卡片按钮在自己的命中区内优先生效；落在空白处的点击先退出搜索输入，否则关闭覆盖层。
+        .onTapGesture {
+            if model.isSearching {
+                model.endSearch()
+            } else {
+                model.onDismiss()
+            }
+        }
+        .onChange(of: model.isSearching) { _, searching in
+            // 条件插入的输入框需要显式取焦点；AppKit 第一响应者由聚焦探针兜底。
+            isSearchFieldFocused = searching
+        }
+        .onChange(of: model.searchFieldFocusRequest) { _, _ in
+            guard model.isSearching else { return }
+            isSearchFieldFocused = true
+        }
         .ignoresSafeArea()
     }
 
@@ -195,7 +211,7 @@ struct FoilExposeView: View {
         if indices != visibleIndices {
             visibleIndices = indices
         }
-        model.setVisibleIDs(visible.map(\.item.id), for: screen)
+        model.setVisibleIDs(visible.map(\.item.id))
         // 实际列数从卡片外框推导：同一行的卡片 y 相同，数一数即可，不依赖布局估算公式。
         if !frames.isEmpty {
             let rows = Dictionary(grouping: frames.values) { $0.minY.rounded() }
@@ -238,37 +254,64 @@ struct FoilExposeView: View {
         shortcutByID: [UUID: String]
     ) -> some View {
         if entries.isEmpty {
-            Text(model.selectedTab == .history
-                 ? NSLocalizedString("No History", comment: "")
-                 : NSLocalizedString("No Foils on This Screen", comment: ""))
+            Text(model.searchQuery.isEmpty
+                 ? NSLocalizedString("No Foils on This Screen", comment: "")
+                 : NSLocalizedString("No Search Results", comment: ""))
                 .font(.system(size: 15))
                 .foregroundStyle(.white.opacity(0.6))
                 .padding(.top, 120)
         } else {
-            LazyVGrid(columns: Self.gridColumns, spacing: 18) {
-                ForEach(entries, id: \.item.id) { entry in
-                    FoilExposeItemView(
-                        item: entry.item,
-                        isHighlighted: entry.offset == model.selectedIndex,
-                        shortcut: shortcutByID[entry.item.id]
-                    ) {
-                        model.onSelect(entry.item)
-                    }
-                    .background(ItemFrameReporter(id: entry.item.id))
+            let openEntries = entries.filter { !$0.item.isHistoryEntry }
+            let historyEntries = entries.filter { $0.item.isHistoryEntry }
+            VStack(spacing: 18) {
+                if !openEntries.isEmpty {
+                    grid(for: openEntries, shortcutByID: shortcutByID)
+                }
+                if !historyEntries.isEmpty {
+                    // 历史记录另起一行，并降低透明度与打开的箔片区分；高亮项保持完整亮度。
+                    grid(for: historyEntries, shortcutByID: shortcutByID, dimsHistory: true)
                 }
             }
         }
     }
 
+    private func grid(
+        for entries: [(offset: Int, item: FoilExposeItem)],
+        shortcutByID: [UUID: String],
+        dimsHistory: Bool = false
+    ) -> some View {
+        LazyVGrid(columns: Self.gridColumns, spacing: 18) {
+            ForEach(entries, id: \.item.id) { entry in
+                FoilExposeItemView(
+                    item: entry.item,
+                    isHighlighted: entry.offset == model.selectedIndex,
+                    shortcut: shortcutByID[entry.item.id],
+                    showsSearchModifier: model.isSearching
+                ) {
+                    model.onSelect(entry.item)
+                }
+                .background(ItemFrameReporter(id: entry.item.id))
+                .opacity(dimsHistory && entry.offset != model.selectedIndex ? 0.72 : 1)
+            }
+        }
+    }
+
     private var header: some View {
-        VStack(spacing: 6) {
-            Text(Self.headerTitle)
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.white)
-            tabBar
-            Text("Show All Foils Hint")
-                .font(.system(size: 13))
-                .foregroundStyle(.white.opacity(0.62))
+        VStack(spacing: 8) {
+            HStack(spacing: 14) {
+                Text(Self.headerTitle)
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(.white)
+                searchControl
+            }
+            HStack(spacing: 16) {
+                Text(model.isSearching
+                     ? NSLocalizedString("Search Foils Hint", comment: "")
+                     : NSLocalizedString("Show All Foils Hint", comment: ""))
+                Text("Tip: Command-Shift-V opens clipboard content")
+            }
+            .font(.system(size: 13))
+            .foregroundStyle(.white.opacity(0.62))
         }
         .padding(.top, 30)
         .padding(.bottom, 20)
@@ -276,30 +319,73 @@ struct FoilExposeView: View {
         .contentShape(Rectangle())
     }
 
-    /// 两个标签页：打开的箔片 / 历史记录；点击或 Tab 键循环切换。
-    private var tabBar: some View {
-        HStack(spacing: 10) {
-            ForEach(FoilExposeTab.allCases, id: \.rawValue) { tab in
-                let isSelected = model.selectedTab == tab
+    /// 标题后的搜索入口：默认是“/ 搜索”键帽提示，按 / 或点击后变成输入框；
+    /// 退出输入后保留结果，提示位置显示 “xxx”的搜索结果 与清除按钮。
+    @ViewBuilder
+    private var searchControl: some View {
+        if model.isSearching {
+            HStack(spacing: 7) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.55))
+                TextField(NSLocalizedString("Search Foils Placeholder", comment: ""), text: $model.searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white)
+                    // 不设置 tint：白色 tint 会把选区高亮一并染白，导致选中文字不可见。
+                    .frame(width: 200)
+                    .focused($isSearchFieldFocused)
+                    .background(
+                        SearchFieldFocusProbe(
+                            isActive: model.isSearching,
+                            focusRequest: model.searchFieldFocusRequest
+                        )
+                        .frame(width: 0, height: 0)
+                    )
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(Color.white.opacity(0.14)))
+            .overlay(Capsule().stroke(Color.white.opacity(0.32), lineWidth: 1))
+            .environment(\.colorScheme, .dark)
+        } else if model.searchQuery.isEmpty {
+            Button {
+                model.beginSearch()
+            } label: {
+                HStack(spacing: 7) {
+                    Text("/")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(minWidth: 20)
+                        .padding(.vertical, 3)
+                        .background(RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(0.16)))
+                        .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.white.opacity(0.35), lineWidth: 1))
+                    Text(NSLocalizedString("Search Foils", comment: ""))
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.75))
+                }
+            }
+            .buttonStyle(.plain)
+            .help(NSLocalizedString("Search Foils", comment: ""))
+            .accessibilityLabel(NSLocalizedString("Search Foils Placeholder", comment: ""))
+        } else {
+            HStack(spacing: 8) {
+                Text(String(format: NSLocalizedString("Search Foils Results Format", comment: ""), model.searchQuery))
+                    .font(.system(size: 14))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineLimit(1)
                 Button {
-                    model.switchTab(to: tab)
+                    model.clearSearch()
                 } label: {
-                    Text(tab.title)
-                        .font(.system(size: 15, weight: isSelected ? .semibold : .regular))
-                        .foregroundStyle(isSelected ? Color.white : Color.white.opacity(0.55))
-                        .padding(.horizontal, 18)
-                        .padding(.vertical, 7)
-                        .background(
-                            Capsule().fill(Color.white.opacity(isSelected ? 0.18 : 0.06))
-                        )
-                        .overlay(
-                            Capsule().stroke(Color.white.opacity(isSelected ? 0.35 : 0.12), lineWidth: 1)
-                        )
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.white.opacity(0.6))
                 }
                 .buttonStyle(.plain)
+                .help(NSLocalizedString("Clear", comment: ""))
+                .accessibilityLabel(NSLocalizedString("Clear", comment: ""))
             }
         }
-        .padding(.vertical, 2)
     }
 
     /// 覆盖层标题使用应用显示名（中文环境为“浮箔”），与 App 菜单名称保持一致。
@@ -309,13 +395,65 @@ struct FoilExposeView: View {
         ?? "foofoil"
 }
 
-/// 覆盖层中的单个箔片卡片：缩略图 + 快捷键角标 + 标题，悬停/按压反馈对齐 HistoryCardView。
+/// SwiftUI 条件插入的搜索输入框上 FocusState 偶尔无法落到 AppKit 第一响应者（面板尚未成为
+/// key window 时尤其明显）；该探针直接在面板里找到输入框并设置第一响应者，作为兜底。
+/// 对尚未成为 key 的窗口设置第一响应者同样有效，面板成为 key 后按键即进入输入框。
+private struct SearchFieldFocusProbe: NSViewRepresentable {
+    let isActive: Bool
+    /// 聚焦请求序号：值变化会驱动一次视图更新，面板刚成为 key window 时据此重试聚焦。
+    let focusRequest: UInt64
+
+    func makeNSView(context: Context) -> NSView {
+        NSView(frame: .zero)
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        guard isActive else { return }
+        // 更新期间不改第一响应者；输入框可能尚未建好，等本次更新结束后短暂重试。
+        DispatchQueue.main.async {
+            Self.focusSearchField(in: nsView.window, retries: 3)
+        }
+    }
+
+    private static func focusSearchField(in window: NSWindow?, retries: Int) {
+        guard let window, window is FoilExposePanel else { return }
+        if window.firstResponder is NSTextView { return }
+        if let field = firstEditableTextField(in: window) {
+            _ = window.makeFirstResponder(field)
+            if window.firstResponder is NSTextView { return }
+        }
+        guard retries > 0 else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+            focusSearchField(in: window, retries: retries - 1)
+        }
+    }
+
+    /// 覆盖层面板中唯一可编辑的输入框就是搜索框，按前序遍历取第一个即可。
+    private static func firstEditableTextField(in window: NSWindow) -> NSTextField? {
+        guard let contentView = window.contentView else { return nil }
+        return firstEditableTextField(in: contentView)
+    }
+
+    private static func firstEditableTextField(in view: NSView) -> NSTextField? {
+        if let field = view as? NSTextField, field.isEditable {
+            return field
+        }
+        for subview in view.subviews {
+            if let found = firstEditableTextField(in: subview) { return found }
+        }
+        return nil
+    }
+}
+
+/// 覆盖层中的单个箔片卡片：缩略图 + 类型图标 + 快捷键角标 + 标题，悬停/按压反馈对齐 HistoryCardView。
 /// 键盘高亮与鼠标悬停使用同等的放大反馈，高亮另以更亮的描边区分。
 struct FoilExposeItemView: View {
     let item: FoilExposeItem
     var isHighlighted: Bool = false
     /// 动态编号：随滚动实时变化，只有当前可见项才有编号。
     var shortcut: String?
+    /// 搜索输入状态：编号直选需要 ⌥，角标同步显示修饰键。
+    var showsSearchModifier: Bool = false
     var onSelect: () -> Void
 
     @State private var isHovered = false
@@ -350,7 +488,7 @@ struct FoilExposeItemView: View {
 
     private var accessibilityLabel: String {
         guard let shortcut else { return item.title }
-        return "\(shortcut) \(item.title)"
+        return "\(showsSearchModifier ? "⌥" : "")\(shortcut) \(item.title)"
     }
 
     private var thumbnail: some View {
@@ -366,7 +504,9 @@ struct FoilExposeItemView: View {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                typeIconBadge
             } else {
+                // 没有缩略图时用大号类型图标占位，仍能看出内容类型。
                 Image(systemName: item.symbolName)
                     .font(.system(size: 34))
                     .foregroundStyle(.white.opacity(0.55))
@@ -398,28 +538,36 @@ struct FoilExposeItemView: View {
         }
     }
 
-    /// 叠在缩略图上的播放标记：打开的音视频箔片正在播放时显示与音频列表当前曲目一致的
-    /// 动态频率柱状图（替换原静态图标）；暂停回退静态图标，历史条目等无窗口卡片保持静态。
+    /// 缩略图左下角的类型图标：叠加在缩略图上标明内容类型，避免只靠画面猜内容。
+    private var typeIconBadge: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Image(systemName: item.symbolName)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .frame(width: 22, height: 22)
+                    .background(Circle().fill(Color.black.opacity(0.55)))
+                    .overlay(Circle().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
+                Spacer()
+            }
+        }
+        .padding(7)
+        .accessibilityHidden(true)
+    }
+
+    /// 打开的音视频箔片正在播放时，叠加与音频列表当前曲目一致的动态频率柱状图；
+    /// 暂停与历史条目不再叠加居中静态图标，类型信息由左下角类型图标承担。
     @ViewBuilder
     private var mediaKindOverlay: some View {
         if let appState = item.controller?.appState,
-           item.contentKind == .audio || item.contentKind == .video {
-            FoilExposeMediaBadge(
-                appState: appState,
-                contentKind: item.contentKind,
-                showsStaticIcon: thumbnailLoader.image != nil
-            )
-        } else if thumbnailLoader.image != nil,
-                  item.contentKind == .audio || item.contentKind == .video {
-            staticKindIcon
+           item.contentKind == .audio || item.contentKind == .video,
+           appState.isMediaPlaying {
+            MediaPlaybackBars(isPlaying: true)
+                // 覆盖层卡片远大于导航行，柱状图等比放大并加投影保证可读。
+                .scaleEffect(1.6)
+                .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
         }
-    }
-
-    private var staticKindIcon: some View {
-        Image(systemName: item.contentKind == .audio ? "music.note" : "play.fill")
-            .font(.system(size: 28, weight: .semibold))
-            .foregroundStyle(.white.opacity(0.85))
-            .shadow(color: .black.opacity(0.5), radius: 3, y: 1)
     }
 
     @ViewBuilder
@@ -427,7 +575,7 @@ struct FoilExposeItemView: View {
         if let shortcut {
             VStack {
                 HStack {
-                    Text(shortcut)
+                    Text(showsSearchModifier ? "⌥\(shortcut)" : shortcut)
                         .font(.system(size: 11, weight: .bold, design: .rounded))
                         .foregroundColor(.white)
                         .padding(.horizontal, 7)
@@ -455,27 +603,5 @@ private struct FoilExposeCardButtonStyle: ButtonStyle {
         configuration.label
             .scaleEffect(configuration.isPressed ? 0.97 : 1.0)
             .animation(.interactiveSpring(response: 0.12, dampingFraction: 0.8), value: configuration.isPressed)
-    }
-}
-
-/// 打开的音视频箔片的播放标记：订阅 AppState 的播放状态，
-/// 播放时显示动态频率柱状图（与音频列表当前曲目一致），暂停时回退静态类型图标。
-private struct FoilExposeMediaBadge: View {
-    @ObservedObject var appState: AppState
-    let contentKind: HistoryContentKind
-    var showsStaticIcon: Bool
-
-    var body: some View {
-        if appState.isMediaPlaying {
-            MediaPlaybackBars(isPlaying: true)
-                // 覆盖层卡片远大于导航行，柱状图等比放大并加投影保证可读。
-                .scaleEffect(1.6)
-                .shadow(color: .black.opacity(0.55), radius: 3, y: 1)
-        } else if showsStaticIcon {
-            Image(systemName: contentKind == .audio ? "music.note" : "play.fill")
-                .font(.system(size: 28, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.85))
-                .shadow(color: .black.opacity(0.5), radius: 3, y: 1)
-        }
     }
 }

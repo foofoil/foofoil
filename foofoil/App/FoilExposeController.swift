@@ -25,26 +25,12 @@ enum FoilExposeMoveDirection: Equatable {
     case up, down, left, right
 }
 
-/// 覆盖层的两个标签页：打开的箔片与历史记录。
-enum FoilExposeTab: Int, CaseIterable {
-    case openFoils
-    case history
-
-    var title: String {
-        switch self {
-        case .openFoils: return NSLocalizedString("Open Foils", comment: "")
-        case .history: return NSLocalizedString("History", comment: "")
-        }
-    }
-}
-
 /// 覆盖层中一个箔片的快照：打开的箔片收集自 AppDelegate.windowControllers，展示信息取自历史配置。
 /// controller 为 nil 表示占位卡（新建空白箔）或历史记录条目（isHistoryEntry）。
 struct FoilExposeItem: Identifiable {
     let id: UUID
     let controller: FloatingWindowController?
     let isHistoryEntry: Bool
-    let screen: NSScreen
     let title: String
     let symbolName: String
     let contentKind: HistoryContentKind
@@ -52,53 +38,71 @@ struct FoilExposeItem: Identifiable {
 
     var window: NSWindow? { controller?.window }
     var isNewFoil: Bool { controller == nil && !isHistoryEntry }
+
+    /// 关键字匹配：标题不区分大小写与变音符号的包含匹配。
+    func matches(query: String) -> Bool {
+        title.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+    }
 }
 
-/// 面板视图回传的整页滚动请求：token 区分相邻两次请求，screenID 限定只由目标屏幕的面板执行。
+/// 面板视图回传的整页滚动请求：token 区分相邻两次请求。
 struct FoilExposePageScrollRequest: Equatable {
     let direction: FoilExposeMoveDirection
-    let screenID: ObjectIdentifier
     let token: UUID
 }
 
-/// 覆盖层的共享模型：每个屏幕一个面板视图，键盘监听与选择回调共用同一份条目。
+/// 覆盖层的共享模型：覆盖层只在当前活跃显示器上展示一块面板，键盘监听与选择回调共用同一份条目。
+/// 打开的箔片在前、历史记录在后的统一列表；关键字搜索即时过滤，输入状态与结果展示分离。
 @MainActor
 final class FoilExposeModel: ObservableObject {
-    /// “打开的箔片”标签的条目。
+    /// 打开的箔片条目。
     let items: [FoilExposeItem]
-    /// “历史记录”标签的条目。
+    /// 历史记录条目。
     let historyItems: [FoilExposeItem]
-    /// 当前键盘高亮的条目下标（对应当前标签的条目数组）；默认高亮第一项。
+    /// 当前键盘高亮的条目下标（对应 currentItems）；默认高亮第一项。
     @Published var selectedIndex: Int = 0
-    @Published var selectedTab: FoilExposeTab = .openFoils
-    /// 最新的整页滚动请求；面板视图按 screenID 认领执行。
+    /// 搜索关键字；输入时即时过滤，退出输入后关键字与过滤结果仍保留。
+    @Published var searchText: String = "" {
+        didSet {
+            // 过滤结果变化后回到第一项，避免高亮落在已被过滤掉的条目上。
+            if selectedIndex != 0 { selectedIndex = 0 }
+        }
+    }
+    /// 是否处于搜索输入状态：Esc 只退出输入并保留关键字，不关闭覆盖层。
+    @Published var isSearching: Bool = false
+    /// 搜索输入框聚焦请求序号：面板稍后成为 key window 或 FocusState 落空时，视图据此重新聚焦。
+    @Published var searchFieldFocusRequest: UInt64 = 0
+    /// 最新的整页滚动请求；面板视图认领执行。
     @Published var pageScrollRequest: FoilExposePageScrollRequest?
     /// 网格实际列数，由面板视图从卡片外框推导回填，供上下移动跨行使用。
     var columnCount: Int = 4
     var onSelect: (FoilExposeItem) -> Void = { _ in }
     var onDismiss: () -> Void = {}
-    /// 每个屏幕当前可见条目的 id（按显示顺序），由面板视图随滚动实时回填；编号直选只命中可见项。
-    private var visibleIDsByScreen: [ObjectIdentifier: [UUID]] = [:]
+    /// 面板视图当前可见条目的 id（按显示顺序），随滚动实时回填；编号直选只命中可见项。
+    private var visibleIDs: [UUID] = []
 
     init(items: [FoilExposeItem], historyItems: [FoilExposeItem]) {
         self.items = items
         self.historyItems = historyItems
     }
 
-    var currentItems: [FoilExposeItem] {
-        selectedTab == .openFoils ? items : historyItems
+    /// 去掉首尾空白后的搜索关键字；空字符串表示不过滤。
+    var searchQuery: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// 当前标签里属于指定屏幕的条目，附带其在当前条目数组中的全局下标（键盘高亮使用）。
-    func currentEntries(for screen: NSScreen) -> [(offset: Int, item: FoilExposeItem)] {
-        switch selectedTab {
-        case .openFoils:
-            return items.enumerated().compactMap { entry in
-                entry.element.screen === screen ? (entry.offset, entry.element) : nil
-            }
-        case .history:
-            return historyItems.enumerated().map { ($0.offset, $0.element) }
-        }
+    /// 打开的箔片在前、历史记录在后的完整列表；已在打开的箔片中出现的条目不再重复显示；
+    /// 有关键字时只保留标题匹配项。
+    var currentItems: [FoilExposeItem] {
+        let openIDs = Set(items.map(\.id))
+        let combined = items + historyItems.filter { !openIDs.contains($0.id) }
+        guard !searchQuery.isEmpty else { return combined }
+        return combined.filter { $0.matches(query: searchQuery) }
+    }
+
+    /// 当前列表里第一条历史记录的下标；没有可见历史条目时为 nil。
+    var historyStartIndex: Int? {
+        currentItems.firstIndex { $0.isHistoryEntry }
     }
 
     /// 高亮条目：越界时回退到第一项。
@@ -107,20 +111,34 @@ final class FoilExposeModel: ObservableObject {
         return items.indices.contains(selectedIndex) ? items[selectedIndex] : items.first
     }
 
-    /// 切换标签页：重置高亮到第一项，并丢弃旧标签的可见编号。
-    func switchTab(to tab: FoilExposeTab) {
-        guard selectedTab != tab else { return }
-        selectedTab = tab
-        selectedIndex = 0
-        visibleIDsByScreen = [:]
+    /// 按 / 进入关键字输入状态；已有结果时保留关键字继续编辑。
+    func beginSearch() {
+        isSearching = true
     }
 
-    /// Tab 键循环切换标签页。
-    func cycleTab(backward: Bool) {
-        let all = FoilExposeTab.allCases
-        guard let current = all.firstIndex(of: selectedTab) else { return }
-        let next = backward ? (current + all.count - 1) % all.count : (current + 1) % all.count
-        switchTab(to: all[next])
+    /// 请求视图把第一响应者交给搜索输入框；面板刚成为 key window 时补一次聚焦。
+    func requestSearchFieldFocus() {
+        searchFieldFocusRequest &+= 1
+    }
+
+    /// Esc 退出搜索输入：保留关键字与过滤结果，编号直选恢复为无修饰键。
+    func endSearch() {
+        isSearching = false
+    }
+
+    /// 清除关键字并退出搜索输入，恢复完整列表。
+    func clearSearch() {
+        searchText = ""
+        isSearching = false
+        selectedIndex = 0
+    }
+
+    /// “显示历史箔片”入口：把高亮移到第一条历史记录；没有可见历史条目时返回 false。
+    @discardableResult
+    func focusFirstHistoryEntry() -> Bool {
+        guard let index = historyStartIndex else { return false }
+        selectedIndex = index
+        return true
     }
 
     /// 移动键盘高亮，左右逐项、上下跨一行，越界时夹紧。
@@ -153,44 +171,32 @@ final class FoilExposeModel: ObservableObject {
         selectedIndex = min(row * columns + columns - 1, currentItems.count - 1)
     }
 
-    /// 面板视图回填本屏可见条目；随滚动实时更新。
-    func setVisibleIDs(_ ids: [UUID], for screen: NSScreen) {
-        visibleIDsByScreen[ObjectIdentifier(screen)] = ids
+    /// 面板视图回填当前可见条目；随滚动实时更新。
+    func setVisibleIDs(_ ids: [UUID]) {
+        visibleIDs = ids
     }
 
-    private func visibleKeyMap(for screen: NSScreen) -> [String: UUID] {
-        guard let ids = visibleIDsByScreen[ObjectIdentifier(screen)] else { return [:] }
+    private var visibleKeyMap: [String: UUID] {
         var map: [String: UUID] = [:]
-        for (index, id) in ids.enumerated() {
+        for (index, id) in visibleIDs.enumerated() {
             guard let key = FoilExposeShortcut.key(forIndex: index) else { break }
             if map[key] == nil { map[key] = id }
         }
         return map
     }
 
-    /// 按键先转大写再查询；优先命中 key 屏幕的可见编号，键重复时再扫描其他屏幕。
-    func item(forKey key: String, preferredScreen: NSScreen?) -> FoilExposeItem? {
+    /// 按键先转大写再查询；编号直选只命中当前可见条目。
+    func item(forKey key: String) -> FoilExposeItem? {
         let upper = key.uppercased()
-        if let preferredScreen,
-           let id = visibleKeyMap(for: preferredScreen)[upper],
-           let match = currentItems.first(where: { $0.id == id }) {
-            return match
-        }
-        for ids in visibleIDsByScreen.values {
-            for (index, id) in ids.enumerated() {
-                guard FoilExposeShortcut.key(forIndex: index)?.uppercased() == upper,
-                      let match = currentItems.first(where: { $0.id == id }) else { continue }
-                return match
-            }
-        }
-        return nil
+        guard let id = visibleKeyMap[upper],
+              let match = currentItems.first(where: { $0.id == id }) else { return nil }
+        return match
     }
 
-    /// 发起整页滚动：由目标屏幕的面板滚动其内容，完成后把高亮重定位到可见第一项。
-    func requestPageScroll(direction: FoilExposeMoveDirection, screen: NSScreen) {
+    /// 发起整页滚动：由面板滚动其内容，完成后把高亮重定位到可见第一项。
+    func requestPageScroll(direction: FoilExposeMoveDirection) {
         pageScrollRequest = FoilExposePageScrollRequest(
             direction: direction,
-            screenID: ObjectIdentifier(screen),
             token: UUID()
         )
     }
@@ -201,8 +207,9 @@ final class FoilExposePanel: NSPanel {
     override var canBecomeKey: Bool { true }
 }
 
-/// 自建 App Exposé：为每个屏幕铺一块覆盖层，分“打开的箔片”和“历史记录”两个标签页。
+/// 自建 App Exposé：为每个屏幕铺一块覆盖层，打开的箔片在前、历史记录另起一行在后（半透明区分）。
 /// 打开的箔片展示各窗口的历史缩略图；历史记录展示全部历史配置，选中即恢复为新箔片。
+/// 支持 “/” 进入的关键字搜索，搜索输入时数字/字母直选改用 ⌥ 修饰。
 /// 只复用历史缩略图，不抓新截图；不使用屏幕录制、辅助功能、输入监控或私有 API。
 @MainActor
 final class FoilExposeController {
@@ -326,16 +333,15 @@ final class FoilExposeController {
         toggle()
     }
 
-    /// “显示历史箔片”入口：未展示时直接以历史记录标签打开；已展示时切到该标签，再按一次退出。
+    /// “显示历史箔片”入口：未展示时打开覆盖层并高亮第一条历史记录；已展示时移向历史区，
+    /// 已在历史区时再按一次退出。
     func handleHistoryHotKey() {
-        if isShowing {
-            if model?.selectedTab == .history {
+        if isShowing, let model {
+            if model.highlightedItem?.isHistoryEntry == true || !model.focusFirstHistoryEntry() {
                 dismiss()
-            } else {
-                model?.switchTab(to: .history)
             }
         } else {
-            show(selectedTab: .history)
+            show(focusingHistory: true)
         }
     }
 
@@ -344,7 +350,7 @@ final class FoilExposeController {
         isShowing ? dismiss() : show()
     }
 
-    func show(selectedTab tab: FoilExposeTab = .openFoils) {
+    func show(focusingHistory: Bool = false) {
         guard !isShowing,
               let appDelegate = NSApplication.shared.delegate as? AppDelegate else { return }
         // 没有任何箔窗口时也展示覆盖层：每个屏幕放一张“新建空白箔”占位卡。
@@ -352,36 +358,50 @@ final class FoilExposeController {
             items: Self.collectItems(from: appDelegate.windowControllers),
             historyItems: Self.collectHistoryItems()
         )
-        model.selectedTab = tab
+        if focusingHistory {
+            model.focusFirstHistoryEntry()
+        }
         model.onSelect = { [weak self] item in self?.select(item) }
         model.onDismiss = { [weak self] in self?.dismiss() }
         self.model = model
 
-        // 先激活本 App，再铺非激活面板并指定鼠标所在屏幕的面板为 key window。
+        // 先激活本 App，再在当前活跃显示器上铺一块非激活面板并指定它为 key window。
         // 全局热键冷触发时激活是异步完成的，handleDidBecomeActive 会补交键盘焦点。
         NSApp.activate(ignoringOtherApps: true)
-        for screen in NSScreen.screens {
+        if let screen = Self.activeScreen() {
             let panel = Self.makePanel(for: screen, model: model)
             panel.orderFront(nil)
             panels.append(panel)
         }
         if NSApp.isActive {
-            focusPanelOnMouseScreen()
+            focusPanel()
         }
 
         installKeyMonitor()
     }
 
-    /// 让鼠标所在屏幕的覆盖层面板成为 key window，接收键盘操作。
-    private func focusPanelOnMouseScreen() {
+    /// 覆盖层只铺在当前活跃显示器：优先本 App 的 key/main 窗口所在屏幕（菜单或前台触发），
+    /// 其次鼠标所在屏幕（全局热键冷启动时本 App 没有活跃窗口），最后主屏。
+    private static func activeScreen() -> NSScreen? {
+        if let screen = (NSApp.keyWindow ?? NSApp.mainWindow)?.screen {
+            return screen
+        }
         let mouseLocation = NSEvent.mouseLocation
-        let hoveredPanel = panels.first { $0.screen?.frame.contains(mouseLocation) == true } ?? panels.first
-        hoveredPanel?.makeKeyAndOrderFront(nil)
+        return NSScreen.screens.first { $0.frame.contains(mouseLocation) } ?? NSScreen.main ?? NSScreen.screens.first
+    }
+
+    /// 让覆盖层面板成为 key window，接收键盘操作。
+    private func focusPanel() {
+        panels.first?.makeKeyAndOrderFront(nil)
+        // 按 / 时面板可能尚未成为 key（全局热键冷启动的激活是异步的），成为 key 后补一次输入框聚焦。
+        if model?.isSearching == true {
+            model?.requestSearchFieldFocus()
+        }
     }
 
     @objc private func handleDidBecomeActive() {
         guard isShowing else { return }
-        focusPanelOnMouseScreen()
+        focusPanel()
     }
 
     /// App 失去激活（如切到别的 App）时自动关闭覆盖层。
@@ -389,14 +409,10 @@ final class FoilExposeController {
         dismiss()
     }
 
-    /// 收集当前全部箔片：按屏幕排序后统一排序，展示信息取自历史配置。
+    /// 收集当前全部箔片：保持窗口控制器顺序，不区分窗口所在屏幕。
     private static func collectItems(from windowControllers: [FloatingWindowController]) -> [FoilExposeItem] {
-        let screens = NSScreen.screens
-        var collected: [(screenIndex: Int, order: Int, item: FoilExposeItem)] = []
-        for (order, controller) in windowControllers.enumerated() {
-            guard let window = controller.window,
-                  let screen = window.screen ?? NSScreen.main else { continue }
-            let screenIndex = screens.firstIndex { $0 === screen } ?? 0
+        windowControllers.compactMap { controller -> FoilExposeItem? in
+            guard controller.window != nil else { return nil }
             // 历史读取失败时回退到 App State 自身，空白窗口也能得到正确的类型与标题。
             let config = HistoryRepository.shared.config(id: controller.appState.id)
                 ?? controller.appState.toConfig()
@@ -412,27 +428,19 @@ final class FoilExposeController {
                 thumbnailPath = config.imagePath
             }
 
-            collected.append((screenIndex, order, FoilExposeItem(
+            return FoilExposeItem(
                 id: controller.appState.id,
                 controller: controller,
                 isHistoryEntry: false,
-                screen: screen,
                 title: title,
                 symbolName: config.historyMenuSymbolName,
                 contentKind: contentKind,
                 thumbnailPath: thumbnailPath
-            )))
-        }
-
-        // 按屏幕分组排序：每个屏幕的显示顺序都从该屏的第一个窗口开始，与编号一致。
-        let grouped = Dictionary(grouping: collected) { $0.screenIndex }
-            .sorted { $0.key < $1.key }
-        return grouped.flatMap { _, entries in
-            entries.sorted { $0.order < $1.order }.map(\.item)
+            )
         }
     }
 
-    /// 历史记录标签的条目：最近的历史配置，点击/回车恢复为新箔片窗口。
+    /// 历史记录条目：最近的历史配置，附在打开的箔片之后，点击/回车恢复为新箔片窗口。
     private static func collectHistoryItems() -> [FoilExposeItem] {
         HistoryRepository.shared.recent(limit: 500).map { config in
             let contentKind = config.contentKind ?? HistoryContentKind.infer(from: config)
@@ -448,7 +456,6 @@ final class FoilExposeController {
                 id: config.id,
                 controller: nil,
                 isHistoryEntry: true,
-                screen: NSScreen.main ?? NSScreen(),
                 title: title,
                 symbolName: config.historyMenuSymbolName,
                 contentKind: contentKind,
@@ -472,7 +479,7 @@ final class FoilExposeController {
         panel.isReleasedWhenClosed = false
         panel.isExcludedFromWindowsMenu = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-        panel.contentView = NSHostingView(rootView: FoilExposeView(model: model, screen: screen))
+        panel.contentView = NSHostingView(rootView: FoilExposeView(model: model))
         return panel
     }
 
@@ -509,6 +516,11 @@ final class FoilExposeController {
                 && !modifiers.contains(.control) && !modifiers.contains(.option) && !modifiers.contains(.shift)
             let commandShift = modifiers.contains(.command) && modifiers.contains(.shift)
                 && !modifiers.contains(.control) && !modifiers.contains(.option)
+            let hasCommand = modifiers.contains(.command)
+            let hasOption = modifiers.contains(.option)
+            let hasControl = modifiers.contains(.control)
+            // 输入法正在组合文字时，Esc / 回车 / Tab 留给输入法自己处理（取消候选、上屏）。
+            let isComposing = (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true
             // ⌘O/⌘P/⌘L/⌘⇧V 会打开文件对话框、历史搜索等新视图：先收起覆盖层再放行给菜单，
             // 避免打开的内容被覆盖层挡住。
             if onlyCommand, key == "o" || key == "p" || key == "l" {
@@ -519,16 +531,32 @@ final class FoilExposeController {
                 self.dismiss()
                 return event
             }
-            // 其余带命令/选项修饰键的按键放行，让菜单快捷键（含再次触发的 ⌃⇧⎋ / ⌥⇧⎋）继续工作。
-            if modifiers.contains(.command) || modifiers.contains(.option) {
+            // 其余带命令修饰键的按键放行，让菜单快捷键（含再次触发的 ⌃⇧⎋ / ⌥⇧⎋）继续工作。
+            if hasCommand {
                 return event
             }
-            if event.keyCode == 53 { // Esc
+            // 搜索输入状态下，数字/字母直选改为 ⌥ 修饰；未命中条目的 ⌥ 组合仍放行给菜单快捷键。
+            if hasOption {
+                if model.isSearching, !hasControl,
+                   let key = event.charactersIgnoringModifiers,
+                   let item = model.item(forKey: key) {
+                    self.select(item)
+                    return nil
+                }
+                return event
+            }
+            if event.keyCode == 53 { // Esc：搜索状态下只退出搜索输入，否则关闭覆盖层
+                if model.isSearching {
+                    if isComposing { return event }
+                    model.endSearch()
+                    return nil
+                }
                 self.dismiss()
                 return nil
             }
-            // Ctrl+A/E 移到行首/行尾，Ctrl+P/N/F/B 上下左右；其余带 Control 的组合放行给菜单快捷键。
-            if modifiers.contains(.control) {
+            // 搜索输入时 Ctrl 组合交给输入框做文本编辑（如 Ctrl+A/E）；非搜索状态沿用行首/行尾与方向移动。
+            if hasControl {
+                if model.isSearching { return event }
                 guard let key = event.charactersIgnoringModifiers?.lowercased() else { return event }
                 switch key {
                 case "a": model.moveSelectionToRowStart()
@@ -541,22 +569,19 @@ final class FoilExposeController {
                 }
                 return nil
             }
-            let keyScreen = self.panels.first { $0.isKeyWindow }?.screen
             // ⇧↑/⇧↓ 与 PageUp/PageDown 等价：整页滚动，完成后高亮重定位到可见第一项。
             if modifiers.contains(.shift), event.keyCode == 125 || event.keyCode == 126 {
-                if let keyScreen {
-                    model.requestPageScroll(direction: event.keyCode == 126 ? .up : .down, screen: keyScreen)
-                }
+                model.requestPageScroll(direction: event.keyCode == 126 ? .up : .down)
                 return nil
             }
             switch event.keyCode {
-            case 48: // Tab / Shift+Tab：循环切换标签页
-                model.cycleTab(backward: modifiers.contains(.shift))
+            case 48: // Tab：标签页已取消，吞掉以免焦点移出覆盖层；输入法组合时放行
+                if model.isSearching, isComposing { return event }
+                return nil
             case 116, 121: // PageUp / PageDown：整页滚动
-                if let keyScreen {
-                    model.requestPageScroll(direction: event.keyCode == 116 ? .up : .down, screen: keyScreen)
-                }
+                model.requestPageScroll(direction: event.keyCode == 116 ? .up : .down)
             case 36, 76: // 回车打开高亮箔片
+                if model.isSearching, isComposing { return event }
                 guard let highlighted = model.highlightedItem else { return nil }
                 self.select(highlighted)
             case 123: model.moveSelection(.left)   // ←
@@ -564,9 +589,16 @@ final class FoilExposeController {
             case 125: model.moveSelection(.down)   // ↓
             case 126: model.moveSelection(.up)     // ↑
             default:
+                // 搜索输入状态：其余按键交给输入框，关键字实时过滤。
+                if model.isSearching { return event }
+                // 无修饰键的 / 进入搜索输入状态。
+                if event.characters == "/" {
+                    model.beginSearch()
+                    return nil
+                }
                 // 编号/字母直选只命中当前可见项；未命中的无修饰按键静默吞掉，不发出系统提示音。
                 guard let key = event.charactersIgnoringModifiers,
-                      let item = model.item(forKey: key, preferredScreen: keyScreen) else { return nil }
+                      let item = model.item(forKey: key) else { return nil }
                 self.select(item)
             }
             return nil
