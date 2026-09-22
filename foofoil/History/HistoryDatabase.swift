@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 nonisolated final class HistoryDatabase {
-    static let schemaVersion = 14
+    static let schemaVersion = 15
 
     private let queue = DispatchQueue(label: "com.foofoil.history.database", qos: .utility)
     private var connection: OpaquePointer?
@@ -87,9 +87,14 @@ nonisolated final class HistoryDatabase {
                 }
 
                 // 普通保存只重建元数据和文本块，避免窗口移动等状态变化抹掉已完成的 OCR/PDF/网页索引。
-                if old != nil { try deleteChunks(historyID: config.id, kinds: [0, 1]) }
                 let createdAt = old?.createdAt.timeIntervalSince1970 ?? duplicateCreatedAt?.timeIntervalSince1970 ?? config.createdAt?.timeIntervalSince1970 ?? now
                 let title = displayTitle(for: config, kind: kind)
+                let textFingerprint = TextFingerprint.value(for: config.text)
+                // 正文未变化时（关闭窗口、移动、改样式、重开历史等）不再重建搜索分块：
+                // 分块归一化与 n-gram 编码是大文档保存的主要开销，重复执行只是白费。
+                // 展示标题也写进分块的 FTS 词项，标题变化时仍需重建，避免标题检索留下过期词项。
+                let needsTextIndex = old?.textFingerprint != textFingerprint || old?.indexStatus != 2 || old?.displayTitle != title
+                if old != nil { try deleteChunks(historyID: config.id, kinds: needsTextIndex ? [0, 1] : [0]) }
                 try executePrepared("""
                     INSERT INTO history_items (
                         id, content_kind, display_title, original_filename, image_path, text_path,
@@ -102,8 +107,8 @@ nonisolated final class HistoryDatabase {
                         media_sidecar_bookmark, custom_cover_path,
                         extension_id, extension_state_reference, navigator_panel_side,
                         navigator_panel_visibility, navigator_panel_width, file_list,
-                        document_zoom, document_scroll_file, document_scroll_fraction
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        document_zoom, document_scroll_file, document_scroll_fraction, text_fingerprint
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -133,7 +138,8 @@ nonisolated final class HistoryDatabase {
                         file_list=excluded.file_list,
                         document_zoom=excluded.document_zoom,
                         document_scroll_file=excluded.document_scroll_file,
-                        document_scroll_fraction=excluded.document_scroll_fraction
+                        document_scroll_fraction=excluded.document_scroll_fraction,
+                        text_fingerprint=excluded.text_fingerprint
                     """, bindings: [
                         config.id.uuidString, kind.rawValue, title, config.originalImageName,
                         config.imagePath, config.textPath, config.webURLString, config.actualWebURLString,
@@ -151,7 +157,8 @@ nonisolated final class HistoryDatabase {
                         encodeFileList(config.fileList),
                         config.documentZoom,
                         config.documentScrollFile,
-                        config.documentScrollFraction
+                        config.documentScrollFraction,
+                        textFingerprint
                     ])
 
                 let metadata = (
@@ -159,8 +166,10 @@ nonisolated final class HistoryDatabase {
                     + (config.fileList?.items.map(\.displayName) ?? [])
                 ).joined(separator: " ")
                 try insertChunk(historyID: config.id, title: title, kind: 0, ordinal: 0, pageNumber: nil, text: metadata)
-                if kind == .note || kind == .text || kind == .markdown || kind == .csv {
-                    try insertTextChunks(historyID: config.id, title: title, kind: 1, text: config.text)
+                if kind.storesIndexedText {
+                    if needsTextIndex {
+                        try insertTextChunks(historyID: config.id, title: title, kind: 1, text: config.text)
+                    }
                     try updateIndexStatus(id: config.id, status: 2, error: nil)
                 }
             }
@@ -407,6 +416,8 @@ nonisolated final class HistoryDatabase {
         try addColumnIfMissing("document_font_name", definition: "document_font_name TEXT")
         try addColumnIfMissing("document_line_spacing", definition: "document_line_spacing REAL")
         try addColumnIfMissing("document_paragraph_spacing", definition: "document_paragraph_spacing REAL")
+        // v15 正文字数+哈希指纹：正文未变时跳过搜索分块重建，避免每次保存都重编码整篇文档。
+        try addColumnIfMissing("text_fingerprint", definition: "text_fingerprint TEXT")
         if previousVersion >= 1 && previousVersion < 9 {
             // v9：旧列表 video_looping=1 是单曲循环开关；迁成顺序循环，使列表能自动续播。
             try execute("""
@@ -539,11 +550,26 @@ nonisolated final class HistoryDatabase {
         try executePrepared("UPDATE history_items SET index_status = ?, index_version = ?, index_error = ? WHERE id = ?", bindings: [status, 1, error.map { String($0.prefix(500)) }, id.uuidString])
     }
 
-    private struct StoredItem { let id: UUID; let displayTitle: String; let createdAt: Date }
+    private struct StoredItem {
+        let id: UUID
+        let displayTitle: String
+        let createdAt: Date
+        let textFingerprint: String?
+        let indexStatus: Int
+    }
+
     private func fetchItem(id: UUID) throws -> StoredItem? {
         var result: StoredItem?
-        try withStatement("SELECT display_title, created_at FROM history_items WHERE id = ?", bindings: [id.uuidString]) { statement in
-            if sqlite3_step(statement) == SQLITE_ROW { result = StoredItem(id: id, displayTitle: text(statement, 0), createdAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 1))) }
+        try withStatement("SELECT display_title, created_at, text_fingerprint, index_status FROM history_items WHERE id = ?", bindings: [id.uuidString]) { statement in
+            if sqlite3_step(statement) == SQLITE_ROW {
+                result = StoredItem(
+                    id: id,
+                    displayTitle: text(statement, 0),
+                    createdAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 1)),
+                    textFingerprint: optionalText(statement, 2),
+                    indexStatus: Int(sqlite3_column_int(statement, 3))
+                )
+            }
         }
         return result
     }

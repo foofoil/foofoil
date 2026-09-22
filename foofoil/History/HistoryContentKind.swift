@@ -29,6 +29,14 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
         }
     }
 
+    /// 保存时正文会写进搜索分块的内容类型；其它类型只有独立的 OCR/PDF/网页索引。
+    public var storesIndexedText: Bool {
+        switch self {
+        case .note, .text, .markdown, .csv: return true
+        case .image, .web, .pdf, .video, .audio, .extensionContent, .ebook: return false
+        }
+    }
+
     public static func infer(from config: WindowConfig) -> Self {
         // 宿主统一音频列表（含经扩展播放的 DSF/DFF/SACD）按列表类型归类，
         // 否则扩展音频会因 imagePath 为空而误判为笔记。

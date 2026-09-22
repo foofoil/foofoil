@@ -61,6 +61,36 @@ struct HistorySearchTests {
         #expect(repository.searchDatabaseSize > 0)
     }
 
+    @Test func unchangedTextKeepsSearchIndexWithoutReindexing() async throws {
+        // 正文未变时保存只刷新元数据：索引分块必须保留，同时新正文仍会被重建。
+        let (repository, directory) = try repository()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let id = UUID()
+        let config = WindowConfig(id: id, originalImageName: "笔记", text: "第一版正文包含索引关键词")
+        #expect(repository.upsert(config))
+        #expect((await repository.search("索引关键词")).first?.id == id)
+
+        // 同一正文反复保存（关闭窗口、移动位置、改样式都会走到这里）。
+        var metadataOnly = config
+        metadataOnly.isPinned = true
+        metadataOnly.windowFrame = "frame"
+        #expect(repository.upsert(metadataOnly))
+        #expect(repository.upsert(metadataOnly))
+        #expect((await repository.search("索引关键词")).first?.id == id)
+
+        // 正文变化后旧内容必须消失，新内容可检索。
+        var updated = metadataOnly
+        updated.text = "第二版正文包含替换词"
+        #expect(repository.upsert(updated))
+        #expect((await repository.search("索引关键词")).isEmpty)
+        #expect((await repository.search("替换词")).first?.id == id)
+
+        // 改名会重建标题索引，正文检索不受影响。
+        repository.rename(id: id, title: "新标题")
+        #expect((await repository.search("替换词")).first?.id == id)
+        #expect((await repository.search("新标题")).first?.id == id)
+    }
+
     @Test func repeatedLocalSourceKeepsSingleHistoryItem() throws {
         let (repository, directory) = try repository()
         defer { try? FileManager.default.removeItem(at: directory) }
