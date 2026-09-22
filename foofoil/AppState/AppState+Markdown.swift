@@ -57,6 +57,14 @@ extension AppState {
 
             renderTask?.cancel()
 
+            // 内容换成另一篇文档（重新打开、⌘K 后换文件）时，先丢掉上一次的排版结果：
+            // 预览视图拿到的仍是旧富文本，直到新渲染完成，会先显示上一篇文档。
+            let identity = sourceFingerprint ?? textURL?.path ?? "untitled:\(id.uuidString)"
+            if identity != renderedMarkdownIdentity {
+                renderedMarkdownIdentity = identity
+                renderedMarkdown = NSAttributedString()
+            }
+
             let textToRender = self.text
             let fontSize = self.textFontSize
             // 在主线程捕获当前外观，避免后台任务无法正确获取有效外观

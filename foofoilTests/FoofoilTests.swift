@@ -1659,6 +1659,34 @@ struct FoofoilTests {
         #expect(count == 2)
     }
 
+    @Test func switchingDocumentDiscardsPreviousMarkdownPreview() async throws {
+        // ⌘K 重置后再打开另一篇 Markdown 时，新文档渲染完成前不能残留上一篇的排版结果。
+        let state = AppState()
+        state.originalImageName = "first.md"
+        state.sourceFingerprint = "file:/tmp/first.md"
+        state.isMarkdownPreview = true
+        state.text = "# First\n\nfirst document body\n"
+        for _ in 0..<200 where state.renderedMarkdown.string.isEmpty {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        #expect(state.renderedMarkdown.string.contains("first document body"))
+
+        state.resetContent()
+        #expect(state.renderedMarkdown.length == 0)
+
+        state.originalImageName = "second.md"
+        state.sourceFingerprint = "file:/tmp/second.md"
+        state.isMarkdownPreview = true
+        state.text = "# Second\n\nsecond document body\n"
+        #expect(!state.renderedMarkdown.string.contains("first document body"))
+
+        for _ in 0..<200 where !state.renderedMarkdown.string.contains("second document body") {
+            try await Task.sleep(nanoseconds: 50_000_000)
+        }
+        #expect(state.renderedMarkdown.string.contains("second document body"))
+        #expect(!state.renderedMarkdown.string.contains("first document body"))
+    }
+
     @Test func testMarkdownTableNSAttributedStringRendering() throws {
         let md = """
         | Name | Age |

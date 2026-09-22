@@ -312,6 +312,10 @@ public class AppState: NSObject, ObservableObject, Identifiable {
 
     @Published public var renderedMarkdown: NSAttributedString = NSAttributedString()
 
+    /// 当前 `renderedMarkdown` 对应的内容身份（来源文件指纹、缓存路径或未命名箔的 id）。
+    /// 换成另一篇文档时先清空上一次的排版结果，避免新文档渲染完成前显示上一篇内容。
+    var renderedMarkdownIdentity: String?
+
     @Published public var isMarkdownPreview: Bool {
         didSet {
             saveState()
