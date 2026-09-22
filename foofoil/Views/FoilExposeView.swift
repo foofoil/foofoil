@@ -135,6 +135,8 @@ struct FoilExposeView: View {
                     ScrollView {
                         content(for: entries, shortcutByID: shortcutByID)
                             .padding(.horizontal, 44)
+                            // 高亮卡片放大约 3%，屏幕较矮时首行贴住滚动区顶部会被裁掉，这里留出余量。
+                            .padding(.top, 8)
                             .padding(.bottom, 32)
                             .frame(maxWidth: 1240)
                             .frame(maxWidth: .infinity)
@@ -304,6 +306,7 @@ struct FoilExposeView: View {
                     .foregroundStyle(.white)
                 searchControl
             }
+            .frame(height: 32)
             HStack(spacing: 16) {
                 Text(model.isSearching
                      ? NSLocalizedString("Search Foils Hint", comment: "")
