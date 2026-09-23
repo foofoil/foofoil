@@ -27,7 +27,6 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     private var isTerminating = false
     /// hide: 漏掉的箔窗，在 didHide 里补 orderOut，unhide 时再还原。
     private var windowsLeftVisibleAfterHide: [NSWindow] = []
-    weak var lastActiveWindowController: FloatingWindowController?
 
     // 获取当前活跃（Key）窗口对应的 AppState
     var activeWindowController: FloatingWindowController? {
@@ -68,13 +67,23 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     // 处理文件关联打开事件 (右键 "打开方式" 或者双击文件)
+    // 始终新建箔片打开，避免替换当前箔片正在查看的内容。
     public func application(_ sender: NSApplication, openFiles filenames: [String]) {
         didOpenFiles = true
         let urls = filenames.map { URL(fileURLWithPath: $0) }
-        let target = activeWindowController?.appState
-            ?? lastActiveWindowController?.appState
-            ?? availableBlankWindowController?.appState
-        openDroppedFiles(urls, into: target)
+        openFilesInNewFoil(urls)
+    }
+
+    /// 先建好新箔片作为目标，再走拖放管线：多文件分组时首个分组落入该箔片，
+    /// 其余分组各自另开箔片，避免直接传 nil 目标时多出一扇空箔。
+    func openFilesInNewFoil(_ urls: [URL]) {
+        let state = AppState()
+        let controller = showNewWindow(with: state)
+        openDroppedFiles(urls, into: state)
+        // 没有可打开的文件时收回空白箔；目录扫描是异步的，完成前状态为空但不能关。
+        if isBlank(state), state.activeDirectoryDropScan == nil {
+            controller.close()
+        }
     }
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
@@ -246,11 +255,6 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc func handleKeyWindowChanged(_ notification: Notification) {
-        if notification.name == NSWindow.didBecomeKeyNotification,
-           let changedWindow = notification.object as? NSWindow,
-           let controller = windowControllers.first(where: { $0.owns(changedWindow) }) {
-            lastActiveWindowController = controller
-        }
         // 交由下一轮事件循环执行，确保 AppKit 已更新 keyWindow。
         DispatchQueue.main.async { [weak self] in
             self?.updateGoMenuVisibility()

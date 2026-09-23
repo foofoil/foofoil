@@ -27,11 +27,13 @@ extension AppDelegate {
         activeAppState?.performExtensionCommand(commandID)
     }
 
-    func showNewWindow(with state: AppState) {
+    @discardableResult
+    func showNewWindow(with state: AppState) -> FloatingWindowController {
         let controller = FloatingWindowController(appState: state)
         prepareNewWindowFrame(for: controller)
         addWindowController(controller)
         controller.showWindow(nil)
+        return controller
     }
 
     /// 新箔片错开当前活跃窗口，避免完全重合；无活跃窗口时居中。

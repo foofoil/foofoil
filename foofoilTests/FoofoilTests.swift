@@ -2076,6 +2076,70 @@ struct FoofoilTests {
         #expect(state.fileList?.items.contains(where: { $0.path == text.path }) == false)
     }
 
+    @Test func openWithFilesAlwaysCreatesANewFoilWindow() throws {
+        let delegate = AppDelegate()
+        let existing = AppState()
+        let existingController = FloatingWindowController(appState: existing)
+        delegate.addWindowController(existingController)
+        defer {
+            for controller in delegate.windowControllers {
+                HistoryManager.shared.removeFromHistory(controller.appState.toConfig())
+                controller.close()
+            }
+        }
+
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-\(UUID().uuidString)-open-with.txt")
+        try Data("opened from Open With".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        existing.text = "正在查看的内容"
+
+        delegate.application(NSApp, openFiles: [file.path])
+
+        #expect(delegate.windowControllers.count == 2, "“打开方式”没有新建箔片")
+        let opened = delegate.windowControllers.first { $0.appState !== existing }
+        #expect(opened?.appState.textURL != nil, "“打开方式”没有在新箔片里打开文件")
+        #expect(existing.text == "正在查看的内容", "“打开方式”覆盖了当前箔片的内容")
+    }
+
+    /// 多份同类文件（会拆成多个分组）也只新建有内容的箔片，不额外留下空箔。
+    @Test func openWithMultipleFilesDoesNotLeaveABlankFoil() throws {
+        let delegate = try #require(NSApplication.shared.delegate as? AppDelegate)
+        let existing = AppState()
+        let existingController = FloatingWindowController(appState: existing)
+        delegate.addWindowController(existingController)
+        let baseline = Set(delegate.windowControllers.map(ObjectIdentifier.init))
+        defer {
+            for controller in delegate.windowControllers where !baseline.contains(ObjectIdentifier(controller)) {
+                HistoryManager.shared.removeFromHistory(controller.appState.toConfig())
+                controller.close()
+            }
+            existingController.close()
+            HistoryManager.shared.removeFromHistory(existing.toConfig())
+        }
+
+        let first = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-\(UUID().uuidString)-multi-a.txt")
+        let second = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-\(UUID().uuidString)-multi-b.txt")
+        try Data("first".utf8).write(to: first)
+        try Data("second".utf8).write(to: second)
+        defer {
+            try? FileManager.default.removeItem(at: first)
+            try? FileManager.default.removeItem(at: second)
+        }
+
+        existing.text = "正在查看的内容"
+
+        delegate.application(NSApp, openFiles: [first.path, second.path])
+
+        let opened = delegate.windowControllers.filter { !baseline.contains(ObjectIdentifier($0)) }
+        #expect(opened.count == 2, "两份文件应各开一扇箔片，而不是空箔加两扇")
+        #expect(opened.allSatisfy { $0.appState.textURL != nil }, "存在没有内容的空箔")
+        #expect(existing.text == "正在查看的内容", "“打开方式”覆盖了当前箔片的内容")
+    }
+
     @Test func inWindowDropAppendsOnlyImagesToCurrentImage() async throws {
         let first = try writeTestPNG(name: "window-list-a.png")
         let second = try writeTestPNG(name: "window-list-b.png")
