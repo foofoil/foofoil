@@ -78,3 +78,21 @@ private struct SearchResultRow: View {
         .task(id: thumbnailPath) { await thumbnail.load(path: thumbnailPath) }
     }
 }
+
+struct SpotlightFileResultRow: View {
+    let file: SpotlightFileResult
+    let isSelected: Bool
+
+    var body: some View {
+        SearchResultRow(symbolName: file.symbolName, title: file.name,
+                        snippet: file.url.deletingLastPathComponent().path,
+                        pageNumber: nil, thumbnailPath: nil,
+                        showsInlineIcon: false, isSelected: isSelected)
+            .help(file.url.path)
+            .accessibilityLabel(String(
+                format: NSLocalizedString("Search File Accessibility Format", comment: ""),
+                file.name,
+                file.url.deletingLastPathComponent().path
+            ))
+    }
+}

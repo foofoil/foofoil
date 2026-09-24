@@ -4,13 +4,15 @@ import Combine
 
 final class HistorySearchPanel: NSPanel {
     weak var searchModel: HistorySearchViewModel?
+    var dismissSearch: (() -> Void)?
     override var canBecomeKey: Bool { true }
 
     override func sendEvent(_ event: NSEvent) {
         guard event.type == .keyDown, let model = searchModel else { super.sendEvent(event); return }
         let hasMarkedText = (firstResponder as? NSTextView)?.hasMarkedText() ?? false
-        if event.keyCode == 53 { orderOut(nil); return }
-        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "w" { orderOut(nil); return }
+        if hasMarkedText { super.sendEvent(event); return }
+        if event.keyCode == 53 { dismissSearch?(); return }
+        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "w" { dismissSearch?(); return }
         if event.keyCode == 125 || (event.modifierFlags.contains(.control) && event.charactersIgnoringModifiers == "n") { model.moveSelection(by: 1); return }
         if event.keyCode == 126 || (event.modifierFlags.contains(.control) && event.charactersIgnoringModifiers == "p") { model.moveSelection(by: -1); return }
         if (event.keyCode == 36 || event.keyCode == 76) && !hasMarkedText { model.openSelected(); return }
@@ -24,6 +26,8 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
     private let model = HistorySearchViewModel()
     private var sizeCancellable: AnyCancellable?
     private var isResizeScheduled = false
+    private var isOpeningFile = false
+    private var openingTask: Task<Void, Never>?
 
     private init() {
         let panel = HistorySearchPanel(
@@ -44,6 +48,9 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
         panel.contentViewController = NSHostingController(rootView: HistorySearchView(model: model))
         super.init(window: panel)
         panel.delegate = self
+        panel.dismissSearch = { [weak self] in self?.dismiss() }
+        model.chooseSearchFolders = { [weak self] in self?.chooseSearchFolders() }
+        model.openFile = { [weak self] url in self?.openFile(url) }
         model.openResult = { id in
             (NSApplication.shared.delegate as? AppDelegate)?.openSearchResultInNewWindow(id: id)
         }
@@ -120,7 +127,145 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
         resizeToFit()
     }
 
-    func dismiss() { window?.orderOut(nil) }
+    func dismiss() {
+        openingTask?.cancel()
+        model.stop()
+        window?.orderOut(nil)
+    }
+
+    /// 索引命中不等于文件授权；只在真正打开时尝试读取，失败再由系统面板授予访问。
+    private func openFile(_ url: URL) {
+        guard !isOpeningFile else { return }
+        isOpeningFile = true
+        model.stop()
+        openingTask = Task { [self] in
+            let folders = (try? SpotlightSearchFolders.shared.beginAccess()) ?? []
+            let access = await Self.fileAccess(url)
+            guard !Task.isCancelled else { releaseFolderAccess(folders); isOpeningFile = false; return }
+            if access == .readable {
+                acceptFile(url, folderScopes: folders)
+                isOpeningFile = false
+                return
+            }
+            releaseFolderAccess(folders)
+            guard access == .needsPermission else {
+                restoreSearch()
+                model.openError = NSLocalizedString(access == .notDownloaded ? "Search File Not Downloaded" : "Search File Open Failed", comment: "")
+                isOpeningFile = false
+                return
+            }
+            let picker = NSOpenPanel()
+            picker.canChooseDirectories = false
+            picker.canChooseFiles = true
+            picker.allowsMultipleSelection = false
+            picker.directoryURL = url.deletingLastPathComponent()
+            picker.nameFieldStringValue = url.lastPathComponent
+            picker.message = NSLocalizedString("Search File Access Message", comment: "")
+            picker.begin { [weak self] response in
+                guard let self else { return }
+                if response == .OK, let selected = picker.url {
+                    self.acceptFile(selected, folderScopes: [])
+                } else {
+                    self.restoreSearch()
+                }
+                self.isOpeningFile = false
+            }
+        }
+    }
+
+    private func releaseFolderAccess(_ scopes: [URL]) {
+        scopes.forEach { $0.stopAccessingSecurityScopedResource() }
+    }
+
+    /// 打开请求被接受后继续持有目录授权，直到目标箔片装载结束或超时，
+    /// 让扩展会话与媒体探测有时间把目录授权替换成自己的文件级安全范围。
+    private func holdFolderAccessUntilSettled(_ scopes: [URL], target: AppState?) {
+        guard !scopes.isEmpty else { return }
+        Task { [scopes] in
+            let deadline = ContinuousClock.now.advanced(by: .seconds(target == nil ? 3 : 10))
+            while ContinuousClock.now < deadline {
+                if let target, !target.isLoading, target.hasOpenedContent { break }
+                try? await Task.sleep(for: .milliseconds(100))
+            }
+            scopes.forEach { $0.stopAccessingSecurityScopedResource() }
+        }
+    }
+
+    /// 目录授权只保证持有期间可读；转成文件级安全范围 URL 后，窗口与扩展会话各自持有授权。
+    nonisolated static func fileScopedURL(for url: URL) -> URL? {
+        guard let bookmark = try? url.bookmarkData(options: [.withSecurityScope], includingResourceValuesForKeys: nil, relativeTo: nil) else { return nil }
+        var stale = false
+        return try? URL(resolvingBookmarkData: bookmark, options: [.withSecurityScope], relativeTo: nil, bookmarkDataIsStale: &stale)
+    }
+
+    private func chooseSearchFolders() {
+        guard !isOpeningFile else { return }
+        isOpeningFile = true
+        model.stop()
+        let picker = NSOpenPanel()
+        picker.canChooseDirectories = true
+        picker.canChooseFiles = false
+        picker.allowsMultipleSelection = true
+        picker.message = NSLocalizedString("Search Folders Message", comment: "")
+        picker.begin { [weak self] response in
+            guard let self else { return }
+            var failed = false
+            if response == .OK {
+                do { try SpotlightSearchFolders.shared.replace(with: picker.urls) }
+                catch { failed = true }
+            }
+            self.restoreSearch()
+            if failed { self.model.openError = NSLocalizedString("Search Folder Access Failed", comment: "") }
+            self.isOpeningFile = false
+        }
+    }
+
+    nonisolated enum FileAccess: Sendable { case readable, needsPermission, unavailable, notDownloaded }
+
+    @concurrent
+    static func fileAccess(_ url: URL) async -> FileAccess {
+        do {
+            let values = try url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
+            if values.ubiquitousItemDownloadingStatus == .notDownloaded { return .notDownloaded }
+            let handle = try FileHandle(forReadingFrom: url)
+            try handle.close()
+            return .readable
+        } catch {
+            let error = error as NSError
+            if (error.domain == NSCocoaErrorDomain && error.code == NSFileReadNoPermissionError)
+                || (error.domain == NSPOSIXErrorDomain && [Int(EACCES), Int(EPERM)].contains(error.code)) {
+                return .needsPermission
+            }
+            return .unavailable
+        }
+    }
+
+    private func acceptFile(_ url: URL, folderScopes: [URL]) {
+        let scopedURL = Self.fileScopedURL(for: url) ?? url
+        guard let delegate = NSApp.delegate as? AppDelegate else {
+            releaseFolderAccess(folderScopes)
+            restoreSearch()
+            model.openError = NSLocalizedString("Search File Open Failed", comment: "")
+            return
+        }
+        let target = delegate.availableBlankWindowController?.appState
+        let knownWindows = Set(delegate.windowControllers.map(ObjectIdentifier.init))
+        guard delegate.openGroupedFiles([scopedURL], into: target, append: false) else {
+            releaseFolderAccess(folderScopes)
+            restoreSearch()
+            model.openError = NSLocalizedString("Search File Open Failed", comment: "")
+            return
+        }
+        let openedState = target ?? delegate.windowControllers.first { !knownWindows.contains(ObjectIdentifier($0)) }?.appState
+        dismiss()
+        holdFolderAccessUntilSettled(folderScopes, target: openedState)
+    }
+
+    private func restoreSearch() {
+        NSApp.activate(ignoringOtherApps: true)
+        window?.makeKeyAndOrderFront(nil)
+        model.resume()
+    }
 
     private func resizeToFit() {
         guard let panel = window, let contentView = panel.contentView else { return }
@@ -156,5 +301,9 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
         }
     }
 
-    func windowDidResignKey(_ notification: Notification) { window?.orderOut(nil) }
+    func windowDidResignKey(_ notification: Notification) {
+        // 系统授权面板接管焦点时保留待打开操作，其余隐藏路径正常取消查询。
+        if isOpeningFile { model.stop(); window?.orderOut(nil) }
+        else { dismiss() }
+    }
 }

@@ -371,11 +371,12 @@ extension AppDelegate {
     }
 
     /// 按同类型分组打开：第一组进入目标箔片（或新窗口），其余组另开箔片。
-    func openGroupedFiles(_ urls: [URL], into target: AppState?, append: Bool) {
+    @discardableResult
+    func openGroupedFiles(_ urls: [URL], into target: AppState?, append: Bool) -> Bool {
         let probe = target ?? AppState()
         let openable = urls.filter { probe.canOpenFile(url: $0) }
         var groups = FileListGrouper.groups(from: openable)
-        guard !groups.isEmpty else { return }
+        guard !groups.isEmpty else { return false }
 
         if append, let target {
             if let kind = target.listableKind {
@@ -405,7 +406,7 @@ extension AppDelegate {
             for group in groups {
                 openGroupInNewWindow(group)
             }
-            return
+            return true
         }
 
         let first = groups.removeFirst()
@@ -420,6 +421,7 @@ extension AppDelegate {
         for group in groups {
             openGroupInNewWindow(group)
         }
+        return true
     }
 
     /// Finder 拖到 Dock 图标时与箔片内拖放保持一致：非空箔片只接收当前类型。

@@ -565,6 +565,8 @@ extension AppState {
             }
         }
 
+        nonisolated static let textFilenameExtensions: Set<String> = ["txt", "md", "markdown", "csv", "json", "xml", "yaml", "yml", "ini", "conf", "plist", "log", "swift", "py", "js", "ts", "sh", "css", "php", "c", "cpp", "h", "java", "go", "rs", "sql", "rb"]
+
         func isTextFile(url: URL) -> Bool {
             let ext = url.pathExtension.lowercased()
             if FileListGrouper.isCueFile(url) {
@@ -575,8 +577,7 @@ extension AppState {
                 return false
             }
 
-            let textExtensions = ["txt", "md", "markdown", "csv", "json", "xml", "yaml", "yml", "ini", "conf", "plist", "log", "swift", "py", "js", "ts", "sh", "css", "php", "c", "cpp", "h", "java", "go", "rs", "sql", "rb"]
-            if textExtensions.contains(ext) {
+            if Self.textFilenameExtensions.contains(ext) {
                 return true
             }
 

@@ -103,7 +103,8 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                         thumbnailPath: best.thumbnailPath,
                         matchedSnippet: self.snippet(from: best.originalText, keywords: keywords),
                         matchedPageNumber: best.pageNumber,
-                        score: self.score(best, query: normalizedQuery)
+                        score: self.score(best, query: normalizedQuery),
+                        sourcePath: best.sourceFingerprint.flatMap { $0.hasPrefix("file:") ? String($0.dropFirst(5)) : nil }
                     ))
                 }
                 return results.sorted { lhs, rhs in

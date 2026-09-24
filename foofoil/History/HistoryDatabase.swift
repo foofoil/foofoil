@@ -261,7 +261,7 @@ nonisolated final class HistoryDatabase {
             var values: [HistorySearchCandidate] = []
             try withStatement("""
                 SELECT h.id, h.display_title, h.content_kind, COALESCE(h.thumbnail_path, h.image_path),
-                       c.original_text, c.normalized_text, c.page_number, h.last_opened_at
+                       c.original_text, c.normalized_text, c.page_number, h.last_opened_at, h.source_fingerprint
                 FROM search_fts f
                 JOIN search_chunks c ON c.id = f.rowid
                 JOIN history_items h ON h.id = c.history_id
@@ -279,7 +279,8 @@ nonisolated final class HistoryDatabase {
                         originalText: text(statement, 4),
                         normalizedText: text(statement, 5),
                         pageNumber: sqlite3_column_type(statement, 6) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 6)),
-                        lastOpenedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 7))
+                        lastOpenedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 7)),
+                        sourceFingerprint: optionalText(statement, 8)
                     ))
                 }
             }

@@ -8,6 +8,7 @@ nonisolated public struct HistorySearchResult: Identifiable, Sendable, Equatable
     public let matchedSnippet: String?
     public let matchedPageNumber: Int?
     public let score: Double
+    public var sourcePath: String? = nil
 }
 
 nonisolated struct HistorySearchCandidate: Sendable {
@@ -19,4 +20,5 @@ nonisolated struct HistorySearchCandidate: Sendable {
     let normalizedText: String
     let pageNumber: Int?
     let lastOpenedAt: Date
+    var sourceFingerprint: String? = nil
 }
