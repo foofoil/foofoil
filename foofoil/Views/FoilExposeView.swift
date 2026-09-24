@@ -270,12 +270,20 @@ struct FoilExposeView: View {
             let openEntries = entries.filter { !$0.item.isHistoryEntry }
             let historyEntries = entries.filter { $0.item.isHistoryEntry }
             VStack(spacing: 18) {
-                if !openEntries.isEmpty {
-                    grid(for: openEntries, shortcutByID: shortcutByID)
-                }
-                if !historyEntries.isEmpty {
-                    // 历史记录另起一行，并降低透明度与打开的箔片区分；高亮项保持完整亮度。
-                    grid(for: historyEntries, shortcutByID: shortcutByID, dimsHistory: true)
+                if entries.isEmpty {
+                    // 关键字有输入但没有匹配的箔片/历史：文件结果在下方单独成区，先说明这里为什么是空的。
+                    Text(NSLocalizedString("No Matching Foils Hint", comment: ""))
+                        .font(.system(size: 15))
+                        .foregroundStyle(.white.opacity(0.6))
+                        .padding(.top, 8)
+                } else {
+                    if !openEntries.isEmpty {
+                        grid(for: openEntries, shortcutByID: shortcutByID)
+                    }
+                    if !historyEntries.isEmpty {
+                        // 历史记录另起一行，并降低透明度与打开的箔片区分；高亮项保持完整亮度。
+                        grid(for: historyEntries, shortcutByID: shortcutByID, dimsHistory: true)
+                    }
                 }
                 fileResultsSection
             }

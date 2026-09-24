@@ -1,6 +1,23 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "No Matching Foils Hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matching foils or history. See the files below."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有匹配的箔片或历史记录，可查看下方文件"
+          }
+        }
+      }
+    },
     "Enable File Search": {
       "extractionState": "manual",
       "localizations": {
