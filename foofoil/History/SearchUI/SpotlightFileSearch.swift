@@ -52,18 +52,29 @@ final class SpotlightFileSearch {
     private var query: NSMetadataQuery?
     private var observers: [NSObjectProtocol] = []
     private let makeQuery: () -> NSMetadataQuery
+    /// 已有关键字结果时的等待上限：到点先用当前可用文件结束本轮。
     private let deadline: Duration
+    /// 尚无任何可用文件时的兜底上限：主目录范围下“无匹配”也要等系统收集结束才知道，
+    /// 不能把收集较慢误报成超时。
+    private let emptyDeadline: Duration
     private var timeout: Task<Void, Never>?
     private var completion: ((SpotlightSearchOutcome) -> Void)?
 
-    init(makeQuery: @escaping () -> NSMetadataQuery = { NSMetadataQuery() }, deadline: Duration = .seconds(3)) {
+    init(makeQuery: @escaping () -> NSMetadataQuery = { NSMetadataQuery() },
+         deadline: Duration = .seconds(3),
+         emptyDeadline: Duration = .seconds(10)) {
         self.makeQuery = makeQuery
         self.deadline = deadline
+        self.emptyDeadline = emptyDeadline
     }
 
     nonisolated static func predicate(for text: String) -> NSPredicate {
-        NSPredicate(format: "%K CONTAINS[cd] %@ AND NOT (%K == %@)",
-                    "kMDItemFSName", text, "kMDItemContentType", "public.folder")
+        let nameMatch = NSPredicate(format: "%K CONTAINS[cd] %@ AND NOT (%K == %@)",
+                                    "kMDItemFSName", text, "kMDItemContentType", "public.folder")
+        // 主目录范围包含 ~/Library：在谓词里先排除，减少无关候选并加快收集。
+        let libraryPath = SpotlightSearchAccess.userHome.appendingPathComponent("Library", isDirectory: true).path + "/"
+        let excludesLibrary = NSPredicate(format: "NOT (%K BEGINSWITH %@)", "kMDItemPath", libraryPath)
+        return NSCompoundPredicate(andPredicateWithSubpredicates: [nameMatch, excludesLibrary])
     }
 
     func start(text: String, scopes: [URL], extensions: Set<String>, completion: @escaping (SpotlightSearchOutcome) -> Void) {
@@ -89,12 +100,21 @@ final class SpotlightFileSearch {
             })
         }
         guard query.start() else { finish(.unavailable); return }
-        timeout = Task { [weak self, deadline] in
+        timeout = Task { [weak self, deadline, emptyDeadline] in
             do { try await Task.sleep(for: deadline) } catch { return }
             guard let self, self.generation == requestGeneration else { return }
             // 截止只限制等待时间，不能把系统已经收集到的可用文件丢弃。
             let files = self.collectResults(text: text, extensions: extensions)
-            self.finish(files.isEmpty ? .timedOut : .results(files))
+            guard files.isEmpty else {
+                self.finish(.results(files))
+                return
+            }
+            // 还没有任何可用文件：收集通常尚未结束，继续等到收集完成或兜底上限，
+            // 让“没有匹配”正常结束，而不是误报为超时。
+            do { try await Task.sleep(for: emptyDeadline - deadline) } catch { return }
+            guard self.generation == requestGeneration else { return }
+            let lateFiles = self.collectResults(text: text, extensions: extensions)
+            self.finish(lateFiles.isEmpty ? .timedOut : .results(lateFiles))
         }
     }
 

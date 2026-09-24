@@ -34,11 +34,27 @@ struct SpotlightSearchTests {
     }
 
     @Test func predicateTreatsUserInputLiterally() {
+        let home = SpotlightSearchAccess.userHome.path
         for text in ["中文", "a*b", "a?b", "quote'\"", "a\\b"] {
             let predicate = SpotlightFileSearch.predicate(for: text)
-            #expect(predicate.evaluate(with: ["kMDItemFSName": "prefix-\(text).txt", "kMDItemContentType": "public.plain-text"]))
+            #expect(predicate.evaluate(with: [
+                "kMDItemFSName": "prefix-\(text).txt",
+                "kMDItemContentType": "public.plain-text",
+                "kMDItemPath": "\(home)/Documents/prefix-\(text).txt"
+            ]))
         }
-        #expect(!SpotlightFileSearch.predicate(for: "a*b").evaluate(with: ["kMDItemFSName": "axyzb.txt", "kMDItemContentType": "public.plain-text"]))
+        let literal = SpotlightFileSearch.predicate(for: "a*b")
+        #expect(!literal.evaluate(with: [
+            "kMDItemFSName": "axyzb.txt",
+            "kMDItemContentType": "public.plain-text",
+            "kMDItemPath": "\(home)/Documents/axyzb.txt"
+        ]))
+        // 主目录范围包含 ~/Library，谓词层直接排除，减少无关候选。
+        #expect(!literal.evaluate(with: [
+            "kMDItemFSName": "a*b.txt",
+            "kMDItemContentType": "public.plain-text",
+            "kMDItemPath": "\(home)/Library/Caches/a*b.txt"
+        ]))
     }
 
     @Test func capabilityFilteringExcludesApplicationsAndDirectories() {
@@ -290,11 +306,26 @@ struct SpotlightGatheringTests {
 
     @Test func stalledEmptyQueryStillTimesOut() async {
         let query = PendingMetadataQuery()
-        let service = SpotlightFileSearch(makeQuery: { query }, deadline: .milliseconds(20))
+        let service = SpotlightFileSearch(makeQuery: { query }, deadline: .milliseconds(20), emptyDeadline: .milliseconds(60))
         let outcome: SpotlightSearchOutcome = await withCheckedContinuation { continuation in
             service.start(text: "report", scopes: [URL(fileURLWithPath: "/chosen")], extensions: []) { continuation.resume(returning: $0) }
         }
         guard case .timedOut = outcome else { Issue.record("An unfinished empty query must not claim completion"); return }
+        #expect(query.stopCount == 1)
+    }
+
+    @Test func emptyQueryFinishingAfterDeadlineIsNotReportedAsTimeout() async {
+        let query = PendingMetadataQuery()
+        let service = SpotlightFileSearch(makeQuery: { query }, deadline: .milliseconds(20), emptyDeadline: .seconds(2))
+        let outcome: SpotlightSearchOutcome = await withCheckedContinuation { continuation in
+            service.start(text: "report", scopes: [URL(fileURLWithPath: "/chosen")], extensions: []) { continuation.resume(returning: $0) }
+            // 主目录范围下“没有匹配”也要等系统收集结束才知道，收集晚于截止时按空结果处理。
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.06) {
+                NotificationCenter.default.post(name: .NSMetadataQueryDidFinishGathering, object: query)
+            }
+        }
+        guard case .results(let files) = outcome else { Issue.record("A finished empty query must report an empty result"); return }
+        #expect(files.isEmpty)
         #expect(query.stopCount == 1)
     }
 }
