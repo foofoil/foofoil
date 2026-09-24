@@ -77,11 +77,12 @@ struct HistorySearchView: View {
             }
             if model.mode == .history {
                 HStack {
-                    Button(NSLocalizedString("Choose Search Folders", comment: "")) { model.chooseSearchFolders?() }
-                    Spacer()
-                    if model.hasSearchFolders {
-                        Button(NSLocalizedString("Clear Search Folders", comment: "")) { model.clearSearchFolders() }
+                    if model.isFileSearchAuthorized {
+                        Button(NSLocalizedString("Disable File Search", comment: "")) { model.disableFileSearch() }
+                    } else {
+                        Button(NSLocalizedString("Enable File Search", comment: "")) { model.enableFileSearch?() }
                     }
+                    Spacer()
                 }.font(.caption).padding(.horizontal, 18).padding(.bottom, 12)
             }
             if let error = model.openError {

@@ -35,6 +35,8 @@ struct FoilExposeItem: Identifiable {
     let symbolName: String
     let contentKind: HistoryContentKind
     let thumbnailPath: String?
+    /// 历史配置记录的外部源文件路径；用于让 Spotlight 文件结果避开已展示的同一文件。
+    var sourcePath: String? = nil
 
     var window: NSWindow? { controller?.window }
     var isNewFoil: Bool { controller == nil && !isHistoryEntry }
@@ -66,6 +68,7 @@ final class FoilExposeModel: ObservableObject {
         didSet {
             // 过滤结果变化后回到第一项，避免高亮落在已被过滤掉的条目上。
             if selectedIndex != 0 { selectedIndex = 0 }
+            scheduleFileSearch()
         }
     }
     /// 是否处于搜索输入状态：Esc 只退出输入并保留关键字，不关闭覆盖层。
@@ -74,16 +77,39 @@ final class FoilExposeModel: ObservableObject {
     @Published var searchFieldFocusRequest: UInt64 = 0
     /// 最新的整页滚动请求；面板视图认领执行。
     @Published var pageScrollRequest: FoilExposePageScrollRequest?
+    /// Spotlight 文件结果：只在关键字非空时查询与呈现。
+    @Published private(set) var files: [SpotlightFileResult] = []
+    @Published private(set) var isFileSearching = false
+    @Published private(set) var fileStatus: FileSearchStatus?
+    /// 打开文件失败等一次性说明；下一次搜索或重新开启文件搜索时清除。
+    @Published var fileSearchNotice: String?
     /// 网格实际列数，由面板视图从卡片外框推导回填，供上下移动跨行使用。
     var columnCount: Int = 4
     var onSelect: (FoilExposeItem) -> Void = { _ in }
     var onDismiss: () -> Void = {}
+    /// 打开文件结果：由控制器检查可用性并在浮箔中打开。
+    var onOpenFile: (URL) -> Void = { _ in }
+    /// 请求开启文件搜索：由控制器弹出系统面板确认用户主目录。
+    var onRequestFileSearchAuthorization: () -> Void = {}
     /// 面板视图当前可见条目的 id（按显示顺序），随滚动实时回填；编号直选只命中可见项。
     private var visibleIDs: [UUID] = []
+    private let fileSearch: (String, @escaping (SpotlightSearchOutcome) -> Void) -> Void
+    private let cancelFiles: () -> Void
+    private var fileSearchTask: Task<Void, Never>?
+    private var fileGeneration = 0
+    private var rawFiles: [SpotlightFileResult] = []
 
-    init(items: [FoilExposeItem], historyItems: [FoilExposeItem]) {
+    init(items: [FoilExposeItem],
+         historyItems: [FoilExposeItem],
+         fileSearch: ((String, @escaping (SpotlightSearchOutcome) -> Void) -> Void)? = nil,
+         cancelFiles: (() -> Void)? = nil) {
         self.items = items
         self.historyItems = historyItems
+        let service = SpotlightFileSearch()
+        self.fileSearch = fileSearch ?? { text, completion in
+            service.start(text: text, completion: completion)
+        }
+        self.cancelFiles = cancelFiles ?? { service.cancel() }
     }
 
     /// 去掉首尾空白后的搜索关键字；空字符串表示不过滤。
@@ -126,6 +152,76 @@ final class FoilExposeModel: ObservableObject {
         searchText = ""
         isSearching = false
         selectedIndex = 0
+    }
+
+    /// 关键字非空时才呈现 Spotlight 文件结果区；空关键字不展示、不查询。
+    var showsFileResults: Bool { !searchQuery.isEmpty }
+
+    /// 关键字变化后防抖查询 Spotlight；空关键字立即清空并取消，避免结果与输入不一致。
+    private func scheduleFileSearch() {
+        fileSearchTask?.cancel()
+        fileSearchTask = nil
+        fileGeneration += 1
+        let generation = fileGeneration
+        fileSearchNotice = nil
+        let query = searchQuery
+        guard !query.isEmpty else {
+            cancelFiles()
+            rawFiles = []
+            files = []
+            fileStatus = nil
+            isFileSearching = false
+            return
+        }
+        rawFiles = []
+        files = []
+        fileStatus = nil
+        isFileSearching = true
+        fileSearchTask = Task { [weak self] in
+            do { try await Task.sleep(for: .milliseconds(150)) } catch { return }
+            guard let self, !Task.isCancelled, generation == self.fileGeneration else { return }
+            self.fileSearch(query) { [weak self] outcome in
+                guard let self, generation == self.fileGeneration else { return }
+                switch outcome {
+                case .progress(let files):
+                    self.rawFiles = files
+                    self.mergeFiles()
+                    return
+                case .results(let files): self.rawFiles = files
+                case .needsAuthorization: self.fileStatus = .needsAuthorization
+                case .authorizationUnavailable: self.fileStatus = .authorizationUnavailable
+                case .unavailable: self.fileStatus = .unavailable
+                case .timedOut: self.fileStatus = .timedOut
+                }
+                self.isFileSearching = false
+                self.mergeFiles()
+            }
+        }
+    }
+
+    /// 重试或重新授权后按当前关键字重新查询。
+    func restartFileSearch() {
+        scheduleFileSearch()
+    }
+
+    /// 覆盖层关闭时停止查询并释放主目录访问。
+    func stopFileSearch() {
+        fileSearchTask?.cancel()
+        fileSearchTask = nil
+        fileGeneration += 1
+        cancelFiles()
+        isFileSearching = false
+    }
+
+    /// 文件结果按相关度排序，并排除已在箔片/历史条目中展示的同一源文件。
+    private func mergeFiles() {
+        let excluded = Set(currentItems.compactMap(\.sourcePath).map { URL(fileURLWithPath: $0).standardizedFileURL.path })
+        files = SpotlightFileResult.ranked(rawFiles, query: searchQuery, excluding: excluded)
+    }
+
+    /// 请求开启文件搜索：交给控制器弹出系统面板确认用户主目录。
+    func requestFileSearchAuthorization() {
+        onRequestFileSearchAuthorization()
     }
 
     /// 移动键盘高亮，左右逐项、上下跨一行，越界时夹紧。
@@ -207,6 +303,9 @@ final class FoilExposeController {
     private var keyMonitor: Any?
     private var showAllHotKeyRef: EventHotKeyRef?
     private var hotKeyHandler: EventHandlerRef?
+    /// 系统面板（文件选择、授权）展示期间：覆盖层让出焦点，键盘监听放行，避免误操作覆盖层。
+    private var isPresentingSystemUI = false
+    private var isOpeningFile = false
 
     private init() {
         // 观察者与单例同生命周期；未展示时下面的处理会被各自的守卫拦下。
@@ -315,6 +414,8 @@ final class FoilExposeController {
         )
         model.onSelect = { [weak self] item in self?.select(item) }
         model.onDismiss = { [weak self] in self?.dismiss() }
+        model.onOpenFile = { [weak self] url in self?.openFile(url) }
+        model.onRequestFileSearchAuthorization = { [weak self] in self?.requestFileSearchAuthorization() }
         self.model = model
 
         // 先激活本 App，再在当前活跃显示器上铺一块非激活面板并指定它为 key window。
@@ -352,7 +453,7 @@ final class FoilExposeController {
     }
 
     @objc private func handleDidBecomeActive() {
-        guard isShowing else { return }
+        guard isShowing, !isPresentingSystemUI else { return }
         focusPanel()
     }
 
@@ -387,7 +488,8 @@ final class FoilExposeController {
                 title: title,
                 symbolName: config.historyMenuSymbolName,
                 contentKind: contentKind,
-                thumbnailPath: thumbnailPath
+                thumbnailPath: thumbnailPath,
+                sourcePath: Self.sourcePath(from: config)
             )
         }
     }
@@ -411,9 +513,16 @@ final class FoilExposeController {
                 title: title,
                 symbolName: config.historyMenuSymbolName,
                 contentKind: contentKind,
-                thumbnailPath: thumbnailPath
+                thumbnailPath: thumbnailPath,
+                sourcePath: Self.sourcePath(from: config)
             )
         }
+    }
+
+    /// 历史配置记录的外部源文件路径（file: 前缀的指纹），用于文件结果的跨来源去重。
+    private static func sourcePath(from config: WindowConfig) -> String? {
+        guard let fingerprint = config.sourceFingerprint, fingerprint.hasPrefix("file:") else { return nil }
+        return String(fingerprint.dropFirst(5))
     }
 
     private static func makePanel(for screen: NSScreen, model: FoilExposeModel) -> FoilExposePanel {
@@ -459,9 +568,72 @@ final class FoilExposeController {
         window.orderFrontRegardless()
     }
 
+    /// 打开 Spotlight 文件结果：先检查可读性，可读则保持主目录授权直到目标箔片装载结束；
+    /// 文件不可读时留在覆盖层内说明原因，不关闭覆盖层。
+    private func openFile(_ url: URL) {
+        guard !isOpeningFile, let model else { return }
+        isOpeningFile = true
+        let access = (try? SpotlightSearchAccess.shared.beginAccess()) ?? []
+        Task { [weak self] in
+            guard let self else { return }
+            let result = await SpotlightFileOpener.fileAccess(url)
+            guard self.model === model else {
+                SpotlightFileOpener.releaseAccess(access)
+                self.isOpeningFile = false
+                return
+            }
+            switch result {
+            case .readable:
+                if SpotlightFileOpener.openInFoil(url, access: access) {
+                    self.dismiss()
+                } else {
+                    SpotlightFileOpener.releaseAccess(access)
+                    model.fileSearchNotice = NSLocalizedString("Search File Open Failed", comment: "")
+                }
+            case .notDownloaded:
+                SpotlightFileOpener.releaseAccess(access)
+                model.fileSearchNotice = NSLocalizedString("Search File Not Downloaded", comment: "")
+            case .needsPermission, .unavailable:
+                SpotlightFileOpener.releaseAccess(access)
+                model.fileSearchNotice = NSLocalizedString("Search File Open Failed", comment: "")
+            }
+            self.isOpeningFile = false
+        }
+    }
+
+    /// 开启文件搜索：系统面板会盖住覆盖层，先让出面板，选择结束后恢复并重新查询。
+    private func requestFileSearchAuthorization() {
+        guard !isPresentingSystemUI, let model, let panel = panels.first else { return }
+        isPresentingSystemUI = true
+        panel.orderOut(nil)
+        SpotlightSearchAuthorization.request { [weak self] outcome in
+            guard let self else { return }
+            self.isPresentingSystemUI = false
+            // 面板可能已被关闭或覆盖层已退场，此时不再恢复。
+            guard self.model === model, self.panels.first === panel else { return }
+            NSApp.activate(ignoringOtherApps: true)
+            panel.makeKeyAndOrderFront(nil)
+            if model.isSearching {
+                model.requestSearchFieldFocus()
+            }
+            switch outcome {
+            case .authorized:
+                model.restartFileSearch()
+            case .needsHomeFolder:
+                model.fileSearchNotice = NSLocalizedString("File Search Needs Home Folder", comment: "")
+            case .failed:
+                model.fileSearchNotice = NSLocalizedString("File Search Authorization Failed", comment: "")
+            case .cancelled:
+                break
+            }
+        }
+    }
+
     private func installKeyMonitor() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self, let model = self.model else { return event }
+            // 系统面板（文件选择、授权）接管期间把按键交回系统，避免误触覆盖层。
+            if self.isPresentingSystemUI { return event }
             let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             let key = event.charactersIgnoringModifiers?.lowercased()
             let onlyCommand = modifiers.contains(.command)
@@ -561,6 +733,7 @@ final class FoilExposeController {
 
     func dismiss() {
         guard model != nil || !panels.isEmpty else { return }
+        model?.stopFileSearch()
         if let keyMonitor {
             NSEvent.removeMonitor(keyMonitor)
             self.keyMonitor = nil

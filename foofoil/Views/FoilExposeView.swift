@@ -110,6 +110,11 @@ struct FoilExposeView: View {
         GridItem(.adaptive(minimum: 232, maximum: 300), spacing: 18)
     ]
 
+    /// 文件结果用较窄的自适应列：名称与父目录一行可读，同时避免单列铺满整屏。
+    private static let fileColumns = [
+        GridItem(.adaptive(minimum: 320, maximum: 620), spacing: 10)
+    ]
+
     /// 当前可见条目的下标（显示顺序）；编号与编号直选都据此实时计算。
     @State private var visibleIndices: [Int] = []
     @State private var repositionAfterPageScroll = false
@@ -255,10 +260,9 @@ struct FoilExposeView: View {
         for entries: [(offset: Int, item: FoilExposeItem)],
         shortcutByID: [UUID: String]
     ) -> some View {
-        if entries.isEmpty {
-            Text(model.searchQuery.isEmpty
-                 ? NSLocalizedString("No Foils on This Screen", comment: "")
-                 : NSLocalizedString("No Search Results", comment: ""))
+        // 有关键字时不再给整页空态：文件结果区会说明“主目录中没有匹配的文件”。
+        if entries.isEmpty && model.searchQuery.isEmpty {
+            Text(NSLocalizedString("No Foils on This Screen", comment: ""))
                 .font(.system(size: 15))
                 .foregroundStyle(.white.opacity(0.6))
                 .padding(.top, 120)
@@ -273,8 +277,87 @@ struct FoilExposeView: View {
                     // 历史记录另起一行，并降低透明度与打开的箔片区分；高亮项保持完整亮度。
                     grid(for: historyEntries, shortcutByID: shortcutByID, dimsHistory: true)
                 }
+                fileResultsSection
             }
         }
+    }
+
+    /// Spotlight 文件结果区：输入关键字后才出现，出现与结果更新都带平滑过渡。
+    @ViewBuilder
+    private var fileResultsSection: some View {
+        Group {
+            if model.showsFileResults {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(NSLocalizedString("Local Files Section", comment: ""))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.6))
+                    // 关键字变化会先清空再补结果；网格常驻才能让行的增删都走同一段过渡。
+                    LazyVGrid(columns: Self.fileColumns, spacing: 10) {
+                        ForEach(model.files) { file in
+                            FoilExposeFileView(file: file) { model.onOpenFile(file.url) }
+                        }
+                    }
+                    .animation(.smooth(duration: 0.25), value: model.files)
+                    fileStatusLine
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .animation(.smooth(duration: 0.22), value: model.isFileSearching)
+                .animation(.smooth(duration: 0.22), value: model.fileStatus)
+                .animation(.smooth(duration: 0.22), value: model.fileSearchNotice)
+                .transition(.opacity.combined(with: .offset(y: 18)))
+            }
+        }
+        .animation(.smooth(duration: 0.3), value: model.showsFileResults)
+    }
+
+    /// 文件来源的状态行：加载、需要授权、失败与空结果各自给出下一步动作；打开失败另起一行说明。
+    @ViewBuilder
+    private var fileStatusLine: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            if model.isFileSearching {
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(NSLocalizedString("Searching Local Files", comment: ""))
+                }
+                .font(.system(size: 12))
+                .foregroundStyle(.white.opacity(0.62))
+            } else if let status = model.fileStatus {
+                HStack(spacing: 10) {
+                    Text(NSLocalizedString(status.localizationKey, comment: ""))
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.62))
+                    switch status {
+                    case .needsAuthorization, .authorizationUnavailable:
+                        fileActionButton("Enable File Search") { model.requestFileSearchAuthorization() }
+                    case .unavailable, .timedOut:
+                        fileActionButton("Retry File Search") { model.restartFileSearch() }
+                    }
+                }
+            } else if model.files.isEmpty {
+                Text(NSLocalizedString("No Local File Results", comment: ""))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.62))
+            }
+            if let notice = model.fileSearchNotice {
+                Text(notice)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.72))
+            }
+        }
+    }
+
+    /// 覆盖层内的浅色描边按钮：深色材质上保持可读，与搜索控件的键帽风格一致。
+    private func fileActionButton(_ localizationKey: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(NSLocalizedString(localizationKey, comment: ""))
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.white.opacity(0.16)))
+                .overlay(Capsule().stroke(Color.white.opacity(0.32), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
     }
 
     private func grid(
@@ -597,6 +680,52 @@ struct FoilExposeItemView: View {
             }
             .padding(7)
         }
+    }
+}
+
+/// 覆盖层里的 Spotlight 文件结果：类型图标 + 文件名 + 父目录，悬停反馈与卡片一致，点击打开。
+private struct FoilExposeFileView: View {
+    let file: SpotlightFileResult
+    var onOpen: () -> Void
+
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: onOpen) {
+            HStack(spacing: 10) {
+                Image(systemName: file.symbolName)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .frame(width: 30, height: 30)
+                    .background(RoundedRectangle(cornerRadius: 7).fill(Color.white.opacity(0.1)))
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(file.name)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                    Text(file.url.deletingLastPathComponent().path)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(RoundedRectangle(cornerRadius: 9).fill(Color.white.opacity(isHovered ? 0.12 : 0.06)))
+            .contentShape(RoundedRectangle(cornerRadius: 9))
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .help(file.url.path)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(String(
+            format: NSLocalizedString("Search File Accessibility Format", comment: ""),
+            file.name,
+            file.url.deletingLastPathComponent().path
+        ))
     }
 }
 

@@ -36,10 +36,10 @@ nonisolated enum SpotlightSearchOutcome: Sendable {
     case results([SpotlightFileResult])
     /// 初次收集尚未结束，先展示当前可用的候选。
     case progress([SpotlightFileResult])
-    /// 尚未配置搜索文件夹。
-    case needsFolder
-    /// 已保存的文件夹书签无法恢复，需要用户重新选择。
-    case foldersUnavailable
+    /// 尚未授权搜索用户主目录。
+    case needsAuthorization
+    /// 已保存的主目录书签无法恢复，需要用户重新开启。
+    case authorizationUnavailable
     case unavailable
     case timedOut
 }
@@ -68,7 +68,7 @@ final class SpotlightFileSearch {
 
     func start(text: String, scopes: [URL], extensions: Set<String>, completion: @escaping (SpotlightSearchOutcome) -> Void) {
         cancel()
-        guard !scopes.isEmpty else { completion(.needsFolder); return }
+        guard !scopes.isEmpty else { completion(.needsAuthorization); return }
         // 调用方已启动安全范围访问，服务接管到查询完成或取消。
         accessedScopes = scopes
         let requestGeneration = generation
@@ -124,6 +124,7 @@ final class SpotlightFileSearch {
                   url.lastPathComponent.range(of: text, options: [.caseInsensitive, .diacriticInsensitive]) != nil,
                   (item.value(forAttribute: "kMDItemFSInvisible") as? NSNumber)?.boolValue != true,
                   !url.pathComponents.contains(where: { $0.hasPrefix(".") }),
+                  !Self.isHomeLibrary(url),
                   !AppState.isManagedCacheURL(url),
                   let identifier = item.value(forAttribute: "kMDItemContentType") as? String,
                   Self.supports(url: url, typeIdentifier: identifier, extensions: extensions) else { continue }
@@ -138,6 +139,12 @@ final class SpotlightFileSearch {
             let root = $0.standardizedFileURL.path
             return path.hasPrefix(root == "/" ? "/" : root + "/")
         }
+    }
+
+    /// 主目录范围下排除 ~/Library：应用数据与缓存数量庞大，不属于用户要找的文件。
+    nonisolated static func isHomeLibrary(_ url: URL) -> Bool {
+        let library = SpotlightSearchAccess.userHome.appendingPathComponent("Library", isDirectory: true).standardizedFileURL.path
+        return url.standardizedFileURL.path.hasPrefix(library + "/")
     }
 
     nonisolated static func supports(url: URL, typeIdentifier: String, extensions: Set<String>) -> Bool {
@@ -165,5 +172,20 @@ final class SpotlightFileSearch {
         completion = nil
         accessedScopes.forEach { $0.stopAccessingSecurityScopedResource() }
         accessedScopes = []
+    }
+}
+
+extension SpotlightFileSearch {
+    /// 用宿主与可用扩展声明的候选类型，在已授权的主目录范围内查询；未授权时直接报告状态。
+    func start(text: String, completion: @escaping (SpotlightSearchOutcome) -> Void) {
+        let extensions = Set(ExtensionHost.shared.resolver.allDescriptors()
+            .filter { $0.isEnabled && $0.isRuntimeAvailable }
+            .flatMap(\.filenameExtensions).map { $0.lowercased() })
+        do {
+            let scopes = try SpotlightSearchAccess.shared.beginAccess()
+            start(text: text, scopes: scopes, extensions: extensions, completion: completion)
+        } catch {
+            completion(.authorizationUnavailable)
+        }
     }
 }

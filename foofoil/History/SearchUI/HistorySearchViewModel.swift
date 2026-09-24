@@ -8,15 +8,15 @@ enum HistorySearchMode {
 
 /// 文件来源的结束状态；只有明确原因时才展示具体说明，正常零结果不解释为故障。
 enum FileSearchStatus: Equatable {
-    case needsFolder
-    case foldersUnavailable
+    case needsAuthorization
+    case authorizationUnavailable
     case unavailable
     case timedOut
 
     var localizationKey: String {
         switch self {
-        case .needsFolder: "File Search Needs Folder"
-        case .foldersUnavailable: "File Search Folders Unavailable"
+        case .needsAuthorization: "File Search Needs Authorization"
+        case .authorizationUnavailable: "File Search Authorization Unavailable"
         case .unavailable: "File Search Unavailable"
         case .timedOut: "File Search Timed Out"
         }
@@ -51,12 +51,12 @@ final class HistorySearchViewModel: ObservableObject {
     var openResult: ((UUID) -> Void)?
     var openWebURL: ((URL) -> Void)?
     var openFile: ((URL) -> Void)?
-    var chooseSearchFolders: (() -> Void)?
-    var hasSearchFolders: Bool { SpotlightSearchFolders.shared.hasFolders }
+    var enableFileSearch: (() -> Void)?
+    var isFileSearchAuthorized: Bool { SpotlightSearchAccess.shared.isAuthorized }
 
-    func clearSearchFolders() {
+    func disableFileSearch() {
         stop()
-        SpotlightSearchFolders.shared.clear()
+        SpotlightSearchAccess.shared.clear()
         performSearch()
     }
 
@@ -66,13 +66,7 @@ final class HistorySearchViewModel: ObservableObject {
         self.historySearch = historySearch
         let service = SpotlightFileSearch()
         self.fileSearch = fileSearch ?? { text, completion in
-            let extensions = Set(ExtensionHost.shared.resolver.allDescriptors()
-                .filter { $0.isEnabled && $0.isRuntimeAvailable }
-                .flatMap(\.filenameExtensions).map { $0.lowercased() })
-            do {
-                let scopes = try SpotlightSearchFolders.shared.beginAccess()
-                service.start(text: text, scopes: scopes, extensions: extensions, completion: completion)
-            } catch { completion(.foldersUnavailable) }
+            service.start(text: text, completion: completion)
         }
         self.cancelFiles = cancelFiles ?? { service.cancel() }
     }
@@ -174,8 +168,8 @@ final class HistorySearchViewModel: ObservableObject {
                         self.reconcileSelection(previousIndex: previousIndex)
                         return
                     case .results(let files): self.rawFiles = files
-                    case .needsFolder: self.fileStatus = .needsFolder
-                    case .foldersUnavailable: self.fileStatus = .foldersUnavailable
+                    case .needsAuthorization: self.fileStatus = .needsAuthorization
+                    case .authorizationUnavailable: self.fileStatus = .authorizationUnavailable
                     case .unavailable: self.fileStatus = .unavailable
                     case .timedOut: self.fileStatus = .timedOut
                     }

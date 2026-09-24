@@ -14,7 +14,8 @@ struct FoilExposeModelTests {
     private func makeItem(
         id: UUID = UUID(),
         title: String = "item",
-        isHistoryEntry: Bool = false
+        isHistoryEntry: Bool = false,
+        sourcePath: String? = nil
     ) -> FoilExposeItem {
         FoilExposeItem(
             id: id,
@@ -23,15 +24,22 @@ struct FoilExposeModelTests {
             title: title,
             symbolName: "doc",
             contentKind: .text,
-            thumbnailPath: nil
+            thumbnailPath: nil,
+            sourcePath: sourcePath
         )
     }
 
     private func makeModel(openCount: Int = 6, historyCount: Int = 2) -> FoilExposeModel {
         FoilExposeModel(
             items: (0..<openCount).map { _ in makeItem() },
-            historyItems: (0..<historyCount).map { _ in makeItem(isHistoryEntry: true) }
+            historyItems: (0..<historyCount).map { _ in makeItem(isHistoryEntry: true) },
+            fileSearch: { _, _ in },
+            cancelFiles: {}
         )
+    }
+
+    private func makeModel(items: [FoilExposeItem], historyItems: [FoilExposeItem]) -> FoilExposeModel {
+        FoilExposeModel(items: items, historyItems: historyItems, fileSearch: { _, _ in }, cancelFiles: {})
     }
 
     @Test func currentItemsCombineOpenFoilsBeforeHistory() {
@@ -43,7 +51,7 @@ struct FoilExposeModelTests {
 
     @Test func historyEntriesAlreadyOpenAreNotShownTwice() {
         let openID = UUID()
-        let model = FoilExposeModel(
+        let model = makeModel(
             items: [makeItem(id: openID, title: "Open")],
             historyItems: [
                 makeItem(id: openID, title: "Open", isHistoryEntry: true),
@@ -91,7 +99,7 @@ struct FoilExposeModelTests {
     }
 
     @Test func searchFiltersOpenFoilsAndHistoryByTitle() {
-        let model = FoilExposeModel(
+        let model = makeModel(
             items: [makeItem(title: "Alpha"), makeItem(title: "Beta")],
             historyItems: [makeItem(title: "Alphabet", isHistoryEntry: true)]
         )
@@ -105,10 +113,7 @@ struct FoilExposeModelTests {
     }
 
     @Test func searchIsCaseAndWhitespaceInsensitive() {
-        let model = FoilExposeModel(
-            items: [makeItem(title: "Hello World")],
-            historyItems: []
-        )
+        let model = makeModel(items: [makeItem(title: "Hello World")], historyItems: [])
         model.searchText = "  hello  "
         #expect(model.currentItems.count == 1)
         model.searchText = "   "
@@ -158,5 +163,94 @@ struct FoilExposeModelTests {
         let history = model.historyItems[0].id
         model.setVisibleIDs([history])
         #expect(model.item(forKey: "1")?.id == history)
+    }
+
+    private func file(_ path: String, date: Double = 0) -> SpotlightFileResult {
+        .init(url: URL(fileURLWithPath: path), modifiedAt: Date(timeIntervalSince1970: date))
+    }
+
+    private func eventually(_ condition: () -> Bool) async throws {
+        for _ in 0..<200 {
+            if condition() { return }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(condition(), "File search did not reach expected state")
+    }
+
+    @Test func fileSearchOnlyRunsWithAQueryAndClearsOnEmptyInput() async throws {
+        var callbacks: [String: (SpotlightSearchOutcome) -> Void] = [:]
+        var cancellations = 0
+        let model = FoilExposeModel(
+            items: [makeItem(title: "Alpha")],
+            historyItems: [],
+            fileSearch: { callbacks[$0] = $1 },
+            cancelFiles: { cancellations += 1 }
+        )
+        // 空关键字不查询、不呈现文件结果区。
+        #expect(!model.showsFileResults)
+        model.searchText = "   "
+        #expect(!model.showsFileResults)
+        #expect(callbacks.isEmpty)
+
+        model.searchText = "alpha"
+        #expect(model.showsFileResults)
+        try await eventually { callbacks["alpha"] != nil }
+        #expect(model.isFileSearching)
+        callbacks["alpha"]?(.progress([file("/docs/alpha.txt")]))
+        #expect(model.files.map(\.name) == ["alpha.txt"])
+        #expect(model.isFileSearching)
+        callbacks["alpha"]?(.results([file("/docs/alpha.txt"), file("/docs/alpha-old.txt", date: 5)]))
+        #expect(!model.isFileSearching)
+        #expect(model.files.map(\.name) == ["alpha.txt", "alpha-old.txt"])
+
+        model.searchText = ""
+        #expect(!model.showsFileResults)
+        #expect(model.files.isEmpty)
+        #expect(cancellations >= 1)
+    }
+
+    @Test func lateFileResultsCannotOverwriteANewQuery() async throws {
+        var callbacks: [String: (SpotlightSearchOutcome) -> Void] = [:]
+        let model = FoilExposeModel(items: [], historyItems: [],
+                                    fileSearch: { callbacks[$0] = $1 }, cancelFiles: {})
+        model.searchText = "old"
+        try await eventually { callbacks["old"] != nil }
+        model.searchText = "new"
+        try await eventually { callbacks["new"] != nil }
+        callbacks["old"]?(.results([file("/old.txt")]))
+        #expect(model.files.isEmpty)
+        callbacks["new"]?(.results([file("/new.txt")]))
+        #expect(model.files.map(\.name) == ["new.txt"])
+        // 覆盖层关闭后晚到的回调同样被丢弃。
+        model.stopFileSearch()
+        callbacks["new"]?(.results([file("/late.txt")]))
+        #expect(model.files.map(\.name) == ["new.txt"])
+        #expect(!model.isFileSearching)
+    }
+
+    @Test func fileResultsSkipFilesAlreadyShownAsHistoryItems() async throws {
+        var callback: ((SpotlightSearchOutcome) -> Void)?
+        let history = makeItem(title: "Report", isHistoryEntry: true, sourcePath: "/docs/report.txt")
+        let model = FoilExposeModel(items: [], historyItems: [history],
+                                    fileSearch: { _, value in callback = value }, cancelFiles: {})
+        model.searchText = "report"
+        try await eventually { callback != nil }
+        callback?(.results([file("/docs/report.txt"), file("/docs/report-old.txt", date: 5)]))
+        #expect(model.files.map(\.name) == ["report-old.txt"])
+    }
+
+    @Test func fileStatusReportsMissingAuthorization() async throws {
+        var callback: ((SpotlightSearchOutcome) -> Void)?
+        let model = FoilExposeModel(items: [], historyItems: [],
+                                    fileSearch: { _, value in callback = value }, cancelFiles: {})
+        model.searchText = "report"
+        try await eventually { callback != nil }
+        callback?(.needsAuthorization)
+        #expect(model.fileStatus == .needsAuthorization)
+        #expect(!model.isFileSearching)
+        // 重新开启后重新查询并清掉旧状态。
+        model.restartFileSearch()
+        #expect(model.fileStatus == nil)
+        #expect(model.isFileSearching)
     }
 }

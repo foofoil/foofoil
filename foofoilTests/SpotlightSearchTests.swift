@@ -133,19 +133,19 @@ struct SpotlightSearchTests {
         try await eventually { !model.isHistorySearching }
         #expect(model.showsOverallEmptyState)
         // 文件来源给出明确状态时展示具体说明而不是笼统空态。
-        callback?(.foldersUnavailable)
+        callback?(.authorizationUnavailable)
         #expect(!model.showsOverallEmptyState)
-        #expect(model.fileStatus == .foldersUnavailable)
+        #expect(model.fileStatus == .authorizationUnavailable)
         #expect(model.fileStatus?.isRetryable == false)
-        #expect(model.fileStatus?.localizationKey == "File Search Folders Unavailable")
+        #expect(model.fileStatus?.localizationKey == "File Search Authorization Unavailable")
         model.stop()
     }
     @Test func fileAccessDistinguishesReadableAndMissingFiles() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".txt")
         try Data("Spotlight open validation".utf8).write(to: url)
-        #expect(await HistorySearchWindowController.fileAccess(url) == .readable)
+        #expect(await SpotlightFileOpener.fileAccess(url) == .readable)
         try FileManager.default.removeItem(at: url)
-        #expect(await HistorySearchWindowController.fileAccess(url) == .unavailable)
+        #expect(await SpotlightFileOpener.fileAccess(url) == .unavailable)
     }
 
     @Test func historyQueryProjectsSourceIdentityForCrossSourceDeduplication() async throws {
@@ -170,35 +170,44 @@ struct SpotlightSearchTests {
 
     @Test func missingScopeDoesNotStartAnUnrestrictedQuery() {
         let service = SpotlightFileSearch()
-        var needsFolder = false
+        var needsAuthorization = false
         service.start(text: "report", scopes: [], extensions: []) { outcome in
-            if case .needsFolder = outcome { needsFolder = true }
+            if case .needsAuthorization = outcome { needsAuthorization = true }
         }
-        #expect(needsFolder)
+        #expect(needsAuthorization)
         service.cancel()
     }
 
-    @Test func searchFolderBookmarksRoundTripThroughDefaults() throws {
+    @Test func homeAuthorizationRoundTripThroughDefaults() throws {
         let suiteName = "SpotlightSearchTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defer { defaults.removePersistentDomain(forName: suiteName) }
-        let folders = SpotlightSearchFolders(defaults: defaults)
-        #expect(!folders.hasFolders)
 
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: directory) }
+        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: home) }
+        let other = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: other) }
 
-        try folders.replace(with: [directory])
-        #expect(folders.hasFolders)
-        let restored = try folders.beginAccess()
+        let access = SpotlightSearchAccess(defaults: defaults, homeDirectory: home)
+        #expect(!access.isAuthorized)
+        #expect(try access.beginAccess().isEmpty)
+
+        // 固定主目录：选择其他目录不保存授权。
+        #expect(throws: SpotlightSearchAccessError.self) { try access.authorizeHome(other) }
+        #expect(!access.isAuthorized)
+
+        try access.authorizeHome(home)
+        #expect(access.isAuthorized)
+        let restored = try access.beginAccess()
         defer { restored.forEach { $0.stopAccessingSecurityScopedResource() } }
         #expect(restored.map { $0.resolvingSymlinksInPath().standardizedFileURL.path }
-            == [directory.resolvingSymlinksInPath().standardizedFileURL.path])
+            == [home.resolvingSymlinksInPath().standardizedFileURL.path])
 
-        folders.clear()
-        #expect(!folders.hasFolders)
-        #expect(try folders.beginAccess().isEmpty)
+        access.clear()
+        #expect(!access.isAuthorized)
+        #expect(try access.beginAccess().isEmpty)
     }
 
 }

@@ -1,87 +1,138 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "Search Folder Access Failed": {
+    "Enable File Search": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Could not save access to these folders. Please select them again."
+            "value": "Turn On File Search…"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "无法保存这些文件夹的访问授权，请重新选择。"
+            "value": "开启文件搜索…"
           }
         }
       }
     },
-    "Search Folders Message": {
+    "Disable File Search": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Choose the folders to search. This replaces your previous selection."
+            "value": "Turn Off File Search"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "选择要搜索的文件夹，此操作会替换之前的选择。"
+            "value": "关闭文件搜索"
           }
         }
       }
     },
-    "Clear Search Folders": {
+    "File Search Needs Authorization": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Remove Search Folders"
+            "value": "Turn on file search to look through indexed files in your home folder."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "移除搜索文件夹"
+            "value": "开启文件搜索后，可搜索主目录中已建立索引的文件。"
           }
         }
       }
     },
-    "Choose Search Folders": {
+    "File Search Authorization Unavailable": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Choose Search Folders…"
+            "value": "File search access expired. Turn it on again."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "选择搜索文件夹…"
+            "value": "文件搜索的授权已失效，请重新开启。"
           }
         }
       }
     },
-    "File Search Needs Folder": {
+    "File Search Authorization Message": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Choose folders to search their indexed files."
+            "value": "Choose your home folder to let foofoil search indexed files in it."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "选择文件夹，以搜索其中已建立索引的文件。"
+            "value": "请选择用户主目录，以允许浮箔搜索其中已建立索引的文件。"
+          }
+        }
+      }
+    },
+    "File Search Authorization Confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn On"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开启"
+          }
+        }
+      }
+    },
+    "File Search Needs Home Folder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select your home folder to turn on file search."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择用户主目录以开启文件搜索。"
+          }
+        }
+      }
+    },
+    "File Search Authorization Failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not save file search access. Please try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法保存文件搜索授权，请重试。"
           }
         }
       }
@@ -194,30 +245,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "File search is unavailable. History is still available."
+            "value": "File search is unavailable."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "文件搜索暂不可用，仍可搜索历史记录。"
-          }
-        }
-      }
-    },
-    "File Search Folders Unavailable": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Search folders need to be selected again."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "搜索文件夹的授权已失效，请重新选择。"
+            "value": "文件搜索暂不可用。"
           }
         }
       }
@@ -228,13 +262,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No other matching files in the selected folders."
+            "value": "No matching files in your home folder."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "所选文件夹中没有其他匹配的文件。"
+            "value": "主目录中没有匹配的文件。"
           }
         }
       }
@@ -262,13 +296,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Files in Selected Folders"
+            "value": "Files in Your Home Folder"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "所选文件夹中的文件"
+            "value": "主目录中的文件"
           }
         }
       }
