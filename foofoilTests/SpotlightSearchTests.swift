@@ -30,8 +30,15 @@ struct SpotlightSearchTests {
         #expect(ranked.count == 4)
         #expect(ranked.prefix(2).allSatisfy { $0.name.lowercased() == "report.txt" })
         #expect(ranked.last?.name == "my report.txt")
-        let many = (0..<30).map { file("/docs/report-\($0).txt") }
-        #expect(SpotlightFileResult.ranked(many, query: "report").count == 20)
+        let many = (0..<80).map { file("/docs/report-\($0).txt") }
+        #expect(SpotlightFileResult.ranked(many, query: "report").count == 40)
+    }
+
+    @Test func multiKeywordQueriesRankWholeNameMatchesFirst() {
+        let files = [file("/docs/Mahler Symphony No. 7 ''Song Of The Night''.flac", date: 10),
+                     file("/docs/Mahler 7.cue", date: 5)]
+        let ranked = SpotlightFileResult.ranked(files, query: "mahler 7")
+        #expect(ranked.map(\.name) == ["Mahler 7.cue", "Mahler Symphony No. 7 ''Song Of The Night''.flac"])
     }
 
     @Test func predicateTreatsUserInputLiterally() {
@@ -56,6 +63,33 @@ struct SpotlightSearchTests {
             "kMDItemContentType": "public.plain-text",
             "kMDItemPath": "\(home)/Library/Caches/a*b.txt"
         ]))
+    }
+
+    @Test func multiKeywordPredicateMatchesNonContiguousNames() {
+        let home = SpotlightSearchAccess.userHome.path
+        let name = "Mahler Symphony No. 7 ''Song Of The Night''.flac"
+        func evaluate(_ text: String, _ fileName: String) -> Bool {
+            SpotlightFileSearch.predicate(for: text).evaluate(with: [
+                "kMDItemFSName": fileName,
+                "kMDItemContentType": "public.audio",
+                "kMDItemPath": "\(home)/Music/\(fileName)"
+            ])
+        }
+        // 逐词匹配、忽略顺序：mahler 7 命中 Mahler Symphony No. 7。
+        #expect(evaluate("mahler 7", name))
+        #expect(evaluate("7 mahler", name))
+        #expect(evaluate("  mahler   7  ", name))
+        // 每个词都必须出现；整串仍不要求连续。
+        #expect(!evaluate("mahler 9", name))
+        // 空关键字不匹配任何文件。
+        #expect(!evaluate("   ", name))
+    }
+
+    @Test func literalMatchRequiresEveryKeyword() {
+        let url = URL(fileURLWithPath: "/docs/Mahler Symphony No. 7.flac")
+        #expect(SpotlightFileSearch.matches(url: url, keywords: ["mahler", "7"]))
+        #expect(SpotlightFileSearch.matches(url: url, keywords: ["7", "MAHLER"]))
+        #expect(!SpotlightFileSearch.matches(url: url, keywords: ["mahler", "9"]))
     }
 
     @Test func capabilityFilteringExcludesApplicationsAndDirectories() {
@@ -276,7 +310,7 @@ struct SpotlightGatheringTests {
         }
         query.rows = (0..<16_932).map(row)
         NotificationCenter.default.post(name: .NSMetadataQueryGatheringProgress, object: query)
-        #expect(results.count == 200)
+        #expect(results.count == 600)
         #expect(query.stopCount == 1)
         try await Task.sleep(for: .milliseconds(60))
         #expect(callbacks == 1)

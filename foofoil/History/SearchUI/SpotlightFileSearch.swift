@@ -15,20 +15,37 @@ nonisolated struct SpotlightFileResult: Identifiable, Sendable, Equatable {
         return "doc"
     }
 
+    /// 结果展示上限：覆盖层可滚动，40 条仍能保持收集与渲染都很快。
+    static let displayLimit = 40
+
+    /// 多关键字查询：整串吻合最优先，其余按每个关键字在文件名中的匹配质量求和，
+    /// 同级再按修改时间与路径稳定排序。
     static func ranked(_ files: [Self], query: String, excluding paths: Set<String> = []) -> [Self] {
-        let needle = query.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+        let locale = Locale(identifier: "en_US_POSIX")
+        func folded(_ value: String) -> String {
+            value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: locale)
+        }
+        let needle = folded(query)
+        let keywords = query.split(whereSeparator: { $0.isWhitespace }).map { folded(String($0)) }
+        func tokenRank(_ name: String, _ token: String) -> Int {
+            if name == token { return 0 }
+            if (name as NSString).deletingPathExtension == token { return 1 }
+            return name.hasPrefix(token) ? 2 : 3
+        }
         func rank(_ file: Self) -> Int {
-            let name = file.name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+            let name = folded(file.name)
             if name == needle { return 0 }
             if (name as NSString).deletingPathExtension == needle { return 1 }
-            return name.hasPrefix(needle) ? 2 : 3
+            guard keywords.count > 1 else { return name.hasPrefix(needle) ? 2 : 3 }
+            // 基准 2：多关键字下“整串吻合”的两档仍排在最前，其余按逐词质量求和。
+            return 2 + keywords.reduce(0) { $0 + tokenRank(name, $1) }
         }
         var seen = paths
         return files.filter { seen.insert($0.id).inserted }.sorted {
             if rank($0) != rank($1) { return rank($0) < rank($1) }
             if $0.modifiedAt != $1.modifiedAt { return $0.modifiedAt > $1.modifiedAt }
             return $0.id < $1.id
-        }.prefix(20).map { $0 }
+        }.prefix(Self.displayLimit).map { $0 }
     }
 }
 
@@ -68,13 +85,36 @@ final class SpotlightFileSearch {
         self.emptyDeadline = emptyDeadline
     }
 
+    /// 每次收集最多扫描的元数据候选：主目录范围下放宽到 600 仍只读元数据、不读正文。
+    static let candidateLimit = 600
+
+    /// 按空白拆分关键字：多关键字各自匹配文件名任意位置，顺序无关、可不连续。
+    nonisolated static func keywords(for text: String) -> [String] {
+        text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+    }
+
     nonisolated static func predicate(for text: String) -> NSPredicate {
-        let nameMatch = NSPredicate(format: "%K CONTAINS[cd] %@ AND NOT (%K == %@)",
-                                    "kMDItemFSName", text, "kMDItemContentType", "public.folder")
-        // 主目录范围包含 ~/Library：在谓词里先排除，减少无关候选并加快收集。
-        let libraryPath = SpotlightSearchAccess.userHome.appendingPathComponent("Library", isDirectory: true).path + "/"
-        let excludesLibrary = NSPredicate(format: "NOT (%K BEGINSWITH %@)", "kMDItemPath", libraryPath)
-        return NSCompoundPredicate(andPredicateWithSubpredicates: [nameMatch, excludesLibrary])
+        let keywords = keywords(for: text)
+        guard !keywords.isEmpty else { return NSPredicate(value: false) }
+        var subpredicates: [NSPredicate] = [
+            NSPredicate(format: "NOT (%K == %@)", "kMDItemContentType", "public.folder"),
+            // 主目录范围包含 ~/Library：在谓词里先排除，减少无关候选并加快收集。
+            NSPredicate(format: "NOT (%K BEGINSWITH %@)", "kMDItemPath",
+                        SpotlightSearchAccess.userHome.appendingPathComponent("Library", isDirectory: true).path + "/"),
+        ]
+        // 每个关键字一条 CONTAINS，交由系统索引取交集；搜索 `mahler 7` 能命中 `Mahler Symphony No. 7`。
+        subpredicates.append(contentsOf: keywords.map {
+            NSPredicate(format: "%K CONTAINS[cd] %@", "kMDItemFSName", $0)
+        })
+        return NSCompoundPredicate(andPredicateWithSubpredicates: subpredicates)
+    }
+
+    /// 文件名必须包含每个关键字；避免 Spotlight 的查询语法把输入里的通配符扩展成结果。
+    nonisolated static func matches(url: URL, keywords: [String]) -> Bool {
+        let name = url.lastPathComponent
+        return keywords.allSatisfy {
+            name.range(of: $0, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+        }
     }
 
     func start(text: String, scopes: [URL], extensions: Set<String>, completion: @escaping (SpotlightSearchOutcome) -> Void) {
@@ -91,11 +131,12 @@ final class SpotlightFileSearch {
         query.notificationBatchingInterval = 0.1
         self.query = query
         self.completion = completion
+        let keywords = Self.keywords(for: text)
         for name in [Notification.Name.NSMetadataQueryGatheringProgress, .NSMetadataQueryDidFinishGathering] {
             observers.append(NotificationCenter.default.addObserver(forName: name, object: query, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
                     guard let self, self.generation == requestGeneration else { return }
-                    self.receiveResults(text: text, extensions: extensions, isFinished: name == .NSMetadataQueryDidFinishGathering)
+                    self.receiveResults(keywords: keywords, extensions: extensions, isFinished: name == .NSMetadataQueryDidFinishGathering)
                 }
             })
         }
@@ -104,7 +145,7 @@ final class SpotlightFileSearch {
             do { try await Task.sleep(for: deadline) } catch { return }
             guard let self, self.generation == requestGeneration else { return }
             // 截止只限制等待时间，不能把系统已经收集到的可用文件丢弃。
-            let files = self.collectResults(text: text, extensions: extensions)
+            let files = self.collectResults(keywords: keywords, extensions: extensions)
             guard files.isEmpty else {
                 self.finish(.results(files))
                 return
@@ -113,35 +154,35 @@ final class SpotlightFileSearch {
             // 让“没有匹配”正常结束，而不是误报为超时。
             do { try await Task.sleep(for: emptyDeadline - deadline) } catch { return }
             guard self.generation == requestGeneration else { return }
-            let lateFiles = self.collectResults(text: text, extensions: extensions)
+            let lateFiles = self.collectResults(keywords: keywords, extensions: extensions)
             self.finish(lateFiles.isEmpty ? .timedOut : .results(lateFiles))
         }
     }
 
-    private func receiveResults(text: String, extensions: Set<String>, isFinished: Bool) {
-        let files = collectResults(text: text, extensions: extensions)
-        // 系统查询可能命中数万项；候选已足够时停止，不等待全量排序和收集完成。
-        if isFinished || ((query?.resultCount ?? 0) >= 200 && !files.isEmpty) {
+    private func receiveResults(keywords: [String], extensions: Set<String>, isFinished: Bool) {
+        let files = collectResults(keywords: keywords, extensions: extensions)
+        // 系统查询可能命中数万项；候选窗口已满且存在可展示文件时停止，不等待全量排序和收集完成。
+        if isFinished || ((query?.resultCount ?? 0) >= Self.candidateLimit && !files.isEmpty) {
             finish(.results(files))
         } else if !files.isEmpty {
             completion?(.progress(files))
         }
     }
 
-    private func collectResults(text: String, extensions: Set<String>) -> [SpotlightFileResult] {
+    private func collectResults(keywords: [String], extensions: Set<String>) -> [SpotlightFileResult] {
         guard let query else { return [] }
         query.disableUpdates()
         defer { query.enableUpdates() }
         var files: [SpotlightFileResult] = []
-        for index in 0..<min(query.resultCount, 200) {
+        for index in 0..<min(query.resultCount, Self.candidateLimit) {
             // gathering 期间批量属性接口可能尚未填充，直接从元数据项读取。
             guard let item = query.result(at: index) as? NSMetadataItem,
                   let path = item.value(forAttribute: "kMDItemPath") as? String else { continue }
             let url = URL(fileURLWithPath: path)
             guard url.isFileURL,
                   Self.isWithinScopes(url, scopes: accessedScopes),
-                  // 再做字面匹配，避免 Spotlight 的查询语法把输入中的通配符扩展为结果。
-                  url.lastPathComponent.range(of: text, options: [.caseInsensitive, .diacriticInsensitive]) != nil,
+                  // 再做逐词字面匹配，避免 Spotlight 的查询语法把输入中的通配符扩展为结果。
+                  Self.matches(url: url, keywords: keywords),
                   (item.value(forAttribute: "kMDItemFSInvisible") as? NSNumber)?.boolValue != true,
                   !url.pathComponents.contains(where: { $0.hasPrefix(".") }),
                   !Self.isHomeLibrary(url),
