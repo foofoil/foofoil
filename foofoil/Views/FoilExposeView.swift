@@ -271,11 +271,13 @@ struct FoilExposeView: View {
             let historyEntries = entries.filter { $0.item.isHistoryEntry }
             VStack(spacing: 18) {
                 if entries.isEmpty {
-                    // 关键字有输入但没有匹配的箔片/历史：文件结果在下方单独成区，先说明这里为什么是空的。
-                    Text(NSLocalizedString("No Matching Foils Hint", comment: ""))
+                    // 关键字有输入但没有匹配的箔片/历史：提示居中占住网格区域的一行位置，
+                    // 文件结果仍紧接在其下方，不被推到屏幕底部。
+                    Text(String(format: NSLocalizedString("No Matching Foils Format", comment: ""), model.searchQuery))
                         .font(.system(size: 15))
                         .foregroundStyle(.white.opacity(0.6))
-                        .padding(.top, 8)
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity, minHeight: 240, alignment: .center)
                 } else {
                     if !openEntries.isEmpty {
                         grid(for: openEntries, shortcutByID: shortcutByID)

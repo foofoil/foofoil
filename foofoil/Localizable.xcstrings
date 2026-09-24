@@ -1,19 +1,19 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "No Matching Foils Hint": {
+    "No Matching Foils Format": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "No matching foils or history. See the files below."
+            "value": "No foils or history matching \u201c%@\u201d."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "没有匹配的箔片或历史记录，可查看下方文件"
+            "value": "没有匹配到包含\u201c%@\u201d的箔片或历史记录。"
           }
         }
       }
@@ -64,7 +64,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "开启文件搜索后，可搜索主目录中已建立索引的文件。"
+            "value": "开启文件搜索后，可搜索用户目录中已建立索引的文件。"
           }
         }
       }
@@ -98,7 +98,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "已打开用户主目录，确认后即可搜索其中已建立索引的文件。"
+            "value": "已打开用户目录，确认后即可搜索其中已建立索引的文件。"
           }
         }
       }
@@ -132,7 +132,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请选择用户主目录以开启文件搜索。"
+            "value": "请选择用户目录以开启文件搜索。"
           }
         }
       }
@@ -285,7 +285,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "主目录中没有匹配的文件。"
+            "value": "用户目录中没有匹配的文件。"
           }
         }
       }
@@ -319,7 +319,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "主目录中的文件"
+            "value": "用户目录中的文件"
           }
         }
       }
