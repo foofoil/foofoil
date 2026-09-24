@@ -107,13 +107,16 @@ struct FoilExposeView: View {
     @ObservedObject var model: FoilExposeModel
 
     private static let gridColumns = [
-        GridItem(.adaptive(minimum: 232, maximum: 300), spacing: 18)
+        GridItem(.adaptive(minimum: 212, maximum: 300), spacing: 18)
     ]
 
     /// 文件结果用较窄的自适应列：名称与父目录一行可读，同时避免单列铺满整屏。
     private static let fileColumns = [
         GridItem(.adaptive(minimum: 320, maximum: 620), spacing: 10)
     ]
+
+    /// 文件结果区与上方网格的额外间距：两块结果来源拉开距离，避免读成同一组。
+    private static let fileSectionTopPadding: CGFloat = 64
 
     /// 当前可见条目的下标（显示顺序）；编号与编号直选都据此实时计算。
     @State private var visibleIndices: [Int] = []
@@ -311,6 +314,7 @@ struct FoilExposeView: View {
                     fileStatusLine
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, Self.fileSectionTopPadding)
                 .animation(.smooth(duration: 0.22), value: model.isFileSearching)
                 .animation(.smooth(duration: 0.22), value: model.fileStatus)
                 .animation(.smooth(duration: 0.22), value: model.fileSearchNotice)
