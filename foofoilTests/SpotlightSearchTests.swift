@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 @testable import foofoil
@@ -224,6 +225,15 @@ struct SpotlightSearchTests {
         access.clear()
         #expect(!access.isAuthorized)
         #expect(try access.beginAccess().isEmpty)
+    }
+
+    @Test func authorizationPanelOpensAtTheHomeFolder() {
+        let panel = SpotlightSearchAuthorization.makePanel()
+        #expect(panel.canChooseDirectories)
+        #expect(!panel.canChooseFiles)
+        #expect(!panel.allowsMultipleSelection)
+        #expect(panel.directoryURL?.standardizedFileURL.path
+            == SpotlightSearchAccess.shared.homeDirectory.standardizedFileURL.path)
     }
 
 }

@@ -75,13 +75,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Choose your home folder to let foofoil search indexed files in it."
+            "value": "Your home folder is already open. Confirm to let foofoil search its indexed files."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "请选择用户主目录，以允许浮箔搜索其中已建立索引的文件。"
+            "value": "已打开用户主目录，确认后即可搜索其中已建立索引的文件。"
           }
         }
       }

@@ -86,14 +86,7 @@ enum SpotlightSearchAuthorization {
 
     static func request(completion: @escaping (Outcome) -> Void) {
         let access = SpotlightSearchAccess.shared
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        // 定位到主目录的上一级，用户在列表里选中自己的主目录后确认。
-        panel.directoryURL = access.homeDirectory.deletingLastPathComponent()
-        panel.message = NSLocalizedString("File Search Authorization Message", comment: "")
-        panel.prompt = NSLocalizedString("File Search Authorization Confirm", comment: "")
+        let panel = makePanel()
         panel.begin { response in
             guard response == .OK, let url = panel.url else {
                 completion(.cancelled)
@@ -108,5 +101,18 @@ enum SpotlightSearchAuthorization {
                 completion(.failed)
             }
         }
+    }
+
+    /// 直接打开用户主目录：目录模式下确认按钮返回当前文件夹，一次点击即可授权，
+    /// 不必在上一级列表里挑选，也不会误选同级目录或子目录。
+    static func makePanel() -> NSOpenPanel {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.directoryURL = SpotlightSearchAccess.shared.homeDirectory
+        panel.message = NSLocalizedString("File Search Authorization Message", comment: "")
+        panel.prompt = NSLocalizedString("File Search Authorization Confirm", comment: "")
+        return panel
     }
 }
