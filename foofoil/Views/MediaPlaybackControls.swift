@@ -735,6 +735,7 @@ struct MediaBottomProgressLine<Controller: MediaTransportControlling>: View {
                     }
                 }
                 .frame(height: MediaPlaybackBarMetrics.bottomProgressLineHeight)
+                .animation(.easeInOut(duration: 0.2), value: controller.isPlaying)
                 .accessibilityHidden(true)
             }
         }
@@ -743,7 +744,10 @@ struct MediaBottomProgressLine<Controller: MediaTransportControlling>: View {
         }
     }
 
+    /// 暂停时整条线转红色配色提示未在播放；播放中深色画面上用白色前景，
+    /// 避免随系统外观变成不可见的深色。
     private var lineColor: Color {
-        lightContent ? .white : .primary
+        if !controller.isPlaying { return .red }
+        return lightContent ? .white : .primary
     }
 }
