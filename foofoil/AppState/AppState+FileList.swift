@@ -46,6 +46,7 @@ extension AppState {
     }
 
     func resetFileList() {
+        cancelAudioListDetection()
         fileList = nil
         fileListRevision = 0
         navigatorMetadataTask?.cancel()
@@ -121,6 +122,7 @@ extension AppState {
     }
 
     func installFileList(kind: FileListKind, urls: [URL], preservesIdentity: Bool, title: String? = nil) {
+        cancelAudioListDetection()
         let unique = uniqueExistingURLs(urls)
         guard unique.count >= 2 else {
             if let url = unique.first {
@@ -145,7 +147,9 @@ extension AppState {
     /// 安装音频列表：CUE 与 SACD ISO 各自成容器分区，普通音频按直接父目录成目录分区，
     /// 三类分区同属顶层；只有单个目录时目录分区会平铺显示，目录名由分区推导为展示标题。
     /// SACD ISO 先以占位项加入，再按容器会话异步展开成分区。
-    func installAudioList(urls: [URL], preservesIdentity: Bool) {
+    /// - Parameter preferredURL: 列表安装后应选中的文件（如列表检测时用户正在播放的单曲）；缺省选中首项。
+    func installAudioList(urls: [URL], preservesIdentity: Bool, preferredURL: URL? = nil) {
+        cancelAudioListDetection()
         let unique = uniqueExistingURLs(urls)
         guard unique.count >= 2 else {
             if let url = unique.first {
@@ -204,11 +208,12 @@ extension AppState {
             pendingSACD.append(url)
         }
 
-        fileList = FileListState(kind: .audio, items: items, currentID: items[0].id, sections: sections)
+        let currentID = Self.fileListItemID(in: items, matching: preferredURL) ?? items[0].id
+        fileList = FileListState(kind: .audio, items: items, currentID: currentID, sections: sections)
         sourceFingerprint = nil
         mediaPlaybackMode = .sequentialLoop
         isBatchUpdating = false
-        presentFileListItem(id: items[0].id, rotatesIdentity: false)
+        presentFileListItem(id: currentID, rotatesIdentity: false)
         // 正在呈现的容器由播放会话自行安装分区；不要同文件再开临时会话展开，避免并发会话/设备争用。
         if let presented = pendingSACD.firstIndex(where: {
             $0.resolvingSymlinksInPath().standardizedFileURL.path
@@ -226,6 +231,7 @@ extension AppState {
     @discardableResult
     func appendToFileList(urls: [URL]) -> [URL] {
         guard let kind = listableKind else { return urls }
+        cancelAudioListDetection()
         var pendingURLs = urls
         if kind == .audio {
             let cueURLs = uniqueExistingURLs(urls).filter { FileListGrouper.isCueFile($0) }
@@ -1027,6 +1033,15 @@ extension AppState {
         )
     }
 
+    /// 列表安装后应选中的项目：与传入 URL 同路径的项；找不到时由调用方回退到首项。
+    nonisolated static func fileListItemID(in items: [FileListItem], matching url: URL?) -> String? {
+        guard let url else { return nil }
+        let path = url.resolvingSymlinksInPath().standardizedFileURL.path
+        return items.first {
+            $0.url.resolvingSymlinksInPath().standardizedFileURL.path == path
+        }?.id
+    }
+
     private func uniqueExistingURLs(_ urls: [URL]) -> [URL] {
         var seen = Set<String>()
         var result: [URL] = []
@@ -1200,7 +1215,8 @@ extension AppState {
         return [currentIndex]
     }
 
-    func installCueSheets(urls: [URL], preservesIdentity: Bool) {
+    func installCueSheets(urls: [URL], preservesIdentity: Bool, preferredURL: URL? = nil) {
+        cancelAudioListDetection()
         let sheets = loadedCueSheets(from: urls)
         let items = sheets.flatMap(\.items)
         guard !items.isEmpty else { return }
@@ -1209,16 +1225,17 @@ extension AppState {
         if !preservesIdentity, hasOpenedContent {
             id = UUID()
         }
+        let currentID = Self.fileListItemID(in: items, matching: preferredURL) ?? items[0].id
         fileList = FileListState(
             kind: .audio,
             items: items,
-            currentID: items[0].id,
+            currentID: currentID,
             sections: sheets.map(\.section)
         )
         sourceFingerprint = nil
         mediaPlaybackMode = .sequentialLoop
         isBatchUpdating = false
-        presentFileListItem(id: items[0].id, rotatesIdentity: false)
+        presentFileListItem(id: currentID, rotatesIdentity: false)
     }
 
     func appendCueSheets(urls: [URL]) {

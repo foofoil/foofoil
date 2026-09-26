@@ -176,11 +176,12 @@ struct AudioModeView: View {
 
     /// 读取曲目元数据；无内嵌封面且所在目录未获沙盒授权时向用户请求访问权限后重试，
     /// 成功读取同目录封面则保存文件夹书签，保证重启后仍能显示。
+    /// 该次授权同时服务同目录音乐列表检测（与封面并行，不阻塞起播）。
     private func loadTrackInfo() async -> AudioTrackInfo {
         var loaded = await AudioMetadataLoader.load(from: url)
         guard !Task.isCancelled else { return loaded }
         if appState.customCoverImage == nil {
-            if loaded.artwork == nil, await appState.requestSidecarCoverAccessIfNeeded(for: url) {
+            if loaded.artwork == nil, await appState.ensureAudioDirectoryAccess(for: url) {
                 guard !Task.isCancelled else { return loaded }
                 loaded = await AudioMetadataLoader.load(from: url)
                 guard !Task.isCancelled else { return loaded }

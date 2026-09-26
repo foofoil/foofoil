@@ -165,7 +165,7 @@ struct ExtensionAudioModeView: View {
         }
         var loaded = await AudioMetadataLoader.load(from: url)
         if appState.customCoverImage == nil {
-            if loaded.artwork == nil, await appState.requestSidecarCoverAccessIfNeeded(for: url) {
+            if loaded.artwork == nil, await appState.ensureAudioDirectoryAccess(for: url) {
                 loaded = await AudioMetadataLoader.load(from: url)
                 if loaded.artwork != nil { appState.sidecarCoverDidBecomeAvailable() }
             }

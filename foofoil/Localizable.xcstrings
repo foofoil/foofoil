@@ -1,6 +1,91 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Music List Detected Title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Music List Detected"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检测到音乐列表"
+          }
+        }
+      }
+    },
+    "Music List Detected Cue Message Format": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A matching CUE sheet “%1$@” was found next to “%2$@”. Load it as a track list?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在“%2$@”同目录发现匹配的 CUE 谱表“%1$@”。是否加载为曲目列表？"
+          }
+        }
+      }
+    },
+    "Music List Detected Files Message Format": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Found %1$d audio files in the same folder that look like the same list as “%2$@”. Load them as a list?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在同目录发现 %1$d 个疑似与“%2$@”同属一个列表的音频文件。是否加载为列表？"
+          }
+        }
+      }
+    },
+    "Load List": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Load List"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "加载列表"
+          }
+        }
+      }
+    },
+    "Not Now": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Now"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂不"
+          }
+        }
+      }
+    },
     "No Matching Foils Format": {
       "extractionState": "manual",
       "localizations": {
@@ -589,13 +674,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "foofoil needs access to the folder “%@” to display the album cover stored next to the audio file."
+            "value" : "foofoil needs access to the folder “%@” to display the album cover and detect the music list stored next to the audio file."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "foofoil 需要访问文件夹“%@”，才能显示与音频同目录存放的专辑封面。"
+            "value" : "foofoil 需要访问文件夹“%@”，才能显示与音频同目录存放的专辑封面并检测同目录的音乐列表。"
           }
         }
       }

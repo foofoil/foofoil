@@ -134,6 +134,10 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     var navigatorMetadata: [String: FileListNavigatorMetadata] = [:]
     var navigatorProjectedList: FileListState?
     var navigatorRowIndices: [String: Int] = [:]
+    /// 单个普通音频文件打开后的同目录音乐列表检测；新打开、追加或安装列表都会取消旧任务。
+    var audioListDetectionTask: Task<Void, Never>?
+    /// 检测代次：丢弃过期检测结果，避免替换用户已切换的内容。
+    var audioListDetectionGeneration: UInt64 = 0
 
     @Published var navigatorPanelSide: NavigatorPanelSide {
         didSet { saveState() }
@@ -462,6 +466,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     var mediaSidecarBookmarkData: Data?
     /// 当前持有访问授权的封面所在文件夹 URL，切换内容或销毁时需停止访问。
     var accessingSidecarDirectoryURL: URL?
+    /// 同一目录的授权请求（封面读取、CUE 关联音频与音乐列表检测共用）；按目录合并并发请求，避免重复弹面板。
+    var pendingDirectoryAccessRequests: [String: Task<Bool, Never>] = [:]
     /// 用户拖入替换的音频封面缓存文件；重开历史时优先使用。
     @Published var customCoverURL: URL?
     /// 当前箔片正在展示的封面，用于拖入图片时判断是否需要询问替换。

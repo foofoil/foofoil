@@ -213,14 +213,35 @@ extension AppState {
             saveState()
         }
 
-        /// 音频无内嵌封面且所在目录未获沙盒授权时，向用户请求文件夹访问权限以载入同目录封面。
-        /// 返回调用方是否需要重读元数据：弹面板获授权，或经书签恢复授权后目录已可读，都返回 true；
-        /// 目录本来就可读则返回 false（首次读取已带授权，无需重读）。
+        /// 音频目录访问授权的统一入口：封面读取、CUE 关联音频与音乐列表检测共用同一次授权。
+        /// 目录不可读时先恢复已保存书签，仍不可读再向用户请求文件夹访问权限；同一目录的并发请求会合并，
+        /// 避免封面与列表检测各弹一次面板。返回调用方是否需要重读元数据：进入时目录不可读、返回时已可读
+        /// （本次或并发请求获得授权）时为 true；目录本来就可读则返回 false（首次读取已带授权，无需重读）。
         /// 取消会记住该目录，避免同一文件夹反复打扰。
-        func requestSidecarCoverAccessIfNeeded(for audioURL: URL, forCuePlayback: Bool = false) async -> Bool {
+        func ensureAudioDirectoryAccess(for audioURL: URL, forCuePlayback: Bool = false) async -> Bool {
             let directory = audioURL.deletingLastPathComponent()
             // 目录已可读（已持有授权、无需授权或确实没有封面文件）时不必请求
             guard !AudioMetadataLoader.isCoverDirectoryAccessible(for: audioURL) else { return false }
+            let key = directory.resolvingSymlinksInPath().standardizedFileURL.path
+            if let pending = pendingDirectoryAccessRequests[key] {
+                _ = await pending.value
+                if AudioMetadataLoader.isCoverDirectoryAccessible(for: audioURL) { return true }
+                // 在途请求不带 CUE 起播的绕过语义时，仍要发起一次可绕过“已拒绝”记忆的请求。
+                guard forCuePlayback else { return false }
+            }
+            let task = Task { @MainActor [weak self] in
+                guard let self else { return false }
+                return await self.performAudioDirectoryAccessRequest(for: audioURL, forCuePlayback: forCuePlayback)
+            }
+            pendingDirectoryAccessRequests[key] = task
+            let granted = await task.value
+            pendingDirectoryAccessRequests[key] = nil
+            return granted
+        }
+
+        /// 实际执行一次目录授权：书签恢复优先，其次面板授权。
+        private func performAudioDirectoryAccessRequest(for audioURL: URL, forCuePlayback: Bool) async -> Bool {
+            let directory = audioURL.deletingLastPathComponent()
             // 已保存书签但尚未持有授权（如切换内容后释放）时先重新激活，避免重复打扰；
             // 恢复后目录可读，调用方重读一次即可拿到同目录封面。
             if accessingSidecarDirectoryURL == nil,
@@ -458,6 +479,8 @@ extension AppState {
                     return
                 }
                 self.openExternalMedia(url: url, holdsSecurityAccess: holdsSecurityAccess)
+                // 单个音频起播后异步检测同目录音乐列表；与封面读取并行，不阻塞打开。
+                self.detectAudioListIfNeeded(for: url)
             }
         }
 
@@ -732,6 +755,10 @@ extension AppState {
                     self.isBatchUpdating = false
                     self.saveState()
                     self.applyExtensionThumbnail(outcome.session)
+                    // 扩展音频（DSF/DFF 等）同样检测同目录音乐列表；容器 ISO 由检测入口自行排除。
+                    if urls.count == 1 {
+                        self.detectAudioListIfNeeded(for: url)
+                    }
                 } catch {
                     self.isBatchUpdating = false
                     NSLog("Extension session failed: \(error.localizedDescription)")
@@ -908,7 +935,7 @@ extension AppState {
                     if self.fileList?.currentItem?.cue != nil {
                         // 扩展解码器直接读取 APE，不能依赖宿主解析 CUE 时短暂的关联项授权。
                         // 在旧会话释放之后获取目录权限，并持有至新会话结束，封面也复用该授权。
-                        _ = await self.requestSidecarCoverAccessIfNeeded(for: url, forCuePlayback: true)
+                        _ = await self.ensureAudioDirectoryAccess(for: url, forCuePlayback: true)
                         guard self.currentMediaRouteGeneration == routeGeneration,
                               self.fileList?.currentID == itemID else { return }
                     }

@@ -1819,7 +1819,7 @@ struct ExtensionKitTests {
         let track = directory.appendingPathComponent("track.dsf")
         try Data("DSD".utf8).write(to: track)
         let state = AppState()
-        #expect(await state.requestSidecarCoverAccessIfNeeded(for: track) == false)
+        #expect(await state.ensureAudioDirectoryAccess(for: track) == false)
         state.stopVideoAccess()
         HistoryManager.shared.removeFromHistory(state.toConfig())
     }
