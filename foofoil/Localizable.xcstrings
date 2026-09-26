@@ -1,6 +1,23 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+  "No files or folders were received from the service.": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "No files or folders were received from the service."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未从服务收到文件或文件夹。"
+        }
+      }
+    }
+  },
   "Expose History Section": {
     "extractionState": "manual",
     "localizations": {

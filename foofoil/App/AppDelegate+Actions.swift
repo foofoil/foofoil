@@ -611,8 +611,7 @@ extension AppDelegate {
         return html
     }
 
-    func clipboardFileURLs() -> [URL] {
-        let pasteboard = NSPasteboard.general
+    func clipboardFileURLs(from pasteboard: NSPasteboard = .general) -> [URL] {
         let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
         return (pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL]) ?? []
     }

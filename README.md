@@ -79,6 +79,12 @@ Right-click a window to access the most relevant actions for its current content
 
 Additional content-specific and window-position shortcuts are available from the macOS menu bar.
 
+## Open from Finder with a Keyboard Shortcut
+
+Move foofoil to Applications and launch it once. Select files or folders in Finder, then choose **Finder → Services → Open in foofoil** to open them in new foils. Multiple selections are supported; folders use the same scanning and grouping behavior as drag and drop.
+
+In **System Settings → Keyboard → Keyboard Shortcuts → Services**, enable **Open in foofoil** and assign a shortcut that Finder does not already use. Select items and press that shortcut to open them. If the service does not appear after installation, log out of macOS and log back in, then check again.
+
 ## Requirements
 
 - macOS 26.5 or later, matching the current project deployment target

@@ -148,6 +148,9 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
             object: nil
         )
 
+        // 注册后系统可立即投递服务请求，因此先完成打开流程依赖的通知注册。
+        NSApp.servicesProvider = self
+
         // 1. 启动时，如果尚未通过打开文件创建过窗口，且当前窗口列表为空，才显示一个默认尺寸的空白窗口
         if !didOpenFiles && windowControllers.isEmpty {
             let state = AppState()

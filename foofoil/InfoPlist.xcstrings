@@ -1,6 +1,23 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+  "Open in foofoil": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Open in foofoil"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "在浮箔中打开"
+        }
+      }
+    }
+  },
     "Audio" : {
       "extractionState" : "manual",
       "localizations" : {
