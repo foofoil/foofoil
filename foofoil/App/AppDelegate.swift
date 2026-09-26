@@ -80,10 +80,28 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
         let state = AppState()
         let controller = showNewWindow(with: state)
         openDroppedFiles(urls, into: state)
-        // 没有可打开的文件时收回空白箔；目录扫描是异步的，完成前状态为空但不能关。
-        if isBlank(state), state.activeDirectoryDropScan == nil {
-            controller.close()
+        // 没有可打开的文件时收回空白箔；目录扫描与音视频可播性判定是异步的，
+        // 完成前状态为空但不能关，等在途打开结束后再判定，避免关掉在途内容或留下空箔。
+        closeFoilIfStillBlank(controller, for: state)
+    }
+
+    private func closeFoilIfStillBlank(_ controller: FloatingWindowController, for state: AppState) {
+        guard state.pendingContentOpenCount == 0 else {
+            var token: NSObjectProtocol?
+            token = NotificationCenter.default.addObserver(
+                forName: .contentOpenDidSettle,
+                object: state,
+                queue: .main
+            ) { [weak self, weak controller, weak state] _ in
+                if let token { NotificationCenter.default.removeObserver(token) }
+                guard let self, let controller, let state else { return }
+                self.closeFoilIfStillBlank(controller, for: state)
+            }
+            return
         }
+        // 目录扫描在途时保持现状：与既有行为一致，扫描结果自行决定是否呈现内容。
+        guard state.activeDirectoryDropScan == nil, isBlank(state) else { return }
+        controller.close()
     }
 
     public func applicationDidFinishLaunching(_ notification: Notification) {

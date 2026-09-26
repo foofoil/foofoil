@@ -34,6 +34,8 @@ extension Notification.Name {
     public static let mediaPlaybackDidFinish = Notification.Name("mediaPlaybackDidFinish")
     public static let mediaPresentationSizeDidChange = Notification.Name("mediaPresentationSizeDidChange")
     public static let openGroupedFiles = Notification.Name("openGroupedFiles")
+    /// 异步内容打开（音视频可播性判定、扩展会话等）全部结束；object 为对应 AppState。
+    public static let contentOpenDidSettle = Notification.Name("contentOpenDidSettle")
     public static let imageListSlideshowIntervalDidChange = Notification.Name("imageListSlideshowIntervalDidChange")
     public static let mediaPlaybackControlsAutoHideIntervalDidChange = Notification.Name("mediaPlaybackControlsAutoHideIntervalDidChange")
     public static let showsMediaBottomProgressBarDidChange = Notification.Name("showsMediaBottomProgressBarDidChange")

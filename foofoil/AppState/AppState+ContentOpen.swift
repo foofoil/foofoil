@@ -465,7 +465,9 @@ extension AppState {
         func openExternalMediaIfPlayable(url: URL, holdsSecurityAccess: Bool = false) {
             let asset = AVURLAsset(url: url)
             let routeGeneration = currentMediaRouteGeneration
+            beginPendingContentOpen()
             Task { @MainActor [weak self] in
+                defer { self?.endPendingContentOpen() }
                 let isPlayable = (try? await asset.load(.isPlayable)) ?? false
                 guard isPlayable, let self else {
                     if holdsSecurityAccess { url.stopAccessingSecurityScopedResource() }
@@ -689,6 +691,7 @@ extension AppState {
                 ? UUID()
                 : id
             isLoading = true
+            beginPendingContentOpen()
             let previousSession = extensionSession
             extensionSession = nil
             extensionFallbackProviderID = nil
@@ -698,7 +701,10 @@ extension AppState {
             let closeTask = extensionSessionCloseTask
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                defer { self.isLoading = false }
+                defer {
+                    self.isLoading = false
+                    self.endPendingContentOpen()
+                }
                 do {
                     let closeResult = await closeTask?.value
                     guard self.currentMediaRouteGeneration == routeGeneration else { return }

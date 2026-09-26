@@ -2103,6 +2103,60 @@ struct FoofoilTests {
         #expect(existing.text == "正在查看的内容", "“打开方式”覆盖了当前箔片的内容")
     }
 
+    /// “打开方式”打开音视频时要先异步判定可播性；在途期间箔片仍是空白状态，
+    /// 不能被当成“没有可打开的文件”提前回收，否则内容只会写进历史而没有窗口呈现。
+    @Test func openWithAudioKeepsTheNewFoilWhilePlayabilityIsPending() async throws {
+        let delegate = AppDelegate()
+        defer {
+            for controller in delegate.windowControllers {
+                HistoryManager.shared.removeFromHistory(controller.appState.toConfig())
+                controller.close()
+            }
+        }
+
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-open-with-audio-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let audio = directory.appendingPathComponent("open-with.wav")
+        try writeSilentWAV(to: audio)
+
+        delegate.application(NSApp, openFiles: [audio.path])
+
+        let opened = try #require(delegate.windowControllers.first, "“打开方式”在可播性判定期间关闭了箔片")
+        #expect(opened.window?.isVisible == true, "“打开方式”在可播性判定期间关闭了箔片")
+
+        for _ in 0..<200 where opened.appState.imageURL == nil {
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        #expect(opened.appState.imageURL?.path == audio.path, "“打开方式”没有在新箔片里打开音频")
+        #expect(delegate.windowControllers.count == 1, "音频打开不应残留多余箔片")
+    }
+
+    /// 可播性判定失败后箔片仍为空白，应被回收，不能留下打不开的空箔。
+    @Test func openWithUnplayableMediaClosesTheBlankFoil() async throws {
+        let delegate = AppDelegate()
+        defer {
+            for controller in delegate.windowControllers {
+                HistoryManager.shared.removeFromHistory(controller.appState.toConfig())
+                controller.close()
+            }
+        }
+
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-\(UUID().uuidString)-corrupt.mp4")
+        try Data("not a real movie".utf8).write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+
+        delegate.application(NSApp, openFiles: [file.path])
+
+        let opened = try #require(delegate.windowControllers.first)
+        for _ in 0..<200 where opened.window?.isVisible == true {
+            try await Task.sleep(for: .milliseconds(25))
+        }
+        #expect(opened.window?.isVisible == false, "不可播放的媒体不应留下空箔")
+    }
+
     /// 多份同类文件（会拆成多个分组）也只新建有内容的箔片，不额外留下空箔。
     @Test func openWithMultipleFilesDoesNotLeaveABlankFoil() throws {
         let delegate = try #require(NSApplication.shared.delegate as? AppDelegate)
@@ -2883,6 +2937,24 @@ struct FoofoilTests {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("foofoil-\(UUID().uuidString)-\(name)")
         try Data("fake media".utf8).write(to: url)
         return url
+    }
+
+    /// 写一个最小可播放的 16-bit PCM WAV，供音视频可播性判定测试使用。
+    private func writeSilentWAV(to url: URL, sampleRate: UInt32 = 8000, sampleCount: UInt32 = 800) throws {
+        func littleEndian32(_ value: UInt32) -> [UInt8] {
+            [UInt8(value & 0xff), UInt8((value >> 8) & 0xff), UInt8((value >> 16) & 0xff), UInt8((value >> 24) & 0xff)]
+        }
+        func littleEndian16(_ value: UInt16) -> [UInt8] {
+            [UInt8(value & 0xff), UInt8((value >> 8) & 0xff)]
+        }
+        let dataSize = sampleCount * 2
+        var bytes = Array("RIFF".utf8) + littleEndian32(36 + dataSize) + Array("WAVE".utf8)
+        bytes += Array("fmt ".utf8) + littleEndian32(16) + littleEndian16(1) + littleEndian16(1)
+        bytes += littleEndian32(sampleRate) + littleEndian32(sampleRate * 2)
+        bytes += littleEndian16(2) + littleEndian16(16)
+        bytes += Array("data".utf8) + littleEndian32(dataSize)
+        bytes += [UInt8](repeating: 0, count: Int(dataSize))
+        try Data(bytes).write(to: url)
     }
 }
 

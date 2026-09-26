@@ -138,6 +138,21 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     var audioListDetectionTask: Task<Void, Never>?
     /// 检测代次：丢弃过期检测结果，避免替换用户已切换的内容。
     var audioListDetectionGeneration: UInt64 = 0
+    /// 在途的异步内容打开数量（音视频可播性判定、扩展会话等）。
+    /// 在此期间箔片仍是空白状态，但不能被当作“没有可打开的文件”回收。
+    private(set) var pendingContentOpenCount = 0
+
+    /// 标记一次异步内容打开开始；与 `endPendingContentOpen()` 成对调用。
+    func beginPendingContentOpen() {
+        pendingContentOpenCount += 1
+    }
+
+    /// 标记一次异步内容打开结束；全部结束后广播，供新建箔片决定是否回收空白窗口。
+    func endPendingContentOpen() {
+        pendingContentOpenCount = max(0, pendingContentOpenCount - 1)
+        guard pendingContentOpenCount == 0 else { return }
+        NotificationCenter.default.post(name: .contentOpenDidSettle, object: self)
+    }
 
     @Published var navigatorPanelSide: NavigatorPanelSide {
         didSet { saveState() }
