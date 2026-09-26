@@ -101,7 +101,7 @@ private struct ItemFrameReporter: View {
 }
 
 /// 覆盖层主体：深色半透明背景 + 标题/搜索控件 + 自适应网格缩略图；点击背景关闭。
-/// 只在当前活跃显示器上展示，包含全部打开的箔片；历史记录另起一行在后（半透明区分）。
+/// 只在当前活跃显示器上展示，包含全部打开的箔片；历史记录与文件搜索各自独立分区。
 /// 编号随滚动实时重排，保证可见项都有编号。
 struct FoilExposeView: View {
     @ObservedObject var model: FoilExposeModel
@@ -114,9 +114,6 @@ struct FoilExposeView: View {
     private static let fileColumns = [
         GridItem(.adaptive(minimum: 320, maximum: 620), spacing: 10)
     ]
-
-    /// 文件结果区与上方网格的额外间距：两块结果来源拉开距离，避免读成同一组。
-    private static let fileSectionTopPadding: CGFloat = 64
 
     /// 当前可见条目的下标（显示顺序）；编号与编号直选都据此实时计算。
     @State private var visibleIndices: [Int] = []
@@ -272,7 +269,7 @@ struct FoilExposeView: View {
         } else {
             let openEntries = entries.filter { !$0.item.isHistoryEntry }
             let historyEntries = entries.filter { $0.item.isHistoryEntry }
-            VStack(spacing: 18) {
+            VStack(spacing: 32) {
                 if entries.isEmpty {
                     // 关键字有输入但没有匹配的箔片/历史：提示居中占住网格区域的一行位置，
                     // 文件结果仍紧接在其下方，不被推到屏幕底部。
@@ -280,14 +277,19 @@ struct FoilExposeView: View {
                         .font(.system(size: 15))
                         .foregroundStyle(.white.opacity(0.6))
                         .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity, minHeight: 240, alignment: .center)
+                        .frame(maxWidth: .infinity, minHeight: 96, alignment: .center)
                 } else {
                     if !openEntries.isEmpty {
-                        grid(for: openEntries, shortcutByID: shortcutByID)
+                        VStack(alignment: .leading, spacing: 16) {
+                            sectionHeader("Expose Open Section", symbol: "macwindow", count: openEntries.filter { !$0.item.isNewFoil }.count, tint: .mint)
+                            grid(for: openEntries, shortcutByID: shortcutByID)
+                        }
                     }
                     if !historyEntries.isEmpty {
-                        // 历史记录另起一行，并降低透明度与打开的箔片区分；高亮项保持完整亮度。
-                        grid(for: historyEntries, shortcutByID: shortcutByID, dimsHistory: true)
+                        VStack(alignment: .leading, spacing: 16) {
+                            sectionHeader("Expose History Section", symbol: "clock.arrow.circlepath", count: historyEntries.count, tint: .white.opacity(0.7))
+                            grid(for: historyEntries, shortcutByID: shortcutByID)
+                        }
                     }
                 }
                 fileResultsSection
@@ -301,9 +303,7 @@ struct FoilExposeView: View {
         Group {
             if model.showsFileResults {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text(NSLocalizedString("Local Files Section", comment: ""))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.6))
+                    sectionHeader("Local Files Section", symbol: "magnifyingglass", count: model.files.count, tint: .cyan)
                     // 关键字变化会先清空再补结果；网格常驻才能让行的增删都走同一段过渡。
                     LazyVGrid(columns: Self.fileColumns, spacing: 10) {
                         ForEach(model.files) { file in
@@ -314,7 +314,6 @@ struct FoilExposeView: View {
                     fileStatusLine
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.top, Self.fileSectionTopPadding)
                 .animation(.smooth(duration: 0.22), value: model.isFileSearching)
                 .animation(.smooth(duration: 0.22), value: model.fileStatus)
                 .animation(.smooth(duration: 0.22), value: model.fileSearchNotice)
@@ -376,8 +375,7 @@ struct FoilExposeView: View {
 
     private func grid(
         for entries: [(offset: Int, item: FoilExposeItem)],
-        shortcutByID: [UUID: String],
-        dimsHistory: Bool = false
+        shortcutByID: [UUID: String]
     ) -> some View {
         LazyVGrid(columns: Self.gridColumns, spacing: 18) {
             ForEach(entries, id: \.item.id) { entry in
@@ -390,9 +388,32 @@ struct FoilExposeView: View {
                     model.onSelect(entry.item)
                 }
                 .background(ItemFrameReporter(id: entry.item.id))
-                .opacity(dimsHistory && entry.offset != model.selectedIndex ? 0.72 : 1)
+
             }
         }
+    }
+
+    /// 来源标题不依赖卡片透明度，选中和搜索时仍保持清晰的分区。
+    private func sectionHeader(_ key: String, symbol: String, count: Int, tint: Color) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 30, height: 30)
+                .background(tint.opacity(0.12), in: RoundedRectangle(cornerRadius: 9))
+            Text(NSLocalizedString(key, comment: ""))
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.9))
+            Text(count, format: .number)
+                .font(.system(size: 11, weight: .medium, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(.white.opacity(0.65))
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(.white.opacity(0.08), in: Capsule())
+            Rectangle().fill(.white.opacity(0.12)).frame(height: 1)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private var header: some View {
@@ -565,11 +586,17 @@ struct FoilExposeItemView: View {
         Button(action: onSelect) {
             VStack(spacing: 8) {
                 thumbnail
-                Text(item.title)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.9))
-                    .lineLimit(1)
-                    .truncationMode(.middle)
+                HStack(spacing: 6) {
+                    if !item.isNewFoil {
+                        Image(systemName: item.isHistoryEntry ? "clock.arrow.circlepath" : "macwindow")
+                            .foregroundStyle(item.isHistoryEntry ? Color.white.opacity(0.6) : .mint)
+                    }
+                    Text(item.title)
+                        .foregroundStyle(.white.opacity(0.9))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                .font(.system(size: 12, weight: .medium))
             }
             .scaleEffect(isEmphasized ? 1.03 : 1.0)
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: isEmphasized)
