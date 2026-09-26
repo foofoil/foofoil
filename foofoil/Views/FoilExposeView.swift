@@ -545,7 +545,7 @@ private struct SearchFieldFocusProbe: NSViewRepresentable {
     }
 }
 
-/// 覆盖层中的单个箔片卡片：缩略图 + 类型图标 + 快捷键角标 + 标题，悬停/按压反馈对齐 HistoryCardView。
+/// 覆盖层中的单个箔片卡片：缩略图（文档型为截断正文）+ 类型图标 + 快捷键角标 + 标题，悬停/按压反馈对齐 HistoryCardView。
 /// 键盘高亮与鼠标悬停使用同等的放大反馈，高亮另以更亮的描边区分。
 struct FoilExposeItemView: View {
     let item: FoilExposeItem
@@ -604,6 +604,18 @@ struct FoilExposeItemView: View {
                 Image(nsImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                typeIconBadge
+            } else if let bodyPreview = item.bodyPreview {
+                // 文档型箔片：缩略图位置直接展示截断正文，一眼看出写了什么；行数固定避免盖到左下角类型角标。
+                Text(bodyPreview)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .lineSpacing(4)
+                    .multilineTextAlignment(.leading)
+                    .lineLimit(8)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(12)
                 typeIconBadge
             } else {
                 // 没有缩略图时用大号类型图标占位，仍能看出内容类型。

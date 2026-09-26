@@ -165,6 +165,24 @@ struct FoilExposeModelTests {
         #expect(model.item(forKey: "1")?.id == history)
     }
 
+    @Test func bodyPreviewOnlyForDocumentKindsWithContent() {
+        #expect(FoilExposeItem.makeBodyPreview(kind: .text, text: "hello") == "hello")
+        // 首尾空白与空行跳过，预览从正文第一行开始。
+        #expect(FoilExposeItem.makeBodyPreview(kind: .markdown, text: "\n\n  hello \n") == "hello")
+        // 空白正文没有可展示的内容。
+        #expect(FoilExposeItem.makeBodyPreview(kind: .note, text: "  \n\t ") == nil)
+        // 非文档类型一律不给正文预览，卡片保持类型图标占位。
+        #expect(FoilExposeItem.makeBodyPreview(kind: .image, text: "hello") == nil)
+        #expect(FoilExposeItem.makeBodyPreview(kind: .pdf, text: "hello") == nil)
+    }
+
+    @Test func bodyPreviewTruncatesLongTextWithEllipsis() {
+        let long = String(repeating: "字", count: FoilExposeItem.bodyPreviewCharacterLimit + 50)
+        let preview = FoilExposeItem.makeBodyPreview(kind: .csv, text: long)
+        #expect(preview?.count == FoilExposeItem.bodyPreviewCharacterLimit + 1)
+        #expect(preview?.hasSuffix("…") == true)
+    }
+
     private func file(_ path: String, date: Double = 0) -> SpotlightFileResult {
         .init(url: URL(fileURLWithPath: path), modifiedAt: Date(timeIntervalSince1970: date))
     }

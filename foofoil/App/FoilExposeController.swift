@@ -28,6 +28,9 @@ enum FoilExposeMoveDirection: Equatable {
 /// 覆盖层中一个箔片的快照：打开的箔片收集自 AppDelegate.windowControllers，展示信息取自历史配置。
 /// controller 为 nil 表示占位卡（新建空白箔）或历史记录条目（isHistoryEntry）。
 struct FoilExposeItem: Identifiable {
+    /// 文档型卡片正文的截取上限：只作渲染兜底，实际可见行数由卡片布局决定。
+    static let bodyPreviewCharacterLimit = 600
+
     let id: UUID
     let controller: FloatingWindowController?
     let isHistoryEntry: Bool
@@ -37,9 +40,20 @@ struct FoilExposeItem: Identifiable {
     let thumbnailPath: String?
     /// 历史配置记录的外部源文件路径；用于让 Spotlight 文件结果避开已展示的同一文件。
     var sourcePath: String? = nil
+    /// 文档型箔片（笔记/文本/Markdown/CSV）的截断正文，供缩略图位置直接展示内容；其余类型为 nil。
+    var bodyPreview: String? = nil
 
     var window: NSWindow? { controller?.window }
     var isNewFoil: Bool { controller == nil && !isHistoryEntry }
+
+    /// 文档型条目的正文预览：跳过首尾空白后截取开头；空白正文与非文档类型返回 nil，卡片回退到类型图标。
+    static func makeBodyPreview(kind: HistoryContentKind, text: String) -> String? {
+        guard kind.storesIndexedText else { return nil }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        guard trimmed.count > bodyPreviewCharacterLimit else { return trimmed }
+        return trimmed.prefix(bodyPreviewCharacterLimit) + "…"
+    }
 
     /// 关键字匹配：标题不区分大小写与变音符号的包含匹配。
     func matches(query: String) -> Bool {
@@ -291,7 +305,7 @@ final class FoilExposePanel: NSPanel {
 }
 
 /// 自建 App Exposé：为每个屏幕铺一块覆盖层，打开的箔片在前、历史记录另起一行在后（半透明区分）。
-/// 打开的箔片展示各窗口的历史缩略图；历史记录展示全部历史配置，选中即恢复为新箔片。
+/// 打开的箔片展示各窗口的历史缩略图，文档型箔片以截断正文当缩略图；历史记录展示全部历史配置，选中即恢复为新箔片。
 /// 支持 “/” 进入的关键字搜索，搜索输入时数字/字母直选改用 ⌃ 修饰。
 /// 只复用历史缩略图，不抓新截图；不使用屏幕录制、辅助功能、输入监控或私有 API。
 @MainActor
@@ -475,11 +489,17 @@ final class FoilExposeController {
                 title = NSLocalizedString("Untitled Note", comment: "")
             }
             let contentKind = config.contentKind ?? HistoryContentKind.infer(from: config)
-            // 音视频原文件不是图片；仅图片和 PDF 在缺少缩略图时回退到内容原路径。
+            // 与 HistoryCardView 的缩略图兜底一致：网页整页截图、PDF 与图片原文件都在 imagePath；
+            // 音视频原文件不是图片，不回退。
             var thumbnailPath = config.thumbnailPath
-            if thumbnailPath == nil, contentKind == .image || contentKind == .pdf {
+            if thumbnailPath == nil, contentKind != .audio, contentKind != .video {
                 thumbnailPath = config.imagePath
             }
+            // 文档型箔片没有缩略图文件，用窗口里的实时正文生成截断预览。
+            let bodyPreview = FoilExposeItem.makeBodyPreview(
+                kind: contentKind,
+                text: controller.appState.text
+            )
 
             return FoilExposeItem(
                 id: controller.appState.id,
@@ -489,7 +509,8 @@ final class FoilExposeController {
                 symbolName: config.historyMenuSymbolName,
                 contentKind: contentKind,
                 thumbnailPath: thumbnailPath,
-                sourcePath: Self.sourcePath(from: config)
+                sourcePath: Self.sourcePath(from: config),
+                bodyPreview: bodyPreview
             )
         }
     }
@@ -498,8 +519,10 @@ final class FoilExposeController {
     private static func collectHistoryItems() -> [FoilExposeItem] {
         HistoryRepository.shared.recent(limit: 500).map { config in
             let contentKind = config.contentKind ?? HistoryContentKind.infer(from: config)
+            // 与 HistoryCardView 的缩略图兜底一致：网页整页截图、PDF 与图片原文件都在 imagePath；
+            // 音视频原文件不是图片，不回退。
             var thumbnailPath = config.thumbnailPath
-            if thumbnailPath == nil, contentKind == .image || contentKind == .pdf {
+            if thumbnailPath == nil, contentKind != .audio, contentKind != .video {
                 thumbnailPath = config.imagePath
             }
             var title = config.historyMenuDisplayName
@@ -514,7 +537,8 @@ final class FoilExposeController {
                 symbolName: config.historyMenuSymbolName,
                 contentKind: contentKind,
                 thumbnailPath: thumbnailPath,
-                sourcePath: Self.sourcePath(from: config)
+                sourcePath: Self.sourcePath(from: config),
+                bodyPreview: FoilExposeItem.makeBodyPreview(kind: contentKind, text: config.text)
             )
         }
     }
