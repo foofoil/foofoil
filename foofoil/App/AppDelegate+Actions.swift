@@ -653,7 +653,57 @@ extension AppDelegate {
         if closeStandardKeyWindow(NSApplication.shared.keyWindow) {
             return
         }
-        activeWindowController?.close()
+        guard let controller = activeWindowController else { return }
+        // 音频播放中先确认关闭还是隐藏，避免误关导致音乐中断。
+        guard confirmClosingPlayingAudio(for: controller.appState) else { return }
+        controller.close()
+    }
+
+    /// 音频播放中按 ⌘W：询问是关闭还是隐藏，避免误关导致音乐中断。
+    /// 返回 true 表示继续关闭箔片；选择隐藏或取消则返回 false。
+    func confirmClosingPlayingAudio(for appState: AppState) -> Bool {
+        guard appState.isAudioDocument,
+              appState.isMediaPlaying,
+              SettingsStore.shared.confirmClosingPlayingAudio else { return true }
+
+        let alert = NSAlert()
+        alert.messageText = NSLocalizedString("Close Playing Audio Title", comment: "")
+        alert.informativeText = NSLocalizedString("Close Playing Audio Message", comment: "")
+        alert.alertStyle = .informational
+        // 默认按钮放在隐藏上：隐藏不中断播放，是更安全的选择。
+        alert.addButton(withTitle: NSLocalizedString("Hide foofoil", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Close foofoil", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
+        alert.showsSuppressionButton = true
+        alert.suppressionButton?.title = NSLocalizedString("Do Not Ask Again", comment: "")
+        NSApp.activate(ignoringOtherApps: true)
+        let response = alert.runModal()
+
+        // 勾选“不再提示”与设置面板共用同一个偏好项。
+        if alert.suppressionButton?.state == .on {
+            SettingsStore.shared.confirmClosingPlayingAudio = false
+        }
+
+        switch response {
+        case .alertFirstButtonReturn:
+            hideApplicationKeepingAudioPlaying()
+            return false
+        case .alertSecondButtonReturn:
+            return true
+        default:
+            return false
+        }
+    }
+
+    /// 选择隐藏后先说明 ⌘H：隐藏让音乐继续播放，下次可直接按 ⌘H 而不必关闭箔片。
+    private func hideApplicationKeepingAudioPlaying() {
+        let hint = NSAlert()
+        hint.messageText = NSLocalizedString("Audio Hidden Hint Title", comment: "")
+        hint.informativeText = NSLocalizedString("Audio Hidden Hint Message", comment: "")
+        hint.alertStyle = .informational
+        hint.addButton(withTitle: NSLocalizedString("OK", comment: ""))
+        hint.runModal()
+        NSApp.hide(nil)
     }
 
     @discardableResult

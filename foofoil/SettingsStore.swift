@@ -529,7 +529,8 @@ public class SettingsStore {
             Keys.imageListSlideshowInterval: ImageListSlideshow.defaultInterval,
             Keys.mediaPlaybackControlsAutoHideInterval: MediaPlaybackControlsAutoHide.defaultInterval,
             Keys.mediaSeekStepInterval: MediaSeekStep.defaultInterval,
-            Keys.showsMediaBottomProgressBar: true
+            Keys.showsMediaBottomProgressBar: true,
+            Keys.confirmClosingPlayingAudio: true
         ])
     }
 
@@ -552,6 +553,7 @@ public class SettingsStore {
         static let mediaPlaybackControlsAutoHideInterval = "mediaPlaybackControlsAutoHideInterval"
         static let mediaSeekStepInterval = "mediaSeekStepInterval"
         static let showsMediaBottomProgressBar = "showsMediaBottomProgressBar"
+        static let confirmClosingPlayingAudio = "confirmClosingPlayingAudio"
         static let documentFontsChineseOnly = "documentFontsChineseOnly"
     }
 
@@ -672,6 +674,13 @@ public class SettingsStore {
             userDefaults.set(newValue, forKey: Keys.showsMediaBottomProgressBar)
             NotificationCenter.default.post(name: .showsMediaBottomProgressBarDidChange, object: nil)
         }
+    }
+
+    /// 音频播放中按 ⌘W 是否先询问关闭还是隐藏；全局偏好，默认开启。
+    /// 询问框里的“不再提示”与设置面板共用这一项。
+    var confirmClosingPlayingAudio: Bool {
+        get { userDefaults.object(forKey: Keys.confirmClosingPlayingAudio) as? Bool ?? true }
+        set { userDefaults.set(newValue, forKey: Keys.confirmClosingPlayingAudio) }
     }
 
     public var windowConfigs: [WindowConfig] {

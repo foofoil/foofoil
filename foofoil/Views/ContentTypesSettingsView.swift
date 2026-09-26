@@ -14,6 +14,7 @@ struct ContentTypesSettingsView: View {
     @State private var mediaControlsAutoHideInterval = SettingsStore.shared.mediaPlaybackControlsAutoHideInterval
     @State private var mediaSeekStep = SettingsStore.shared.mediaSeekStepInterval
     @State private var showsBottomProgress = SettingsStore.shared.showsMediaBottomProgressBar
+    @State private var confirmClosingPlayingAudio = SettingsStore.shared.confirmClosingPlayingAudio
 
     var body: some View {
         Form {
@@ -33,6 +34,12 @@ struct ContentTypesSettingsView: View {
                     SettingsRowLabel(
                         title: NSLocalizedString("Bottom Progress Bar", comment: ""),
                         note: NSLocalizedString("Bottom Progress Bar Note", comment: "")
+                    )
+                }
+                Toggle(isOn: $confirmClosingPlayingAudio) {
+                    SettingsRowLabel(
+                        title: NSLocalizedString("Confirm Before Closing Playing Audio", comment: ""),
+                        note: NSLocalizedString("Confirm Before Closing Playing Audio Note", comment: "")
                     )
                 }
                 SettingsSliderRow(
@@ -64,12 +71,16 @@ struct ContentTypesSettingsView: View {
             mediaControlsAutoHideInterval = SettingsStore.shared.mediaPlaybackControlsAutoHideInterval
             mediaSeekStep = SettingsStore.shared.mediaSeekStepInterval
             showsBottomProgress = SettingsStore.shared.showsMediaBottomProgressBar
+            confirmClosingPlayingAudio = SettingsStore.shared.confirmClosingPlayingAudio
         }
         .onChange(of: slideshowInterval) { _, value in
             SettingsStore.shared.imageListSlideshowInterval = value
         }
         .onChange(of: showsBottomProgress) { _, value in
             SettingsStore.shared.showsMediaBottomProgressBar = value
+        }
+        .onChange(of: confirmClosingPlayingAudio) { _, value in
+            SettingsStore.shared.confirmClosingPlayingAudio = value
         }
         .onChange(of: mediaSeekStep) { _, value in
             SettingsStore.shared.mediaSeekStepInterval = value

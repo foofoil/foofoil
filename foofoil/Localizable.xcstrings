@@ -906,6 +906,142 @@
         }
       }
     },
+    "Audio Hidden Hint Message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Music will keep playing. Next time, press ⌘H to hide foofoil without closing the foil."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音乐将继续播放。下次可直接按 ⌘H 隐藏 foofoil，无需关闭箔片。"
+          }
+        }
+      }
+    },
+    "Audio Hidden Hint Title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "foofoil Is Hidden"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "foofoil 已隐藏"
+          }
+        }
+      }
+    },
+    "Close Playing Audio Message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Closing this foil will stop playback. Hide foofoil instead to keep the music playing."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭此箔片会停止播放。改为隐藏 foofoil 可让音乐继续播放。"
+          }
+        }
+      }
+    },
+    "Close Playing Audio Title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Audio Is Playing"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音频正在播放"
+          }
+        }
+      }
+    },
+    "Confirm Before Closing Playing Audio" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Confirm Before Closing Playing Audio"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭播放中的音频前确认"
+          }
+        }
+      }
+    },
+    "Confirm Before Closing Playing Audio Note" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When music is playing, ⌘W asks whether to close or hide foofoil."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音乐播放时按 ⌘W 会询问关闭还是隐藏 foofoil。"
+          }
+        }
+      }
+    },
+    "Do Not Ask Again" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Do not ask again"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "不再提示"
+          }
+        }
+      }
+    },
+    "Hide foofoil" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide foofoil"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏 foofoil"
+          }
+        }
+      }
+    },
     "Cancel" : {
       "extractionState" : "manual",
       "localizations" : {

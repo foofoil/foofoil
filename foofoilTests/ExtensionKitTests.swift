@@ -1197,6 +1197,20 @@ struct ExtensionKitTests {
         #expect(changeCount == 2)
     }
 
+    @Test func confirmClosingPlayingAudioDefaultsOnAndPersists() {
+        let original = SettingsStore.shared.confirmClosingPlayingAudio
+        defer { SettingsStore.shared.confirmClosingPlayingAudio = original }
+
+        // 未写入用户偏好时走注册默认值：开启。
+        UserDefaults.standard.removeObject(forKey: "confirmClosingPlayingAudio")
+        #expect(SettingsStore.shared.confirmClosingPlayingAudio == true)
+
+        // ⌘W 提示里的“不再提示”与设置面板共用该键，写入后应立即生效。
+        SettingsStore.shared.confirmClosingPlayingAudio = false
+        #expect(SettingsStore.shared.confirmClosingPlayingAudio == false)
+        #expect(UserDefaults.standard.object(forKey: "confirmClosingPlayingAudio") as? Bool == false)
+    }
+
     @Test func fullScreenLifecycleKeepsWindowedBorderAndFramePreferences() throws {
         let state = AppState()
         state.showBorder = true
