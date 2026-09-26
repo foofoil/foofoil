@@ -1557,6 +1557,26 @@ struct FoofoilTests {
         #expect(model.shouldSelectAll == false)
     }
 
+    @Test func testMarkdownTaskListRendering() {
+        let md = """
+        - [ ] 未完成任务
+        - [x] 已完成任务
+        - 普通任务
+        """
+        let html = AppState.cmarkToHTML(md)
+        #expect(html.contains("<li>☐ 未完成任务</li>"))
+        #expect(html.contains("<li>☑ 已完成任务</li>"))
+        #expect(!html.contains("[☐]"))
+        #expect(!html.contains("[☑]"))
+        #expect(html.contains("普通任务"))
+    }
+
+    @Test func testMarkdownTaskListPreprocessDoesNotTouchInlineText() {
+        let md = "请勾选 [ ] 选项，但 [x] 出现在行内时不转换"
+        let result = AppState.preprocessTaskListItems(md)
+        #expect(result == md)
+    }
+
     @Test func testMarkdownTableBasicRendering() {
         let md = """
         | Name | Age | City |

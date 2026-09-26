@@ -759,6 +759,7 @@ extension AppState {
         }
 
         nonisolated public static func cmarkToHTML(_ text: String) -> String {
+            let text = preprocessTaskListItems(text)
             // 若不含表格特征，直接走 cmark 原路径以保持原有性能与行为
             let segments = parseMarkdownSegmentsWithTables(text)
             // 仅有一段普通文本时，保持单次 cmark 调用
@@ -775,6 +776,32 @@ extension AppState {
                 }
             }
             return html
+        }
+
+        /// 将 GFM 任务列表标记（`- [ ]` / `- [x]`）替换为 ☐ / ☑ 字符。
+        /// vendored cmark 不支持 tasklist 扩展，此处预处理后走普通列表路径。
+        nonisolated static func preprocessTaskListItems(_ text: String) -> String {
+            guard text.contains("[ ]") || text.contains("[x]") || text.contains("[X]") else {
+                return text
+            }
+            var result = text
+            // 仅匹配列表项开头的任务标记，避免误伤行内代码等普通文本
+            guard let regex = try? NSRegularExpression(
+                pattern: "^([ \\t]*(?:[-*+]|\\d+[.)])[ \\t]+)(\\[([ xX])\\])[ \\t]*",
+                options: [.anchorsMatchLines]
+            ) else { return text }
+            let ns = result as NSString
+            let matches = regex.matches(in: result, range: NSRange(location: 0, length: ns.length))
+            guard !matches.isEmpty else { return text }
+            // 从后往前替换，保证 range 不失效
+            for match in matches.reversed() {
+                // group 2 覆盖含方括号的完整标记 [x]，group 3 是其中的单字符
+                let markerRange = match.range(at: 2)
+                let inner = ns.substring(with: match.range(at: 3))
+                let box = inner == " " ? "☐" : "☑"
+                result = (result as NSString).replacingCharacters(in: markerRange, with: box)
+            }
+            return result
         }
 
         /// 纯 cmark 调用（不含表格预处理），用于文本段与单元格 inline 渲染
