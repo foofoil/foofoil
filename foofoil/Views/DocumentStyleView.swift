@@ -38,8 +38,9 @@ struct DocumentStyleView: View {
                     section(NSLocalizedString("Background Color", comment: "")) {
                         colorRow(
                             color: backgroundBinding,
-                            isCustom: appState.backgroundColorHex != nil,
-                            reset: { appState.backgroundColorHex = nil }
+                            statusText: backgroundStatusText,
+                            isDefault: isBackgroundDefault,
+                            reset: { appState.resetBackgroundColorToDefault(isDark: colorScheme == .dark) }
                         )
                     }
                 }
@@ -48,8 +49,9 @@ struct DocumentStyleView: View {
                     section(NSLocalizedString("Text Color", comment: "")) {
                         colorRow(
                             color: textColorBinding,
-                            isCustom: appState.textColorHex != nil,
-                            reset: { appState.textColorHex = nil }
+                            statusText: textStatusText,
+                            isDefault: isTextDefault,
+                            reset: { appState.resetTextColorToDefault(isDark: colorScheme == .dark) }
                         )
                     }
 
@@ -313,16 +315,53 @@ struct DocumentStyleView: View {
 
     // MARK: - 颜色与间距
 
-    private func colorRow(color: Binding<Color>, isCustom: Bool, reset: @escaping () -> Void) -> some View {
+    private var isBackgroundDefault: Bool {
+        let defBg = DocumentThemeCatalog.defaultTheme.backgroundHex(isDark: colorScheme == .dark)
+        return appState.documentThemeId == DocumentThemeCatalog.defaultThemeId
+            || appState.backgroundColorHex?.uppercased() == defBg.uppercased()
+    }
+
+    private var isTextDefault: Bool {
+        let defFg = DocumentThemeCatalog.defaultTheme.textHex(isDark: colorScheme == .dark)
+        return appState.documentThemeId == DocumentThemeCatalog.defaultThemeId
+            || appState.textColorHex?.uppercased() == defFg.uppercased()
+    }
+
+    private var backgroundStatusText: String {
+        if isBackgroundDefault {
+            return NSLocalizedString("Default", comment: "")
+        }
+        if let theme = themeCatalog.theme(for: appState.documentThemeId) {
+            return theme.displayName
+        }
+        return NSLocalizedString("Custom", comment: "")
+    }
+
+    private var textStatusText: String {
+        if isTextDefault {
+            return NSLocalizedString("Default", comment: "")
+        }
+        if let theme = themeCatalog.theme(for: appState.documentThemeId) {
+            return theme.displayName
+        }
+        return NSLocalizedString("Custom", comment: "")
+    }
+
+    private func colorRow(
+        color: Binding<Color>,
+        statusText: String,
+        isDefault: Bool,
+        reset: @escaping () -> Void
+    ) -> some View {
         HStack(spacing: 8) {
             ColorPicker(NSLocalizedString("Color", comment: ""), selection: color, supportsOpacity: true)
                 .labelsHidden()
-            Text(NSLocalizedString(isCustom ? "Custom" : "Default", comment: ""))
+            Text(statusText)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer(minLength: 0)
             Button(NSLocalizedString("Default", comment: ""), action: reset)
-                .disabled(!isCustom)
+                .disabled(isDefault)
         }
     }
 

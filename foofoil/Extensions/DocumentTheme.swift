@@ -74,6 +74,14 @@ public struct DocumentTheme: Identifiable, Codable, Equatable {
 public final class DocumentThemeCatalog: ObservableObject {
     public static let shared = DocumentThemeCatalog()
 
+    /// 默认主题标识（素白）
+    public static let defaultThemeId = "minimal"
+
+    /// 获取默认主题（素白）
+    public static var defaultTheme: DocumentTheme {
+        shared.theme(for: defaultThemeId) ?? shared.presets[0]
+    }
+
     /// 内置舒适阅读预设主题
     public let presets: [DocumentTheme] = [
         // 素白：洁净纯简，经典纸感

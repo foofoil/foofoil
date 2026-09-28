@@ -123,8 +123,11 @@ struct ColorPanelScopeTests {
 
         #expect(DocumentStylePanelController.shared.attachedState == nil, "重置后仍保留样式面板归属")
         #expect(DocumentStylePanelController.shared.window?.isVisible == false)
-        #expect(state.backgroundColorHex == nil, "重置后把内容背景色带到了新的空白箔")
-        #expect(state.textColorHex == nil)
+        let defaultTheme = DocumentThemeCatalog.defaultTheme
+        let isDark = AppState.isDarkMode()
+        #expect(state.documentThemeId == defaultTheme.id)
+        #expect(state.backgroundColorHex == defaultTheme.backgroundHex(isDark: isDark), "重置后把内容背景色带到了新的空白箔")
+        #expect(state.textColorHex == defaultTheme.textHex(isDark: isDark))
         #expect(state.documentFontName == nil)
         #expect(state.documentLineSpacing == nil)
         #expect(state.documentParagraphSpacing == nil)

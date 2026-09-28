@@ -658,9 +658,11 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.documentZoom = 1.0
         self.createdAt = Date()
         self.svgColor = nil
-        self.backgroundColorHex = nil
-        self.textColorHex = nil
-        self.documentThemeId = nil
+        let defaultTheme = DocumentThemeCatalog.defaultTheme
+        let isDark = Self.isDarkMode()
+        self.documentThemeId = defaultTheme.id
+        self.backgroundColorHex = defaultTheme.backgroundHex(isDark: isDark)
+        self.textColorHex = defaultTheme.textHex(isDark: isDark)
         self.documentFontName = nil
         self.documentLineSpacing = nil
         self.documentParagraphSpacing = nil

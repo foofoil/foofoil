@@ -83,6 +83,36 @@ extension AppState {
         isApplyingThemeColors = false
     }
 
+    /// 将背景色恢复为默认样式（素白）；若此时文字颜色亦为默认值（或不支持文字样式），则同步恢复默认主题。
+    public func resetBackgroundColorToDefault(isDark: Bool) {
+        let defaultTheme = DocumentThemeCatalog.defaultTheme
+        let defBg = defaultTheme.backgroundHex(isDark: isDark)
+        let defFg = defaultTheme.textHex(isDark: isDark)
+
+        if textColorHex?.uppercased() == defFg.uppercased() || !supportsDocumentTextStyling {
+            applyDocumentTheme(defaultTheme, isDark: isDark)
+        } else {
+            isApplyingThemeColors = true
+            backgroundColorHex = defBg
+            isApplyingThemeColors = false
+        }
+    }
+
+    /// 将文字颜色恢复为默认样式（素白）；若此时背景色亦为默认值（或不支持背景色），则同步恢复默认主题。
+    public func resetTextColorToDefault(isDark: Bool) {
+        let defaultTheme = DocumentThemeCatalog.defaultTheme
+        let defBg = defaultTheme.backgroundHex(isDark: isDark)
+        let defFg = defaultTheme.textHex(isDark: isDark)
+
+        if backgroundColorHex?.uppercased() == defBg.uppercased() || !supportsContentBackgroundColor {
+            applyDocumentTheme(defaultTheme, isDark: isDark)
+        } else {
+            isApplyingThemeColors = true
+            textColorHex = defFg
+            isApplyingThemeColors = false
+        }
+    }
+
     /// 系统明暗切换后，若选中了主题则切为该主题对应明暗版本的预设色彩；
     /// 否则把与目标主题明显不符的自选颜色换成同色相的深浅版本：
     /// 背景色要配合当前主题（深色主题配深色背景），文字颜色相反（深色主题配浅色文字），

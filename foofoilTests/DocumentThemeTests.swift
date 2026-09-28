@@ -186,6 +186,65 @@ struct DocumentThemeTests {
         #expect(state.textColorHex == "#382E24")
     }
 
+    /// 新建箔片时默认应用「素白」主题样式。
+    @Test func newFoilDefaultsToMinimalTheme() throws {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+
+        let defaultTheme = DocumentThemeCatalog.defaultTheme
+        let isDark = AppState.isDarkMode()
+        #expect(defaultTheme.id == "minimal")
+        #expect(state.documentThemeId == "minimal")
+        #expect(state.backgroundColorHex == defaultTheme.backgroundHex(isDark: isDark))
+        #expect(state.textColorHex == defaultTheme.textHex(isDark: isDark))
+    }
+
+    /// 重置箔片内容时恢复「素白」默认样式。
+    @Test func resetContentRestoresMinimalDefaultTheme() throws {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+
+        let parchment = try #require(DocumentThemeCatalog.shared.theme(for: "parchment"))
+        state.applyDocumentTheme(parchment, isDark: false)
+        #expect(state.documentThemeId == "parchment")
+
+        state.resetContent()
+        let defaultTheme = DocumentThemeCatalog.defaultTheme
+        let isDark = AppState.isDarkMode()
+        #expect(state.documentThemeId == "minimal")
+        #expect(state.backgroundColorHex == defaultTheme.backgroundHex(isDark: isDark))
+        #expect(state.textColorHex == defaultTheme.textHex(isDark: isDark))
+    }
+
+    /// 单独恢复背景色或文字颜色到默认值，当两色均达到默认时自动重设主题标识为「素白」。
+    @Test func resetColorsToDefaultRestoresMinimalTheme() throws {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+
+        let defaultTheme = DocumentThemeCatalog.defaultTheme
+        let isDark = false
+        state.applyDocumentTheme(defaultTheme, isDark: isDark)
+        #expect(state.documentThemeId == "minimal")
+
+        // 自定义背景色
+        state.backgroundColorHex = "#FF0000"
+        #expect(state.documentThemeId == nil)
+
+        // 恢复默认背景色，由于文字颜色仍为默认值，自动恢复素白主题
+        state.resetBackgroundColorToDefault(isDark: isDark)
+        #expect(state.backgroundColorHex == defaultTheme.backgroundHex(isDark: isDark))
+        #expect(state.documentThemeId == "minimal")
+
+        // 自定义文字颜色
+        state.textColorHex = "#00FF00"
+        #expect(state.documentThemeId == nil)
+
+        // 恢复默认文字颜色，由于背景色为默认值，自动恢复素白主题
+        state.resetTextColorToDefault(isDark: isDark)
+        #expect(state.textColorHex == defaultTheme.textHex(isDark: isDark))
+        #expect(state.documentThemeId == "minimal")
+    }
+
     // MARK: - 对比度计算辅助
 
     private func contrastRatio(between c1: NSColor, and c2: NSColor) -> CGFloat {
