@@ -244,7 +244,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.backgroundColor = .clear
         textView.isEditable = false
         textView.isSelectable = true
-        // 留白属于可滚动文档，让滚动条贴近窗口边缘，首尾留白随内容一起滚动。
+        // 文档留白随内容滚动；窗口缩放热区由外层布局单独预留。
         textView.textContainerInset = NSSize(width: documentPadding, height: documentPadding)
 
         textView.textContainer?.containerSize = NSSize(width: contentSize.width, height: CGFloat.greatestFiniteMagnitude)

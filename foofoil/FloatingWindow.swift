@@ -23,13 +23,14 @@ public class FloatingWindow: NSWindow {
     private weak var resizeCursorTrackingView: NSView?
     private var resizeCursorTrackingArea: NSTrackingArea?
     private var currentAccumulatedMagnification: CGFloat = 1.0
-    private static let resizeHitThickness: CGFloat = 8
+    static let resizeHitThickness: CGFloat = 8
     private static let resizeCornerExtent: CGFloat = 20
 
     public init(contentRect: NSRect, defer deferCreation: Bool) {
         super.init(
             contentRect: contentRect,
-            styleMask: [.borderless, .resizable],
+            // 缩放统一由下方命中检测处理，避免 AppKit 的外沿热区和角部范围与之冲突。
+            styleMask: [.borderless],
             backing: .buffered,
             defer: deferCreation
         )
@@ -94,6 +95,19 @@ public class FloatingWindow: NSWindow {
 
     public override func sendEvent(_ event: NSEvent) {
         let modifiers = KeyboardShortcut.effectiveModifiers(for: event)
+
+        // 内容视图可能在 mouseMoved/Entered 中设置文本光标；派发结束后再恢复边缘光标。
+        // 子视图的 mouseExited 不代表离开窗口，始终按当前指针位置重新判断。
+        defer {
+            switch event.type {
+            case .mouseEntered, .mouseMoved, .mouseExited, .cursorUpdate, .flagsChanged:
+                if !modifiers.contains(.command) {
+                    _ = updateEdgeResizeCursor(at: convertPoint(fromScreen: NSEvent.mouseLocation))
+                }
+            default:
+                break
+            }
+        }
 
         if event.type == .flagsChanged {
             let isCommandPressed = modifiers.contains(.command)
@@ -349,9 +363,9 @@ public class FloatingWindow: NSWindow {
         let bounds = NSRect(origin: .zero, size: size)
         // 窗口外坐标不能继续命中最近的边，否则离开窗口后会残留甚至切换成错误方向的缩放光标。
         guard point.x >= bounds.minX,
-              point.x <= bounds.maxX,
+              point.x < bounds.maxX,
               point.y >= bounds.minY,
-              point.y <= bounds.maxY else {
+              point.y < bounds.maxY else {
             return nil
         }
 
@@ -379,7 +393,10 @@ public class FloatingWindow: NSWindow {
     }
 
     private func resizeEdges(at point: NSPoint) -> ResizeEdges? {
-        Self.resizeEdges(at: point, in: frame.size)
+        guard (windowController as? FloatingWindowController)?.appState.isFullScreen != true else {
+            return nil
+        }
+        return Self.resizeEdges(at: point, in: frame.size)
     }
 
     private func updateEdgeResizeCursor(at point: NSPoint) -> Bool {
@@ -596,14 +613,7 @@ public class FloatingWindow: NSWindow {
         return super.performKeyEquivalent(with: event)
     }
 
-    // 【折中方案说明】
-    // 如果在某些 macOS 版本下，.borderless 搭配 .resizable 边缘缩放手势难以触发（因为无可视边框），
-    // 可以采用如下折中方案：
-    // 使用 styleMask = [.titled, .resizable, .fullSizeContentView] 并设置：
-    //   self.titleVisibility = .hidden
-    //   self.titlebarAppearsTransparent = true
-    // 这能在保留系统标准隐形边框缩放热区的同时，依然实现无标题栏的视觉效果。
-    // 当前实现通过窗口级边缘拖拽保证四边缩放，因此继续保留纯 .borderless 外观。
+
 }
 
 extension NSView {

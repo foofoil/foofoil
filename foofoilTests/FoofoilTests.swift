@@ -860,6 +860,25 @@ struct FoofoilTests {
         #expect(FloatingWindow.resizeEdges(at: NSPoint(x: 200, y: 301), in: size) == nil)
     }
 
+    @Test func resizeHitAreaExcludesOuterBoundaryAndMatchesBottomCornerDrag() {
+        let size = NSSize(width: 400, height: 300)
+        #expect(FloatingWindow.resizeEdges(at: NSPoint(x: 400, y: 150), in: size) == nil)
+        #expect(FloatingWindow.resizeEdges(at: NSPoint(x: 200, y: 300), in: size) == nil)
+        let corner = FloatingWindow.resizeEdges(at: NSPoint(x: 395, y: 15), in: size)
+        #expect(corner == [.right, .bottom])
+        let initialFrame = NSRect(origin: .zero, size: size)
+        let resized = FloatingWindow.edgeResizeSize(
+            initialFrame: initialFrame, offset: NSPoint(x: 12, y: -10), edges: corner!
+        )
+        #expect(resized == NSSize(width: 412, height: 310))
+        #expect(FloatingWindow.resizeEdges(at: NSPoint(x: 395, y: 21), in: size) == .right)
+    }
+
+    @Test @MainActor func floatingWindowUsesOnlyCustomResizeRegions() {
+        let window = FloatingWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 300), defer: true)
+        #expect(!window.styleMask.contains(.resizable))
+    }
+
     @Test func resizeEdgeStillDeliversMouseEnteredAndMovedToViews() {
         #expect(FloatingWindow.shouldDeliverToViews(eventType: .mouseEntered, isOnResizeEdge: true))
         #expect(FloatingWindow.shouldDeliverToViews(eventType: .mouseMoved, isOnResizeEdge: true))

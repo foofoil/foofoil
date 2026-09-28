@@ -33,7 +33,7 @@ struct TextEditorModeView: View {
 
                 VStack(alignment: .leading, spacing: 0) {
                     ZStack(alignment: .topLeading) {
-                        // 文本留白在可滚动文档内，滚动条贴边；剩余区域为真实窗口背景，用原生手势移动窗口。
+                        // 文本留白在可滚动文档内；剩余区域为真实窗口背景，用原生手势移动窗口。
                         WindowDragArea()
 
                         if appState.isMarkdownPreview && appState.isMarkdownDocument && !appState.text.isEmpty {
@@ -42,6 +42,8 @@ struct TextEditorModeView: View {
                                 calculatedHeight: $textHeight
                             )
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                // 整个滚动视图避开四边缩放热区，滚动条首尾也不会触发角部缩放。
+                                .padding(appState.isFullScreen ? 0 : FloatingWindow.resizeHitThickness + 1)
                         } else if appState.textURL != nil && !appState.isMarkdownDocument {
                             ReadOnlyTextView(
                                 text: appState.text,
