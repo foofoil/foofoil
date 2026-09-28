@@ -192,6 +192,72 @@ struct DocumentTextSpacingTests {
         #expect(abs(style.paragraphSpacing - state.textFontSize * 1.5) < 0.001, "段距未生效：\(style.paragraphSpacing)")
     }
 
+    @Test func codeBlocksInsideListPreserveNumberingAndParagraphBoundaries() async throws {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.originalImageName = "list.md"
+        state.text = """
+        1. 构建并启动：
+           ```sh
+           cd foofoil && ./run
+           echo done
+           ```
+        2. 记录 `device`。
+        3. 准备文件。
+        4. 观察日志：
+           ```sh
+           log stream
+           ```
+           关键日志：`stalled`。
+        5. 记录结果。
+        """
+        state.isMarkdownPreview = true
+        let rendered = await waitForRenderedMarkdown(state)
+        let text = rendered.string as NSString
+        for (number, label) in ["构建并启动", "记录", "准备文件", "观察日志", "记录结果"].enumerated() {
+            #expect(rendered.string.contains("\t\(number + 1)\t\(label)"))
+        }
+        #expect(!rendered.string.contains("\t6\t"))
+        #expect(rendered.string.contains("cd foofoil && ./run\necho done"))
+        for label in ["构建并启动", "记录结果", "关键日志"] {
+            let location = text.range(of: label).location
+            let style = try #require(paragraphStyle(of: rendered, at: location))
+            #expect(style.maximumLineHeight == 0, "正文不能继承代码块间隔行的固定高度")
+        }
+        // 在窄窗与宽窗中使用真实 TextKit 布局，边框不能碰到前后正文。
+        for width: CGFloat in [280, 800] {
+            let storage = NSTextStorage(attributedString: rendered)
+            let manager = NSLayoutManager()
+            let container = NSTextContainer(size: NSSize(width: width, height: .greatestFiniteMagnitude))
+            storage.addLayoutManager(manager)
+            manager.addTextContainer(container)
+            manager.ensureLayout(for: container)
+            for (code, before, after) in [("cd foofoil", "构建并启动", "记录"), ("log stream", "观察日志", "关键日志")] {
+                var blockRange = NSRange()
+                _ = rendered.attribute(.markdownCodeBlockLanguage, at: text.range(of: code).location,
+                                       effectiveRange: &blockRange)
+                let glyphs = manager.glyphRange(forCharacterRange: blockRange, actualCharacterRange: nil)
+                var frame = NSRect.null
+                manager.enumerateLineFragments(forGlyphRange: glyphs) { rect, _, _, _, _ in
+                    frame = frame.union(rect)
+                }
+                func textRect(_ value: String) -> NSRect {
+                    manager.boundingRect(forGlyphRange: manager.glyphRange(
+                        forCharacterRange: text.range(of: value), actualCharacterRange: nil), in: container)
+                }
+                #expect(textRect(before).maxY <= frame.minY - 6.5)
+                #expect(textRect(after).minY >= frame.maxY + 7.5)
+            }
+        }
+        for label in ["cd foofoil", "log stream"] {
+            let location = text.range(of: label).location
+            let style = try #require(paragraphStyle(of: rendered, at: location))
+            #expect(style.textLists.isEmpty)
+            let paragraph = text.substring(with: text.paragraphRange(for: NSRange(location: location, length: 0)))
+            #expect(paragraph.hasPrefix(label))
+        }
+    }
+
     /// 等待后台 Markdown 渲染完成；超时返回当前（可能为空的）结果，由断言给出失败信息。
     private func waitForRenderedMarkdown(_ state: AppState) async -> NSAttributedString {
         var attempts = 0

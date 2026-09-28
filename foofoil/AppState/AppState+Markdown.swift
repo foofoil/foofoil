@@ -574,7 +574,9 @@ extension AppState {
                 } else {
                     language = original.substring(with: match.range(at: 1)).uppercased()
                 }
+                // HTML 导入器把 pre 中的换行误算成新的列表项；先用软换行，导入后恢复。
                 let code = original.substring(with: match.range(at: 2))
+                    .replacingOccurrences(of: "\n", with: "&#8232;")
                 let replacement = "<pre>\(MarkdownRenderMarker.codeBlockStart)\(language)\(MarkdownRenderMarker.codeBlockLanguageEnd)<span class=\"markdown-code-content\">\(code)</span>\(MarkdownRenderMarker.codeBlockEnd)</pre>"
                 guard let range = Range(match.range, in: result) else { continue }
                 result.replaceSubrange(range, with: replacement)
@@ -614,17 +616,35 @@ extension AppState {
                 let labelLine = "\(label)\n"
                 let labelLineLength = (labelLine as NSString).length
 
-                attributedString.deleteCharacters(in: endRange)
+                // 恢复代码中的硬换行，让每个代码段落与列表正文独立排版。
+                let importedCodeRange = NSRange(
+                    location: NSMaxRange(languageEndRange),
+                    length: endRange.location - NSMaxRange(languageEndRange)
+                )
+                let importedCode = source.substring(with: importedCodeRange)
+                    .replacingOccurrences(of: "\u{2028}", with: "\n")
+                attributedString.replaceCharacters(in: importedCodeRange, with: importedCode)
+                var closingRange = endRange
+                if NSMaxRange(endRange) < source.length {
+                    let separator = source.character(at: NSMaxRange(endRange))
+                    if separator == 0x2028 || separator == 0x0A {
+                        closingRange.length += 1
+                    }
+                }
+                attributedString.replaceCharacters(in: closingRange, with: blockSpacer)
+                let needsParagraphBreak = prefixRange.location > 0
+                    && source.character(at: prefixRange.location - 1) != 0x0A
                 // 独立间隔行位于边框范围外，避免 paragraphSpacing 被 AppKit 算进代码块内部。
-                attributedString.replaceCharacters(in: prefixRange, with: blockSpacer + labelLine)
+                attributedString.replaceCharacters(in: prefixRange, with: (needsParagraphBreak ? "\n" : "") + blockSpacer + labelLine)
 
-                let blockLocation = prefixRange.location + blockSpacerLength
+                let spacerLocation = prefixRange.location + (needsParagraphBreak ? 1 : 0)
+                let blockLocation = spacerLocation + blockSpacerLength
                 var codeLength = endRange.location - NSMaxRange(languageEndRange)
                 // cmark 会在 fenced code 末尾保留换行；不把它纳入边框范围，避免底部出现一整行空白。
                 // 从原始快照读取代码尾部，避免每次复制当前富文本字符串。
                 while codeLength > 0 {
                     let finalCharacter = source.character(at: NSMaxRange(languageEndRange) + codeLength - 1)
-                    guard finalCharacter == 0x0A || finalCharacter == 0x0D else { break }
+                    guard finalCharacter == 0x0A || finalCharacter == 0x0D || finalCharacter == 0x2028 else { break }
                     codeLength -= 1
                 }
                 let blockRange = NSRange(
@@ -637,6 +657,7 @@ extension AppState {
                         at: prefixRange.location,
                         effectiveRange: nil
                     ), let spacerStyle = (value as? NSParagraphStyle)?.mutableCopy() as? NSMutableParagraphStyle {
+                        spacerStyle.textLists = []
                         spacerStyle.minimumLineHeight = 10
                         spacerStyle.maximumLineHeight = 10
                         spacerStyle.lineHeightMultiple = 1
@@ -644,7 +665,7 @@ extension AppState {
                         spacerStyle.paragraphSpacing = 0
                         spacerStyle.paragraphSpacingBefore = 0
                         let spacerParagraphRange = (attributedString.string as NSString).paragraphRange(
-                            for: NSRange(location: prefixRange.location, length: 0)
+                            for: NSRange(location: spacerLocation, length: 0)
                         )
                         attributedString.addAttribute(
                             .paragraphStyle,
@@ -669,6 +690,7 @@ extension AppState {
                     var paragraphStyles: [(NSRange, NSMutableParagraphStyle)] = []
                     attributedString.enumerateAttribute(.paragraphStyle, in: blockRange) { value, range, _ in
                         let style = ((value as? NSParagraphStyle) ?? .default).mutableCopy() as! NSMutableParagraphStyle
+                        style.textLists = []
                         style.minimumLineHeight = 0
                         style.maximumLineHeight = 0
                         style.lineSpacing = 0
@@ -694,6 +716,15 @@ extension AppState {
                         firstStyle.paragraphSpacing = 7
                         attributedString.addAttribute(.paragraphStyle, value: firstStyle, range: firstParagraphRange)
                     }
+
+                    // 底部间隔独立于边框，确保后续正文不被描边覆盖。
+                    let closingSpacerLocation = blockLocation + labelLineLength + importedCode.utf16.count
+                    let closingStyle = NSMutableParagraphStyle()
+                    closingStyle.minimumLineHeight = 10
+                    closingStyle.maximumLineHeight = 10
+                    closingStyle.lineHeightMultiple = 1
+                    attributedString.addAttribute(.paragraphStyle, value: closingStyle,
+                        range: NSRange(location: closingSpacerLocation, length: blockSpacerLength))
 
                     let lastLocation = NSMaxRange(blockRange) - 1
                     let lastParagraphRange = currentString.paragraphRange(

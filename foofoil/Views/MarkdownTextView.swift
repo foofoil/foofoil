@@ -150,7 +150,10 @@ private final class MarkdownNSTextView: NSTextView {
                 )
                 let backgroundRect = NSRect(
                     x: origin.x + glyphRect.minX - 3,
-                    y: origin.y + lineRect.midY - backgroundHeight / 2,
+                    // 行片段包含行距与段距，背景应跟随字形基线而非整行中心。
+                    y: origin.y + lineRect.minY
+                        + layoutManager.location(forGlyphAt: fragmentGlyphRange.location).y
+                        - font.ascender - 2,
                     width: glyphRect.width + 6,
                     height: backgroundHeight
                 )
