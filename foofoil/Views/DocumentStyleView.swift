@@ -13,6 +13,12 @@ import SwiftUI
 struct DocumentStyleView: View {
     @ObservedObject var appState: AppState
 
+    @Environment(\.colorScheme) private var colorScheme
+    @ObservedObject private var themeCatalog = DocumentThemeCatalog.shared
+
+    @State private var isShowingSaveThemePopover = false
+    @State private var newThemeName = ""
+
     @State private var catalog: DocumentFontCatalog.Catalog?
     @State private var chineseOnly = false
     @State private var query = ""
@@ -23,6 +29,10 @@ struct DocumentStyleView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
+            if appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling {
+                themeSection
+            }
+
             if appState.supportsContentBackgroundColor {
                 section(NSLocalizedString("Background Color", comment: "")) {
                     colorRow(
@@ -66,7 +76,7 @@ struct DocumentStyleView: View {
             Spacer(minLength: 0)
         }
         .padding(18)
-        .frame(minWidth: 360, idealWidth: 380, minHeight: 420)
+        .frame(minWidth: 360, idealWidth: 380, minHeight: 460)
         .task {
             let loaded = await DocumentFontCatalog.load()
             catalog = loaded
@@ -74,6 +84,145 @@ struct DocumentStyleView: View {
             chineseOnly = SettingsStore.shared.documentFontsChineseOnly
                 ?? DocumentFontCatalog.prefersChineseFonts(text: appState.text)
         }
+    }
+
+    // MARK: - 主题
+
+    private var themeSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(NSLocalizedString("Theme", comment: ""))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button {
+                    newThemeName = ""
+                    isShowingSaveThemePopover = true
+                } label: {
+                    HStack(spacing: 3) {
+                        Image(systemName: "plus")
+                        Text(NSLocalizedString("Save as Theme...", comment: ""))
+                    }
+                    .font(.caption)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(appState.documentThemeId == nil ? Color.accentColor : Color.secondary.opacity(0.4))
+                .disabled(appState.documentThemeId != nil)
+                .help(appState.documentThemeId == nil
+                    ? NSLocalizedString("Save current colors as a theme", comment: "")
+                    : NSLocalizedString("Theme is selected. Change color to customize or save a new theme.", comment: ""))
+                .popover(isPresented: $isShowingSaveThemePopover) {
+                    saveThemePopover
+                }
+            }
+
+            if themeCatalog.allThemes.count > 6 {
+                ScrollView(.vertical) {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                        ForEach(themeCatalog.allThemes) { theme in
+                            themeCard(theme)
+                        }
+                    }
+                }
+                .frame(maxHeight: 120)
+            } else {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    ForEach(themeCatalog.allThemes) { theme in
+                        themeCard(theme)
+                    }
+                }
+            }
+        }
+    }
+
+    private func themeCard(_ theme: DocumentTheme) -> some View {
+        let isDark = colorScheme == .dark
+        let isSelected = appState.documentThemeId == theme.id
+        let bg = theme.backgroundColor(isDark: isDark)
+        let fg = theme.textColor(isDark: isDark)
+
+        return Button {
+            appState.applyDocumentTheme(theme, isDark: isDark)
+        } label: {
+            HStack(spacing: 6) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(bg)
+                    RoundedRectangle(cornerRadius: 4)
+                        .stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
+                    Text("Aa")
+                        .font(.system(size: 11, weight: .semibold, design: .serif))
+                        .foregroundStyle(fg)
+                }
+                .frame(width: 24, height: 24)
+
+                Text(theme.displayName)
+                    .font(.system(size: 12, weight: isSelected ? .medium : .regular))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+
+                Spacer(minLength: 0)
+
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(Color.accentColor)
+                }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isSelected ? Color.accentColor.opacity(0.12) : Color.secondary.opacity(0.06))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
+            )
+        }
+        .buttonStyle(.plain)
+        .contextMenu {
+            if theme.isCustom {
+                Button(role: .destructive) {
+                    if appState.documentThemeId == theme.id {
+                        appState.documentThemeId = nil
+                    }
+                    themeCatalog.deleteCustomTheme(id: theme.id)
+                } label: {
+                    Label(NSLocalizedString("Delete Theme", comment: ""), systemImage: "trash")
+                }
+            }
+        }
+    }
+
+    private var saveThemePopover: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(NSLocalizedString("Save Custom Theme", comment: ""))
+                .font(.headline)
+
+            TextField(NSLocalizedString("Theme Name", comment: ""), text: $newThemeName)
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 220)
+
+            HStack {
+                Spacer()
+                Button(NSLocalizedString("Cancel", comment: "")) {
+                    isShowingSaveThemePopover = false
+                }
+                Button(NSLocalizedString("Save", comment: "")) {
+                    let created = themeCatalog.addCustomTheme(
+                        name: newThemeName,
+                        currentBackgroundHex: appState.backgroundColorHex,
+                        currentTextHex: appState.textColorHex,
+                        isCurrentlyDark: colorScheme == .dark
+                    )
+                    appState.applyDocumentTheme(created, isDark: colorScheme == .dark)
+                    isShowingSaveThemePopover = false
+                }
+                .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(14)
     }
 
     // MARK: - 字体

@@ -72,10 +72,32 @@ extension AppState {
         supportsDocumentTextStyling ? documentParagraphSpacing : nil
     }
 
-    /// 系统明暗切换后，把与目标主题明显不符的自选颜色换成同色相的深浅版本：
+    /// 应用选中的文档主题（前景色与背景色随当前外观切换）；不改变字体与排版参数。
+    public func applyDocumentTheme(_ theme: DocumentTheme, isDark: Bool) {
+        isApplyingThemeColors = true
+        backgroundColorHex = theme.backgroundHex(isDark: isDark)
+        if supportsDocumentTextStyling {
+            textColorHex = theme.textHex(isDark: isDark)
+        }
+        documentThemeId = theme.id
+        isApplyingThemeColors = false
+    }
+
+    /// 系统明暗切换后，若选中了主题则切为该主题对应明暗版本的预设色彩；
+    /// 否则把与目标主题明显不符的自选颜色换成同色相的深浅版本：
     /// 背景色要配合当前主题（深色主题配深色背景），文字颜色相反（深色主题配浅色文字），
     /// 让内容始终可读；中间色与已相符的颜色保持不变。
     func adaptDocumentColorsToAppearanceChange(toDarkAppearance isDark: Bool) {
+        if let themeId = documentThemeId, let theme = DocumentThemeCatalog.shared.theme(for: themeId) {
+            isApplyingThemeColors = true
+            backgroundColorHex = theme.backgroundHex(isDark: isDark)
+            if supportsDocumentTextStyling {
+                textColorHex = theme.textHex(isDark: isDark)
+            }
+            isApplyingThemeColors = false
+            return
+        }
+
         if let adapted = mirroredHex(contentBackgroundHex, forDarkAppearance: isDark) {
             backgroundColorHex = adapted
         }

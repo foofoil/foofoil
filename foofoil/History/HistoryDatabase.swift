@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 nonisolated final class HistoryDatabase {
-    static let schemaVersion = 15
+    static let schemaVersion = 16
 
     private let queue = DispatchQueue(label: "com.foofoil.history.database", qos: .utility)
     private var connection: OpaquePointer?
@@ -101,14 +101,14 @@ nonisolated final class HistoryDatabase {
                         web_url, actual_web_url, image_source, inline_text, is_pinned, opacity,
                         window_frame, show_border, image_scale, text_font_size, is_markdown_preview,
                         svg_color, background_color_hex, text_color_hex,
-                        document_font_name, document_line_spacing, document_paragraph_spacing,
+                        document_font_name, document_line_spacing, document_paragraph_spacing, document_theme_id,
                         created_at, updated_at, last_opened_at,
                         source_fingerprint, index_status, index_version, video_looping, video_bookmark,
                         media_sidecar_bookmark, custom_cover_path,
                         extension_id, extension_state_reference, navigator_panel_side,
                         navigator_panel_visibility, navigator_panel_width, file_list,
                         document_zoom, document_scroll_file, document_scroll_fraction, text_fingerprint
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -124,6 +124,7 @@ nonisolated final class HistoryDatabase {
                         document_font_name=excluded.document_font_name,
                         document_line_spacing=excluded.document_line_spacing,
                         document_paragraph_spacing=excluded.document_paragraph_spacing,
+                        document_theme_id=excluded.document_theme_id,
                         updated_at=excluded.updated_at,
                         last_opened_at=excluded.last_opened_at,
                         source_fingerprint=excluded.source_fingerprint,
@@ -148,6 +149,7 @@ nonisolated final class HistoryDatabase {
                         config.isMarkdownPreview, config.svgColor, config.backgroundColorHex,
                         config.textColorHex,
                         config.documentFontName, config.documentLineSpacing, config.documentParagraphSpacing,
+                        config.documentThemeId,
                         createdAt, now, now, config.sourceFingerprint, 0, 1, config.mediaPlaybackMode.sqliteValue,
                         config.videoBookmark?.base64EncodedString(), config.mediaSidecarBookmark?.base64EncodedString(),
                         config.customCoverPath,
@@ -419,6 +421,8 @@ nonisolated final class HistoryDatabase {
         try addColumnIfMissing("document_paragraph_spacing", definition: "document_paragraph_spacing REAL")
         // v15 正文字数+哈希指纹：正文未变时跳过搜索分块重建，避免每次保存都重编码整篇文档。
         try addColumnIfMissing("text_fingerprint", definition: "text_fingerprint TEXT")
+        // v16 文档样式面板：选中的主题 ID；为空表示自定义或未选中主题。
+        try addColumnIfMissing("document_theme_id", definition: "document_theme_id TEXT")
         if previousVersion >= 1 && previousVersion < 9 {
             // v9：旧列表 video_looping=1 是单曲循环开关；迁成顺序循环，使列表能自动续播。
             try execute("""
@@ -627,6 +631,7 @@ nonisolated final class HistoryDatabase {
                     documentFontName: columns["document_font_name"].flatMap { optionalText(statement, $0) },
                     documentLineSpacing: columns["document_line_spacing"].flatMap { optionalReal(statement, $0) },
                     documentParagraphSpacing: columns["document_paragraph_spacing"].flatMap { optionalReal(statement, $0) },
+                    documentThemeId: columns["document_theme_id"].flatMap { optionalText(statement, $0) },
                     textPath: optionalText(statement, columns["text_path"]!),
                     contentKind: kind,
                     sourceFingerprint: optionalText(statement, columns["source_fingerprint"]!),

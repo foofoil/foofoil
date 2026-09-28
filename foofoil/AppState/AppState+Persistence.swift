@@ -54,6 +54,7 @@ extension AppState {
             self.svgColor = config.svgColor
             self.backgroundColorHex = config.backgroundColorHex
             self.textColorHex = config.textColorHex
+            self.documentThemeId = config.documentThemeId
             self.documentFontName = config.documentFontName
             self.documentLineSpacing = config.documentLineSpacing
             self.documentParagraphSpacing = config.documentParagraphSpacing
@@ -181,6 +182,7 @@ extension AppState {
                 documentFontName: documentFontName,
                 documentLineSpacing: documentLineSpacing,
                 documentParagraphSpacing: documentParagraphSpacing,
+                documentThemeId: documentThemeId,
                 textPath: textURL?.path,
                 contentKind: HistoryContentKind.infer(from: WindowConfig(
                     id: id,

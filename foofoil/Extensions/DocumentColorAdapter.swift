@@ -23,6 +23,18 @@ enum DocumentColorAdapter {
         guard isDark ? isClearlyLight : isClearlyDark else { return nil }
         return components.mirroredLightness
     }
+
+    /// 直接返回 HSL 明度镜像后的颜色（L' = 1 - L），用于自建主题时推导另一套外观的成对颜色。
+    static func mirroredColor(_ color: NSColor) -> NSColor? {
+        guard let srgb = color.usingColorSpace(.sRGB), let components = HSB(srgb) else { return nil }
+        return components.mirroredLightness
+    }
+
+    /// 对十六进制颜色做明度镜像。
+    static func mirroredHex(_ hex: String) -> String? {
+        guard let color = NSColor(hex: hex), let mirrored = mirroredColor(color) else { return nil }
+        return mirrored.toHex()
+    }
 }
 
 /// HSB 分量与其 HSL 明度的镜像：AppKit 只提供 HSB，明度判断与镜像都换成 HSL 明度，

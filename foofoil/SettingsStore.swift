@@ -132,6 +132,8 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     public var documentLineSpacing: Double?
     /// 无排版文档内容的段落间距（相对字号的倍数）；为空时沿用通道默认段距。
     public var documentParagraphSpacing: Double?
+    /// 文档样式选中的主题 ID；为空表示自定义或未选中主题。
+    public var documentThemeId: String?
     public var textPath: String?
     /// SQLite 历史记录保存的真实内容类型；旧 DTO 解码时允许为空并按来源推断。
     public var contentKind: HistoryContentKind?
@@ -191,6 +193,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         documentFontName: String? = nil,
         documentLineSpacing: Double? = nil,
         documentParagraphSpacing: Double? = nil,
+        documentThemeId: String? = nil,
         textPath: String? = nil,
         contentKind: HistoryContentKind? = nil,
         sourceFingerprint: String? = nil,
@@ -233,6 +236,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.documentFontName = documentFontName
         self.documentLineSpacing = documentLineSpacing
         self.documentParagraphSpacing = documentParagraphSpacing
+        self.documentThemeId = documentThemeId
         self.textPath = textPath
         self.contentKind = contentKind
         self.sourceFingerprint = sourceFingerprint
@@ -256,7 +260,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, textPath, contentKind, sourceFingerprint, storedDisplayTitle, thumbnailPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction
+        case id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, thumbnailPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction
     }
 
     public init(from decoder: Decoder) throws {
@@ -282,6 +286,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         documentFontName = try container.decodeIfPresent(String.self, forKey: .documentFontName)
         documentLineSpacing = try container.decodeIfPresent(Double.self, forKey: .documentLineSpacing)
         documentParagraphSpacing = try container.decodeIfPresent(Double.self, forKey: .documentParagraphSpacing)
+        documentThemeId = try container.decodeIfPresent(String.self, forKey: .documentThemeId)
         textPath = try container.decodeIfPresent(String.self, forKey: .textPath)
         contentKind = try container.decodeIfPresent(HistoryContentKind.self, forKey: .contentKind)
         sourceFingerprint = try container.decodeIfPresent(String.self, forKey: .sourceFingerprint)
@@ -555,6 +560,23 @@ public class SettingsStore {
         static let showsMediaBottomProgressBar = "showsMediaBottomProgressBar"
         static let confirmClosingPlayingAudio = "confirmClosingPlayingAudio"
         static let documentFontsChineseOnly = "documentFontsChineseOnly"
+        static let customDocumentThemes = "customDocumentThemes"
+    }
+
+    /// 用户自建的文档主题列表
+    public var customDocumentThemes: [DocumentTheme] {
+        get {
+            guard let data = userDefaults.data(forKey: Keys.customDocumentThemes),
+                  let themes = try? JSONDecoder().decode([DocumentTheme].self, from: data) else {
+                return []
+            }
+            return themes
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue) {
+                userDefaults.set(data, forKey: Keys.customDocumentThemes)
+            }
+        }
     }
 
     /// 文档样式面板的字体列表是否只显示中文字体；未设置表示按系统语言与正文内容自动判定。

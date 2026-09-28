@@ -221,15 +221,31 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         }
     }
 
+    /// 是否正由主题或外观切换应用色彩；为 true 时不触发 documentThemeId 清空。
+    var isApplyingThemeColors = false
+
     /// 文档箔的内容背景色；为空时内容沿用窗口毛玻璃外观，非文档箔不使用该值。
     @Published public var backgroundColorHex: String? {
         didSet {
+            if !isApplyingThemeColors {
+                documentThemeId = nil
+            }
             saveState()
         }
     }
 
     /// 无排版文档内容的文字颜色；为空时文字跟随系统外观。
     @Published public var textColorHex: String? {
+        didSet {
+            if !isApplyingThemeColors {
+                documentThemeId = nil
+            }
+            saveState()
+        }
+    }
+
+    /// 文档样式选中的主题 ID；为空表示自定义或未选中主题。
+    @Published public var documentThemeId: String? {
         didSet {
             saveState()
         }
@@ -530,6 +546,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.svgColor = config.svgColor
         self.backgroundColorHex = config.backgroundColorHex
         self.textColorHex = config.textColorHex
+        self.documentThemeId = config.documentThemeId
         self.documentFontName = config.documentFontName
         self.documentLineSpacing = config.documentLineSpacing
         self.documentParagraphSpacing = config.documentParagraphSpacing
@@ -643,6 +660,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.svgColor = nil
         self.backgroundColorHex = nil
         self.textColorHex = nil
+        self.documentThemeId = nil
         self.documentFontName = nil
         self.documentLineSpacing = nil
         self.documentParagraphSpacing = nil
