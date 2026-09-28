@@ -24,8 +24,11 @@ struct ContentBackgroundTests {
             return state
         }
 
-        // 空白箔与纯文本通道（文本、Markdown、CSV）都是文档。
-        #expect(makeState().supportsContentBackgroundColor)
+        // 空白箔在用户输入内容前不是文档；输入内容后或加载文件时成为文档。
+        #expect(!makeState().supportsContentBackgroundColor)
+        let typed = makeState()
+        typed.text = "正文"
+        #expect(typed.supportsContentBackgroundColor)
 
         for name in ["photo.png", "vector.svg", "clip.mp4", "song.mp3"] {
             let state = makeState()
@@ -87,9 +90,16 @@ struct ContentBackgroundTests {
         }
 
         let text = makeState()
+        text.text = "文档正文"
         text.backgroundColorHex = "#123456"
         #expect(text.contentBackgroundHex == "#123456")
         #expect(text.contentBackgroundColor == NSColor(hex: "#123456"))
+
+        // 空白箔在用户输入内容前不是文档，不提供文档背景色。
+        let blank = makeState()
+        blank.backgroundColorHex = "#123456"
+        #expect(blank.contentBackgroundHex == nil)
+        #expect(blank.contentBackgroundColor == nil)
 
         // 图片箔即使带着历史背景色，也不把它当作文档背景。
         let image = makeState()
@@ -110,8 +120,11 @@ struct ContentBackgroundTests {
             return state
         }
 
-        // 空白箔与纯文本、Markdown：由宿主排版，可改文字颜色与字体。
-        #expect(makeState().supportsDocumentTextStyling)
+        // 空白箔在用户输入内容前不是文档；纯文本、Markdown在输入内容后或加载文件时由宿主排版，可改文字颜色与字体。
+        #expect(!makeState().supportsDocumentTextStyling)
+        let typedText = makeState()
+        typedText.text = "正文"
+        #expect(typedText.supportsDocumentTextStyling)
         for name in ["notes.txt", "notes.md"] {
             let state = makeState()
             state.originalImageName = name
@@ -143,6 +156,7 @@ struct ContentBackgroundTests {
 
         // 文字颜色同样只对这类内容生效。
         let text = makeState()
+        text.text = "正文"
         text.textColorHex = "#123456"
         text.documentFontName = "Songti SC"
         text.documentLineSpacing = 1.8
@@ -164,6 +178,7 @@ struct ContentBackgroundTests {
     @Test func textColorAdaptsOppositeToBackground() {
         let state = AppState()
         defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.text = "正文"
 
         state.textColorHex = "#1C1C1E"
         state.adaptDocumentColorsToAppearanceChange(toDarkAppearance: true)
@@ -295,6 +310,7 @@ struct ContentBackgroundTests {
         }
 
         let document = makeState()
+        document.text = "正文"
         document.backgroundColorHex = "#F5EFE0"
         document.adaptDocumentColorsToAppearanceChange(toDarkAppearance: true)
         let darkHex = try #require(document.backgroundColorHex)

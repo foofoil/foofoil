@@ -10,21 +10,25 @@ extension AppState {
     /// 文档箔：内容是一份可读文档，可为其选择内容背景色
     /// （纯文本/笔记、Markdown、CSV、PDF、网页，以及电子书等扩展文档）。
     /// 图片、视频、音频以自身画面为内容，窗口只作画框，不提供背景色设置。
+    /// 空白箔在用户输入内容前不是文档类型，不提供背景色设置。
     public var supportsContentBackgroundColor: Bool {
         // PDF 复用图片内容通道，但内容是一页页纸张，仍按文档处理。
         if isPDFDocument { return true }
         if webURL != nil { return true }
         if extensionSession != nil { return isExtensionDocument }
-        return imageURL == nil
+        guard imageURL == nil else { return false }
+        return !isBlank
     }
 
     /// 无排版文档内容：纯文本/笔记、Markdown，以及电子书等扩展文档。
     /// 它们由宿主排版，可单独选择文字颜色与字体；PDF 自带版式，CSV 是表格，网页有站点自己的排版。
+    /// 空白箔在用户输入内容前不是文档类型。
     public var supportsDocumentTextStyling: Bool {
         if isPDFDocument || isCSVDocument { return false }
         if webURL != nil { return false }
         if extensionSession != nil { return isExtensionDocument }
-        return imageURL == nil
+        guard imageURL == nil else { return false }
+        return !isBlank
     }
 
     /// 文档内容背景色（十六进制）；非文档箔为 nil，避免把整窗外观当成背景作用对象。

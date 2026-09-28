@@ -42,10 +42,10 @@ extension AppState {
             self.id = UUID()
             self.createdAt = Date()
             self.svgColor = nil
-            // 重置按新窗口处理：恢复默认文档样式（素白），旧自选颜色与字体不带到新空白箔。
-            let defaultTheme = DocumentThemeCatalog.defaultTheme
-            let isDark = Self.isDarkMode()
-            applyDocumentTheme(defaultTheme, isDark: isDark)
+            // 重置按新窗口处理：空白箔无默认主题，旧自选颜色、主题与字体不带到新空白箔。
+            self.backgroundColorHex = nil
+            self.textColorHex = nil
+            self.documentThemeId = nil
             self.documentFontName = nil
             self.documentLineSpacing = nil
             self.documentParagraphSpacing = nil

@@ -334,6 +334,22 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         didSet {
             updateRenderedMarkdown()
 
+            // 空白箔在用户首次输入内容时成为文档类型，此时自动应用默认文档样式（素白）。
+            if oldValue.isEmpty && !text.isEmpty && !isBatchUpdating {
+                if documentThemeId == nil && backgroundColorHex == nil && textColorHex == nil {
+                    applyDocumentTheme(DocumentThemeCatalog.defaultTheme, isDark: Self.isDarkMode())
+                }
+            } else if text.isEmpty && textURL == nil && imageURL == nil && webURL == nil && extensionSession == nil {
+                if documentThemeId == DocumentThemeCatalog.defaultThemeId {
+                    isApplyingThemeColors = true
+                    documentThemeId = nil
+                    backgroundColorHex = nil
+                    textColorHex = nil
+                    isApplyingThemeColors = false
+                }
+                (NSApplication.shared.delegate as? AppDelegate)?.dismissDocumentStylePanel(ownedBy: self)
+            }
+
             if !isBatchUpdating {
                 saveTask?.cancel()
                 saveTask = Task {
@@ -368,6 +384,16 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     public var isCSVDocument: Bool {
         guard let name = originalImageName?.lowercased() else { return false }
         return name.hasSuffix(".csv")
+    }
+
+    /// 空白箔：尚未加载任何图像、网页、扩展会话或关联文件，且用户尚未输入任何文本内容。
+    /// 在用户输入内容前空白箔不是文档类型，不显示文档背景，也不允许配置样式和主题。
+    public var isBlank: Bool {
+        imageURL == nil
+            && webURL == nil
+            && textURL == nil
+            && extensionSession == nil
+            && text.isEmpty
     }
 
     @Published public var isPinned: Bool {
@@ -658,11 +684,9 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.documentZoom = 1.0
         self.createdAt = Date()
         self.svgColor = nil
-        let defaultTheme = DocumentThemeCatalog.defaultTheme
-        let isDark = Self.isDarkMode()
-        self.documentThemeId = defaultTheme.id
-        self.backgroundColorHex = defaultTheme.backgroundHex(isDark: isDark)
-        self.textColorHex = defaultTheme.textHex(isDark: isDark)
+        self.backgroundColorHex = nil
+        self.textColorHex = nil
+        self.documentThemeId = nil
         self.documentFontName = nil
         self.documentLineSpacing = nil
         self.documentParagraphSpacing = nil

@@ -60,6 +60,7 @@ struct DocumentThemeTests {
     @Test func changingBackgroundColorDeselectsTheme() throws {
         let state = AppState()
         defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.text = "正文"
 
         let minimal = try #require(DocumentThemeCatalog.shared.theme(for: "minimal"))
         state.applyDocumentTheme(minimal, isDark: false)
@@ -80,6 +81,7 @@ struct DocumentThemeTests {
     @Test func changingTextColorDeselectsTheme() throws {
         let state = AppState()
         defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.text = "正文"
 
         let bamboo = try #require(DocumentThemeCatalog.shared.theme(for: "bamboo"))
         state.applyDocumentTheme(bamboo, isDark: false)
@@ -100,6 +102,7 @@ struct DocumentThemeTests {
     @Test func appearanceChangeAdaptsThemeColors() throws {
         let state = AppState()
         defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.text = "正文"
 
         let dusk = try #require(DocumentThemeCatalog.shared.theme(for: "dusk"))
         state.applyDocumentTheme(dusk, isDark: false)
@@ -186,10 +189,31 @@ struct DocumentThemeTests {
         #expect(state.textColorHex == "#382E24")
     }
 
-    /// 新建箔片时默认应用「素白」主题样式。
-    @Test func newFoilDefaultsToMinimalTheme() throws {
+    /// 空白箔在用户输入内容前没有默认主题，且不是文档类型。
+    @Test func blankFoilHasNoThemeAndIsNotDocument() throws {
         let state = AppState()
         defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+
+        #expect(state.isBlank)
+        #expect(!state.supportsContentBackgroundColor)
+        #expect(!state.supportsDocumentTextStyling)
+        #expect(state.documentThemeId == nil)
+        #expect(state.backgroundColorHex == nil)
+        #expect(state.textColorHex == nil)
+        #expect(state.contentBackgroundColor == nil)
+        #expect(state.documentTextColor == nil)
+    }
+
+    /// 用户首次输入内容时成为文档类型，并自动应用默认文档样式「素白」。
+    @Test func enteringContentMakesDocumentAndAppliesMinimalTheme() throws {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+
+        #expect(state.isBlank)
+        state.text = "开始输入正文"
+        #expect(!state.isBlank)
+        #expect(state.supportsContentBackgroundColor)
+        #expect(state.supportsDocumentTextStyling)
 
         let defaultTheme = DocumentThemeCatalog.defaultTheme
         let isDark = AppState.isDarkMode()
@@ -199,28 +223,31 @@ struct DocumentThemeTests {
         #expect(state.textColorHex == defaultTheme.textHex(isDark: isDark))
     }
 
-    /// 重置箔片内容时恢复「素白」默认样式。
-    @Test func resetContentRestoresMinimalDefaultTheme() throws {
+    /// 重置箔片内容时回到空白箔状态，清除主题与自选色彩。
+    @Test func resetContentClearsThemeForBlankFoil() throws {
         let state = AppState()
         defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
 
+        state.text = "正文"
         let parchment = try #require(DocumentThemeCatalog.shared.theme(for: "parchment"))
         state.applyDocumentTheme(parchment, isDark: false)
         #expect(state.documentThemeId == "parchment")
 
         state.resetContent()
-        let defaultTheme = DocumentThemeCatalog.defaultTheme
-        let isDark = AppState.isDarkMode()
-        #expect(state.documentThemeId == "minimal")
-        #expect(state.backgroundColorHex == defaultTheme.backgroundHex(isDark: isDark))
-        #expect(state.textColorHex == defaultTheme.textHex(isDark: isDark))
+        #expect(state.isBlank)
+        #expect(!state.supportsContentBackgroundColor)
+        #expect(!state.supportsDocumentTextStyling)
+        #expect(state.documentThemeId == nil)
+        #expect(state.backgroundColorHex == nil)
+        #expect(state.textColorHex == nil)
     }
 
-    /// 单独恢复背景色或文字颜色到默认值，当两色均达到默认时自动重设主题标识为「素白」。
+    /// 文档有内容时，单独恢复背景色或文字颜色到默认值，当两色均达到默认时自动重设主题标识为「素白」。
     @Test func resetColorsToDefaultRestoresMinimalTheme() throws {
         let state = AppState()
         defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
 
+        state.text = "正文"
         let defaultTheme = DocumentThemeCatalog.defaultTheme
         let isDark = false
         state.applyDocumentTheme(defaultTheme, isDark: isDark)

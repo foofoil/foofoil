@@ -36,6 +36,7 @@ final class DocumentStylePanelController: NSWindowController {
 
     /// 打开面板并绑定到指定箔；已打开时直接改绑，不新建窗口。
     func show(for appState: AppState) {
+        guard appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling else { return }
         attachedState = appState
         if let window {
             window.contentView = NSHostingView(rootView: DocumentStyleView(appState: appState))

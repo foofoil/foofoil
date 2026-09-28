@@ -47,7 +47,9 @@ struct ColorPanelScopeTests {
     @Test func stylePanelFollowsOwningFoil() throws {
         let appDelegate = try #require(NSApplication.shared.delegate as? AppDelegate)
         let owner = AppState()
+        owner.text = "正文1"
         let other = AppState()
+        other.text = "正文2"
         let ownerController = FloatingWindowController(appState: owner)
         let otherController = FloatingWindowController(appState: other)
         appDelegate.addWindowController(ownerController)
@@ -80,6 +82,7 @@ struct ColorPanelScopeTests {
     @Test func closingOwnerWindowDismissesStylePanel() throws {
         let appDelegate = try #require(NSApplication.shared.delegate as? AppDelegate)
         let owner = AppState()
+        owner.text = "正文"
         let controller = FloatingWindowController(appState: owner)
         _ = controller.window
         appDelegate.addWindowController(controller)
@@ -123,11 +126,9 @@ struct ColorPanelScopeTests {
 
         #expect(DocumentStylePanelController.shared.attachedState == nil, "重置后仍保留样式面板归属")
         #expect(DocumentStylePanelController.shared.window?.isVisible == false)
-        let defaultTheme = DocumentThemeCatalog.defaultTheme
-        let isDark = AppState.isDarkMode()
-        #expect(state.documentThemeId == defaultTheme.id)
-        #expect(state.backgroundColorHex == defaultTheme.backgroundHex(isDark: isDark), "重置后把内容背景色带到了新的空白箔")
-        #expect(state.textColorHex == defaultTheme.textHex(isDark: isDark))
+        #expect(state.documentThemeId == nil)
+        #expect(state.backgroundColorHex == nil, "重置后把内容背景色带到了新的空白箔")
+        #expect(state.textColorHex == nil)
         #expect(state.documentFontName == nil)
         #expect(state.documentLineSpacing == nil)
         #expect(state.documentParagraphSpacing == nil)

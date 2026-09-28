@@ -807,6 +807,7 @@ extension AppDelegate {
 
     @objc func documentStyleAction() {
         guard let appState = activeAppState else { return }
+        guard appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling else { return }
         DocumentStylePanelController.shared.show(for: appState)
     }
 
