@@ -28,55 +28,56 @@ struct DocumentStyleView: View {
     private let paragraphSpacingRange: ClosedRange<Double> = 0...2.0
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling {
-                themeSection
-            }
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 16) {
+                if appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling {
+                    themeSection
+                }
 
-            if appState.supportsContentBackgroundColor {
-                section(NSLocalizedString("Background Color", comment: "")) {
-                    colorRow(
-                        color: backgroundBinding,
-                        isCustom: appState.backgroundColorHex != nil,
-                        reset: { appState.backgroundColorHex = nil }
-                    )
+                if appState.supportsContentBackgroundColor {
+                    section(NSLocalizedString("Background Color", comment: "")) {
+                        colorRow(
+                            color: backgroundBinding,
+                            isCustom: appState.backgroundColorHex != nil,
+                            reset: { appState.backgroundColorHex = nil }
+                        )
+                    }
+                }
+
+                if appState.supportsDocumentTextStyling {
+                    section(NSLocalizedString("Text Color", comment: "")) {
+                        colorRow(
+                            color: textColorBinding,
+                            isCustom: appState.textColorHex != nil,
+                            reset: { appState.textColorHex = nil }
+                        )
+                    }
+
+                    fontSection
+
+                    section(NSLocalizedString("Line Spacing", comment: "")) {
+                        spacingRow(
+                            binding: lineSpacingBinding,
+                            range: lineHeightRange,
+                            defaultStart: 1.6,
+                            valueLabel: { String(format: "%.2f×", $0) }
+                        )
+                    }
+
+                    section(NSLocalizedString("Paragraph Spacing", comment: "")) {
+                        spacingRow(
+                            binding: paragraphSpacingBinding,
+                            range: paragraphSpacingRange,
+                            defaultStart: 0.6,
+                            valueLabel: { String(format: "%.2f em", $0) }
+                        )
+                    }
                 }
             }
-
-            if appState.supportsDocumentTextStyling {
-                section(NSLocalizedString("Text Color", comment: "")) {
-                    colorRow(
-                        color: textColorBinding,
-                        isCustom: appState.textColorHex != nil,
-                        reset: { appState.textColorHex = nil }
-                    )
-                }
-
-                fontSection
-
-                section(NSLocalizedString("Line Spacing", comment: "")) {
-                    spacingRow(
-                        binding: lineSpacingBinding,
-                        range: lineHeightRange,
-                        defaultStart: 1.6,
-                        valueLabel: { String(format: "%.2f×", $0) }
-                    )
-                }
-
-                section(NSLocalizedString("Paragraph Spacing", comment: "")) {
-                    spacingRow(
-                        binding: paragraphSpacingBinding,
-                        range: paragraphSpacingRange,
-                        defaultStart: 0.6,
-                        valueLabel: { String(format: "%.2f em", $0) }
-                    )
-                }
-            }
-
-            Spacer(minLength: 0)
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .padding(18)
-        .frame(minWidth: 360, idealWidth: 380, minHeight: 460)
+        .frame(minWidth: 360, idealWidth: 380)
         .task {
             let loaded = await DocumentFontCatalog.load()
             catalog = loaded
@@ -116,20 +117,9 @@ struct DocumentStyleView: View {
                 }
             }
 
-            if themeCatalog.allThemes.count > 6 {
-                ScrollView(.vertical) {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                        ForEach(themeCatalog.allThemes) { theme in
-                            themeCard(theme)
-                        }
-                    }
-                }
-                .frame(maxHeight: 120)
-            } else {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    ForEach(themeCatalog.allThemes) { theme in
-                        themeCard(theme)
-                    }
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                ForEach(themeCatalog.allThemes) { theme in
+                    themeCard(theme)
                 }
             }
         }

@@ -20,8 +20,8 @@ final class DocumentStylePanelController: NSWindowController {
 
     private convenience init() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 380, height: 560),
-            styleMask: [.titled, .closable, .utilityWindow],
+            contentRect: NSRect(x: 0, y: 0, width: 380, height: 600),
+            styleMask: [.titled, .closable, .resizable, .utilityWindow],
             backing: .buffered,
             defer: false
         )
@@ -30,6 +30,7 @@ final class DocumentStylePanelController: NSWindowController {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.fullScreenAuxiliary]
+        panel.minSize = NSSize(width: 360, height: 420)
         self.init(window: panel)
     }
 
@@ -38,6 +39,13 @@ final class DocumentStylePanelController: NSWindowController {
         attachedState = appState
         if let window {
             window.contentView = NSHostingView(rootView: DocumentStyleView(appState: appState))
+            if window.frame.height < 580 {
+                var frame = window.frame
+                let diff = 580 - frame.height
+                frame.origin.y -= diff
+                frame.size.height = 580
+                window.setFrame(frame, display: true)
+            }
             if !window.isVisible {
                 window.center()
             }
