@@ -1,0 +1,246 @@
+#!/bin/zsh
+#
+# package-dmg - 构建 foofoil Release app，内嵌所有一方插件并打包为 DMG。
+#
+# 与 ./run 的区别：run 面向本地调试（Debug + 注入开发插件），
+# package-dmg 面向分发（Release + 内嵌插件 + DMG）。两者都不会写入安装记录。
+#
+# 签名与公证：
+#   - 不签名时不做开发者签名与公证（Apple Silicon 仍由链接器自动写 ad-hoc 签名）。
+#   - 签名时由内到外签：插件 -> app，全部 Developer ID + hardened runtime + 时间戳；
+#     随后先公证并 staple app，再公证并 staple DMG。
+#   - 签名分支会剔除测试用的 Contents/XPCServices（工程与单测保持不变）。
+#
+# 用法:
+#   ./package-dmg [--sign|--sign-only|--no-sign] [输出目录]
+#
+#     （无参数）    询问是否签名并公证；非交互式终端默认不签名
+#     --sign        直接签名并公证，不询问
+#     --sign-only   仅签名，不做公证（本地验证用）
+#     --no-sign     直接打不签名包，不询问
+#     -h, --help    显示帮助
+#
+# 环境变量:
+#   SIGN_IDENTITY   签名身份；默认自动查找钥匙串中的 "Developer ID Application"
+#   NOTARY_PROFILE  notarytool 钥匙串凭据名；默认 foofoil-notary
+#
+# 准备签名所需凭据（只需一次）:
+#   xcrun notarytool store-credentials "foofoil-notary" \
+#       --apple-id "you@example.com" --team-id RFQ56XLHXJ --password "xxxx-xxxx-xxxx-xxxx"
+
+set -euo pipefail
+
+PROJECT="foofoil.xcodeproj"
+SCHEME="foofoil"
+APP_NAME="foofoil"
+CONFIGURATION="Release"
+DESTINATION='platform=macOS'
+
+# 一方插件：<仓库相对目录>:<bundle 名>:<构建配置>
+EXTENSION_DEFS=(
+    "../hifi:Hi-Fi.foofoilextension:release"
+    "../ebook:EBook.foofoilextension:release"
+)
+
+SCRIPT_DIR="${0:A:h}"
+cd "$SCRIPT_DIR"
+
+DERIVED_DATA="$SCRIPT_DIR/build"
+ENTITLEMENTS="$SCRIPT_DIR/foofoil/foofoil.entitlements"
+NOTARY_PROFILE="${NOTARY_PROFILE:-foofoil-notary}"
+
+usage() {
+    print -r -- "用法: ./package-dmg [--sign|--sign-only|--no-sign] [输出目录]"
+    print -r -- ""
+    print -r -- "  --sign       签名并公证（不询问）"
+    print -r -- "  --sign-only  仅签名，不做公证"
+    print -r -- "  --no-sign    不签名，直接打包"
+    print -r -- "  -h, --help   显示帮助"
+    print -r -- ""
+    print -r -- "  环境变量: SIGN_IDENTITY, NOTARY_PROFILE"
+}
+
+resolve_sign_identity() {
+    if [[ -n "${SIGN_IDENTITY:-}" ]]; then
+        print -r -- "$SIGN_IDENTITY"
+        return
+    fi
+    security find-identity -v -p codesigning 2>/dev/null \
+        | awk -F'"' '/"Developer ID Application/ { print $2; exit }'
+}
+
+MODE="ask"
+OUTPUT_DIR=""
+while (( $# > 0 )); do
+    case "$1" in
+        --sign) MODE="sign" ;;
+        --sign-only) MODE="sign-only" ;;
+        --no-sign) MODE="no-sign" ;;
+        -h|--help) usage; exit 0 ;;
+        --) shift; break ;;
+        -*) print -u2 "未知参数: $1"; usage; exit 2 ;;
+        *)
+            if [[ -n "$OUTPUT_DIR" ]]; then
+                print -u2 "只能指定一个输出目录"
+                exit 2
+            fi
+            OUTPUT_DIR="$1"
+            ;;
+    esac
+    shift
+done
+if (( $# > 0 )); then
+    if [[ -n "$OUTPUT_DIR" ]]; then
+        print -u2 "只能指定一个输出目录"
+        exit 2
+    fi
+    OUTPUT_DIR="$1"
+fi
+OUTPUT_DIR="${OUTPUT_DIR:-$DERIVED_DATA/dist}"
+
+if [[ "$MODE" == "ask" ]]; then
+    if [[ -t 0 && -t 1 ]]; then
+        print -n "是否签名并公证？需要钥匙串中的 Developer ID 证书 (y/N) "
+        read -r reply || reply=""
+        if [[ "$reply" == [yY]* ]]; then
+            MODE="sign"
+        else
+            MODE="no-sign"
+        fi
+    else
+        print "非交互式运行，默认不签名（用 --sign 可显式开启）"
+        MODE="no-sign"
+    fi
+fi
+
+SIGN_ENABLED=0
+NOTARIZE_ENABLED=0
+case "$MODE" in
+    sign) SIGN_ENABLED=1; NOTARIZE_ENABLED=1 ;;
+    sign-only) SIGN_ENABLED=1; NOTARIZE_ENABLED=0 ;;
+    no-sign) SIGN_ENABLED=0 ;;
+esac
+
+CODESIGN_IDENTITY="-"
+TIMESTAMP_FLAG=()
+if (( SIGN_ENABLED )); then
+    CODESIGN_IDENTITY="$(resolve_sign_identity)"
+    if [[ -z "$CODESIGN_IDENTITY" ]]; then
+        print -u2 "未找到 Developer ID Application 证书。"
+        print -u2 "  1) 请 Account Holder 用你的 CSR 创建 Developer ID Application 证书并导入钥匙串"
+        print -u2 "  2) 或用 SIGN_IDENTITY='...' 指定身份"
+        print -u2 "  3) 或改用 --no-sign"
+        exit 1
+    fi
+    [[ "$CODESIGN_IDENTITY" != "-" ]] && TIMESTAMP_FLAG=(--timestamp)
+    print "签名身份: $CODESIGN_IDENTITY"
+    if (( NOTARIZE_ENABLED )); then
+        print "公证凭据: $NOTARY_PROFILE"
+    else
+        print "公证: 跳过（--sign-only）"
+    fi
+else
+    print "签名/公证: 跳过（不签名打包）"
+fi
+
+# 1. 构建 app。签名与否都先用 CODE_SIGNING_ALLOWED=NO 构建，签名统一在打包阶段处理。
+xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" \
+    -derivedDataPath "$DERIVED_DATA" -destination "$DESTINATION" \
+    CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+    build
+
+APP_PATH="$DERIVED_DATA/Build/Products/$CONFIGURATION/$APP_NAME.app"
+if [[ ! -d "$APP_PATH" ]]; then
+    print -u2 "Missing built app: $APP_PATH"
+    exit 1
+fi
+
+# 2. 剔除仅在开发/单测中使用的 XPC 服务，工程与测试目标保持不变。
+rm -rf "$APP_PATH/Contents/XPCServices"
+
+# 3. 构建插件并注入 app 内置目录。ExtensionHost 在 Release 下也会加载这里的插件。
+PLUGINS_ROOT="$DERIVED_DATA/PackagedPlugins"
+rm -rf "$PLUGINS_ROOT"
+mkdir -p "$PLUGINS_ROOT" "$APP_PATH/Contents/PlugIns"
+
+for def in "${EXTENSION_DEFS[@]}"; do
+    root="${def%%:*}"
+    rest="${def#*:}"
+    bundle="${rest%%:*}"
+    config="${rest##*:}"
+    source_root="$SCRIPT_DIR/$root"
+    if [[ ! -x "$source_root/build-plugin" ]]; then
+        print -u2 "Missing plugin build script: $source_root/build-plugin"
+        exit 1
+    fi
+    print "Building plugin $bundle ($config) from $root"
+    "$source_root/build-plugin" "$PLUGINS_ROOT" - "$config" >/dev/null
+    rm -rf "$APP_PATH/Contents/PlugIns/$bundle"
+    ditto "$PLUGINS_ROOT/$bundle" "$APP_PATH/Contents/PlugIns/$bundle"
+done
+
+# 4. 签名：由内到外，先插件再 app。
+if (( SIGN_ENABLED )); then
+    print "Signing plugins..."
+    for def in "${EXTENSION_DEFS[@]}"; do
+        rest="${def#*:}"
+        bundle="${rest%%:*}"
+        codesign --force --options runtime "${TIMESTAMP_FLAG[@]}" \
+            --sign "$CODESIGN_IDENTITY" "$APP_PATH/Contents/PlugIns/$bundle"
+    done
+    print "Signing app..."
+    codesign --force --options runtime "${TIMESTAMP_FLAG[@]}" \
+        --entitlements "$ENTITLEMENTS" --sign "$CODESIGN_IDENTITY" "$APP_PATH"
+
+    print "Verifying signature..."
+    if ! codesign --verify --deep --strict --verbose=2 "$APP_PATH"; then
+        print -u2 "codesign --verify 失败"
+        exit 1
+    fi
+fi
+
+# 5. 公证 app（先 staple app，保证拖到本地后离线也能过 Gatekeeper）。
+if (( NOTARIZE_ENABLED )); then
+    APP_ZIP="$DERIVED_DATA/$APP_NAME-notarize.zip"
+    rm -f "$APP_ZIP"
+    print "Notarizing app (this can take several minutes)..."
+    ditto -c -k --keepParent "$APP_PATH" "$APP_ZIP"
+    if ! xcrun notarytool submit "$APP_ZIP" --keychain-profile "$NOTARY_PROFILE" --wait; then
+        print -u2 "app 公证失败。请确认已执行: xcrun notarytool store-credentials \"$NOTARY_PROFILE\" ..."
+        print -u2 "诊断: xcrun notarytool log <submission-id> --keychain-profile \"$NOTARY_PROFILE\""
+        exit 1
+    fi
+    rm -f "$APP_ZIP"
+    xcrun stapler staple "$APP_PATH"
+    xcrun stapler validate "$APP_PATH"
+fi
+
+# 6. 组装 DMG 内容：app 与 Applications 快捷方式。
+VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" \
+    "$APP_PATH/Contents/Info.plist" 2>/dev/null || print "1.0")
+DMG_NAME="$APP_NAME-$VERSION.dmg"
+STAGING="$DERIVED_DATA/dmg-staging"
+rm -rf "$STAGING"
+mkdir -p "$STAGING" "$OUTPUT_DIR"
+ditto "$APP_PATH" "$STAGING/$APP_NAME.app"
+ln -s /Applications "$STAGING/Applications"
+
+DMG_PATH="$OUTPUT_DIR/$DMG_NAME"
+hdiutil create -volname "$APP_NAME" -srcfolder "$STAGING" -ov -format UDZO "$DMG_PATH"
+
+# 7. 公证并 staple DMG。
+if (( NOTARIZE_ENABLED )); then
+    print "Notarizing DMG (this can take several minutes)..."
+    if ! xcrun notarytool submit "$DMG_PATH" --keychain-profile "$NOTARY_PROFILE" --wait; then
+        print -u2 "DMG 公证失败。诊断: xcrun notarytool log <submission-id> --keychain-profile \"$NOTARY_PROFILE\""
+        exit 1
+    fi
+    xcrun stapler staple "$DMG_PATH"
+    xcrun stapler validate "$DMG_PATH"
+fi
+
+print ""
+print "Built: $DMG_PATH"
+print "Signed/notarized: $([[ $SIGN_ENABLED -eq 1 ]] && print yes || print no)$([[ $NOTARIZE_ENABLED -eq 1 ]] && print ' + notarized' || true)"
+print "Bundled plugins:"
+ls -1 "$APP_PATH/Contents/PlugIns"

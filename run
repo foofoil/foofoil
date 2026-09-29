@@ -19,7 +19,7 @@ xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Debug \
 
 APP_PATH="$SCRIPT_DIR/build/Build/Products/Debug/$APP_NAME.app"
 
-# Debug 运行时注入兄弟仓库的开发插件；Release 仍通过扩展安装机制独立分发。
+# Debug 运行时注入兄弟仓库的开发插件；Release 分发见 ./package-dmg（内嵌插件）。
 EXTENSION_ROOTS=("$SCRIPT_DIR/../hifi" "$SCRIPT_DIR/../ebook")
 EXTENSION_BUNDLES=("Hi-Fi.foofoilextension" "EBook.foofoilextension")
 DEVELOPMENT_EXTENSIONS="$SCRIPT_DIR/build/DevelopmentExtensions"
