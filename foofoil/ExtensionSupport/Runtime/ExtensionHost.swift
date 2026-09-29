@@ -34,9 +34,7 @@ final class ExtensionHost: ExtensionRuntimeHost {
         self.manager = resolvedManager
         resolvedManager.host = self
         resolvedManager.loadInstalledRuntimes()
-#if DEBUG
-        loadBundledDevelopmentRuntimes()
-#endif
+        loadBundledRuntimes()
     }
 
     func setPreferredProvider(_ providerID: String?, for domain: String) {
@@ -266,20 +264,20 @@ final class ExtensionHost: ExtensionRuntimeHost {
         sessionLock.unlock()
     }
 
-#if DEBUG
-    /// `./run` 注入的开发插件不写安装状态；Release 只从正式安装目录加载。
-    private func loadBundledDevelopmentRuntimes() {
+    /// App 内置插件随包分发：Debug 由 `./run` 注入，Release 由打包流程注入。
+    /// 不写安装记录；正式安装目录中的同 ID 扩展优先，内置副本仅作兜底。
+    private func loadBundledRuntimes() {
         guard let directory = Bundle.main.builtInPlugInsURL else { return }
         let loader = manager.makeLoader()
         for discovered in loader.discover(in: directory) {
             guard case .success(let loaded) = discovered.result else {
                 if case .failure(let error) = discovered.result {
-                    NSLog("Development extension load failed: \(error.localizedDescription)")
+                    NSLog("Bundled extension load failed: \(error.localizedDescription)")
                 }
                 continue
             }
+            guard !isLoadedInProcess(loaded.manifest.id) else { continue }
             activateRuntime(for: loaded)
         }
     }
-#endif
 }
