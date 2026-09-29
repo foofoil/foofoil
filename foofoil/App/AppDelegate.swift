@@ -151,12 +151,33 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
         // 注册后系统可立即投递服务请求，因此先完成打开流程依赖的通知注册。
         NSApp.servicesProvider = self
 
-        // 1. 启动时，如果尚未通过打开文件创建过窗口，且当前窗口列表为空，才显示一个默认尺寸的空白窗口
+        // 1. 启动时，如果尚未通过打开文件创建过窗口，且当前窗口列表为空，按启动行为偏好处理
         if !didOpenFiles && windowControllers.isEmpty {
-            let state = AppState()
-            let controller = FloatingWindowController(appState: state)
-            addWindowController(controller)
-            controller.showWindow(nil)
+            switch SettingsStore.shared.startupBehavior {
+            case .newWindow:
+                let state = AppState()
+                let controller = FloatingWindowController(appState: state)
+                addWindowController(controller)
+                controller.showWindow(nil)
+            case .restoreWindows:
+                let savedConfigs = SettingsStore.shared.lastOpenWindowConfigs
+                if !savedConfigs.isEmpty {
+                    for config in savedConfigs {
+                        let state = AppState(config: config)
+                        let controller = FloatingWindowController(appState: state)
+                        if config.windowFrame == nil { controller.window?.center() }
+                        addWindowController(controller)
+                        controller.showWindow(nil)
+                    }
+                } else {
+                    let state = AppState()
+                    let controller = FloatingWindowController(appState: state)
+                    addWindowController(controller)
+                    controller.showWindow(nil)
+                }
+            case .nothing:
+                break
+            }
         }
 
         // 2. 动态创建 macOS 菜单项 (延时到主线程下一个循环，确保在 SwiftUI 初始化菜单之后执行)
@@ -176,6 +197,10 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard !isTerminating else { return .terminateLater }
         isTerminating = true
+        // 保存当前活跃窗口配置，用于下次启动恢复
+        let activeConfigs = windowControllers.map { $0.appState.toConfig() }
+        SettingsStore.shared.lastOpenWindowConfigs = activeConfigs
+
         HistoryManager.shared.flushPendingListSaves()
         // 进程退出只会自动归还 hog，不会恢复采样率；先停 PCM 引擎，再等待扩展恢复设备。
         AudioPlaybackController.stopAllOutputsForTermination()

@@ -40,4 +40,7 @@ extension Notification.Name {
     public static let mediaPlaybackControlsAutoHideIntervalDidChange = Notification.Name("mediaPlaybackControlsAutoHideIntervalDidChange")
     public static let showsMediaBottomProgressBarDidChange = Notification.Name("showsMediaBottomProgressBarDidChange")
     public static let keyboardShortcutsDidChange = Notification.Name("keyboardShortcutsDidChange")
+    public static let navigatorPanelSideDidChange = Notification.Name("navigatorPanelSideDidChange")
+    public static let navigatorPanelVisibilityModeDidChange = Notification.Name("navigatorPanelVisibilityModeDidChange")
+    public static let spotlightSearchAuthorizationDidChange = Notification.Name("spotlightSearchAuthorizationDidChange")
 }

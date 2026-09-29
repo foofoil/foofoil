@@ -105,6 +105,21 @@ public nonisolated enum MediaSeekStep {
     }
 }
 
+/// 应用启动时的窗口行为：打开空白箔片、恢复上次打开的箔片、不打开窗口。
+public nonisolated enum StartupBehavior: String, Codable, CaseIterable, Sendable {
+    case newWindow
+    case restoreWindows
+    case nothing
+
+    public var localizationKey: String {
+        switch self {
+        case .newWindow: "Startup Behavior New Window"
+        case .restoreWindows: "Startup Behavior Restore Windows"
+        case .nothing: "Startup Behavior Nothing"
+        }
+    }
+}
+
 nonisolated public struct WindowConfig: Codable, Identifiable {
     public let id: UUID
     public var imagePath: String?
@@ -535,7 +550,8 @@ public class SettingsStore {
             Keys.mediaPlaybackControlsAutoHideInterval: MediaPlaybackControlsAutoHide.defaultInterval,
             Keys.mediaSeekStepInterval: MediaSeekStep.defaultInterval,
             Keys.showsMediaBottomProgressBar: true,
-            Keys.confirmClosingPlayingAudio: true
+            Keys.confirmClosingPlayingAudio: true,
+            Keys.startupBehavior: StartupBehavior.newWindow.rawValue
         ])
     }
 
@@ -561,6 +577,8 @@ public class SettingsStore {
         static let confirmClosingPlayingAudio = "confirmClosingPlayingAudio"
         static let documentFontsChineseOnly = "documentFontsChineseOnly"
         static let customDocumentThemes = "customDocumentThemes"
+        static let startupBehavior = "startupBehavior"
+        static let lastOpenWindowConfigs = "lastOpenWindowConfigs"
     }
 
     /// 用户自建的文档主题列表
@@ -593,7 +611,11 @@ public class SettingsStore {
 
     var navigatorPanelSide: NavigatorPanelSide {
         get { NavigatorPanelSide(rawValue: userDefaults.string(forKey: Keys.navigatorPanelSide) ?? "") ?? .left }
-        set { userDefaults.set(newValue.rawValue, forKey: Keys.navigatorPanelSide) }
+        set {
+            guard newValue != navigatorPanelSide else { return }
+            userDefaults.set(newValue.rawValue, forKey: Keys.navigatorPanelSide)
+            NotificationCenter.default.post(name: .navigatorPanelSideDidChange, object: nil)
+        }
     }
 
     var navigatorPanelVisibilityMode: NavigatorPanelVisibilityMode {
@@ -602,7 +624,40 @@ public class SettingsStore {
                 rawValue: userDefaults.string(forKey: Keys.navigatorPanelVisibilityMode) ?? ""
             ) ?? .onHover
         }
-        set { userDefaults.set(newValue.rawValue, forKey: Keys.navigatorPanelVisibilityMode) }
+        set {
+            guard newValue != navigatorPanelVisibilityMode else { return }
+            userDefaults.set(newValue.rawValue, forKey: Keys.navigatorPanelVisibilityMode)
+            NotificationCenter.default.post(name: .navigatorPanelVisibilityModeDidChange, object: nil)
+        }
+    }
+
+    public var startupBehavior: StartupBehavior {
+        get {
+            guard let raw = userDefaults.string(forKey: Keys.startupBehavior),
+                  let behavior = StartupBehavior(rawValue: raw) else {
+                return .newWindow
+            }
+            return behavior
+        }
+        set {
+            guard newValue != startupBehavior else { return }
+            userDefaults.set(newValue.rawValue, forKey: Keys.startupBehavior)
+        }
+    }
+
+    public var lastOpenWindowConfigs: [WindowConfig] {
+        get {
+            guard let data = userDefaults.data(forKey: Keys.lastOpenWindowConfigs),
+                  let configs = try? JSONDecoder().decode([WindowConfig].self, from: data) else {
+                return []
+            }
+            return configs
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue) {
+                userDefaults.set(data, forKey: Keys.lastOpenWindowConfigs)
+            }
+        }
     }
 
     var navigatorPanelWidth: Double {

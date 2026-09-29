@@ -75,13 +75,10 @@ struct HistorySearchView: View {
                     }
                 }
             }
-            if model.mode == .history {
+            // ⌘P 面板只提供开启文件搜索的入口；关闭文件搜索在设置中完成。
+            if model.mode == .history, !model.isFileSearchAuthorized {
                 HStack {
-                    if model.isFileSearchAuthorized {
-                        Button(NSLocalizedString("Disable File Search", comment: "")) { model.disableFileSearch() }
-                    } else {
-                        Button(NSLocalizedString("Enable File Search", comment: "")) { model.enableFileSearch?() }
-                    }
+                    Button(NSLocalizedString("Enable File Search", comment: "")) { model.enableFileSearch?() }
                     Spacer()
                 }.font(.caption).padding(.horizontal, 18).padding(.bottom, 12)
             }

@@ -36,9 +36,13 @@ final class SpotlightSearchAccess {
             relativeTo: nil
         )
         defaults.set(bookmark, forKey: key)
+        NotificationCenter.default.post(name: .spotlightSearchAuthorizationDidChange, object: nil)
     }
 
-    func clear() { defaults.removeObject(forKey: key) }
+    func clear() {
+        defaults.removeObject(forKey: key)
+        NotificationCenter.default.post(name: .spotlightSearchAuthorizationDidChange, object: nil)
+    }
 
     func isUserHome(_ url: URL) -> Bool {
         Self.canonicalPath(url) == Self.canonicalPath(homeDirectory)

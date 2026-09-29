@@ -285,6 +285,24 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                 self.scheduleMediaPlaybackControlsHide()
             }
             .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: .navigatorPanelSideDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                if self.appState.navigatorPanelSide != SettingsStore.shared.navigatorPanelSide {
+                    self.appState.navigatorPanelSide = SettingsStore.shared.navigatorPanelSide
+                }
+            }
+            .store(in: &cancellables)
+        NotificationCenter.default.publisher(for: .navigatorPanelVisibilityModeDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                if self.appState.navigatorPanelVisibilityMode != SettingsStore.shared.navigatorPanelVisibilityMode {
+                    self.appState.navigatorPanelVisibilityMode = SettingsStore.shared.navigatorPanelVisibilityMode
+                }
+            }
+            .store(in: &cancellables)
     }
 
     required init?(coder: NSCoder) {

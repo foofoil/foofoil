@@ -113,7 +113,7 @@ struct ContentTypesSettingsView: View {
 }
 
 /// 标题 + 副标题的说明样式：说明改用短句紧贴标题，替代分组底部的长段落。
-private struct SettingsRowLabel: View {
+struct SettingsRowLabel: View {
     let title: String
     let note: String
 

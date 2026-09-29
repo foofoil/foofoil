@@ -43,6 +43,7 @@ final class HistorySearchViewModel: ObservableObject {
     private let historySearch: (String) async -> [HistorySearchResult]
     private let fileSearch: (String, @escaping (SpotlightSearchOutcome) -> Void) -> Void
     private let cancelFiles: () -> Void
+    private var authCancellable: AnyCancellable?
     private var searchTask: Task<Void, Never>?
     private var generation = 0
     private var rawFiles: [SpotlightFileResult] = []
@@ -54,12 +55,6 @@ final class HistorySearchViewModel: ObservableObject {
     var enableFileSearch: (() -> Void)?
     var isFileSearchAuthorized: Bool { SpotlightSearchAccess.shared.isAuthorized }
 
-    func disableFileSearch() {
-        stop()
-        SpotlightSearchAccess.shared.clear()
-        performSearch()
-    }
-
     init(historySearch: @escaping (String) async -> [HistorySearchResult] = { await HistoryRepository.shared.search($0) },
          fileSearch: ((String, @escaping (SpotlightSearchOutcome) -> Void) -> Void)? = nil,
          cancelFiles: (() -> Void)? = nil) {
@@ -69,6 +64,11 @@ final class HistorySearchViewModel: ObservableObject {
             service.start(text: text, completion: completion)
         }
         self.cancelFiles = cancelFiles ?? { service.cancel() }
+        self.authCancellable = NotificationCenter.default.publisher(for: .spotlightSearchAuthorizationDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
     }
 
     var isSearching: Bool { isHistorySearching || isFileSearching }

@@ -11,14 +11,6 @@ enum SettingsWindowMetrics {
     static let maxHeight: CGFloat = 640
 }
 
-struct EmptySettingsPane: View {
-    var body: some View {
-        Form {}
-            .formStyle(.grouped)
-            .frame(width: SettingsWindowMetrics.width, alignment: .top)
-    }
-}
-
 @MainActor
 final class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
@@ -55,7 +47,7 @@ final class SettingsWindowController: NSWindowController {
                 identifier: "general",
                 title: NSLocalizedString("General", comment: ""),
                 symbolName: "gearshape",
-                rootView: EmptySettingsPane()
+                rootView: GeneralSettingsView()
             )
         )
         tabController.addTabViewItem(
