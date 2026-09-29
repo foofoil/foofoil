@@ -46,7 +46,10 @@ struct ImageModeView: View {
     private func renderImage(for nsImage: NSImage, contentMode: ContentMode, width: CGFloat?, height: CGFloat?) -> some View {
         let baseImage = Image(nsImage: nsImage).resizable()
 
-        if appState.isSVG, let svgColorHex = appState.svgColor, let color = Color(hex: svgColorHex) {
+        if appState.isSVG, let url = appState.imageURL {
+            SVGImageView(url: url, contentMode: contentMode, colorHex: appState.svgColor)
+                .frame(width: width, height: height)
+        } else if appState.isSVG, let svgColorHex = appState.svgColor, let color = Color(hex: svgColorHex) {
             baseImage
                 .renderingMode(.template)
                 .aspectRatio(contentMode: contentMode)

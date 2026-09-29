@@ -465,14 +465,25 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
+        // 文档类型变化会改变无边框判定（图片/视频/音频、网页、扩展会话），据此同步窗口阴影。
+        Publishers.CombineLatest4(appState.$imageURL, appState.$webURL, appState.$fileList, appState.$extensionSession)
+            .sink { [weak self] _, _, _, _ in
+                DispatchQueue.main.async { self?.updateWindowShadow() }
+            }
+            .store(in: &cancellables)
+        // 上面订阅的首次发射要等一个主线程回合，先同步应用一次，避免窗口出现时闪一下阴影。
+        updateWindowShadow()
+
         // 监听边框显示状态变化 (通过 didSet 后的通知进行同步更新，消除闪烁)
         NotificationCenter.default.publisher(for: .showBorderDidChange)
             .sink { [weak self] notification in
                 guard let self = self,
                       let targetState = notification.object as? AppState,
-                      targetState === self.appState,
-                      self.isImageMode else { return }
+                      targetState === self.appState else { return }
 
+                self.updateWindowShadow()
+
+                guard self.isImageMode else { return }
                 let showBorder = targetState.showBorder
                 if showBorder {
                     self.window?.resizeIncrements = NSSize(width: 1.0, height: 1.0)
@@ -736,9 +747,18 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     /// 与 ContentView 的圆角规则保持一致：全屏或隐藏边框时窗口内容无圆角。
     private var pinGlowWindowCornerRadius: CGFloat {
-        let hidesBorder = appState.isFullScreen
+        shouldHideBorder ? 0 : 12
+    }
+
+    /// 与 ContentView 的 `shouldHideBorder` 同源：全屏，或图片/网页/音频箔隐藏了视觉边框。
+    private var shouldHideBorder: Bool {
+        appState.isFullScreen
             || ((appState.imageURL != nil || appState.webURL != nil || appState.isAudioDocument) && !appState.showBorder)
-        return hidesBorder ? 0 : 12
+    }
+
+    /// 无边框（含全屏）时关闭系统窗口阴影：透明内容箔片上的阴影会沿内容轮廓描出一圈细黑线。
+    private func updateWindowShadow() {
+        window?.hasShadow = !shouldHideBorder
     }
 
     private func setupNavigatorPanelBindings() {
@@ -1735,7 +1755,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         appState.isNavigatorEdgeHovered = false
         navigatorPanelController.hide()
         removeNavigatorHoverMonitors()
-        window.hasShadow = false
+        updateWindowShadow()
         (NSApplication.shared.delegate as? AppDelegate)?.syncFoilSpaceJoining()
     }
 
@@ -1759,7 +1779,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         guard let window else { return }
         isTransitioningFullScreen = false
         appState.isFullScreen = false
-        window.hasShadow = true
+        updateWindowShadow()
         window.level = appState.isPinned ? .floating : .normal
         // 其他箔片可能仍在全屏：按全局状态决定自身是否恢复加入所有 Space，并同步其余箔片。
         (NSApplication.shared.delegate as? AppDelegate)?.syncFoilSpaceJoining()
@@ -1773,7 +1793,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     public func windowDidFailToEnterFullScreen(_ window: NSWindow) {
         isTransitioningFullScreen = false
         appState.isFullScreen = false
-        window.hasShadow = true
+        updateWindowShadow()
         window.level = appState.isPinned ? .floating : .normal
         (NSApplication.shared.delegate as? AppDelegate)?.syncFoilSpaceJoining()
         windowedFrameDescriptorBeforeFullScreen = nil
@@ -1783,7 +1803,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     public func windowDidFailToExitFullScreen(_ window: NSWindow) {
         isTransitioningFullScreen = false
         appState.isFullScreen = true
-        window.hasShadow = false
+        updateWindowShadow()
         navigatorPanelController.hide()
         (NSApplication.shared.delegate as? AppDelegate)?.syncFoilSpaceJoining()
     }

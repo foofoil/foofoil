@@ -1274,6 +1274,45 @@ struct ExtensionKitTests {
         controller.close()
     }
 
+    @Test func borderlessFoilSuppressesWindowShadowToAvoidContourHairline() async throws {
+        let state = AppState()
+        let historyID = state.id
+        state.originalImageName = "shadow-test.svg"
+        state.imageURL = URL(fileURLWithPath: "/tmp/shadow-test.svg")
+        state.showBorder = false
+
+        let controller = FloatingWindowController(appState: state)
+        defer {
+            controller.close()
+            // 边框切换会写共享历史库；与其它用例一样清掉自己写入的条目，避免干扰并行运行的套件。
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+            if let config = HistoryRepository.shared.config(id: historyID) {
+                HistoryManager.shared.removeFromHistory(config)
+            }
+        }
+        let window = try #require(controller.window)
+
+        // 无边框透明内容箔片不画系统窗口阴影（阴影会沿内容轮廓描出细黑线）；等一个主线程回合看稳定态。
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(!window.hasShadow)
+
+        // 切回有边框立即恢复阴影；全屏期间无阴影，退出后按边框状态恢复。
+        state.showBorder = true
+        #expect(window.hasShadow)
+
+        controller.windowWillEnterFullScreen(
+            Notification(name: NSWindow.willEnterFullScreenNotification, object: window)
+        )
+        #expect(!window.hasShadow)
+        controller.windowDidExitFullScreen(
+            Notification(name: NSWindow.didExitFullScreenNotification, object: window)
+        )
+        #expect(window.hasShadow)
+
+        state.showBorder = false
+        #expect(!window.hasShadow)
+    }
+
     @Test func audioOverrideIsSelectedAndFallsBackToBuiltInAfterFailure() async throws {
         let resolver = ProviderResolver()
         resolver.register(BuiltInAudioProvider())
