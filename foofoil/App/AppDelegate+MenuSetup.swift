@@ -442,6 +442,7 @@ extension AppDelegate {
         let extensionMenuItem = NSMenuItem(title: NSLocalizedString("Extension", comment: ""), action: nil, keyEquivalent: "")
         extensionMenuItem.submenu = extensionMenu
         self.extensionMenuItem = extensionMenuItem
+        extensionMenuItem.isHidden = !ExtensionProductPolicy.exposesUserManagement
         mainMenu.addItem(extensionMenuItem)
 
         // 4.5 Window 菜单

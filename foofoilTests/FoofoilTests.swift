@@ -1339,8 +1339,7 @@ struct FoofoilTests {
         #expect(tabController.tabViewItems.map(\.label) == [
             NSLocalizedString("General", comment: ""),
             NSLocalizedString("Types", comment: ""),
-            NSLocalizedString("Keyboard Shortcuts", comment: ""),
-            NSLocalizedString("Extensions", comment: "")
+            NSLocalizedString("Keyboard Shortcuts", comment: "")
         ])
         #expect(!window.styleMask.contains(.resizable))
         #expect(window.contentMinSize.width == SettingsWindowMetrics.width)
@@ -1361,9 +1360,9 @@ struct FoofoilTests {
         #expect(typesHeight > generalHeight)
         #expect(typesHeight <= SettingsWindowMetrics.maxHeight + 0.5)
 
-        tabController.selectedTabViewItemIndex = 3
+        tabController.selectedTabViewItemIndex = 2
         controller.applySelectedTabAppearance(animated: false)
-        #expect(window.title == NSLocalizedString("Extensions", comment: ""))
+        #expect(window.title == NSLocalizedString("Keyboard Shortcuts", comment: ""))
         #expect(window.contentLayoutRect.height <= SettingsWindowMetrics.maxHeight + 0.5)
         #expect(window.styleMask.contains(.closable))
     }

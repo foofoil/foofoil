@@ -635,7 +635,8 @@ extension AppState {
             if NSImage(contentsOf: url) != nil {
                 return true
             }
-            return ExtensionHost.shared.manager.availableExtension(for: url) != nil
+            return ExtensionProductPolicy.exposesUserManagement
+                && ExtensionHost.shared.manager.availableExtension(for: url) != nil
         }
 
         public func openFile(url: URL) {
@@ -668,7 +669,8 @@ extension AppState {
                 openExternalMediaIfPlayable(url: url, holdsSecurityAccess: accessed)
             } else if NSImage(contentsOf: url) != nil {
                 openImage(url: url)
-            } else if let available = ExtensionHost.shared.manager.availableExtension(for: url) {
+            } else if ExtensionProductPolicy.exposesUserManagement,
+                      let available = ExtensionHost.shared.manager.availableExtension(for: url) {
                 promptToInstall(available, opening: url)
             }
         }
@@ -1021,6 +1023,7 @@ extension AppState {
         }
 
         func promptToInstall(_ entry: ExtensionRegistryEntry, opening url: URL) {
+            guard ExtensionProductPolicy.exposesUserManagement else { return }
             let alert = NSAlert()
             alert.messageText = String(format: NSLocalizedString("Install Extension Title Format", comment: ""), entry.name)
             alert.informativeText = String(

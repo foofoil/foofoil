@@ -1,5 +1,7 @@
 # ExtensionKit Phase 0 部署验证
 
+> 策略更新（2026-09-29）：本文保留为阶段性技术方案/验收记录。扩展/插件仅是开发手段，最终产品不提供扩展概念；Hi-Fi、EPUB 等能力随浮箔统一交付。本文涉及按需安装、独立插件发布、Registry 或扩展管理入口的旧产品路线不再适用；源码名称、协议边界与当时的验证记录仍可参考，不代表当前实现或发布承诺。当前说明见[开发与交付说明](../../docs/extension-support.zh-CN.md)。
+
 Phase 0 的跨进程样机是 `foofoilTestExtensionService.xpc`。它和 Host 只交换 JSON `Data`，并通过
 `ContentRequest` 传递 security-scoped bookmark；不传递 SwiftUI、`NSView` 或进程内对象。
 

@@ -186,7 +186,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async {
             self.setupMainMenu()
             self.updateHistoryMenu()
-            if SettingsStore.shared.extensionAutoCheckUpdates {
+            if ExtensionProductPolicy.exposesUserManagement, SettingsStore.shared.extensionAutoCheckUpdates {
                 Task {
                     await ExtensionHost.shared.manager.refreshCatalog()
                 }

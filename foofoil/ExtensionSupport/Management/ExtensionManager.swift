@@ -8,6 +8,11 @@ import CryptoKit
 import Foundation
 import FoofoilExtensionKit
 
+/// 产品仅展示整体能力；保留管理实现供将来重新启用，不读取用户偏好来绕过此策略。
+enum ExtensionProductPolicy {
+    static let exposesUserManagement = false
+}
+
 protocol ExtensionRuntimeHost: AnyObject {
     func activateRuntime(for loaded: LoadedExtension)
     func deactivateRuntime(extensionID: String)

@@ -1905,13 +1905,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The selected extension failed. This session is using its fallback provider."
+            "value": "The content could not be opened normally. An alternative method is being used."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "所选扩展运行失败，此会话已改用回退提供者。"
+            "value": "内容未能正常打开，已改用备用方式。"
           }
         }
       }
@@ -1922,13 +1922,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The extension is unavailable or its saved state is damaged."
+            "value": "This content could not be restored. Try opening the original file again."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "扩展当前不可用，或保存的状态已损坏。"
+            "value": "无法恢复此内容，请尝试重新打开原文件。"
           }
         }
       }
@@ -1939,13 +1939,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Extension Session Unavailable"
+            "value": "Content Unavailable"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "扩展会话不可用"
+            "value": "内容不可用"
           }
         }
       }

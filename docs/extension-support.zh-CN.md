@@ -1,5 +1,19 @@
 # 宿主扩展开发说明
 
+## 当前产品策略（2026-09-29）
+
+扩展/插件仅用于开发阶段的模块拆分、联调与验证。最终产品不提供扩展概念：Hi-Fi、EPUB 等能力随浮箔统一交付，用户无需安装、启用或更新单独插件。独立仓库不等于独立产品，也不再以 Registry、扩展市场或 Extension Manager 为产品目标。
+
+当前工程仍通过 C ABI、JSON、Manifest 与 `.foofoilextension` 包连接内部模块。这些名称及 Runtime / Management / Presentation 的分层可以继续用于描述源码；Management 中的安装、下载、更新、Registry 和“扩展”设置页实现均保留，由 `ExtensionProductPolicy.exposesUserManagement`（当前为 false）统一隐藏设置/菜单入口、停止启动更新检查并禁用安装提示。该开关不影响内置内容运行时；未来重新启用时可复用现有实现。
+
+- `extension-kit`：工程必需的本地 Swift 包，维护内部共享契约与契约测试。
+- `hifi` / `ebook`：分别维护音频与 EPUB 实现，保留清晰的解析、设备及资源生命周期边界。
+- `./run`：构建并嵌入相邻 `hifi`、`ebook` 的 Debug 模块；缺少构建脚本时跳过对应能力。
+- `./package-dmg`：构建 Release 并将两个模块嵌入 `foofoil.app`，统一签名/公证（选择签名模式时）及打包；完整分发需要全部兄弟仓库。
+- Xcode ⌘R 和普通 `xcodebuild` 不执行上述模块嵌入步骤。联合编辑使用 `foofoil.xcworkspace`。
+
+旧扩展系统方案、边界重构报告及 Phase 0 验证文档保留为技术与验收记录。其按需安装、独立发布、公开插件平台和 Registry 路线已被本策略取代；协议、职责边界和测试记录仍可参考。不要把过去的计划或验收结果当作当前发布承诺。
+
 `foofoil/ExtensionSupport/` 是宿主实现；兄弟仓库 `extension-kit` 是公共契约，两者不是重复的插件 SDK。
 
 | 目录 | 职责 |
@@ -31,6 +45,6 @@ xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platfor
 ./run
 ```
 
-`./run` 会构建、注入并签名开发版 hifi 插件，然后启动应用。普通 xcodebuild 测试宿主不自动注入该插件；缺插件时 DAC 测试的失败/跳过不能当作真实设备验证。
+`./run` 会构建、嵌入并签名开发版 hifi 与 ebook 模块，然后启动应用。普通 xcodebuild 测试宿主不自动注入该插件；缺插件时 DAC 测试的失败/跳过不能当作真实设备验证。
 
 契约或 Runtime 改动另外运行对应仓库 `swift test` 和 ABI smoke。真实 DAC 回归以用户的实机记录为准；目录整理不增加新的硬件覆盖结论。

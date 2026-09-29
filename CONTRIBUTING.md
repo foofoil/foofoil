@@ -1,5 +1,9 @@
 # Contributing to foofoil
 
+## Product and Module Scope
+
+Hi-Fi and EPUB are app capabilities delivered with foofoil. Extensions/plugins are only a development mechanism, not a user-facing product or distribution model. Do not add user installation, activation, marketplace, or independent plugin update flows. See the [README](README.md#build-from-source) for the sibling checkout layout and `./run`, and the [module guide](docs/extension-support.zh-CN.md) for current ownership and legacy implementation details.
+
 Thank you for contributing to foofoil.
 
 ## Before You Start

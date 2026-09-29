@@ -1,5 +1,7 @@
 # 收尾阶段 0：基线、依赖与语义决策
 
+> 策略更新（2026-09-29）：本文保留为阶段性技术方案/验收记录。扩展/插件仅是开发手段，最终产品不提供扩展概念；Hi-Fi、EPUB 等能力随浮箔统一交付。本文涉及按需安装、独立插件发布、Registry 或扩展管理入口的旧产品路线不再适用；源码名称、协议边界与当时的验证记录仍可参考，不代表当前实现或发布承诺。当前说明见[开发与交付说明](extension-support.zh-CN.md)。
+
 日期：2026-09-10  
 范围：仅盘点、基线验证及决策，不实施阶段 1–6 的源码变更。依据[评审终稿](extension-boundary-refactor-review-final.zh-CN.md)和[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)。下文“决定”是后续实现要求，不宣称当前代码已满足。
 

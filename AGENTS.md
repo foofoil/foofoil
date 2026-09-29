@@ -1,12 +1,16 @@
 # Agent Instructions for foofoil
 
+## Product Strategy (2026-09-29)
+
+Extensions/plugins are a development mechanism only. The final product has no user-facing extension concept: content capabilities ship with foofoil, without separate installation, enablement, or updates. Keep internal module boundaries and existing ABI/type names where useful; they do not imply a public plugin platform or independent release compatibility promise. Do not plan a Registry, marketplace, or Extension Manager as a product feature. Management code/UI is retained behind `ExtensionProductPolicy.exposesUserManagement` (currently false); do not delete it. This policy hides settings/menu entry points and disables startup catalog refresh and install prompts, without disabling content runtimes. The app’s `./run` embeds sibling Hi-Fi and EPUB modules for Debug; `./package-dmg` embeds them for Release distribution.
+
 ## Project Overview
 
 foofoil is a lightweight macOS reference app built for keeping useful content visible while working. It presents content in minimal floating windows that can be borderless, resizable, draggable, translucent, and pinned above other windows.
 
 The app is written in Swift and uses SwiftUI for most interface code, with AppKit where direct macOS window, menu, text, or visual-effect control is required. It also uses native Apple frameworks for web content, PDFs, OCR, images, file types, and persistence.
 
-Reusable Extension API contracts live in the sibling `extension-kit` repository; this app links it as a local Swift package at `../extension-kit`. Capability extensions such as Hi-Fi live in their own sibling repositories and are not part of the Core app target. Host loading, the Extension Manager, Registry client, and UI stay in this repository.
+Reusable Extension API contracts live in the sibling `extension-kit` repository; this app links it as a local Swift package at `../extension-kit`. Capability modules such as Hi-Fi and EPUB live in sibling repositories and are embedded by the app scripts rather than compiled in the Core app target. Host loading and UI stay here; existing Manager/Registry code is legacy implementation infrastructure.
 
 Host extension code lives in `foofoil/ExtensionSupport/`: `Runtime` owns providers, loading, sessions and optional device services; `Management` owns installation, compatibility negotiation and Registry; `Presentation` owns host UI, playback adapters and host queue projection. There is no `Compatibility` layer: legacy Hi-Fi fallbacks are deleted and must not be reintroduced. Keep playback controllers separate from views. `foofoil/Extensions/` remains Swift/system type extensions, not plugins. Xcode uses a filesystem-synchronized source group, so moves within the source root need no per-file project entries.
 

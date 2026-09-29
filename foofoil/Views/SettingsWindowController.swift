@@ -66,14 +66,16 @@ final class SettingsWindowController: NSWindowController {
                 rootView: KeyboardShortcutsSettingsView()
             )
         )
-        tabController.addTabViewItem(
-            makeTab(
-                identifier: "extensions",
-                title: NSLocalizedString("Extensions", comment: ""),
-                symbolName: "puzzlepiece.extension",
-                rootView: ExtensionSettingsView(manager: ExtensionHost.shared.manager)
+        if ExtensionProductPolicy.exposesUserManagement {
+            tabController.addTabViewItem(
+                makeTab(
+                    identifier: "extensions",
+                    title: NSLocalizedString("Extensions", comment: ""),
+                    symbolName: "puzzlepiece.extension",
+                    rootView: ExtensionSettingsView(manager: ExtensionHost.shared.manager)
+                )
             )
-        )
+        }
         window.contentViewController = tabController
         applySelectedTabAppearance(animated: false)
     }

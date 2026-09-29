@@ -9,42 +9,28 @@ foofoil is a lightweight reference app for macOS that keeps images, videos, audi
 
 The name **foofoil** combines *foo* — the familiar placeholder for anything or arbitrary content — with *foil*, a thin sheet that carries whatever you put on it. It reflects a simple idea: whatever the content is, keep it lightweight and right where you need it.
 
-Built with SwiftUI and AppKit, foofoil favors native macOS capabilities, fast interaction, and a small dependency footprint. Formats that need extra codecs, renderers, or runtimes ship as optional first-party extensions and are installed from inside the app.
+Built with SwiftUI and AppKit, foofoil favors native macOS capabilities, fast interaction, and a small dependency footprint.
 
 ## Features
 
 - Open multiple independent floating windows.
 - Pin a window above other apps, adjust its opacity, and show or hide its border.
 - Drag, resize, zoom, and position windows across multiple displays.
-- Open images, videos, audio, PDFs, plain text, Markdown, CSV, HTML, and web URLs.
+- Open images, videos, audio, Hi-Fi audio, EPUB e-books, PDFs, plain text, Markdown, CSV, HTML, and web URLs.
 - Paste or open an image directly from the clipboard.
 - Preview Markdown, browse CSV data as a table, and navigate PDF pages.
 - Zoom images and web content, fit images to a window, and customize SVG colors or the document look: background, text color, font, line spacing and paragraph spacing for plain text, Markdown and EPUB foils, following light/dark appearance changes.
 - Save, copy, share, or capture displayed content using native macOS workflows.
 - Restore window state and keep a local content history.
 - Search history by title and content, including on-device OCR for images and extracted text from PDFs and web pages.
-- Use English or Simplified Chinese throughout the interface.
-- Install optional first-party extensions from Settings when you need capabilities beyond macOS-native formats.
+- Use ⌘P to search history alongside Spotlight filename results from authorized folders.
+- Customize keyboard shortcuts in Settings and use English or Simplified Chinese throughout the interface.
 
-## Extensions
+Hi-Fi currently supports DSF, raw DFF, uncompressed stereo SACD ISO, and APE/CUE. DSD playback requires a DoP-capable output device, with no DSD-to-PCM fallback; DST and SACD multichannel are not supported yet. EPUB supports table-of-contents navigation and reading-position restore; DRM-protected books are unsupported.
 
-foofoil Core stays small: windows, history, and content types that macOS already handles well (images, PDF, web, ordinary audio and video, text). Additional capability domains are independent repositories with their own versioning and releases:
+## Lightweight by Design
 
-| Repository | Role |
-| --- | --- |
-| [extension-kit](https://github.com/foofoil/extension-kit) | Extension API contracts, ABI header, Manifest schema, and fixtures |
-| [hifi](https://github.com/foofoil/hifi) | Hi-Fi audio extension. Requires foofoil. |
-
-Host loading, the Extension Manager, Registry client, and UI remain in this repository. Check out sibling directories when developing locally and open `foofoil.xcworkspace`. `./run` injects the sibling `hifi` Debug plugin when `../hifi/build-plugin` exists; Xcode ⌘R does not.
-
-```text
-foofoil/
-  foofoil/
-  extension-kit/
-  hifi/
-```
-
-Host implementation lives in `foofoil/ExtensionSupport/`, divided into Runtime, Management, and Presentation. Audio UI and playback adapters stay in the host; public contracts stay in `extension-kit`, and format/device engines stay in `hifi`. `foofoil/Extensions/` is reserved for Swift/system type extensions. See the [development guide](docs/extension-support.zh-CN.md) for ownership, public-contract usage, and verification.
+foofoil keeps its footprint small by using macOS system frameworks wherever they already provide the capability well, rather than bundling another browser engine, language runtime, or large general-purpose media stack. Lightweight is an implementation principle: keep dependencies focused, reuse native capabilities, and avoid carrying infrastructure the system already provides.
 
 ## Quick Start
 
@@ -66,7 +52,7 @@ Right-click a window to access the most relevant actions for its current content
 | Open a file | <kbd>⌘ O</kbd> |
 | Open a URL | <kbd>⌘ L</kbd> |
 | Open clipboard image | <kbd>⇧ ⌘ V</kbd> |
-| Search history | <kbd>⌘ P</kbd> |
+| Search history and files | <kbd>⌘ P</kbd> |
 | Toggle always on top | <kbd>⌘ T</kbd> |
 | Toggle border | <kbd>⌘ B</kbd> |
 | Zoom content in/out | <kbd>⌘ +</kbd> / <kbd>⌘ −</kbd> |
@@ -77,7 +63,7 @@ Right-click a window to access the most relevant actions for its current content
 | Close the current window | <kbd>⌘ W</kbd> |
 | Increase/decrease opacity | <kbd>⇧ ⌘ ↑</kbd> / <kbd>⇧ ⌘ ↓</kbd> |
 
-Additional content-specific and window-position shortcuts are available from the macOS menu bar.
+These are the default shortcuts and can be customized in Settings. Additional content-specific and window-position shortcuts are available from the macOS menu bar.
 
 ## Open from Finder with a Keyboard Shortcut
 
@@ -92,14 +78,30 @@ In **System Settings → Keyboard → Keyboard Shortcuts → Services**, enable 
 
 ## Build from Source
 
-Check out `extension-kit` and `hifi` as siblings of this repository. Open `foofoil.xcworkspace` to edit the app, kit, and Hi-Fi together. The app target still links `../extension-kit` as a local package.
+Use the following sibling checkout layout for the complete development environment. `extension-kit` is a required local Swift package; `hifi` and `ebook` provide the audio and EPUB capabilities delivered with the app.
 
-1. Open `foofoil.xcworkspace` in Xcode.
+```text
+workspace/
+├── foofoil/        # App, windows, content presentation, and search
+├── extension-kit/  # Internal module contracts and tests
+├── hifi/           # Hi-Fi audio implementation
+└── ebook/          # EPUB parsing and reading
+```
+
+From the `foofoil` repository, the recommended way to run is:
+
+```sh
+./run
+```
+
+The script builds the Debug app, builds and embeds the sibling Hi-Fi and EPUB modules, then restarts foofoil. If a module's `build-plugin` script is missing, that module is skipped and its content capabilities are unavailable.
+
+1. Open `foofoil.xcworkspace` in Xcode to edit the app and sibling modules together.
 2. Select the `foofoil` scheme and the **My Mac** destination.
 3. Configure a development signing team if Xcode requests one.
-4. Build and run the project.
+4. Use `./run` to verify the complete content experience; Xcode ⌘R does not build and embed the sibling modules.
 
-To build from the command line:
+To build only the app target (without embedding sibling modules):
 
 ```sh
 xcodebuild build \
@@ -118,11 +120,19 @@ xcodebuild test \
   -destination 'platform=macOS'
 ```
 
+## Development Modules and Distribution
+
+Extensions/plugins are only a development mechanism for separating, integrating, and testing capabilities. The final product has no extension concept: Hi-Fi and EPUB are foofoil content capabilities, with no separate plugin installation, activation, or updates for users.
+
+The source still contains internal names such as `ExtensionSupport`, the C ABI, manifests, and `.foofoilextension`, and the retained management implementation. A single internal product policy hides management UI, disables startup update checks, and suppresses installation prompts; loading and management code remain available for future reuse. See the [development guide](docs/extension-support.zh-CN.md) (Chinese) for ownership and the scope of historical plans.
+
+`./package-dmg` builds the Release app, embeds both Hi-Fi and EPUB modules, and creates a DMG. Complete packaging requires all four repositories above. Use `./package-dmg --no-sign` for a local validation package; `./package-dmg --sign` requires Developer ID signing and notarytool credentials (documented in the script header).
+
 ## Technology
 
-foofoil is implemented primarily with SwiftUI and uses AppKit for native floating-window, menu, text-control, and visual-effect behavior. Its content and search features use Apple frameworks including WebKit, PDFKit, Vision, ImageIO, Uniform Type Identifiers, and SQLite3. Markdown rendering uses the existing vendored cmark library.
+foofoil is implemented primarily with SwiftUI and uses AppKit for native floating-window, menu, text-control, and visual-effect behavior. Its content and search features use Apple frameworks including WebKit, PDFKit, Vision, AVFoundation, CoreAudio, ImageIO, Uniform Type Identifiers, and SQLite3. Markdown rendering uses the existing vendored cmark library.
 
-History and cached content are stored locally in the user's Application Support directory. OCR and indexing run on the device; foofoil only requires network access when displaying remote web content.
+History and cached content are stored locally in the user's Application Support directory. OCR and indexing run on the device; loading web pages and their remote resources requires network access.
 
 ## Development Principles
 
@@ -130,7 +140,7 @@ History and cached content are stored locally in the user's Application Support 
 - Prefer macOS system frameworks and established project components.
 - Avoid heavyweight or unnecessary third-party dependencies.
 - Preserve native macOS behavior, accessibility, and localization.
-- Keep persisted data backward compatible and user-owned files safe.
+- Preserve current-version window restoration and session rebuilding, and protect user-owned files; unreleased development data has no cross-version compatibility promise.
 
 See [AGENTS.md](AGENTS.md) for the full contribution and implementation guidelines.
 

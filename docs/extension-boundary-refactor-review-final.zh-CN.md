@@ -1,5 +1,7 @@
 # 扩展边界重构评审终稿
 
+> 策略更新（2026-09-29）：本文保留为阶段性技术方案/验收记录。扩展/插件仅是开发手段，最终产品不提供扩展概念；Hi-Fi、EPUB 等能力随浮箔统一交付。本文涉及按需安装、独立插件发布、Registry 或扩展管理入口的旧产品路线不再适用；源码名称、协议边界与当时的验证记录仍可参考，不代表当前实现或发布承诺。当前说明见[开发与交付说明](extension-support.zh-CN.md)。
+
 日期：2026-09-10  
 状态：收尾阶段 0–6 全部完成，全部实机/界面手动项已由用户复验通过，最终验收通过；进度见[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)
 评审范围：`foofoil`、`extension-kit`、`hifi` 当前 `ext` / `ext-fix` 实现相对各仓库 `main` 的职责与行为变化

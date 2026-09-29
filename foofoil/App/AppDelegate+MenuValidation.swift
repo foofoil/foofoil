@@ -36,7 +36,8 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
     }
 
     func updateExtensionMenuVisibility() {
-        extensionMenuItem?.isHidden = activeAppState?.extensionSession?.commands.isEmpty != false
+        extensionMenuItem?.isHidden = !ExtensionProductPolicy.exposesUserManagement
+            || activeAppState?.extensionSession?.commands.isEmpty != false
     }
 
     func updateFileMenu(_ menu: NSMenu) {

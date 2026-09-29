@@ -50,7 +50,7 @@ struct ExtensionPresentationView: View {
         switch session.presentation {
         case .text(let titleKey, let body):
             VStack(alignment: .leading, spacing: 12) {
-                Label(NSLocalizedString(titleKey, comment: ""), systemImage: "puzzlepiece.extension")
+                Label(NSLocalizedString(titleKey, comment: ""), systemImage: "doc.text")
                     .font(.headline)
                 ScrollView {
                     Text(body)
@@ -97,7 +97,7 @@ struct ExtensionPresentationView: View {
         case .unavailable(let titleKey, let messageKey):
             ContentUnavailableView(
                 NSLocalizedString(titleKey, comment: ""),
-                systemImage: "puzzlepiece.extension",
+                systemImage: "doc.text",
                 description: Text(NSLocalizedString(messageKey, comment: ""))
             )
         case .document:
