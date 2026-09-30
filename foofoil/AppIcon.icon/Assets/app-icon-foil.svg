@@ -28,7 +28,7 @@
   <path d="M206 790.5 411.5 282 800.5 212.5 620 715.5Z" fill="url(#surface)"/>
   <g clip-path="url(#clip)">
     <path d="M206 790.5 411.5 282 800.5 212.5 620 715.5Z" fill="url(#top)"/>
-    <path d="M411.5 282 800.5 212.5C689 247 541 290 394 330Z" fill="#f6ffff" filter="url(#top-soft)"/>
+    <path d="M411.5 282 800.5 212.5C692 264 548 318 388 362Z" fill="#f6ffff" filter="url(#top-soft)"/>
     <path d="M206 790.5 411.5 282 800.5 212.5 620 715.5Z" fill="url(#left)"/>
     <path d="M206 790.5 411.5 282 800.5 212.5 620 715.5Z" fill="url(#lower)"/>
     <path d="M300 554C321 503 344 477 404 469C498 461 603 451 701 438C588 462 489 483 404 503C352 516 324 532 300 554Z" fill="#9cdeff" filter="url(#wide)"/>
@@ -39,5 +39,7 @@
   <g clip-path="url(#clip)">
     <path d="M206 790.5 411.5 282 800.5 212.5" fill="none" stroke="#ffffff" stroke-width="11" stroke-linejoin="miter" filter="url(#soft)"/>
     <path d="M206 790.5 411.5 282 800.5 212.5" fill="none" stroke="#ffffff" stroke-width="5" stroke-linejoin="miter"/>
+    <path d="M411.5 282 800.5 212.5" fill="none" stroke="#ffffff" stroke-width="22" stroke-linecap="round" filter="url(#soft)"/>
+    <path d="M411.5 282 800.5 212.5" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round"/>
   </g>
 </svg>
