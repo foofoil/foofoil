@@ -5,6 +5,7 @@
 //  Created by tolg on 2026/8/30.
 //
 
+import AppKit
 import Foundation
 import MediaPlayer
 
@@ -15,6 +16,7 @@ final class MediaRemoteCommandCoordinator {
 
     private weak var activeTarget: (any MediaTransportControlling)?
     private var title = ""
+    private let artworks = NSMapTable<AnyObject, MPMediaItemArtwork>.weakToStrongObjects()
     private var commandTargets: [(MPRemoteCommand, Any)] = []
 
     private init() {
@@ -42,6 +44,17 @@ final class MediaRemoteCommandCoordinator {
         guard isActive(target) else { return }
         if let title { self.title = title }
         updateNowPlayingInfo(for: target)
+    }
+
+    /// 每个箔片保留自己的封面；后台箔片完成加载时不能覆盖当前系统播放信息。
+    func updateArtwork(_ image: NSImage?, for target: any MediaTransportControlling) {
+        if let image, image.size.width > 0, image.size.height > 0 {
+            let artwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            artworks.setObject(artwork, forKey: target)
+        } else {
+            artworks.removeObject(forKey: target)
+        }
+        update(target)
     }
 
     func deactivate(_ target: any MediaTransportControlling) {
@@ -97,6 +110,7 @@ final class MediaRemoteCommandCoordinator {
         if target.duration.isFinite, target.duration > 0 {
             info[MPMediaItemPropertyPlaybackDuration] = target.duration
         }
+        info[MPMediaItemPropertyArtwork] = artworks.object(forKey: target)
         let infoCenter = MPNowPlayingInfoCenter.default()
         infoCenter.nowPlayingInfo = info
         infoCenter.playbackState = target.isPlaying ? .playing : .paused

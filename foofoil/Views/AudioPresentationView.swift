@@ -44,6 +44,10 @@ struct AudioPresentationView<Controller: MediaTransportControlling>: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .animation(.easeInOut(duration: 0.15), value: appState.isMediaPlaybackControlsVisible)
         .padding(shouldHideBorder ? 0 : 8)
+        .onChange(of: info.artwork, initial: true) {
+            // 与箔片使用同一张最终封面，包含内嵌、目录封面及用户替换图。
+            MediaRemoteCommandCoordinator.shared.updateArtwork(info.artwork, for: controller)
+        }
     }
 
     @ViewBuilder
