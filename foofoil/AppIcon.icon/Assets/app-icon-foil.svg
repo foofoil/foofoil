@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+  <title>Foofoil — luminous foil (icon master)</title>
+  <desc>Icon Composer 主图层。所有 use 引用已展平，只保留 CoreSVG 支持的 path、gradient、clipPath 与 filter。</desc>
+  <defs>
+    <clipPath id="clip">
+      <path d="M206 790.5 411.5 282 800.5 212.5 620 715.5Z"/>
+    </clipPath>
+    <linearGradient id="surface" x1="280" y1="440" x2="732" y2="618" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#b1e9fc"/><stop offset=".34" stop-color="#83b6f1"/><stop offset=".7" stop-color="#648ec4"/><stop offset="1" stop-color="#50739e"/>
+    </linearGradient>
+    <radialGradient id="top" cx="0" cy="0" r="1" gradientTransform="translate(411.5 282) rotate(-10.13) scale(490 190)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/><stop offset=".2" stop-color="#f6ffff"/><stop offset=".38" stop-color="#c2f5ff" stop-opacity=".92"/><stop offset="1" stop-color="#8dcaff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="left" x1="306" y1="537" x2="442" y2="591" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff"/><stop offset=".16" stop-color="#fff"/><stop offset=".3" stop-color="#ddffff" stop-opacity=".98"/><stop offset=".58" stop-color="#aff0ff" stop-opacity=".62"/><stop offset="1" stop-color="#9ed8ff" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="fold" x1="346" y1="493" x2="694" y2="440" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff"/><stop offset=".43" stop-color="#f0ffff"/><stop offset=".8" stop-color="#d4f9ff" stop-opacity=".85"/><stop offset="1" stop-color="#c0e6ff" stop-opacity="0"/>
+    </linearGradient>
+    <radialGradient id="lower" cx="0" cy="0" r="1" gradientTransform="translate(268 758) rotate(-39) scale(291 144)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#c8ebff" stop-opacity=".8"/><stop offset="1" stop-color="#a0ceff" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="top-soft" x="-50%" y="-100%" width="200%" height="300%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="7"/></filter>
+    <filter id="wide" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="20"/></filter>
+    <filter id="halo" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="8"/></filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="sRGB"><feGaussianBlur stdDeviation="3"/></filter>
+  </defs>
+  <path d="M206 790.5 411.5 282 800.5 212.5 620 715.5Z" fill="url(#surface)"/>
+  <g clip-path="url(#clip)">
+    <path d="M206 790.5 411.5 282 800.5 212.5 620 715.5Z" fill="url(#top)"/>
+    <path d="M411.5 282 800.5 212.5C689 247 541 290 394 330Z" fill="#f6ffff" filter="url(#top-soft)"/>
+    <path d="M206 790.5 411.5 282 800.5 212.5 620 715.5Z" fill="url(#left)"/>
+    <path d="M206 790.5 411.5 282 800.5 212.5 620 715.5Z" fill="url(#lower)"/>
+    <path d="M300 554C321 503 344 477 404 469C498 461 603 451 701 438C588 462 489 483 404 503C352 516 324 532 300 554Z" fill="#9cdeff" filter="url(#wide)"/>
+    <path d="M300 554C321 503 344 477 404 469C498 461 603 451 701 438C588 462 489 483 404 503C352 516 324 532 300 554Z" fill="url(#fold)" filter="url(#halo)"/>
+    <path d="M300 554C321 503 344 477 404 469C498 461 603 451 701 438C588 462 489 483 404 503C352 516 324 532 300 554Z" fill="url(#fold)" filter="url(#soft)"/>
+    <path d="M311 531C340 495 365 485 414 477C512 463 611 452 699 438C596 460 492 480 415 495C368 505 338 515 311 531Z" fill="url(#fold)" opacity=".92"/>
+  </g>
+  <g clip-path="url(#clip)">
+    <path d="M206 790.5 411.5 282 800.5 212.5" fill="none" stroke="#ffffff" stroke-width="11" stroke-linejoin="miter" filter="url(#soft)"/>
+    <path d="M206 790.5 411.5 282 800.5 212.5" fill="none" stroke="#ffffff" stroke-width="5" stroke-linejoin="miter"/>
+  </g>
+</svg>
