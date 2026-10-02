@@ -63,6 +63,14 @@ nonisolated enum KeyboardShortcutSection: String, CaseIterable, Identifiable {
     }
 }
 
+/// 快捷键搜索命中的一个分组：分组本身 + 组内命中的命令。
+nonisolated struct KeyboardShortcutSearchResult: Identifiable {
+    let section: KeyboardShortcutSection
+    let definitions: [KeyboardShortcutDefinition]
+
+    var id: String { section.id }
+}
+
 nonisolated enum KeyboardShortcutCatalog {
     static var sections: [KeyboardShortcutSection] { KeyboardShortcutSection.allCases }
 
@@ -142,6 +150,32 @@ nonisolated enum KeyboardShortcutCatalog {
 
     static func definition(withID id: String) -> KeyboardShortcutDefinition? {
         sections.flatMap { $0.definitions }.first { $0.id == id }
+    }
+
+    /// 设置页顶部搜索：按命令名称（本地化标题或说明）和/或当前生效的快捷键过滤。
+    /// 两个条件同时给出时取交集；返回的分组都不为空。`shortcutProvider` 供测试注入。
+    static func searchResults(
+        nameQuery: String,
+        shortcutQuery: KeyboardShortcut?,
+        shortcutProvider: (KeyboardShortcutDefinition) -> KeyboardShortcut? = {
+            KeyboardShortcutStore.shared.shortcut(for: $0)
+        }
+    ) -> [KeyboardShortcutSearchResult] {
+        let trimmedQuery = nameQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        return sections.compactMap { section in
+            let matches = section.definitions.filter { definition in
+                if !trimmedQuery.isEmpty {
+                    let nameMatches = definition.displayName.localizedCaseInsensitiveContains(trimmedQuery)
+                    let noteMatches = definition.note?.localizedCaseInsensitiveContains(trimmedQuery) ?? false
+                    guard nameMatches || noteMatches else { return false }
+                }
+                if let shortcutQuery {
+                    guard shortcutProvider(definition) == shortcutQuery else { return false }
+                }
+                return true
+            }
+            return matches.isEmpty ? nil : KeyboardShortcutSearchResult(section: section, definitions: matches)
+        }
     }
 
     private static func definition(

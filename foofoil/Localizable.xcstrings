@@ -6798,6 +6798,41 @@
           }
         }
       }
+    },
+    "Search Keyboard Shortcuts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Search Shortcuts" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "搜索快捷键" } }
+      }
+    },
+    "Search by Keys": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "By Shortcut" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "按键搜索" } }
+      }
+    },
+    "Search Shortcut Recorder Help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Click, then press a key combination to find the command using it. Press Delete to clear." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "点击后按下快捷键，查找使用该快捷键的命令。按 Delete 清除。" } }
+      }
+    },
+    "No Matching Shortcuts": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "No Matching Shortcuts" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有匹配的快捷键" } }
+      }
+    },
+    "Clear Shortcut Search": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Clear Shortcut Search" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清除按键搜索" } }
+      }
     }
   },
   "version": "1.0"

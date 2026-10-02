@@ -10,16 +10,31 @@ import SwiftUI
 /// 快捷键录制控件：点击后捕获下一个带修饰键的按键组合；按 Delete 清除快捷键。
 struct ShortcutRecorderView: NSViewRepresentable {
     var shortcut: KeyboardShortcut?
+    /// 快捷键为空时的占位标题（搜索等场景）；nil 时沿用“无快捷键”。
+    var promptTitle: String? = nil
+    /// 是否接受不带修饰键的按键；快捷键搜索需要匹配方向键等无修饰键键位。
+    var allowsUnmodifiedKeys: Bool = false
+    /// 自定义悬停提示；nil 时使用录制帮助文本。
+    var helpText: String? = nil
+    /// 搜索模式：录制结束后，Esc 或 Backspace 可清除已录键位（按钮持有焦点时生效）。
+    var cancelClearsShortcut: Bool = false
     var onChange: (KeyboardShortcut?) -> Void
 
     func makeNSView(context: Context) -> ShortcutRecorderButton {
         let button = ShortcutRecorderButton()
+        button.promptTitle = promptTitle
+        button.allowsUnmodifiedKeys = allowsUnmodifiedKeys
+        button.cancelClearsShortcut = cancelClearsShortcut
+        if let helpText { button.toolTip = helpText }
         button.onChange = onChange
         button.shortcut = shortcut
         return button
     }
 
     func updateNSView(_ nsView: ShortcutRecorderButton, context: Context) {
+        nsView.promptTitle = promptTitle
+        nsView.allowsUnmodifiedKeys = allowsUnmodifiedKeys
+        nsView.cancelClearsShortcut = cancelClearsShortcut
         nsView.onChange = onChange
         nsView.shortcut = shortcut
     }
@@ -28,6 +43,12 @@ struct ShortcutRecorderView: NSViewRepresentable {
 /// 用即时本地事件监听覆盖菜单匹配：录制期间按键不会触发菜单命令。
 final class ShortcutRecorderButton: NSButton {
     var onChange: ((KeyboardShortcut?) -> Void)?
+    var promptTitle: String? {
+        didSet { updateTitle() }
+    }
+    var allowsUnmodifiedKeys = false
+    /// 搜索模式下，录制结束后 Esc/Backspace 清除已录键位。
+    var cancelClearsShortcut = false
     var shortcut: KeyboardShortcut? {
         didSet { updateTitle() }
     }
@@ -77,6 +98,16 @@ final class ShortcutRecorderButton: NSButton {
         }
     }
 
+    /// 录制期间的事件由本地监听吞掉；这里处理的是录制结束、按钮仍持有焦点时的按键。
+    override func keyDown(with event: NSEvent) {
+        if cancelClearsShortcut, shortcut != nil, event.keyCode == 53 || event.keyCode == 51 {
+            shortcut = nil
+            onChange?(nil)
+            return
+        }
+        super.keyDown(with: event)
+    }
+
     /// 返回 nil 表示吞掉事件；录制期间不允许普通按键触发菜单或控件。
     private func handle(_ event: NSEvent) -> NSEvent? {
         switch event.type {
@@ -104,7 +135,8 @@ final class ShortcutRecorderButton: NSButton {
                 keyEquivalent: event.charactersIgnoringModifiers ?? "",
                 modifiers: event.modifierFlags
             )
-            guard !shortcut.keyEquivalent.isEmpty, shortcut.hasRequiredModifiers else {
+            guard !shortcut.keyEquivalent.isEmpty,
+                  allowsUnmodifiedKeys || shortcut.hasRequiredModifiers else {
                 NSSound.beep()
                 return nil
             }
@@ -137,7 +169,7 @@ final class ShortcutRecorderButton: NSButton {
         } else if let shortcut {
             title = shortcut.displayString
         } else {
-            title = NSLocalizedString("No Shortcut", comment: "")
+            title = promptTitle ?? NSLocalizedString("No Shortcut", comment: "")
         }
     }
 }

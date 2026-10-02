@@ -1376,9 +1376,58 @@ struct FoofoilTests {
 
         #expect(appDelegate.closeStandardKeyWindow(window))
         #expect(!window.isVisible)
+    }
 
+    /// 快捷键页搜索与清空：窗口高度保持不动，搜索栏始终完整留在可视区域内。
+    @Test func shortcutSearchKeepsWindowHeightAndSearchBarVisible() throws {
+        let controller = SettingsWindowController.shared
+        let window = try #require(controller.window)
+        let tabController = try #require(window.contentViewController as? NSTabViewController)
         controller.show()
-        #expect(window.isVisible)
+        defer { window.close() }
+        tabController.selectedTabViewItemIndex = 2
+        controller.applySelectedTabAppearance(animated: false)
+        pumpSettingsRunLoop()
+
+        let paneView = try #require(tabController.tabViewItems[2].view)
+        let searchField = try #require(findSearchField(in: paneView), "未找到搜索输入框")
+        let initialHeight = window.contentLayoutRect.height
+
+        // 输入关键词过滤：窗口高度不变（面板内部滚动，而不是窗口随结果缩放）。
+        window.makeFirstResponder(searchField)
+        let editor = try #require(searchField.currentEditor())
+        editor.insertText("reset")
+        pumpSettingsRunLoop(0.6)
+        #expect(abs(window.contentLayoutRect.height - initialHeight) < 1,
+                "过滤时窗口高度应从 \(initialHeight) 保持不变，实际 \(window.contentLayoutRect.height)")
+
+        // 清空搜索：高度仍不变，搜索栏完整可见。
+        editor.selectAll(nil)
+        editor.deleteBackward(nil)
+        pumpSettingsRunLoop(0.6)
+        #expect(abs(window.contentLayoutRect.height - initialHeight) < 1)
+
+        let fieldFrameInWindow = searchField.convert(searchField.bounds, to: nil)
+        #expect(fieldFrameInWindow.minY >= -0.5,
+                "搜索框底部被裁：\(fieldFrameInWindow)，窗口内容高 \(window.contentLayoutRect.height)")
+        #expect(fieldFrameInWindow.maxY <= window.contentLayoutRect.height + 0.5,
+                "搜索框顶部被裁：\(fieldFrameInWindow)，窗口内容高 \(window.contentLayoutRect.height)")
+    }
+
+    /// 递归找到快捷键页的搜索输入框（占位符为本地化搜索文案）。
+    private func findSearchField(in view: NSView) -> NSTextField? {
+        if let field = view as? NSTextField,
+           field.placeholderString == NSLocalizedString("Search Keyboard Shortcuts", comment: "") {
+            return field
+        }
+        for subview in view.subviews {
+            if let match = findSearchField(in: subview) { return match }
+        }
+        return nil
+    }
+
+    private func pumpSettingsRunLoop(_ seconds: TimeInterval = 0.3) {
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: seconds))
     }
 
     @Test func testMainMenuIncludesHideMenuItems() {
@@ -1559,6 +1608,106 @@ struct FoofoilTests {
         store.setShortcut(nil, for: definition)
         delegate.updateHistoryMenu(preloadedConfigs: [config])
         #expect(delegate.historyMenu?.items.first { $0.representedObject is WindowConfig }?.keyEquivalent == "")
+    }
+
+    /// 快捷键设置页搜索：名称关键词大小写不敏感，空分组不保留。
+    /// 关键词直接取本地化文案，保证在任意系统语言下都能命中。
+    @Test func shortcutSearchMatchesNameCaseInsensitively() throws {
+        let fullScreenName = NSLocalizedString("Enter Full Screen", comment: "")
+        let results = KeyboardShortcutCatalog.searchResults(nameQuery: fullScreenName, shortcutQuery: nil)
+        let matchedIDs = results.flatMap { $0.definitions.map(\.id) }
+        #expect(matchedIDs == ["view.toggleFullScreen"])
+        #expect(results.first?.section == .view)
+
+        // 说明文字（适用范围）也参与名称搜索。
+        let noteResults = KeyboardShortcutCatalog.searchResults(nameQuery: NSLocalizedString("Shortcut Scope Web", comment: ""), shortcutQuery: nil)
+        let noteIDs = noteResults.flatMap { $0.definitions.map(\.id) }
+        #expect(noteIDs.contains("file.openInBrowser"))
+        #expect(noteIDs.contains("view.reloadPage"))
+
+        // 无命中时不保留空分组。
+        #expect(KeyboardShortcutCatalog.searchResults(nameQuery: "no such command xyz", shortcutQuery: nil).isEmpty)
+    }
+
+    /// 快捷键设置页搜索：按键位过滤使用注入的当前快捷键；与名称条件取交集。
+    @Test func shortcutSearchMatchesShortcutQuery() throws {
+        let provider: (KeyboardShortcutDefinition) -> foofoil.KeyboardShortcut? = { $0.defaultShortcut }
+
+        let keyResults = KeyboardShortcutCatalog.searchResults(
+            nameQuery: "",
+            shortcutQuery: foofoil.KeyboardShortcut(keyEquivalent: "k", modifiers: [.command]),
+            shortcutProvider: provider
+        )
+        #expect(keyResults.flatMap { $0.definitions.map { $0.id } } == ["file.reset"])
+
+        // 无修饰键键位也能按精确匹配搜到（搜索录制控件允许无修饰键输入）。
+        let arrowResults = KeyboardShortcutCatalog.searchResults(
+            nameQuery: "",
+            shortcutQuery: foofoil.KeyboardShortcut(keyEquivalent: "\u{F703}", modifiers: []),
+            shortcutProvider: provider
+        )
+        let arrowIDs = arrowResults.flatMap { $0.definitions.map { $0.id } }
+        #expect(arrowIDs.contains("go.nextPage"))
+        #expect(arrowIDs.contains("playback.forward"))
+
+        // 名称 + 键位取交集。
+        let intersection = KeyboardShortcutCatalog.searchResults(
+            nameQuery: NSLocalizedString("Next Page", comment: ""),
+            shortcutQuery: foofoil.KeyboardShortcut(keyEquivalent: "\u{F703}", modifiers: []),
+            shortcutProvider: provider
+        )
+        #expect(intersection.flatMap { $0.definitions.map { $0.id } } == ["go.nextPage"])
+    }
+
+    /// 按键搜索录制控件：录制结束后 Esc/Backspace 清除已录键位；行内录制控件默认不响应。
+    @Test func shortcutSearchRecorderEscapeAndBackspaceClearRecordedValue() throws {
+        func keyDownEvent(_ keyCode: UInt16) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(
+                with: .keyDown,
+                location: .zero,
+                modifierFlags: [],
+                timestamp: 0,
+                windowNumber: 0,
+                context: nil,
+                characters: "",
+                charactersIgnoringModifiers: "",
+                isARepeat: false,
+                keyCode: keyCode
+            ))
+        }
+
+        let button = ShortcutRecorderButton(frame: .zero)
+        button.promptTitle = NSLocalizedString("Search by Keys", comment: "")
+        button.cancelClearsShortcut = true
+        var clearedCount = 0
+        button.onChange = { value in
+            if value == nil { clearedCount += 1 }
+        }
+
+        let recorded = foofoil.KeyboardShortcut(keyEquivalent: "k", modifiers: [.command])
+
+        // Esc 清除。
+        button.shortcut = recorded
+        button.keyDown(with: try keyDownEvent(53))
+        #expect(button.shortcut == nil)
+        #expect(clearedCount == 1)
+        #expect(button.title == NSLocalizedString("Search by Keys", comment: ""))
+
+        // Backspace 清除。
+        button.shortcut = recorded
+        button.keyDown(with: try keyDownEvent(51))
+        #expect(button.shortcut == nil)
+        #expect(clearedCount == 2)
+
+        // 没有已录键位时不触发变更。
+        button.keyDown(with: try keyDownEvent(53))
+        #expect(clearedCount == 2)
+
+        // 行内录制控件（非搜索模式）：Esc 不清除已有快捷键。
+        let rowButton = ShortcutRecorderButton(frame: .zero)
+        rowButton.shortcut = recorded
+        rowButton.keyDown(with: try keyDownEvent(53))
+        #expect(rowButton.shortcut == recorded)
     }
 
     /// 合成按键事件，用于核对键位匹配。
