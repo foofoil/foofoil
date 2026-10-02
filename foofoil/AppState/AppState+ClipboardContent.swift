@@ -76,6 +76,16 @@ extension AppState {
             || trimmed.range(of: "<body") != nil
     }
 
+    /// 剪贴板文本整体是一个 http/https 网址时返回该 URL；混有其它文字（含空白）则不算网址。
+    nonisolated static func websiteURL(fromClipboardText text: String) -> URL? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty,
+              let url = URL(string: trimmed),
+              let scheme = url.scheme?.lowercased(),
+              scheme == "http" || scheme == "https" else { return nil }
+        return url
+    }
+
     /// 剪贴板 HTML 片段通常没有可用的 `<title>`，历史标题改用粘贴文本开头的摘要。
     nonisolated static func clipboardHTMLTitle(html: String, plainText: String?) -> String? {
         if let plainText, let title = plainTextHistoryTitle(from: plainText) { return title }

@@ -260,6 +260,21 @@ struct FoilExposeView: View {
         for entries: [(offset: Int, item: FoilExposeItem)],
         shortcutByID: [UUID: String]
     ) -> some View {
+        VStack(spacing: 24) {
+            // 剪贴板入口贴在内容区上方、与内容右对齐；只有剪贴板里有可打开内容时出现。
+            if let clipboardContent = model.clipboardContent {
+                ClipboardHintButton(content: clipboardContent, action: model.onOpenClipboard)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            contentSections(for: entries, shortcutByID: shortcutByID)
+        }
+    }
+
+    @ViewBuilder
+    private func contentSections(
+        for entries: [(offset: Int, item: FoilExposeItem)],
+        shortcutByID: [UUID: String]
+    ) -> some View {
         // 有关键字时不再给整页空态：文件结果区会说明“主目录中没有匹配的文件”。
         if entries.isEmpty && model.searchQuery.isEmpty {
             Text(NSLocalizedString("No Foils on This Screen", comment: ""))
@@ -429,7 +444,6 @@ struct FoilExposeView: View {
                 Text(model.isSearching
                      ? NSLocalizedString("Search Foils Hint", comment: "")
                      : NSLocalizedString("Show All Foils Hint", comment: ""))
-                Text("Tip: Command-Shift-V opens clipboard content")
             }
             .font(.system(size: 13))
             .foregroundStyle(.white.opacity(0.62))
@@ -514,6 +528,47 @@ struct FoilExposeView: View {
         (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
         ?? (Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String)
         ?? "foofoil"
+}
+
+/// 顶栏下方的剪贴板入口：只在剪贴板里有可打开内容时出现，类型名与实际打开结果一致；
+/// 胶囊按钮造型明确可点击，点击等价于按 ⌘⇧V，在（空白或新建）箔片中打开剪贴板内容。
+private struct ClipboardHintButton: View {
+    let content: ClipboardOpenableContent
+    let action: () -> Void
+
+    @State private var isHovered = false
+
+    private var title: String {
+        String(format: NSLocalizedString("Open Clipboard Item Format", comment: ""), content.localizedName)
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: "doc.on.clipboard")
+                    .font(.system(size: 12, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 13, weight: .medium))
+                Text("⌘⇧V")
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(0.18)))
+                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.white.opacity(0.38), lineWidth: 1))
+            }
+            .foregroundStyle(.white.opacity(isHovered ? 1.0 : 0.88))
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(Capsule().fill(Color.white.opacity(isHovered ? 0.22 : 0.13)))
+            .overlay(Capsule().stroke(Color.white.opacity(isHovered ? 0.5 : 0.3), lineWidth: 1))
+            .scaleEffect(isHovered ? 1.03 : 1.0)
+            .animation(.spring(response: 0.25, dampingFraction: 0.8), value: isHovered)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
+        .help(title)
+        .accessibilityLabel(title)
+    }
 }
 
 /// SwiftUI 条件插入的搜索输入框上 FocusState 偶尔无法落到 AppKit 第一响应者（面板尚未成为

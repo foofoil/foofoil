@@ -497,7 +497,7 @@ extension AppDelegate {
         _ = openClipboardContentInNewWindow()
     }
 
-    /// 直接打开剪贴板内容：文件/文件夹/图片复用拖入箔片的处理管线，文本按 Markdown / HTML / 笔记区分。
+    /// 直接打开剪贴板内容：文件/文件夹/图片复用拖入箔片的处理管线，文本按 Markdown / 网址 / HTML / 笔记区分。
     @discardableResult
     func openClipboardContentInNewWindow() -> Bool {
         let fileURLs = clipboardFileURLs()
@@ -550,6 +550,13 @@ extension AppDelegate {
             if isDeclaredMarkdown || AppState.looksLikeMarkdown(text) {
                 let target = clipboardContentTarget()
                 target.state.openText(text, isMarkdown: true)
+                presentClipboardTarget(target)
+                return true
+            }
+            // 剪贴板内容整体是一个网址时直接作为网站打开，不落为纯文本笔记。
+            if let url = AppState.websiteURL(fromClipboardText: text) {
+                let target = clipboardContentTarget()
+                target.state.openWeb(url: url)
                 presentClipboardTarget(target)
                 return true
             }
@@ -641,6 +648,26 @@ extension AppDelegate {
             return true
         }
         return clipboardHTML(from: pasteboard) != nil
+    }
+
+    /// 覆盖层提示用：与 openClipboardContentInNewWindow 走同一条判定顺序（文件 → 图片 → 文本/HTML），
+    /// 返回剪贴板当前会打开成的内容类型；没有可打开内容时返回 nil，提示随之隐藏。
+    func clipboardOpenableContent() -> ClipboardOpenableContent? {
+        let fileURLs = clipboardFileURLs()
+        if !fileURLs.isEmpty {
+            return ClipboardOpenableContent.forFileURLs(fileURLs)
+        }
+        if clipboardImage() != nil { return ClipboardOpenableContent(.image) }
+        let pasteboard = NSPasteboard.general
+        let declaredMarkdown = Self.markdownPasteboardTypes
+            .compactMap { pasteboard.availableType(from: [$0]) }
+            .first
+            .flatMap { pasteboard.string(forType: $0) }
+        return ClipboardOpenableContent.forText(
+            declaredMarkdown: declaredMarkdown,
+            plainText: pasteboard.string(forType: .string),
+            html: clipboardHTML(from: pasteboard)
+        )
     }
 
     @objc func resetContentAction() {
@@ -962,5 +989,114 @@ extension AppDelegate {
 
     @objc func moveToNextScreenAction() {
         activeWindowController?.moveToNextScreen()
+    }
+}
+
+/// 剪贴板内容按打开规则归出的类型：覆盖层提示里的类型名取自这里，
+/// 判定与 openClipboardContentInNewWindow 保持一致，保证“提示什么就打开什么”。
+struct ClipboardOpenableContent: Equatable {
+    enum Kind: Equatable {
+        case folder, file, image, imageList, audio, audioList, video, videoList, pdf, web, htmlFragment, website, markdown, text
+
+        /// 提示文案中的基础类型名（“打开剪贴板里的图片”中的“图片”）。
+        var localizedName: String {
+            switch self {
+            case .folder: return NSLocalizedString("Clipboard Type Folder", comment: "")
+            case .file: return NSLocalizedString("File", comment: "")
+            case .image: return NSLocalizedString("Clipboard Type Image", comment: "")
+            case .imageList: return NSLocalizedString("Image List", comment: "")
+            case .audio: return NSLocalizedString("Clipboard Type Audio", comment: "")
+            case .audioList: return NSLocalizedString("Audio List", comment: "")
+            case .video: return NSLocalizedString("Video", comment: "")
+            case .videoList: return NSLocalizedString("Video List", comment: "")
+            case .pdf: return NSLocalizedString("Clipboard Type PDF", comment: "")
+            case .web: return NSLocalizedString("Clipboard Type Web Page", comment: "")
+            case .htmlFragment: return NSLocalizedString("Clipboard Type HTML Fragment", comment: "")
+            case .website: return NSLocalizedString("Clipboard Type Website", comment: "")
+            case .markdown: return NSLocalizedString("Clipboard Type Markdown", comment: "")
+            case .text: return NSLocalizedString("Clipboard Type Text", comment: "")
+            }
+        }
+    }
+
+    let kind: Kind
+    /// 文件来源内容的扩展名（小写、不含点），如 “flac”、“log”；组内扩展名不一致或不是文件来源时为 nil。
+    let fileExtension: String?
+
+    init(_ kind: Kind, fileExtension: String? = nil) {
+        self.kind = kind
+        self.fileExtension = fileExtension
+    }
+
+    /// 提示文案中的类型名：文件来源带上扩展名（如 “.flac音频”、“.log文本”），其余只显示类型名。
+    var localizedName: String {
+        let base = kind.localizedName
+        guard let fileExtension, !fileExtension.isEmpty else { return base }
+        return String(
+            format: NSLocalizedString("Clipboard Type With Extension Format", comment: ""),
+            "." + fileExtension,
+            base
+        )
+    }
+
+    /// 组内文件扩展名一致时返回它（小写）；不一致或没有扩展名时返回 nil。
+    nonisolated static func commonExtension(of urls: [URL]) -> String? {
+        let extensions = Set(urls.map { $0.pathExtension.lowercased() })
+        guard extensions.count == 1, let ext = extensions.first, !ext.isEmpty else { return nil }
+        return ext
+    }
+
+    /// 文件分支：与 openClipboardFileURLs → handleDroppedFileURLs 的分组选择一致；
+    /// 目录打开的是其内容，先按“文件夹”提示；没有可打开文件时返回 nil（与实际打开结果一致：无动作）。
+    @MainActor
+    static func forFileURLs(_ urls: [URL]) -> ClipboardOpenableContent? {
+        if DroppedFileResolver.containsDirectory(in: urls) { return ClipboardOpenableContent(.folder) }
+        let probe = AppState()
+        let openable = urls.filter { probe.canOpenFile(url: $0) }
+        guard let group = FileListGrouper.groups(from: openable).first,
+              let firstURL = group.urls.first else { return nil }
+        let ext = commonExtension(of: group.urls)
+        switch group.kind {
+        case .listable(.audio):
+            return ClipboardOpenableContent(group.urls.count > 1 ? .audioList : .audio, fileExtension: ext)
+        case .cueSheets:
+            return ClipboardOpenableContent(.audio, fileExtension: ext)
+        case .listable(.video):
+            return ClipboardOpenableContent(group.urls.count > 1 ? .videoList : .video, fileExtension: ext)
+        case .listable(.image):
+            return ClipboardOpenableContent(group.urls.count > 1 ? .imageList : .image, fileExtension: ext)
+        case .other:
+            switch FileListGrouper.dropKind(url: firstURL) {
+            // PDF 的类型名本身已是扩展名，不再重复前缀。
+            case .pdf: return ClipboardOpenableContent(.pdf)
+            case .web: return ClipboardOpenableContent(.web, fileExtension: ext)
+            case .text:
+                // 与 openTextFile 一致：md/markdown 后缀进入 Markdown 预览，其余按文本。
+                let isMarkdown = ["md", "markdown"].contains(firstURL.pathExtension.lowercased())
+                return ClipboardOpenableContent(isMarkdown ? .markdown : .text, fileExtension: ext)
+            case .image: return ClipboardOpenableContent(.image, fileExtension: ext)
+            case .video: return ClipboardOpenableContent(.video, fileExtension: ext)
+            case .audio: return ClipboardOpenableContent(.audio, fileExtension: ext)
+            case .other: return ClipboardOpenableContent(.file, fileExtension: ext)
+            }
+        }
+    }
+
+    /// 文本分支：与 openClipboardText 的 Markdown → 网址 → HTML → 笔记顺序一致。
+    nonisolated static func forText(
+        declaredMarkdown: String?,
+        plainText: String?,
+        html: String?
+    ) -> ClipboardOpenableContent? {
+        let isDeclaredMarkdown = !(declaredMarkdown?
+            .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        let text = isDeclaredMarkdown ? declaredMarkdown : plainText
+        if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if isDeclaredMarkdown || AppState.looksLikeMarkdown(text) { return ClipboardOpenableContent(.markdown) }
+            if AppState.websiteURL(fromClipboardText: text) != nil { return ClipboardOpenableContent(.website) }
+            if html != nil || AppState.looksLikeHTML(text) { return ClipboardOpenableContent(.htmlFragment) }
+            return ClipboardOpenableContent(.text)
+        }
+        return html == nil ? nil : ClipboardOpenableContent(.htmlFragment)
     }
 }

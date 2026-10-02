@@ -75,6 +75,8 @@ final class FoilExposeModel: ObservableObject {
     let items: [FoilExposeItem]
     /// 历史记录条目。
     let historyItems: [FoilExposeItem]
+    /// 展示时剪贴板里可打开的内容类型（与实际打开结果一致）；nil 表示没有可打开内容，不显示提示。
+    let clipboardContent: ClipboardOpenableContent?
     /// 当前键盘高亮的条目下标（对应 currentItems）；默认高亮第一项。
     @Published var selectedIndex: Int = 0
     /// 搜索关键字；输入时即时过滤，退出输入后关键字与过滤结果仍保留。
@@ -105,6 +107,8 @@ final class FoilExposeModel: ObservableObject {
     var onOpenFile: (URL) -> Void = { _ in }
     /// 请求开启文件搜索：由控制器弹出系统面板确认用户主目录。
     var onRequestFileSearchAuthorization: () -> Void = {}
+    /// 点击剪贴板提示：由控制器关闭覆盖层并打开剪贴板内容（等价于 ⌘⇧V）。
+    var onOpenClipboard: () -> Void = {}
     /// 面板视图当前可见条目的 id（按显示顺序），随滚动实时回填；编号直选只命中可见项。
     private var visibleIDs: [UUID] = []
     private let fileSearch: (String, @escaping (SpotlightSearchOutcome) -> Void) -> Void
@@ -115,10 +119,12 @@ final class FoilExposeModel: ObservableObject {
 
     init(items: [FoilExposeItem],
          historyItems: [FoilExposeItem],
+         clipboardContent: ClipboardOpenableContent? = nil,
          fileSearch: ((String, @escaping (SpotlightSearchOutcome) -> Void) -> Void)? = nil,
          cancelFiles: (() -> Void)? = nil) {
         self.items = items
         self.historyItems = historyItems
+        self.clipboardContent = clipboardContent
         let service = SpotlightFileSearch()
         self.fileSearch = fileSearch ?? { text, completion in
             service.start(text: text, completion: completion)
@@ -424,12 +430,14 @@ final class FoilExposeController {
         // 没有任何箔窗口时也展示覆盖层：每个屏幕放一张“新建空白箔”占位卡。
         let model = FoilExposeModel(
             items: Self.collectItems(from: appDelegate.windowControllers),
-            historyItems: Self.collectHistoryItems()
+            historyItems: Self.collectHistoryItems(),
+            clipboardContent: appDelegate.clipboardOpenableContent()
         )
         model.onSelect = { [weak self] item in self?.select(item) }
         model.onDismiss = { [weak self] in self?.dismiss() }
         model.onOpenFile = { [weak self] url in self?.openFile(url) }
         model.onRequestFileSearchAuthorization = { [weak self] in self?.requestFileSearchAuthorization() }
+        model.onOpenClipboard = { [weak self] in self?.openClipboard() }
         self.model = model
 
         // 先激活本 App，再在当前活跃显示器上铺一块非激活面板并指定它为 key window。
@@ -623,6 +631,13 @@ final class FoilExposeController {
             }
             self.isOpeningFile = false
         }
+    }
+
+    /// 点击剪贴板提示：先收起覆盖层，再打开剪贴板内容（与放行 ⌘⇧V 给菜单动作等价）。
+    private func openClipboard() {
+        dismiss()
+        NSApp.activate(ignoringOtherApps: true)
+        (NSApplication.shared.delegate as? AppDelegate)?.openClipboardContentInNewWindow()
     }
 
     /// 开启文件搜索：系统面板会盖住覆盖层，先让出面板，选择结束后恢复并重新查询。
