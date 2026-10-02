@@ -245,6 +245,7 @@ extension AppState {
         }
 
         public func loadImage(from url: URL) -> NSImage? {
+            guard !isQuickLookDocument else { return nil }
             if let cached = loadedImageCache, cached.url == url {
                 return cached.image
             }

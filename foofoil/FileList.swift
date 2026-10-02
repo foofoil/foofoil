@@ -517,7 +517,7 @@ public nonisolated enum DroppedFileResolver {
             guard !isHidden(url) else { continue }
             var isDirectory: ObjCBool = false
             guard fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory) else { continue }
-            guard isDirectory.boolValue else {
+            guard isDirectory.boolValue && (try? url.resourceValues(forKeys: [.isPackageKey]).isPackage) != true else {
                 guard scannedFileCount < limit else {
                     didReachLimit = true
                     break
@@ -543,13 +543,13 @@ public nonisolated enum DroppedFileResolver {
                 }
                 guard let child = item as? URL, !isHidden(child),
                       let values = try? child.resourceValues(forKeys: Set(keys)) else { continue }
-                if values.isDirectory == true {
+                if values.isDirectory == true && values.isPackage != true {
                     if values.isHidden == true || values.isPackage == true {
                         enumerator.skipDescendants()
                     }
                     continue
                 }
-                guard values.isRegularFile != false else { continue }
+                guard values.isRegularFile != false || values.isPackage == true else { continue }
                 guard scannedFileCount < limit else {
                     didReachLimit = true
                     enumerator.skipDescendants()
@@ -578,6 +578,7 @@ public nonisolated enum DroppedFileResolver {
             return url.isFileURL
                 && fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory)
                 && isDirectory.boolValue
+                && (try? url.resourceValues(forKeys: [.isPackageKey]).isPackage) != true
         }
     }
 
@@ -606,7 +607,8 @@ public enum FileListGrouper {
             let ext = url.pathExtension.lowercased()
             if ext == "pdf" { return .pdf }
             if ["html", "htm", "webarchive", "xhtml"].contains(ext) { return .web }
-            if let type = UTType(filenameExtension: ext), type.conforms(to: .text) { return .text }
+            if let type = UTType(filenameExtension: ext),
+               type.conforms(to: .plainText) || type.conforms(to: .sourceCode) { return .text }
             return .other(ext)
         }
     }

@@ -39,6 +39,7 @@ extension AppState {
                 resetFileList()
                 clearCustomCover()
             }
+            self.quickLookSourceURL = nil
             self.originalImageName = originalName
             self.sourceFingerprint = fileList == nil ? Self.localSourceFingerprint(for: url) : nil
             self.imageSource = nil
@@ -77,7 +78,8 @@ extension AppState {
             holdsSecurityAccess: Bool,
             rotatesIdentity: Bool,
             clearsFileList: Bool,
-            originalName: String? = nil
+            originalName: String? = nil,
+            usesQuickLook: Bool = false
         ) {
             isBatchUpdating = true
             defer {
@@ -134,6 +136,7 @@ extension AppState {
                 list.items[index].bookmark = videoBookmarkData
                 fileList = list
             }
+            self.quickLookSourceURL = usesQuickLook ? url : nil
             self.imageURL = url
         }
 
@@ -469,7 +472,7 @@ extension AppState {
             Task { @MainActor [weak self] in
                 defer { self?.endPendingContentOpen() }
                 let isPlayable = (try? await asset.load(.isPlayable)) ?? false
-                guard isPlayable, let self else {
+                guard let self else {
                     if holdsSecurityAccess { url.stopAccessingSecurityScopedResource() }
                     return
                 }
@@ -477,6 +480,11 @@ extension AppState {
                     _ = await closeTask.value
                 }
                 guard self.currentMediaRouteGeneration == routeGeneration else {
+                    if holdsSecurityAccess { url.stopAccessingSecurityScopedResource() }
+                    return
+                }
+                guard isPlayable else {
+                    self.openQuickLook(url: url)
                     if holdsSecurityAccess { url.stopAccessingSecurityScopedResource() }
                     return
                 }
@@ -610,33 +618,21 @@ extension AppState {
                 if ext == "svg" || type.conforms(to: .svg) {
                     return false
                 }
-                return type.conforms(to: .text)
+                return type.conforms(to: .plainText) || type.conforms(to: .sourceCode)
             }
             return false
         }
 
-        /// 判断本应用能否按内容打开本地文件，避免将未知文件的 Finder 图标当成图片。
+        /// 不枚举 Quick Look 的生成器：系统及已安装的预览扩展共同决定可呈现内容。
         public func canOpenFile(url: URL) -> Bool {
-            guard url.isFileURL else { return false }
+            guard url.isFileURL,
+                  let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isPackageKey]) else { return false }
+            return values.isRegularFile == true || values.isPackage == true
+        }
 
-            if ExtensionHost.shared.canOpen(url: url) { return true }
-
-            if FileListGrouper.isCueFile(url) {
-                return true
-            }
-
-            let ext = url.pathExtension.lowercased()
-            if ["html", "htm", "webarchive", "xhtml"].contains(ext) || isTextFile(url: url) {
-                return true
-            }
-            if Self.isExternalMediaFile(url: url) {
-                return true
-            }
-            if NSImage(contentsOf: url) != nil {
-                return true
-            }
-            return ExtensionProductPolicy.exposesUserManagement
-                && ExtensionHost.shared.manager.availableExtension(for: url) != nil
+        func openQuickLook(url: URL) {
+            // 复用原始文件的书签及窗口持有授权，避免复制大型文档或拆散文件包。
+            applyExternalMedia(url: url, holdsSecurityAccess: false, rotatesIdentity: true, clearsFileList: true, usesQuickLook: true)
         }
 
         public func openFile(url: URL) {
@@ -672,6 +668,8 @@ extension AppState {
             } else if ExtensionProductPolicy.exposesUserManagement,
                       let available = ExtensionHost.shared.manager.availableExtension(for: url) {
                 promptToInstall(available, opening: url)
+            } else {
+                openQuickLook(url: url)
             }
         }
 

@@ -28,12 +28,14 @@ extension AppState {
 
         /// 当前内容是否为视频文档（复用图片内容通道，但不经缓存）。
         public var isVideoDocument: Bool {
+            guard !isQuickLookDocument else { return false }
             guard let name = originalImageName else { return false }
             return Self.isVideoFileName(name)
         }
 
         /// 当前内容是否为音频文档（复用图片内容通道，但不经缓存）。
         public var isAudioDocument: Bool {
+            guard !isQuickLookDocument else { return false }
             if let session = extensionSession, ExtensionPlaybackSupport.usesHostAudioChrome(session) {
                 return true
             }

@@ -2171,8 +2171,8 @@ struct FoofoilTests {
         #expect(delegate.windowControllers.count == 1, "音频打开不应残留多余箔片")
     }
 
-    /// 可播性判定失败后箔片仍为空白，应被回收，不能留下打不开的空箔。
-    @Test func openWithUnplayableMediaClosesTheBlankFoil() async throws {
+    /// 原生播放器无法解码时保留浮箔，交由系统 Quick Look 呈现。
+    @Test func openWithUnplayableMediaUsesQuickLook() async throws {
         let delegate = AppDelegate()
         defer {
             for controller in delegate.windowControllers {
@@ -2189,10 +2189,11 @@ struct FoofoilTests {
         delegate.application(NSApp, openFiles: [file.path])
 
         let opened = try #require(delegate.windowControllers.first)
-        for _ in 0..<200 where opened.window?.isVisible == true {
+        for _ in 0..<200 where !opened.appState.isQuickLookDocument {
             try await Task.sleep(for: .milliseconds(25))
         }
-        #expect(opened.window?.isVisible == false, "不可播放的媒体不应留下空箔")
+        #expect(opened.window?.isVisible == true)
+        #expect(opened.appState.isQuickLookDocument)
     }
 
     /// 多份同类文件（会拆成多个分组）也只新建有内容的箔片，不额外留下空箔。

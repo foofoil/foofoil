@@ -13,9 +13,11 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
     case audio = 8
     case extensionContent = 9
     case ebook = 10
+    case quickLook = 11
 
     public var symbolName: String {
         switch self {
+        case .quickLook: return "doc"
         case .web: return "globe"
         case .image: return "photo"
         case .pdf: return "text.document"
@@ -33,7 +35,7 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
     public var storesIndexedText: Bool {
         switch self {
         case .note, .text, .markdown, .csv: return true
-        case .image, .web, .pdf, .video, .audio, .extensionContent, .ebook: return false
+        case .image, .web, .pdf, .video, .audio, .extensionContent, .ebook, .quickLook: return false
         }
     }
 

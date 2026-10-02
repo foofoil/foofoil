@@ -256,10 +256,10 @@ struct ClipboardOpenableContentTests {
         #expect(result?.fileExtension == "mp3")
     }
 
-    @Test func unsupportedFileHasNoContent() throws {
-        // 打不开的扩展名：实际打开动作同样无结果，提示应隐藏。
+    @Test func unknownFileOffersQuickLook() throws {
+        // 未知格式也可以交给系统 Quick Look。
         let directory = try makeTempDirectory()
         let url = try makeFile("data.foofoilunknownext", in: directory)
-        #expect(ClipboardOpenableContent.forFileURLs([url]) == nil)
+        #expect(ClipboardOpenableContent.forFileURLs([url])?.kind == .file)
     }
 }

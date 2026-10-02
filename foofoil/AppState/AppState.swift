@@ -283,12 +283,18 @@ public class AppState: NSObject, ObservableObject, Identifiable {
 
     public var imageSource: ImageSource?
 
+    @Published var quickLookSourceURL: URL?
+
+    var isQuickLookDocument: Bool {
+        imageURL != nil && imageURL == quickLookSourceURL
+    }
+
     @Published public var imageURL: URL? {
         didSet {
             loadedImageCache = nil
             if let url = imageURL {
                 // 视频/音频不复制到应用缓存目录，仅记录原始文件路径。
-                if !Self.isExternalMediaFile(url: url) {
+                if !Self.isExternalMediaFile(url: url) && !isQuickLookDocument {
                     // 切到非媒体内容时释放旧文件的安全范围访问授权
                     stopVideoAccess()
                     let cacheDir = getCachedImageURL()?.deletingLastPathComponent()
@@ -591,10 +597,11 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         if let path = config.imagePath {
             let url = URL(fileURLWithPath: path)
             // 视频/音频经安全范围书签恢复沙盒访问（重启后路径直接不可达）
-            if Self.isExternalMediaFileName(config.originalImageName ?? path) {
+            if config.contentKind == .quickLook || Self.isExternalMediaFileName(config.originalImageName ?? path) {
                 if let restored = Self.restoreVideoAccess(config: config, fallbackURL: url) {
                     self.accessingVideoURL = restored.accessedURL
                     self.videoBookmarkData = restored.bookmark
+                    self.quickLookSourceURL = config.contentKind == .quickLook ? restored.url : nil
                     self.imageURL = restored.url
                     // 音频再恢复同目录封面文件夹的访问，保证封面在重启后仍可读取
                     if Self.isAudioFileName(config.originalImageName ?? path),

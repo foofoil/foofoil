@@ -79,6 +79,8 @@ public struct ContentView: View {
                     }, shouldHideBorder: shouldHideBorder)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .transition(.opacity)
+                } else if let url = appState.imageURL, appState.isQuickLookDocument {
+                    QuickLookModeView(url: url)
                 } else if let videoURL = appState.imageURL, appState.isVideoDocument {
                     VideoModeView(appState: appState, url: videoURL, shouldHideBorder: shouldHideBorder)
                         .transition(.opacity)
@@ -215,7 +217,7 @@ public struct ContentView: View {
         .simultaneousGesture(
             MagnificationGesture()
                 .onChanged { value in
-                    guard appState.imageURL == nil || appState.isExternalMediaDocument || appState.webURL != nil else { return }
+                    guard appState.imageURL == nil || appState.isExternalMediaDocument || appState.isQuickLookDocument || appState.webURL != nil else { return }
 
                     if !isResizingWindowWithPinch {
                         isResizingWindowWithPinch = true
@@ -227,7 +229,7 @@ public struct ContentView: View {
                     )
                 }
                 .onEnded { _ in
-                    guard (appState.imageURL == nil || appState.isExternalMediaDocument || appState.webURL != nil), isResizingWindowWithPinch else { return }
+                    guard (appState.imageURL == nil || appState.isExternalMediaDocument || appState.isQuickLookDocument || appState.webURL != nil), isResizingWindowWithPinch else { return }
 
                     NotificationCenter.default.post(
                         name: .shouldEndWindowPinchResize,

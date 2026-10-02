@@ -1643,7 +1643,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func resizeWindowForPinch(magnification: CGFloat) {
-        guard appState.imageURL == nil || appState.isExternalMediaDocument || appState.webURL != nil, let window = window else { return }
+        guard appState.imageURL == nil || appState.isExternalMediaDocument || appState.isQuickLookDocument || appState.webURL != nil, let window = window else { return }
 
         if pinchResizeInitialSize == nil {
             pinchResizeInitialSize = window.frame.size

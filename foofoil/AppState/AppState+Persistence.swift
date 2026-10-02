@@ -89,12 +89,13 @@ extension AppState {
             if let path = config.imagePath {
                 let url = URL(fileURLWithPath: path)
                 // 视频/音频经安全范围书签恢复沙盒访问（重启后路径直接不可达）
-                if Self.isExternalMediaFileName(config.originalImageName ?? path) {
+                if config.contentKind == .quickLook || Self.isExternalMediaFileName(config.originalImageName ?? path) {
                     // 加载新配置前先释放旧的媒体授权
                     stopVideoAccess()
                     if let restored = Self.restoreVideoAccess(config: config, fallbackURL: url) {
                         self.accessingVideoURL = restored.accessedURL
                         self.videoBookmarkData = restored.bookmark
+                        self.quickLookSourceURL = config.contentKind == .quickLook ? restored.url : nil
                         self.imageURL = restored.url
                         // 音频再恢复同目录封面文件夹的访问，保证封面在重启后仍可读取
                         if Self.isAudioFileName(config.originalImageName ?? path),
@@ -184,7 +185,7 @@ extension AppState {
                 documentParagraphSpacing: documentParagraphSpacing,
                 documentThemeId: documentThemeId,
                 textPath: textURL?.path,
-                contentKind: HistoryContentKind.infer(from: WindowConfig(
+                contentKind: isQuickLookDocument ? .quickLook : HistoryContentKind.infer(from: WindowConfig(
                     id: id,
                     imagePath: imageURL?.path,
                     webURLString: webURL?.absoluteString,

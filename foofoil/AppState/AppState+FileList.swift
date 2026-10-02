@@ -24,7 +24,7 @@ extension AppState {
     /// 当前箔片能否作为同类型列表的宿主（含尚未形成列表的单个图片/视频/音频）。
     var listableKind: FileListKind? {
         if let fileList { return fileList.kind }
-        if isPDFDocument { return nil }
+        if isPDFDocument || isQuickLookDocument { return nil }
         if isVideoDocument { return .video }
         if isAudioDocument { return .audio }
         if imageURL != nil, webURL == nil { return .image }
@@ -34,6 +34,7 @@ extension AppState {
     /// 非空箔片锁定其文件类型，拖放不能用其它类型替换当前内容。
     var currentDroppedFileKind: DroppedFileKind? {
         if webURL != nil { return .web }
+        if isQuickLookDocument, let url = imageURL { return FileListGrouper.dropKind(url: url) }
         if isPDFDocument { return .pdf }
         if isVideoDocument { return .video }
         if isAudioDocument { return .audio }

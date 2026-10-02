@@ -319,18 +319,8 @@ extension AppDelegate {
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
 
-        var types: [UTType] = [.image, .pdf, .html, .text, .movie, .audio]
-        if let cueType = UTType(filenameExtension: "cue") {
-            types.append(cueType)
-        }
-        if let testExtensionType = UTType("app.foofoil.test-document") {
-            types.append(testExtensionType)
-        }
-        if let webarchiveType = UTType("com.apple.webarchive") {
-            types.append(webarchiveType)
-        }
-        types.append(contentsOf: ExtensionHost.shared.additionalContentTypes(for: .audio))
-        panel.allowedContentTypes = Array(Dictionary(grouping: types, by: \.identifier).compactMap(\.value.first))
+        // Quick Look 接管其它文件类型，选择面板不再维护格式白名单。
+        panel.treatsFilePackagesAsDirectories = false
 
         panel.begin { response in
             if response == .OK {
