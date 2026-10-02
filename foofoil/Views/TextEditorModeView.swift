@@ -10,6 +10,7 @@ import SwiftUI
 struct TextEditorModeView: View {
     @ObservedObject var appState: AppState
     @ObservedObject private var historyManager = HistoryManager.shared
+    @State private var shortcutRevision = 0
     @State private var textHeight: CGFloat = 68 // 动态高度，初始为单行行高加上下文档内边距
     @State private var hoveredHistoryID: UUID? = nil
     @State private var isSearchCardHovered = false
@@ -24,6 +25,7 @@ struct TextEditorModeView: View {
     }
 
     var body: some View {
+        let _ = shortcutRevision
         GeometryReader { geometry in
             if geometry.size.width < 100 || geometry.size.height < 100 {
                 Color.clear
@@ -92,7 +94,7 @@ struct TextEditorModeView: View {
                                         VStack(spacing: 4) {
                                             HistoryCardView(
                                                 config: config,
-                                                shortcutText: index < 9 && appState.isCommandKeyPressed ? "⌘\(index + 1)" : nil,
+                                                shortcutText: appState.isCommandKeyPressed ? KeyboardShortcutStore.shared.shortcut(forID: "history.openRecent\(index + 1)")?.displayString : nil,
                                                 isHovered: hoveredHistoryID == config.id,
                                                 action: {
                                                     let isCurrentlyBlank = appState.imageURL == nil && appState.webURL == nil && appState.text.isEmpty
@@ -145,7 +147,7 @@ struct TextEditorModeView: View {
                                     }
                                     VStack(spacing: 4) {
                                         SearchHistoryCard(
-                                            shortcutText: appState.isCommandKeyPressed ? "⌘P" : nil,
+                                            shortcutText: appState.isCommandKeyPressed ? KeyboardShortcutStore.shared.shortcut(forID: "history.search")?.displayString : nil,
                                             isHovered: isSearchCardHovered
                                         ) {
                                             HistorySearchWindowController.shared.show()
@@ -203,6 +205,9 @@ struct TextEditorModeView: View {
                     }
                 }
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .keyboardShortcutsDidChange)) { _ in
+            shortcutRevision += 1
         }
         .alert(NSLocalizedString("Change Title", comment: ""), isPresented: $showRenameAlert) {
             TextField(NSLocalizedString("Change Title", comment: ""), text: $newTitleText)

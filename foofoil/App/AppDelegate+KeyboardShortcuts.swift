@@ -7,13 +7,18 @@
 import AppKit
 
 extension AppDelegate {
-    /// 按当前配置刷新视图/窗口菜单的键位；菜单项以 representedObject 存稳定标识。
+    /// 按当前配置刷新文件/视图/窗口菜单的键位；菜单项以 representedObject 存稳定标识。
     func applyConfiguredKeyboardShortcuts() {
+        applyKeyboardShortcuts(to: fileMenu)
         applyKeyboardShortcuts(to: viewMenu)
         applyKeyboardShortcuts(to: windowMenu)
+        applyKeyboardShortcuts(to: editMenu)
+        applyKeyboardShortcuts(to: goMenu)
+        syncGoMenuKeyEquivalents()
+        updateHistoryMenu()
     }
 
-    private func applyKeyboardShortcuts(to menu: NSMenu?) {
+    func applyKeyboardShortcuts(to menu: NSMenu?) {
         guard let menu else { return }
         for item in menu.items {
             guard let identifier = item.representedObject as? String,
@@ -55,6 +60,11 @@ extension AppDelegate {
             keys.insert(unshifted)
         }
         return keys
+    }
+
+    /// 总览与主菜单共用当前配置，并支持 Shift 产生的符号键。
+    func matchesShortcut(_ event: NSEvent, definition: KeyboardShortcutDefinition) -> Bool {
+        KeyboardShortcutStore.shared.matches(event, identifier: definition.id)
     }
 
     private static let shiftedKeys: [String: String] = [

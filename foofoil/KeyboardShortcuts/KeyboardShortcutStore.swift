@@ -33,6 +33,28 @@ final class KeyboardShortcutStore {
         }
     }
 
+    func shortcut(forID identifier: String) -> KeyboardShortcut? {
+        guard let definition = KeyboardShortcutCatalog.definition(withID: identifier) else { return nil }
+        return shortcut(for: definition)
+    }
+
+    func matches(_ event: NSEvent, identifier: String) -> Bool {
+        guard let shortcut = shortcut(forID: identifier),
+              let characters = event.charactersIgnoringModifiers else { return false }
+        let key = KeyboardShortcut.normalizedKeyEquivalent(characters)
+        let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        // 仅符号键允许隐含 Shift，字母组合必须精确匹配。
+        return ((key == shortcut.keyEquivalent || (key.isEmpty && shortcut.carbonKeyCode == UInt32(event.keyCode)))
+                && modifiers == shortcut.modifiers)
+            || (characters == "+" && shortcut.keyEquivalent == "+"
+                && modifiers.subtracting(.shift) == shortcut.modifiers)
+    }
+
+    func usesDefault(_ identifier: String) -> Bool {
+        guard let definition = KeyboardShortcutCatalog.definition(withID: identifier) else { return false }
+        return !isCustomized(definition)
+    }
+
     func isCustomized(_ definition: KeyboardShortcutDefinition) -> Bool {
         overrides[definition.id] != nil
     }

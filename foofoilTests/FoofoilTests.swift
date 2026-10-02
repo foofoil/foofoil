@@ -1483,6 +1483,84 @@ struct FoofoilTests {
         #expect(!appDelegate.matchesConfigurableShortcut(commandShiftY))
     }
 
+
+    @Test func customNavigationSurvivesMenuRefreshAndDisable() throws {
+        let definition = try #require(KeyboardShortcutCatalog.definition(withID: "go.nextItem"))
+        let store = KeyboardShortcutStore.shared
+        let wasCustomized = store.isCustomized(definition)
+        let previous = store.shortcut(for: definition)
+        defer {
+            if wasCustomized { store.setShortcut(previous, for: definition) }
+            else { store.reset(definition) }
+        }
+        let menu = NSMenu()
+        let item = NSMenuItem(title: "Next", action: nil, keyEquivalent: "")
+        item.tag = GoMenuItemTag.fileListNext
+        menu.addItem(item)
+        let alternate = NSMenuItem(title: "Next", action: nil, keyEquivalent: "n")
+        alternate.tag = GoMenuItemTag.fileListExtra
+        alternate.representedObject = "n"
+        menu.addItem(alternate)
+
+        store.setShortcut(KeyboardShortcut(keyEquivalent: "j", modifiers: [.command, .shift]), for: definition)
+        AppDelegate.syncGoMenuKeyEquivalents(in: menu, isPDFDocument: false, hasFileList: true)
+        #expect(item.keyEquivalent == "j")
+        #expect(item.keyEquivalentModifierMask == [.command, .shift])
+        #expect(alternate.keyEquivalent.isEmpty)
+        AppDelegate.syncGoMenuKeyEquivalents(in: menu, isPDFDocument: false, hasFileList: false)
+        #expect(item.keyEquivalent.isEmpty)
+        store.setShortcut(nil, for: definition)
+        AppDelegate.syncGoMenuKeyEquivalents(in: menu, isPDFDocument: false, hasFileList: true)
+        #expect(item.keyEquivalent.isEmpty)
+        #expect(alternate.keyEquivalent.isEmpty)
+    }
+
+    @Test func customLocalShortcutsReplaceOldKeysAndCanBeCleared() throws {
+        let store = KeyboardShortcutStore.shared
+        for identifier in ["playback.toggle", "playback.backward", "go.previousPage", "file.openClipboardContent"] {
+            let definition = try #require(KeyboardShortcutCatalog.definition(withID: identifier))
+            let wasCustomized = store.isCustomized(definition)
+            let previous = store.shortcut(for: definition)
+            defer {
+                if wasCustomized { store.setShortcut(previous, for: definition) }
+                else { store.reset(definition) }
+            }
+            let original = try #require(definition.defaultShortcut)
+            let oldEvent = try #require(shortcutEvent(original.keyEquivalent, modifiers: original.modifiers))
+            let customEvent = try #require(shortcutEvent("j", modifiers: [.command, .shift]))
+            store.setShortcut(KeyboardShortcut(keyEquivalent: "j", modifiers: [.command, .shift]), for: definition)
+            #expect(store.matches(customEvent, identifier: identifier))
+            #expect(!store.matches(oldEvent, identifier: identifier))
+            #expect(!store.matches(try #require(shortcutEvent("j", modifiers: [.command])), identifier: identifier))
+            store.setShortcut(nil, for: definition)
+            #expect(!store.matches(customEvent, identifier: identifier))
+            #expect(!store.matches(oldEvent, identifier: identifier))
+        }
+    }
+
+    @Test func historyRebuildUsesConfiguredKeysAndKeepsConfigPayload() throws {
+        let definition = try #require(KeyboardShortcutCatalog.definition(withID: "history.openRecent1"))
+        let store = KeyboardShortcutStore.shared
+        let wasCustomized = store.isCustomized(definition)
+        let previous = store.shortcut(for: definition)
+        defer {
+            if wasCustomized { store.setShortcut(previous, for: definition) }
+            else { store.reset(definition) }
+        }
+        let delegate = AppDelegate()
+        delegate.historyMenu = NSMenu()
+        let config = WindowConfig(id: UUID(), text: "Shortcut test")
+        store.setShortcut(KeyboardShortcut(keyEquivalent: "1", modifiers: [.control, .option]), for: definition)
+        delegate.updateHistoryMenu(preloadedConfigs: [config])
+        let item = try #require(delegate.historyMenu?.items.first { $0.representedObject is WindowConfig })
+        #expect(item.keyEquivalent == "1")
+        #expect(item.keyEquivalentModifierMask == [.control, .option])
+        #expect((item.representedObject as? WindowConfig)?.id == config.id)
+        store.setShortcut(nil, for: definition)
+        delegate.updateHistoryMenu(preloadedConfigs: [config])
+        #expect(delegate.historyMenu?.items.first { $0.representedObject is WindowConfig }?.keyEquivalent == "")
+    }
+
     /// 合成按键事件，用于核对键位匹配。
     private func shortcutEvent(_ characters: String, modifiers: NSEvent.ModifierFlags) -> NSEvent? {
         NSEvent.keyEvent(

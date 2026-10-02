@@ -173,6 +173,7 @@ struct PDFModeView: NSViewRepresentable {
             )
             pinItem.withSymbol("pin")
             pinItem.keyEquivalentModifierMask = [.command]
+            pinItem.applyConfiguredShortcut("view.togglePin")
             pinItem.target = self
             pinItem.state = appState.isPinned ? .on : .off
             menu.addItem(pinItem)
@@ -185,6 +186,7 @@ struct PDFModeView: NSViewRepresentable {
                 )
                 borderItem.withSymbol("rectangle")
                 borderItem.keyEquivalentModifierMask = [.command]
+                borderItem.applyConfiguredShortcut("view.toggleBorder")
                 borderItem.target = self
                 borderItem.state = appState.showBorder ? .on : .off
                 menu.addItem(borderItem)
@@ -199,6 +201,7 @@ struct PDFModeView: NSViewRepresentable {
             )
             previousPageItem.withSymbol("chevron.left")
             previousPageItem.keyEquivalentModifierMask = []
+            previousPageItem.applyConfiguredShortcut("go.previousPage")
             previousPageItem.target = self
             menu.addItem(previousPageItem)
 
@@ -209,6 +212,7 @@ struct PDFModeView: NSViewRepresentable {
             )
             nextPageItem.withSymbol("chevron.right")
             nextPageItem.keyEquivalentModifierMask = []
+            nextPageItem.applyConfiguredShortcut("go.nextPage")
             nextPageItem.target = self
             menu.addItem(nextPageItem)
 
@@ -219,6 +223,7 @@ struct PDFModeView: NSViewRepresentable {
             )
             goToPageItem.withSymbol("number.square")
             goToPageItem.keyEquivalentModifierMask = [.command]
+            goToPageItem.applyConfiguredShortcut("go.goToPage")
             goToPageItem.target = self
             menu.addItem(goToPageItem)
 
@@ -241,6 +246,7 @@ struct PDFModeView: NSViewRepresentable {
             )
             resetItem.withSymbol("arrow.counterclockwise")
             resetItem.keyEquivalentModifierMask = [.command]
+            resetItem.applyConfiguredShortcut("file.reset")
             resetItem.target = self
             menu.addItem(resetItem)
 

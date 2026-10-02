@@ -593,33 +593,22 @@ extension AppState {
             return true
         }
         guard fileList?.isPresentable == true, !isPDFDocument else { return false }
+        let shortcuts = KeyboardShortcutStore.shared
         let modifiers = KeyboardShortcut.effectiveModifiers(for: event)
-        if modifiers.isEmpty {
-            if event.keyCode == 123 || event.keyCode == 124, isExternalMediaDocument {
-                return false
-            }
-            switch event.keyCode {
-            case 123, 126:
-                activateAdjacentFileListItem(delta: -1)
+        let key = event.charactersIgnoringModifiers?.lowercased()
+        for (identifier, delta, arrow, aliases) in [
+            ("go.previousItem", -1, UInt16(123), ["p", "b"]),
+            ("go.nextItem", 1, UInt16(124), ["n", "f"])
+        ] {
+            let legacyAlias = shortcuts.usesDefault(identifier)
+                && ((modifiers.isEmpty && event.keyCode == arrow && !isExternalMediaDocument)
+                    || (modifiers == .control && aliases.contains(key ?? "")))
+            if shortcuts.matches(event, identifier: identifier) || legacyAlias {
+                activateAdjacentFileListItem(delta: delta)
                 return true
-            case 124, 125:
-                activateAdjacentFileListItem(delta: 1)
-                return true
-            default:
-                return false
             }
         }
-        guard modifiers == .control else { return false }
-        switch event.charactersIgnoringModifiers?.lowercased() {
-        case "n", "f":
-            activateAdjacentFileListItem(delta: 1)
-            return true
-        case "p", "b":
-            activateAdjacentFileListItem(delta: -1)
-            return true
-        default:
-            return false
-        }
+        return false
     }
 
     func advanceFileListAfterPlayback() {

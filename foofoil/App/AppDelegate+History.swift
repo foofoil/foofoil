@@ -60,7 +60,9 @@ extension AppDelegate {
 
         let searchItem = NSMenuItem(title: NSLocalizedString("Search History Menu Item", comment: ""), action: #selector(showHistorySearchAction), keyEquivalent: "p")
         searchItem.withSymbol("magnifyingglass")
-        searchItem.keyEquivalentModifierMask = [.command]
+        let searchShortcut = KeyboardShortcutStore.shared.shortcut(forID: "history.search")
+        searchItem.keyEquivalent = searchShortcut?.keyEquivalent ?? ""
+        searchItem.keyEquivalentModifierMask = searchShortcut?.modifiers ?? []
         searchItem.target = self
         historyMenu.addItem(searchItem)
         historyMenu.addItem(NSMenuItem.separator())
@@ -80,8 +82,10 @@ extension AppDelegate {
                     title = NSLocalizedString("Untitled Note", comment: "")
                 }
 
-                let keyEquivalent = index < 9 ? "\(index + 1)" : ""
+                let shortcut = KeyboardShortcutStore.shared.shortcut(forID: "history.openRecent\(index + 1)")
+                let keyEquivalent = shortcut?.keyEquivalent ?? ""
                 let item = NSMenuItem(title: title, action: #selector(openHistoryItemAction(_:)), keyEquivalent: keyEquivalent)
+                item.keyEquivalentModifierMask = shortcut?.modifiers ?? []
                 item.image = NSImage(systemSymbolName: config.historyMenuSymbolName, accessibilityDescription: nil)
                 item.representedObject = config
                 item.target = self

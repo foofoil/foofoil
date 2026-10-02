@@ -28,6 +28,11 @@ nonisolated struct KeyboardShortcutDefinition: Identifiable, Hashable {
 /// 快捷键配置分组；新增其他快捷键时在此追加 section，设置界面按分组渲染。
 /// 声明顺序即设置界面的分组顺序。
 nonisolated enum KeyboardShortcutSection: String, CaseIterable, Identifiable {
+    case global
+    case file
+    case go
+    case playback
+    case history
     case view
     case window
 
@@ -35,6 +40,11 @@ nonisolated enum KeyboardShortcutSection: String, CaseIterable, Identifiable {
 
     var titleKey: String {
         switch self {
+        case .global: return "Global"
+        case .file: return "File"
+        case .go: return "Go"
+        case .playback: return "Shortcut Playback"
+        case .history: return "History"
         case .view: return "View"
         case .window: return "Window"
         }
@@ -42,6 +52,11 @@ nonisolated enum KeyboardShortcutSection: String, CaseIterable, Identifiable {
 
     var definitions: [KeyboardShortcutDefinition] {
         switch self {
+        case .global: return KeyboardShortcutCatalog.global
+        case .file: return KeyboardShortcutCatalog.file
+        case .go: return KeyboardShortcutCatalog.go
+        case .playback: return KeyboardShortcutCatalog.playback
+        case .history: return KeyboardShortcutCatalog.history
         case .view: return KeyboardShortcutCatalog.view
         case .window: return KeyboardShortcutCatalog.window
         }
@@ -50,6 +65,43 @@ nonisolated enum KeyboardShortcutSection: String, CaseIterable, Identifiable {
 
 nonisolated enum KeyboardShortcutCatalog {
     static var sections: [KeyboardShortcutSection] { KeyboardShortcutSection.allCases }
+
+    static let global: [KeyboardShortcutDefinition] = [
+        definition("window.showAllFoils", "Foil Overview", "\u{1B}", [.control, .shift]),
+        definition("global.openClipboardContent", "Open Clipboard Content", nil, [])
+    ]
+
+    static let openClipboardContent = definition("file.openClipboardContent", "Open Clipboard Content", "v", [.command, .shift])
+
+    static let file: [KeyboardShortcutDefinition] = [
+        definition("file.addToList", "Add to List...", nil, []),
+        openClipboardContent,
+        definition("file.openURL", "Open URL Menu Item", "l", [.command]),
+        definition("file.share", "Share...", nil, []),
+        definition("file.openInBrowser", "Shortcut Open in Browser", nil, [], "Shortcut Scope Web"),
+        definition("file.copyURL", "Copy URL", "c", [.command, .option], "Shortcut Scope Web"),
+        definition("file.reset", "Reset", "k", [.command])
+    ]
+
+    static let go: [KeyboardShortcutDefinition] = [
+        definition("go.previousPage", "Previous Page", "\u{F702}", [], "Shortcut Scope PDF"),
+        definition("go.nextPage", "Next Page", "\u{F703}", [], "Shortcut Scope PDF"),
+        definition("go.goToPage", "Go to Page Menu Item", "g", [.command], "Shortcut Scope PDF"),
+        definition("go.previousItem", "Previous Item", "\u{F700}", [], "Shortcut Scope Lists"),
+        definition("go.nextItem", "Next Item", "\u{F701}", [], "Shortcut Scope Lists")
+    ]
+
+    static let playback: [KeyboardShortcutDefinition] = [
+        definition("playback.toggle", "Shortcut Play Pause", " ", [], "Shortcut Scope Media"),
+        definition("playback.backward", "Shortcut Seek Backward", "\u{F702}", [], "Shortcut Scope Media"),
+        definition("playback.forward", "Shortcut Seek Forward", "\u{F703}", [], "Shortcut Scope Media")
+    ]
+
+    static let history: [KeyboardShortcutDefinition] = [
+        definition("history.search", "Search History Menu Item", "p", [.command])
+    ] + (1...9).map {
+        definition("history.openRecent\($0)", "Shortcut Open Recent \($0)", String($0), [.command])
+    }
 
     /// 视图菜单的全部命令；顺序与菜单一致。默认值与菜单首次建立时保持一致。
     static let view: [KeyboardShortcutDefinition] = [
@@ -85,7 +137,6 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("window.moveBottomLeft", "Bottom-Left", "z"),
         definition("window.moveBottom", "Bottom", "x"),
         definition("window.moveBottomRight", "Bottom-Right", "c"),
-        definition("window.showAllFoils", "Foil Overview", "\u{1B}", [.control, .shift]),
         definition("window.moveToNextScreen", "Move to Next Screen", "\t")
     ]
 

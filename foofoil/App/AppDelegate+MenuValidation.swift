@@ -87,31 +87,35 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
 
     /// 独立成静态方法便于直接验证键位策略：主键位（菜单里展示的那个）与隐藏备用键位一起刷新。
     static func syncGoMenuKeyEquivalents(in menu: NSMenu, isPDFDocument: Bool, hasFileList: Bool) {
-        let left = String(UnicodeScalar(NSLeftArrowFunctionKey)!)
-        let right = String(UnicodeScalar(NSRightArrowFunctionKey)!)
-        let up = String(UnicodeScalar(NSUpArrowFunctionKey)!)
-        let down = String(UnicodeScalar(NSDownArrowFunctionKey)!)
-
         for item in menu.items {
+            let identifier: String
+            let isActive: Bool
             switch item.tag {
             case GoMenuItemTag.pdfPrevious:
-                item.keyEquivalent = isPDFDocument ? left : ""
-                item.keyEquivalentModifierMask = []
+                identifier = "go.previousPage"
+                isActive = isPDFDocument
             case GoMenuItemTag.pdfNext:
-                item.keyEquivalent = isPDFDocument ? right : ""
-                item.keyEquivalentModifierMask = []
+                identifier = "go.nextPage"
+                isActive = isPDFDocument
             case GoMenuItemTag.fileListPrevious:
-                item.keyEquivalent = hasFileList ? up : ""
-                item.keyEquivalentModifierMask = []
+                identifier = "go.previousItem"
+                isActive = hasFileList
             case GoMenuItemTag.fileListNext:
-                item.keyEquivalent = hasFileList ? down : ""
-                item.keyEquivalentModifierMask = []
+                identifier = "go.nextItem"
+                isActive = hasFileList
             case GoMenuItemTag.fileListExtra:
                 let assigned = item.representedObject as? String ?? ""
-                item.keyEquivalent = hasFileList ? assigned : ""
+                let primary = ["p", "b"].contains(assigned) ? "go.previousItem" : "go.nextItem"
+                item.keyEquivalent = hasFileList && KeyboardShortcutStore.shared.usesDefault(primary) ? assigned : ""
+                continue
             default:
-                break
+                guard item.action == #selector(goToPDFPageAction) else { continue }
+                identifier = "go.goToPage"
+                isActive = isPDFDocument
             }
+            let shortcut = isActive ? KeyboardShortcutStore.shared.shortcut(forID: identifier) : nil
+            item.keyEquivalent = shortcut?.keyEquivalent ?? ""
+            item.keyEquivalentModifierMask = shortcut?.modifiers ?? []
         }
     }
 

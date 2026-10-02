@@ -170,16 +170,14 @@ public class FloatingWindow: NSWindow {
 
         // PDF 翻页使用窗口级键盘事件，避免焦点落在 PDFView 的子视图时快捷键失效。
         if event.type == .keyDown,
-           modifiers.isEmpty,
            let controller = self.windowController as? FloatingWindowController,
            controller.appState.isPDFDocument {
             let notificationName: Notification.Name?
-            switch event.keyCode {
-            case 123: // 左方向键
+            if KeyboardShortcutStore.shared.matches(event, identifier: "go.previousPage") {
                 notificationName = .shouldGoToPreviousPDFPage
-            case 124: // 右方向键
+            } else if KeyboardShortcutStore.shared.matches(event, identifier: "go.nextPage") {
                 notificationName = .shouldGoToNextPDFPage
-            default:
+            } else {
                 notificationName = nil
             }
 
@@ -191,32 +189,14 @@ public class FloatingWindow: NSWindow {
                 )
                 return
             }
+            // 清除或改写翻页键后，不能再由 PDFKit 的原生方向键处理恢复旧行为。
+            if modifiers.isEmpty {
+                let identifier = event.keyCode == 123 ? "go.previousPage" : event.keyCode == 124 ? "go.nextPage" : nil
+                if let identifier, !KeyboardShortcutStore.shared.usesDefault(identifier) { return }
+            }
         }
 
-        // 音视频模式使用窗口级空格键切换播放/暂停；忽略按住空格产生的重复事件。
-        if event.type == .keyDown,
-           modifiers.isEmpty,
-           event.keyCode == 49,
-           !event.isARepeat,
-           let controller = self.windowController as? FloatingWindowController,
-           controller.appState.isExternalMediaDocument {
-            NotificationCenter.default.post(
-                name: .shouldToggleVideoPlayback,
-                object: nil,
-                userInfo: ["id": controller.appState.id]
-            )
-            return
-        }
-
-        // 音视频模式左右方向键按设置步长快退/快进；上/下仍由列表切项处理。
-        if event.type == .keyDown,
-           modifiers.isEmpty,
-           (event.keyCode == 123 || event.keyCode == 124),
-           let controller = self.windowController as? FloatingWindowController,
-           controller.appState.isExternalMediaDocument {
-            postMediaSeek(keyCode: event.keyCode, for: controller.appState)
-            return
-        }
+        if event.type == .keyDown, handleMediaShortcut(event) { return }
 
         // 无边框 PDF 的缩放只调整窗口；手势结束后再由 PDFKit 适配新的窗口尺寸。
         if let controller = self.windowController as? FloatingWindowController,
@@ -338,6 +318,38 @@ public class FloatingWindow: NSWindow {
         }
 
         super.sendEvent(event)
+    }
+
+    /// 播放控制在内容视图前匹配，设置变更后旧键位不再触发。
+    private func handleMediaShortcut(_ event: NSEvent) -> Bool {
+        guard let controller = windowController as? FloatingWindowController,
+              controller.appState.isExternalMediaDocument else { return false }
+        let shortcuts = KeyboardShortcutStore.shared
+        if shortcuts.matches(event, identifier: "playback.toggle") {
+            if !event.isARepeat {
+                NotificationCenter.default.post(name: .shouldToggleVideoPlayback, object: nil,
+                                                userInfo: ["id": controller.appState.id])
+            }
+            return true
+        }
+        for (identifier, keyCode) in [("playback.backward", UInt16(123)), ("playback.forward", UInt16(124))] {
+            if shortcuts.matches(event, identifier: identifier) {
+                postMediaSeek(keyCode: keyCode, for: controller.appState)
+                return true
+            }
+        }
+        // AVPlayerView 也有原生空格与方向键处理，改键后截住旧默认键。
+        if KeyboardShortcut.effectiveModifiers(for: event).isEmpty {
+            let identifier: String?
+            switch event.keyCode {
+            case 49: identifier = "playback.toggle"
+            case 123: identifier = "playback.backward"
+            case 124: identifier = "playback.forward"
+            default: identifier = nil
+            }
+            if let identifier, !shortcuts.usesDefault(identifier) { return true }
+        }
+        return false
     }
 
     /// 左右方向键快退/快进：步长实时读取设置，通知由当前窗口的媒体控制器消费。
@@ -534,14 +546,7 @@ public class FloatingWindow: NSWindow {
         let modifiers = KeyboardShortcut.effectiveModifiers(for: event)
         let delegate = NSApplication.shared.delegate as? AppDelegate
 
-        // 音视频左右方向键先于主菜单与内容视图处理；图片等列表类型仍走上面的左右翻页。
-        if let controller = windowController as? FloatingWindowController,
-           controller.appState.isExternalMediaDocument,
-           modifiers.isEmpty,
-           event.keyCode == 123 || event.keyCode == 124 {
-            postMediaSeek(keyCode: event.keyCode, for: controller.appState)
-            return true
-        }
+        if handleMediaShortcut(event) { return true }
 
         // 默认全屏键 ⌃⌘F：保持窗口直属切换，避免内容视图吞键。
         if delegate?.isUsingDefaultShortcut("view.toggleFullScreen") == true,
@@ -594,16 +599,9 @@ public class FloatingWindow: NSWindow {
             }
         }
 
-        // ⇧⌘v 直接打开剪贴板内容；不是可配置的菜单命令，保留窗口直属处理。
-        if modifiers == [.command, .shift],
-           event.charactersIgnoringModifiers?.lowercased() == "v" {
-            if delegate?.openClipboardContentInNewWindow() == true {
-                return true
-            }
-        }
-
         // 内容放大同时接受不带 Shift 的 ⌘=，与菜单里的 ⌘+ 互补。
-        if modifiers == .command,
+        if delegate?.isUsingDefaultShortcut("view.zoomInContent") == true,
+           modifiers == .command,
            event.charactersIgnoringModifiers == "=",
            let controller = windowController as? FloatingWindowController {
             controller.zoomIn()

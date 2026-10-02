@@ -92,17 +92,20 @@ extension AppDelegate {
             keyEquivalent: ""
         )
         addToListItem.withSymbol("plus.rectangle.on.folder")
+        addToListItem.representedObject = "file.addToList"
         addToListItem.target = self
         fileMenu.addItem(addToListItem)
 
         let openClipboardContentItem = NSMenuItem(title: NSLocalizedString("Open Clipboard Content", comment: ""), action: #selector(openClipboardContentAction), keyEquivalent: "v")
         openClipboardContentItem.withSymbol("doc.on.clipboard")
         openClipboardContentItem.keyEquivalentModifierMask = [.command, .shift]
+        openClipboardContentItem.representedObject = KeyboardShortcutCatalog.openClipboardContent.id
         openClipboardContentItem.target = self
         fileMenu.addItem(openClipboardContentItem)
 
         let openWebURLItem = NSMenuItem(title: NSLocalizedString("Open URL Menu Item", comment: ""), action: #selector(openWebURLAction), keyEquivalent: "l")
         openWebURLItem.withSymbol("link")
+        openWebURLItem.representedObject = "file.openURL"
         openWebURLItem.target = self
         fileMenu.addItem(openWebURLItem)
 
@@ -114,6 +117,7 @@ extension AppDelegate {
 
         let shareItem = NSMenuItem(title: NSLocalizedString("Share...", comment: ""), action: #selector(shareAction), keyEquivalent: "")
         shareItem.withSymbol("square.and.arrow.up")
+        shareItem.representedObject = "file.share"
         shareItem.target = self
         fileMenu.addItem(shareItem)
 
@@ -123,6 +127,7 @@ extension AppDelegate {
             keyEquivalent: ""
         )
         openInDefaultBrowserItem.withSymbol("safari")
+        openInDefaultBrowserItem.representedObject = "file.openInBrowser"
         openInDefaultBrowserItem.target = self
         fileMenu.addItem(openInDefaultBrowserItem)
 
@@ -132,6 +137,7 @@ extension AppDelegate {
             keyEquivalent: ""
         )
         copyWebURLItem.withSymbol("link")
+        copyWebURLItem.representedObject = "file.copyURL"
         copyWebURLItem.target = self
         fileMenu.addItem(copyWebURLItem)
 
@@ -140,6 +146,7 @@ extension AppDelegate {
         let resetContentItem = NSMenuItem(title: NSLocalizedString("Reset", comment: ""), action: #selector(resetContentAction), keyEquivalent: "k")
         resetContentItem.withSymbol("arrow.counterclockwise")
         resetContentItem.keyEquivalentModifierMask = [.command]
+        resetContentItem.representedObject = "file.reset"
         resetContentItem.target = self
         fileMenu.addItem(resetContentItem)
 
@@ -174,6 +181,7 @@ extension AppDelegate {
         )
         previousPageItem.withSymbol("chevron.left")
         previousPageItem.tag = GoMenuItemTag.pdfPrevious
+        previousPageItem.representedObject = "go.previousPage"
         previousPageItem.target = self
         goMenu.addItem(previousPageItem)
 
@@ -184,6 +192,7 @@ extension AppDelegate {
         )
         nextPageItem.withSymbol("chevron.right")
         nextPageItem.tag = GoMenuItemTag.pdfNext
+        nextPageItem.representedObject = "go.nextPage"
         nextPageItem.target = self
         goMenu.addItem(nextPageItem)
 
@@ -194,6 +203,7 @@ extension AppDelegate {
         )
         previousItem.withSymbol("chevron.left")
         previousItem.tag = GoMenuItemTag.fileListPrevious
+        previousItem.representedObject = "go.previousItem"
         previousItem.target = self
         goMenu.addItem(previousItem)
 
@@ -204,6 +214,7 @@ extension AppDelegate {
         )
         nextItem.withSymbol("chevron.right")
         nextItem.tag = GoMenuItemTag.fileListNext
+        nextItem.representedObject = "go.nextItem"
         nextItem.target = self
         goMenu.addItem(nextItem)
 
@@ -251,6 +262,7 @@ extension AppDelegate {
         let goToPageItem = NSMenuItem(title: NSLocalizedString("Go to Page Menu Item", comment: ""), action: #selector(goToPDFPageAction), keyEquivalent: "g")
         goToPageItem.withSymbol("number.square")
         goToPageItem.keyEquivalentModifierMask = [.command]
+        goToPageItem.representedObject = "go.goToPage"
         goToPageItem.target = self
         goMenu.addItem(goToPageItem)
 
@@ -565,6 +577,7 @@ extension AppDelegate {
 
     func rebuildEditMenu(_ menu: NSMenu) {
         menu.removeAllItems()
+        defer { applyKeyboardShortcuts(to: menu) }
 
         if activeAppState?.imageURL != nil, activeAppState?.webURL == nil {
             // 视频/音频没有“拷贝图片”能力，不提供该菜单项。
@@ -609,6 +622,7 @@ extension AppDelegate {
             )
             copyURLItem.withSymbol("link")
             copyURLItem.keyEquivalentModifierMask = [.command, .option]
+            copyURLItem.representedObject = "file.copyURL"
             copyURLItem.target = self
             menu.addItem(copyURLItem)
         }

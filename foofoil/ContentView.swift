@@ -243,13 +243,13 @@ public struct ContentView: View {
             Toggle(isOn: $appState.isPinned) {
                 Label(NSLocalizedString("Toggle Pin (ContextMenu)", comment: ""), systemImage: "pin")
             }
-                .keyboardShortcut("t", modifiers: [.command])
+                .configuredKeyboardShortcut("view.togglePin")
 
             if !appState.isFullScreen && (appState.imageURL != nil || appState.webURL != nil) {
                 Toggle(isOn: $appState.showBorder) {
                     Label(NSLocalizedString("Border (ContextMenu)", comment: ""), systemImage: "rectangle")
                 }
-                    .keyboardShortcut("b", modifiers: [.command])
+                    .configuredKeyboardShortcut("view.toggleBorder")
             }
 
             if appState.canToggleImageListSlideshow {
@@ -259,6 +259,7 @@ public struct ContentView: View {
                 )) {
                     Label(NSLocalizedString("Slideshow (ContextMenu)", comment: ""), systemImage: "play.rectangle")
                 }
+                .configuredKeyboardShortcut("view.slideshow")
             }
 
             if appState.imageURL != nil, appState.webURL == nil {
@@ -278,6 +279,7 @@ public struct ContentView: View {
                     }) {
                         Label(NSLocalizedString("Select Color", comment: ""), systemImage: "eyedropper")
                     }
+                    .configuredKeyboardShortcut("view.selectColor")
                 }
 
                 if appState.effectiveShowBorder {
@@ -290,7 +292,7 @@ public struct ContentView: View {
                     }) {
                         Label(NSLocalizedString("Fit Window to Image", comment: ""), systemImage: "rectangle.inset.filled")
                     }
-                    .keyboardShortcut("[", modifiers: [.command])
+                    .configuredKeyboardShortcut("view.fitWindowToImage")
 
                     Button(action: {
                         NotificationCenter.default.post(
@@ -301,7 +303,7 @@ public struct ContentView: View {
                     }) {
                         Label(NSLocalizedString("Fit Image to Window Width", comment: ""), systemImage: "arrow.left.and.right")
                     }
-                    .keyboardShortcut("]", modifiers: [.command])
+                    .configuredKeyboardShortcut("view.fitImageToWindowWidth")
                 }
             }
 
@@ -312,7 +314,7 @@ public struct ContentView: View {
             }) {
                 Label(NSLocalizedString("Reset (ContextMenu)", comment: ""), systemImage: "arrow.counterclockwise")
             }
-            .keyboardShortcut("k", modifiers: [.command])
+            .configuredKeyboardShortcut("file.reset")
 
             Button(action: {
                 NotificationCenter.default.post(

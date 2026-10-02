@@ -322,6 +322,7 @@ final class FoilExposeController {
     private var model: FoilExposeModel?
     private var keyMonitor: Any?
     private var showAllHotKeyRef: EventHotKeyRef?
+    private var clipboardHotKeyRef: EventHotKeyRef?
     private var hotKeyHandler: EventHandlerRef?
     /// 系统面板（文件选择、授权）展示期间：覆盖层让出焦点，键盘监听放行，避免误操作覆盖层。
     private var isPresentingSystemUI = false
@@ -345,7 +346,7 @@ final class FoilExposeController {
 
     var isShowing: Bool { model != nil }
 
-    /// 启动入口：安装事件处理器并按当前配置注册“浮箔总览”的全局热键。
+    /// 启动入口：安装事件处理器并按当前配置注册总览与剪贴板全局热键。
     /// 经 Carbon RegisterEventHotKey，浮箔未激活时也能唤起覆盖层；不需要输入监控或辅助功能权限。
     func installGlobalHotKey() {
         installEventHandlerIfNeeded()
@@ -353,21 +354,25 @@ final class FoilExposeController {
     }
 
     /// 快捷键配置变更后重新注册全局热键。
-    /// 仅当组合键含 Control/Option 且能映射为 Carbon 键码时才全局注册，避免吞掉系统常用快捷键。
+    /// 仅注册带修饰键且能映射为 Carbon 键码的组合。
     func applyConfiguredGlobalHotKey() {
         installEventHandlerIfNeeded()
         if let showAllHotKeyRef {
             _ = UnregisterEventHotKey(showAllHotKeyRef)
             self.showAllHotKeyRef = nil
         }
+        if let clipboardHotKeyRef {
+            _ = UnregisterEventHotKey(clipboardHotKeyRef)
+            self.clipboardHotKeyRef = nil
+        }
+        clipboardHotKeyRef = registerGlobalHotKey(definitionID: "global.openClipboardContent", id: 2)
         showAllHotKeyRef = registerGlobalHotKey(definitionID: "window.showAllFoils", id: 1)
     }
 
     private func registerGlobalHotKey(definitionID: String, id: UInt32) -> EventHotKeyRef? {
         guard let definition = KeyboardShortcutCatalog.definition(withID: definitionID),
               let shortcut = KeyboardShortcutStore.shared.shortcut(for: definition) else { return nil }
-        let modifiers = shortcut.modifiers
-        guard modifiers.contains(.control) || modifiers.contains(.option),
+        guard shortcut.hasRequiredModifiers,
               let keyCode = shortcut.carbonKeyCode else { return nil }
 
         var hotKey: EventHotKeyRef?
@@ -396,9 +401,19 @@ final class FoilExposeController {
         var handler: EventHandlerRef?
         let status = InstallEventHandler(
             GetApplicationEventTarget(),
-            { _, _, _ in
+            { _, event, _ in
+                var hotKeyID = EventHotKeyID()
+                guard let event,
+                      GetEventParameter(event, EventParamName(kEventParamDirectObject),
+                                        EventParamType(typeEventHotKeyID), nil,
+                                        MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID) == noErr,
+                      hotKeyID.signature == OSType(0x464F_494C) else { return OSStatus(eventNotHandledErr) }
                 MainActor.assumeIsolated {
-                    FoilExposeController.shared.handleGlobalHotKey()
+                    if hotKeyID.id == 2 {
+                        FoilExposeController.shared.openClipboard()
+                    } else if hotKeyID.id == 1 {
+                        FoilExposeController.shared.handleGlobalHotKey()
+                    }
                 }
                 return noErr
             },
@@ -633,7 +648,7 @@ final class FoilExposeController {
         }
     }
 
-    /// 点击剪贴板提示：先收起覆盖层，再打开剪贴板内容（与放行 ⌘⇧V 给菜单动作等价）。
+    /// 剪贴板提示与快捷键共用入口：先收起覆盖层，再打开剪贴板内容。
     private func openClipboard() {
         dismiss()
         NSApp.activate(ignoringOtherApps: true)
@@ -677,20 +692,22 @@ final class FoilExposeController {
             let key = event.charactersIgnoringModifiers?.lowercased()
             let onlyCommand = modifiers.contains(.command)
                 && !modifiers.contains(.control) && !modifiers.contains(.option) && !modifiers.contains(.shift)
-            let commandShift = modifiers.contains(.command) && modifiers.contains(.shift)
-                && !modifiers.contains(.control) && !modifiers.contains(.option)
             let hasCommand = modifiers.contains(.command)
             let hasOption = modifiers.contains(.option)
             let hasControl = modifiers.contains(.control)
             // 输入法正在组合文字时，Esc / 回车 / Tab 留给输入法自己处理（取消候选、上屏）。
             let isComposing = (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true
-            // ⌘O/⌘P/⌘L/⌘⇧V 会打开文件对话框、历史搜索等新视图：先收起覆盖层再放行给菜单，
-            // 避免打开的内容被覆盖层挡住。
-            if onlyCommand, key == "o" || key == "p" || key == "l" {
-                self.dismiss()
-                return event
+            if let delegate = NSApp.delegate as? AppDelegate,
+               delegate.matchesShortcut(event, definition: KeyboardShortcutCatalog.openClipboardContent) {
+                self.openClipboard()
+                return nil
             }
-            if commandShift, key == "v" {
+            // ⌘O/⌘P/⌘L 会打开文件对话框、历史搜索等新视图：先收起覆盖层再放行给菜单，
+            // 避免打开的内容被覆盖层挡住。
+            let opensAnotherView = ["file.openURL", "history.search"].contains {
+                KeyboardShortcutStore.shared.matches(event, identifier: $0)
+            }
+            if (onlyCommand && key == "o") || opensAnotherView {
                 self.dismiss()
                 return event
             }

@@ -5,11 +5,22 @@
 //  Created by tolg on 2026/9/14.
 //
 
-import Foundation
+import AppKit
 import Testing
 @testable import foofoil
 
 struct FoilExposeShortcutTests {
+    @Test func globalAndFileShortcutGroups() {
+        #expect(KeyboardShortcutCatalog.sections.prefix(2) == [.global, .file])
+        #expect(KeyboardShortcutCatalog.global.map(\.id) == ["window.showAllFoils", "global.openClipboardContent"])
+        #expect(KeyboardShortcutCatalog.global.last?.defaultShortcut == nil)
+        #expect(!KeyboardShortcutCatalog.window.contains { $0.id == "window.showAllFoils" })
+        #expect(KeyboardShortcutCatalog.openClipboardContent.defaultShortcut ==
+                KeyboardShortcut(keyEquivalent: "v", modifiers: [.command, .shift]))
+        let ids = KeyboardShortcutCatalog.sections.flatMap { $0.definitions.map(\.id) }
+        #expect(Set(ids).count == ids.count)
+    }
+
     @Test func indicesZeroThroughEightMapToDigits() {
         #expect(FoilExposeShortcut.key(forIndex: 0) == "1")
         #expect(FoilExposeShortcut.key(forIndex: 4) == "5")

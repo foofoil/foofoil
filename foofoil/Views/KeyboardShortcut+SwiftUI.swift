@@ -51,3 +51,30 @@ extension View {
         }
     }
 }
+
+private struct ConfiguredKeyboardShortcutModifier: ViewModifier {
+    let identifier: String
+    @State private var revision = 0
+
+    func body(content: Content) -> some View {
+        let _ = revision
+        content.optionalKeyboardShortcut(KeyboardShortcutStore.shared.shortcut(forID: identifier))
+            .onReceive(NotificationCenter.default.publisher(for: .keyboardShortcutsDidChange)) { _ in
+                revision += 1
+            }
+    }
+}
+
+extension View {
+    func configuredKeyboardShortcut(_ identifier: String) -> some View {
+        modifier(ConfiguredKeyboardShortcutModifier(identifier: identifier))
+    }
+}
+
+extension NSMenuItem {
+    func applyConfiguredShortcut(_ identifier: String) {
+        let shortcut = KeyboardShortcutStore.shared.shortcut(forID: identifier)
+        keyEquivalent = shortcut?.keyEquivalent ?? ""
+        keyEquivalentModifierMask = shortcut?.modifiers ?? []
+    }
+}

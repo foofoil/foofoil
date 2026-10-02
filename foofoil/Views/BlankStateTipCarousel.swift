@@ -9,6 +9,7 @@ import SwiftUI
 
 // 空白窗口中的随机操作提示。
 struct BlankStateTipCarousel: View {
+    @State private var shortcutRevision = 0
     @State private var displayedTip = ""
     @State private var horizontalOffset: CGFloat = 0
     @State private var isVisible = false
@@ -18,11 +19,15 @@ struct BlankStateTipCarousel: View {
             NSLocalizedString("Tip: Drop image, PDF, or Markdown", comment: ""),
             NSLocalizedString("Tip: Type directly to write a note", comment: ""),
             NSLocalizedString("Tip: Hold Command while dragging to move the window", comment: ""),
-            NSLocalizedString("Tip: Command-T keeps the window on top", comment: ""),
-            NSLocalizedString("Tip: Command-L opens a web link", comment: ""),
-            NSLocalizedString("Tip: Command-Shift-V opens clipboard content", comment: ""),
             NSLocalizedString("Tip: Try a two-finger pinch", comment: "")
-        ]
+        ] + [
+            ("view.togglePin", "Shortcut Tip Pin"),
+            ("file.openURL", "Shortcut Tip URL"),
+            ("file.openClipboardContent", "Shortcut Tip Clipboard")
+        ].compactMap { identifier, titleKey in
+            guard let shortcut = KeyboardShortcutStore.shared.shortcut(forID: identifier) else { return nil }
+            return String(format: NSLocalizedString(titleKey, comment: ""), shortcut.displayString)
+        }
     }
 
     var body: some View {
@@ -33,7 +38,10 @@ struct BlankStateTipCarousel: View {
             .fixedSize(horizontal: false, vertical: true)
             .offset(x: horizontalOffset)
             .opacity(isVisible ? 1 : 0)
-            .task {
+            .onReceive(NotificationCenter.default.publisher(for: .keyboardShortcutsDidChange)) { _ in
+                shortcutRevision += 1
+            }
+            .task(id: shortcutRevision) {
                 // 每次进入空白状态时重新洗牌，随后按该顺序轮播。
                 await rotateTips(in: tips.shuffled())
             }

@@ -538,6 +538,8 @@ private struct ClipboardHintButton: View {
 
     @State private var isHovered = false
 
+    @State private var shortcut = KeyboardShortcutStore.shared.shortcut(for: KeyboardShortcutCatalog.openClipboardContent)
+
     private var title: String {
         String(format: NSLocalizedString("Open Clipboard Item Format", comment: ""), content.localizedName)
     }
@@ -549,12 +551,14 @@ private struct ClipboardHintButton: View {
                     .font(.system(size: 12, weight: .semibold))
                 Text(title)
                     .font(.system(size: 13, weight: .medium))
-                Text("⌘⇧V")
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(0.18)))
-                    .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.white.opacity(0.38), lineWidth: 1))
+                if let shortcut {
+                    Text(shortcut.displayString)
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(0.18)))
+                        .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.white.opacity(0.38), lineWidth: 1))
+                }
             }
             .foregroundStyle(.white.opacity(isHovered ? 1.0 : 0.88))
             .padding(.horizontal, 14)
@@ -568,6 +572,9 @@ private struct ClipboardHintButton: View {
         .onHover { isHovered = $0 }
         .help(title)
         .accessibilityLabel(title)
+        .onReceive(NotificationCenter.default.publisher(for: .keyboardShortcutsDidChange)) { _ in
+            shortcut = KeyboardShortcutStore.shared.shortcut(for: KeyboardShortcutCatalog.openClipboardContent)
+        }
     }
 }
 
