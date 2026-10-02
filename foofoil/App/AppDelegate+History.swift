@@ -75,17 +75,15 @@ extension AppDelegate {
             noHistoryItem.isEnabled = false
             historyMenu.addItem(noHistoryItem)
         } else {
-            for (index, config) in configs.prefix(10).enumerated() {
+            for config in configs.prefix(10) {
                 var title = config.historyMenuDisplayName
 
                 if title.isEmpty {
                     title = NSLocalizedString("Untitled Note", comment: "")
                 }
 
-                let shortcut = KeyboardShortcutStore.shared.shortcut(forID: "history.openRecent\(index + 1)")
-                let keyEquivalent = shortcut?.keyEquivalent ?? ""
-                let item = NSMenuItem(title: title, action: #selector(openHistoryItemAction(_:)), keyEquivalent: keyEquivalent)
-                item.keyEquivalentModifierMask = shortcut?.modifiers ?? []
+                // ⌘1-9 不再作为全局菜单快捷键；打开最近历史仅在空白箔窗口内生效。
+                let item = NSMenuItem(title: title, action: #selector(openHistoryItemAction(_:)), keyEquivalent: "")
                 item.image = NSImage(systemSymbolName: config.historyMenuSymbolName, accessibilityDescription: nil)
                 item.representedObject = config
                 item.target = self
@@ -97,6 +95,9 @@ extension AppDelegate {
 
         let clearHistoryItem = NSMenuItem(title: NSLocalizedString("Clear History Menu Item", comment: ""), action: #selector(clearHistoryAction), keyEquivalent: "")
         clearHistoryItem.withSymbol("trash")
+        let clearShortcut = KeyboardShortcutStore.shared.shortcut(forID: "history.clear")
+        clearHistoryItem.keyEquivalent = clearShortcut?.keyEquivalent ?? ""
+        clearHistoryItem.keyEquivalentModifierMask = clearShortcut?.modifiers ?? []
         clearHistoryItem.target = self
         historyMenu.addItem(clearHistoryItem)
     }

@@ -94,7 +94,7 @@ struct TextEditorModeView: View {
                                         VStack(spacing: 4) {
                                             HistoryCardView(
                                                 config: config,
-                                                shortcutText: appState.isCommandKeyPressed ? KeyboardShortcutStore.shared.shortcut(forID: "history.openRecent\(index + 1)")?.displayString : nil,
+                                                shortcutText: appState.isCommandKeyPressed && index < 9 ? "⌘\(index + 1)" : nil,
                                                 isHovered: hoveredHistoryID == config.id,
                                                 action: {
                                                     let isCurrentlyBlank = appState.imageURL == nil && appState.webURL == nil && appState.text.isEmpty

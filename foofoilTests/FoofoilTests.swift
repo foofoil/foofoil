@@ -1587,8 +1587,32 @@ struct FoofoilTests {
         }
     }
 
-    @Test func historyRebuildUsesConfiguredKeysAndKeepsConfigPayload() throws {
-        let definition = try #require(KeyboardShortcutCatalog.definition(withID: "history.openRecent1"))
+    @Test func historyMenuRecentItemsCarryNoGlobalKeyEquivalent() throws {
+        let delegate = AppDelegate()
+        delegate.historyMenu = NSMenu()
+        let config = WindowConfig(id: UUID(), text: "Shortcut test")
+        // 最近历史不再是全局菜单快捷键（⌘1-9 只在空白箔生效）。
+        delegate.updateHistoryMenu(preloadedConfigs: [config])
+        let item = try #require(delegate.historyMenu?.items.first { $0.representedObject is WindowConfig })
+        #expect(item.keyEquivalent == "")
+        #expect(item.keyEquivalentModifierMask == [])
+        #expect((item.representedObject as? WindowConfig)?.id == config.id)
+    }
+
+    @Test func blankFoilRecentHistoryShortcutMatchesNumberKeys() throws {
+        // ⌘1-9 已从可配置快捷键目录移除，改由空白箔窗口按固定键位处理。
+        #expect(KeyboardShortcutCatalog.definition(withID: "history.openRecent1") == nil)
+        #expect(FloatingWindow.matchedRecentHistoryIndex(try #require(shortcutEvent("3", modifiers: [.command]))) == 3)
+        #expect(FloatingWindow.matchedRecentHistoryIndex(try #require(shortcutEvent("9", modifiers: [.command]))) == 9)
+        #expect(FloatingWindow.matchedRecentHistoryIndex(try #require(shortcutEvent("3", modifiers: []))) == nil)
+        #expect(FloatingWindow.matchedRecentHistoryIndex(try #require(shortcutEvent("0", modifiers: [.command]))) == nil)
+        #expect(FloatingWindow.matchedRecentHistoryIndex(try #require(shortcutEvent("1", modifiers: [.command, .shift]))) == nil)
+    }
+
+    @Test func historyMenuClearItemFollowsConfiguredShortcutWithoutDefault() throws {
+        let definition = try #require(KeyboardShortcutCatalog.definition(withID: "history.clear"))
+        // 新增的“清空历史记录”不设默认快捷键。
+        #expect(definition.defaultShortcut == nil)
         let store = KeyboardShortcutStore.shared
         let wasCustomized = store.isCustomized(definition)
         let previous = store.shortcut(for: definition)
@@ -1598,16 +1622,18 @@ struct FoofoilTests {
         }
         let delegate = AppDelegate()
         delegate.historyMenu = NSMenu()
-        let config = WindowConfig(id: UUID(), text: "Shortcut test")
-        store.setShortcut(KeyboardShortcut(keyEquivalent: "1", modifiers: [.control, .option]), for: definition)
-        delegate.updateHistoryMenu(preloadedConfigs: [config])
-        let item = try #require(delegate.historyMenu?.items.first { $0.representedObject is WindowConfig })
-        #expect(item.keyEquivalent == "1")
-        #expect(item.keyEquivalentModifierMask == [.control, .option])
-        #expect((item.representedObject as? WindowConfig)?.id == config.id)
-        store.setShortcut(nil, for: definition)
-        delegate.updateHistoryMenu(preloadedConfigs: [config])
-        #expect(delegate.historyMenu?.items.first { $0.representedObject is WindowConfig }?.keyEquivalent == "")
+        func clearItem() throws -> NSMenuItem {
+            try #require(delegate.historyMenu?.items.first { $0.action == #selector(AppDelegate.clearHistoryAction) })
+        }
+        // 未配置时没有快捷键。
+        store.reset(definition)
+        delegate.updateHistoryMenu(preloadedConfigs: [])
+        #expect(try clearItem().keyEquivalent == "")
+        // 配置后菜单项跟随，且不要求带修饰键。
+        store.setShortcut(KeyboardShortcut(keyEquivalent: "k", modifiers: []), for: definition)
+        delegate.updateHistoryMenu(preloadedConfigs: [])
+        #expect(try clearItem().keyEquivalent == "k")
+        #expect(try clearItem().keyEquivalentModifierMask == [])
     }
 
     /// 快捷键设置页搜索：名称关键词大小写不敏感，空分组不保留。

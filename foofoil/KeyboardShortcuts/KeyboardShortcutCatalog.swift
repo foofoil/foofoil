@@ -106,10 +106,9 @@ nonisolated enum KeyboardShortcutCatalog {
     ]
 
     static let history: [KeyboardShortcutDefinition] = [
-        definition("history.search", "Search History Menu Item", "p", [.command])
-    ] + (1...9).map {
-        definition("history.openRecent\($0)", "Shortcut Open Recent \($0)", String($0), [.command])
-    }
+        definition("history.search", "Search History Menu Item", "p", [.command]),
+        definition("history.clear", "Clear History Menu Item", nil, [])
+    ]
 
     /// 视图菜单的全部命令；顺序与菜单一致。默认值与菜单首次建立时保持一致。
     static let view: [KeyboardShortcutDefinition] = [

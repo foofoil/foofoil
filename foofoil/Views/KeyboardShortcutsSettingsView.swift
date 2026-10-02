@@ -31,7 +31,6 @@ struct KeyboardShortcutsSettingsView: View {
                 ShortcutRecorderView(
                     shortcut: shortcutQuery,
                     promptTitle: NSLocalizedString("Search by Keys", comment: ""),
-                    allowsUnmodifiedKeys: true,
                     helpText: NSLocalizedString("Search Shortcut Recorder Help", comment: ""),
                     cancelClearsShortcut: true
                 ) { newValue in
@@ -78,10 +77,6 @@ struct KeyboardShortcutsSettingsView: View {
                             }
                         } header: {
                             Text(NSLocalizedString(section.titleKey, comment: ""))
-                        } footer: {
-                            if section == KeyboardShortcutCatalog.sections.last {
-                                Text(NSLocalizedString("Keyboard Shortcuts Footer", comment: ""))
-                            }
                         }
                     }
                 }

@@ -7,13 +7,11 @@
 import AppKit
 import SwiftUI
 
-/// 快捷键录制控件：点击后捕获下一个带修饰键的按键组合；按 Delete 清除快捷键。
+/// 快捷键录制控件：点击后捕获下一个按键组合（不强制带修饰键）；按 Delete 清除快捷键。
 struct ShortcutRecorderView: NSViewRepresentable {
     var shortcut: KeyboardShortcut?
     /// 快捷键为空时的占位标题（搜索等场景）；nil 时沿用“无快捷键”。
     var promptTitle: String? = nil
-    /// 是否接受不带修饰键的按键；快捷键搜索需要匹配方向键等无修饰键键位。
-    var allowsUnmodifiedKeys: Bool = false
     /// 自定义悬停提示；nil 时使用录制帮助文本。
     var helpText: String? = nil
     /// 搜索模式：录制结束后，Esc 或 Backspace 可清除已录键位（按钮持有焦点时生效）。
@@ -23,7 +21,6 @@ struct ShortcutRecorderView: NSViewRepresentable {
     func makeNSView(context: Context) -> ShortcutRecorderButton {
         let button = ShortcutRecorderButton()
         button.promptTitle = promptTitle
-        button.allowsUnmodifiedKeys = allowsUnmodifiedKeys
         button.cancelClearsShortcut = cancelClearsShortcut
         if let helpText { button.toolTip = helpText }
         button.onChange = onChange
@@ -33,7 +30,6 @@ struct ShortcutRecorderView: NSViewRepresentable {
 
     func updateNSView(_ nsView: ShortcutRecorderButton, context: Context) {
         nsView.promptTitle = promptTitle
-        nsView.allowsUnmodifiedKeys = allowsUnmodifiedKeys
         nsView.cancelClearsShortcut = cancelClearsShortcut
         nsView.onChange = onChange
         nsView.shortcut = shortcut
@@ -46,7 +42,6 @@ final class ShortcutRecorderButton: NSButton {
     var promptTitle: String? {
         didSet { updateTitle() }
     }
-    var allowsUnmodifiedKeys = false
     /// 搜索模式下，录制结束后 Esc/Backspace 清除已录键位。
     var cancelClearsShortcut = false
     var shortcut: KeyboardShortcut? {
@@ -135,8 +130,8 @@ final class ShortcutRecorderButton: NSButton {
                 keyEquivalent: event.charactersIgnoringModifiers ?? "",
                 modifiers: event.modifierFlags
             )
-            guard !shortcut.keyEquivalent.isEmpty,
-                  allowsUnmodifiedKeys || shortcut.hasRequiredModifiers else {
+            // 不强制带修饰键：允许录制裸键（如方向键、空格、字母）。
+            guard !shortcut.keyEquivalent.isEmpty else {
                 NSSound.beep()
                 return nil
             }

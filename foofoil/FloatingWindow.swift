@@ -7,6 +7,7 @@
 
 import Cocoa
 import PDFKit
+import SwiftUI
 
 public class FloatingWindow: NSWindow {
     struct ResizeEdges: OptionSet {
@@ -352,6 +353,14 @@ public class FloatingWindow: NSWindow {
         return false
     }
 
+    /// 事件是否为 ⌘1-9（打开最近历史）；仅在空白箔窗口内消费，不作为可配置快捷键。
+    static func matchedRecentHistoryIndex(_ event: NSEvent) -> Int? {
+        guard KeyboardShortcut.effectiveModifiers(for: event) == [.command],
+              let chars = event.charactersIgnoringModifiers, chars.count == 1,
+              let digit = Int(chars), (1...9).contains(digit) else { return nil }
+        return digit
+    }
+
     /// 左右方向键快退/快进：步长实时读取设置，通知由当前窗口的媒体控制器消费。
     private func postMediaSeek(keyCode: UInt16, for appState: AppState) {
         let step = SettingsStore.shared.mediaSeekStepInterval
@@ -545,6 +554,17 @@ public class FloatingWindow: NSWindow {
 
         let modifiers = KeyboardShortcut.effectiveModifiers(for: event)
         let delegate = NSApplication.shared.delegate as? AppDelegate
+
+        // ⌘1-9 打开最近历史仅在空白箔有效：菜单不再绑定该键，改由空白箔窗口直属处理。
+        if let controller = windowController as? FloatingWindowController,
+           controller.appState.isBlank,
+           let index = Self.matchedRecentHistoryIndex(event),
+           let config = HistoryManager.shared.historyConfigs.dropFirst(index - 1).first {
+            withAnimation(.easeInOut(duration: 0.35)) {
+                controller.appState.loadConfig(config)
+            }
+            return true
+        }
 
         if handleMediaShortcut(event) { return true }
 
