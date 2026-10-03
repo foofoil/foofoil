@@ -45,6 +45,15 @@ extension AppState {
             return Self.isAudioFileName(name)
         }
 
+        var isPPTXDocument: Bool {
+            isQuickLookDocument && imageURL?.pathExtension.lowercased() == "pptx"
+        }
+
+        /// 视频与 PPT 翻页器共享指针活动计时；音频仍保留自己的暂停/悬停规则。
+        var usesTransientContentControls: Bool {
+            isExternalMediaDocument || isPPTXDocument
+        }
+
         /// 视频或音频：均引用原始文件并依赖安全范围书签。
         public var isExternalMediaDocument: Bool {
             isVideoDocument || isAudioDocument
@@ -77,9 +86,9 @@ extension AppState {
             return false
         }
 
-        /// 全屏视频目录复用控制条的显隐状态和计时器，确保同一配置下同步隐藏。
+        /// 全屏视频与 PPT 目录复用控制条的显隐状态和计时器，确保同一配置下同步隐藏。
         var isNavigatorHiddenForVideoInactivity: Bool {
-            isFullScreen && isVideoDocument && !isMediaPlaybackControlsVisible
+            isFullScreen && (isVideoDocument || isPPTXDocument) && !isMediaPlaybackControlsVisible
         }
 
         /// 内置音频与扩展音频 chrome 共享封面/元数据呈现时所对应的当前源文件。

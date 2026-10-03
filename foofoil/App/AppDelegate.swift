@@ -305,6 +305,16 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &contentModeCancellables)
 
+        // PPT 目录在后台读取完后才可翻页，提交页列表后再同步图片共用的“前往”菜单。
+        controller.appState.pptxNavigationController.$slides
+            .sink { [weak self, weak controller] _ in
+                DispatchQueue.main.async {
+                    guard let self, let controller, self.activeWindowController === controller else { return }
+                    self.updateGoMenuVisibility()
+                }
+            }
+            .store(in: &contentModeCancellables)
+
         // 主体检测要等图片载入后才有结论：结论落地时刷新菜单项的可用性与键位。
         controller.appState.$hasExtractableImageSubject
             .sink { [weak self, weak controller] _ in

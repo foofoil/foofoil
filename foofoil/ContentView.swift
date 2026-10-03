@@ -33,7 +33,7 @@ public struct ContentView: View {
         // 音视频窗口再抬高最小宽度，保证底部播放条单行能放下。
         let minimumWidth = appState.isExternalMediaDocument
             ? max(minimumLength, MediaPlaybackBarMetrics.minimumWindowWidth)
-            : minimumLength
+            : (appState.isPPTXDocument ? max(minimumLength, PPTXModeView.minimumWindowWidth) : minimumLength)
         // PDF 显示边框时，四周保留 12pt 的边框区域。
         let isMarkdownPreview = appState.isMarkdownPreview && appState.isMarkdownDocument
         let contentPadding: CGFloat = isMarkdownPreview ? 0 : (appState.isPDFDocument && appState.effectiveShowBorder ? 12 : (shouldHideBorder ? 0 : 4))
@@ -80,7 +80,11 @@ public struct ContentView: View {
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .transition(.opacity)
                 } else if let url = appState.imageURL, appState.isQuickLookDocument {
-                    QuickLookModeView(url: url)
+                    if url.pathExtension.lowercased() == "pptx" {
+                        PPTXModeView(appState: appState, url: url)
+                    } else {
+                        QuickLookModeView(url: url)
+                    }
                 } else if let videoURL = appState.imageURL, appState.isVideoDocument {
                     VideoModeView(appState: appState, url: videoURL, shouldHideBorder: shouldHideBorder)
                         .transition(.opacity)

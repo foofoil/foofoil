@@ -209,6 +209,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     private var navigatorHoverGlobalMonitor: Any?
     private var navigatorScrollLocalMonitor: Any?
     private var isTransitioningFullScreen = false
+    private var insertedResizableForFullScreen = false
     private var windowedFrameDescriptorBeforeFullScreen: String?
     /// 置顶切换光晕的临时面板；仅在做提示动画时存在。
     private var pinGlowPanel: NSWindow?
@@ -245,6 +246,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         // 装载 SwiftUI 视图
         let contentView = ContentView(appState: appState)
         let hostingView = FileDropHostingView(rootView: contentView, appState: appState)
+        hostingView.autoresizingMask = [.width, .height]
         window.contentView = hostingView
         window.installResizeCursorTracking(in: hostingView)
 
@@ -352,7 +354,11 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                             self.currentMediaSize = size
                         }
                     } else {
-                        self.hideMediaPlaybackControls()
+                        if self.appState.isPPTXDocument {
+                            self.revealMediaPlaybackControlsIfPointerIsInside()
+                        } else {
+                            self.hideMediaPlaybackControls()
+                        }
                         self.currentMediaSize = nil
                         if let image = self.appState.loadImage(from: url) {
                             self.currentImageSize = AudioMetadataLoader.layoutSize(image)
@@ -489,8 +495,25 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                     self.window?.resizeIncrements = NSSize(width: 1.0, height: 1.0)
                 }
                 self.applyWindowSizeLimits()
+                if targetState.isPPTXDocument {
+                    if !showBorder, let size = self.currentContentSize() {
+                        self.restoreSavedMediaFrameIfNeeded(contentSize: size)
+                    }
+                    return
+                }
                 // 同步调整窗口大小，使窗口物理尺寸调整与 SwiftUI 视图的最新状态在同一 RunLoop 内同步渲染完成
                 self.fitWindowToCurrentImageSize(showBorderOverride: showBorder, animated: false)
+            }
+            .store(in: &cancellables)
+
+        appState.pptxNavigationController.$slideSize
+            .sink { [weak self] size in
+                DispatchQueue.main.async {
+                    guard let self, self.appState.isPPTXDocument, let size,
+                          self.appState.pptxNavigationController.slideSize == size else { return }
+                    self.pendingSavedFrameRestore = false
+                    if !self.appState.showBorder { self.restoreSavedMediaFrameIfNeeded(contentSize: size) }
+                }
             }
             .store(in: &cancellables)
 
@@ -1102,7 +1125,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     /// 只由真实指针输入调用；SwiftUI tracking area 重建产生的 entered/exited 不会让控制条自行复现。
     func handleMediaPointerActivity(at point: NSPoint, autoHideInterval: TimeInterval? = nil) {
         guard let window,
-              appState.isExternalMediaDocument,
+              appState.usesTransientContentControls,
               point.x >= 0, point.y >= 0,
               point.x <= window.frame.width, point.y <= window.frame.height else { return }
         revealMediaPlaybackControls(autoHideInterval: autoHideInterval)
@@ -1111,7 +1134,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     /// 离开窗口与窗口内静止采用同一延迟；重新进入前控制条仍平滑保留。
     /// 音频例外：显隐由播放状态与箔窗/目录 hover 区域推导，暂停或仍悬停在目录上时继续显示。
     func handleMediaPointerExit(autoHideInterval: TimeInterval? = nil, screenPoint: NSPoint? = nil) {
-        guard appState.isExternalMediaDocument,
+        guard appState.usesTransientContentControls,
               appState.isMediaPlaybackControlsVisible else { return }
         if appState.isAudioDocument {
             updateAudioPlaybackControlsVisibility(screenPoint: screenPoint)
@@ -1134,7 +1157,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func revealMediaPlaybackControls(autoHideInterval: TimeInterval? = nil) {
-        guard appState.isExternalMediaDocument else {
+        guard appState.usesTransientContentControls else {
             hideMediaPlaybackControls()
             return
         }
@@ -1251,6 +1274,9 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     public func toggleFullScreen() {
         guard let window, !isTransitioningFullScreen else { return }
         if !appState.isFullScreen {
+            // 无边框窗口平时由应用处理缩放；原生全屏必须临时允许 AppKit 将窗口铺满屏幕。
+            insertedResizableForFullScreen = !window.styleMask.contains(.resizable)
+            window.styleMask.insert(.resizable)
             window.collectionBehavior = [.fullScreenPrimary]
             window.level = .normal
         }
@@ -1421,6 +1447,9 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func currentContentSize() -> NSSize? {
+        if appState.isPPTXDocument {
+            return appState.pptxNavigationController.slideSize
+        }
         if appState.isPDFDocument, let currentPDFPageSize {
             return currentPDFPageSize
         }
@@ -1760,6 +1789,12 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     public func windowDidEnterFullScreen(_ notification: Notification) {
+        // 全屏完成后同步根画布，避免保留进入前的窗口尺寸。
+        if let window, let contentView = window.contentView {
+            contentView.frame = NSRect(origin: .zero, size: window.contentLayoutRect.size)
+            contentView.needsLayout = true
+            contentView.layoutSubtreeIfNeeded()
+        }
         isTransitioningFullScreen = false
         appState.isFullScreen = true
         updateNavigatorPanelVisibility()
@@ -1779,6 +1814,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         guard let window else { return }
         isTransitioningFullScreen = false
         appState.isFullScreen = false
+        if insertedResizableForFullScreen { window.styleMask.remove(.resizable) }
+        insertedResizableForFullScreen = false
         updateWindowShadow()
         window.level = appState.isPinned ? .floating : .normal
         // 其他箔片可能仍在全屏：按全局状态决定自身是否恢复加入所有 Space，并同步其余箔片。
@@ -1791,6 +1828,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     public func windowDidFailToEnterFullScreen(_ window: NSWindow) {
+        if insertedResizableForFullScreen { window.styleMask.remove(.resizable) }
+        insertedResizableForFullScreen = false
         isTransitioningFullScreen = false
         appState.isFullScreen = false
         updateWindowShadow()
@@ -2092,6 +2131,13 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             }
             return
         }
+        if appState.isPPTXDocument {
+            pendingSavedFrameRestore = false
+            if !appState.showBorder, let size = currentContentSize() {
+                restoreSavedMediaFrameIfNeeded(contentSize: size)
+            }
+            return
+        }
         // 文本、网页、PDF 与空白箔没有内容尺寸校正，恢复到此结束；残留标记会让后续拖入的图片
         // 被误判成“仍在恢复历史窗口框”而跳过自动布局。
         pendingSavedFrameRestore = false
@@ -2163,7 +2209,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         let length = minimumWindowLength(showBorderOverride: showBorderOverride)
         let width = appState.isExternalMediaDocument
             ? max(length, MediaPlaybackBarMetrics.minimumWindowWidth)
-            : length
+            : (appState.isPPTXDocument ? max(length, PPTXModeView.minimumWindowWidth) : length)
         return NSSize(width: width, height: length)
     }
 

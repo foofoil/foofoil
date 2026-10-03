@@ -50,7 +50,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
 
     func updateGoMenu(_ menu: NSMenu) {
         let isPDFDocument = activeAppState?.isPDFDocument == true
-        let hasFileList = activeAppState?.fileList?.isPresentable == true
+        let hasFileList = activeAppState?.supportsItemNavigation == true
         for item in menu.items {
             if item.action == #selector(previousFileListItemAction)
                 || item.action == #selector(nextFileListItemAction) {
@@ -72,7 +72,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
     func updateGoMenuVisibility() {
         let appState = activeAppState
         goMenuItem?.isHidden = appState?.isPDFDocument != true
-            && appState?.fileList?.isPresentable != true
+            && appState?.supportsItemNavigation != true
         syncGoMenuKeyEquivalents()
     }
 
@@ -83,7 +83,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         Self.syncGoMenuKeyEquivalents(
             in: menu,
             isPDFDocument: activeAppState?.isPDFDocument == true,
-            hasFileList: activeAppState?.fileList?.isPresentable == true
+            hasFileList: activeAppState?.supportsItemNavigation == true
         )
     }
 
@@ -333,7 +333,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
 
         if menuItem.action == #selector(previousFileListItemAction) ||
             menuItem.action == #selector(nextFileListItemAction) {
-            return activeAppState?.fileList?.isPresentable == true
+            return activeAppState?.supportsItemNavigation == true
         }
 
         if menuItem.action == #selector(findNavigatorAction) {

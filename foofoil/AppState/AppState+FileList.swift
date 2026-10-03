@@ -526,7 +526,16 @@ extension AppState {
         scheduleImageListSlideshowAdvance()
     }
 
+    /// 图片列表与 PPT 共用“上一项/下一项”命令和快捷键，PPT 首尾不循环。
+    var supportsItemNavigation: Bool {
+        fileList?.isPresentable == true || (isPPTXDocument && !pptxNavigationController.slides.isEmpty)
+    }
+
     func activateAdjacentFileListItem(delta: Int, wraps: Bool = false) {
+        if isPPTXDocument {
+            pptxNavigationController.selectAdjacent(delta: delta)
+            return
+        }
         guard let list = fileList, list.isPresentable,
               let index = list.items.firstIndex(where: { $0.id == list.currentID }) else { return }
         let count = list.items.count
@@ -592,7 +601,7 @@ extension AppState {
             endNavigatorSearch()
             return true
         }
-        guard fileList?.isPresentable == true, !isPDFDocument else { return false }
+        guard supportsItemNavigation, !isPDFDocument else { return false }
         let shortcuts = KeyboardShortcutStore.shared
         let modifiers = KeyboardShortcut.effectiveModifiers(for: event)
         let key = event.charactersIgnoringModifiers?.lowercased()

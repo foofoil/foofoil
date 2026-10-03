@@ -282,8 +282,10 @@ public class FloatingWindow: NSWindow {
                 && appState.webURL == nil
                 && !appState.isExternalMediaDocument
                 && !appState.isPDFDocument
+                && !appState.isQuickLookDocument
             let isWindowMagnify = appState.imageURL == nil
                 || appState.isExternalMediaDocument
+                || appState.isQuickLookDocument
                 || appState.webURL != nil
                 || (appState.isPDFDocument && !appState.showBorder)
 

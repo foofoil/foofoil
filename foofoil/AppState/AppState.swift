@@ -301,7 +301,13 @@ public class AppState: NSObject, ObservableObject, Identifiable {
 
     public var imageSource: ImageSource?
 
-    @Published var quickLookSourceURL: URL?
+    /// 会话属于箔片状态；全屏重建 SwiftUI 视图时仍保留页码与临时预览。
+    let pptxNavigationController = PPTXNavigationController()
+    @Published var quickLookSourceURL: URL? {
+        didSet {
+            if oldValue != quickLookSourceURL { pptxNavigationController.close() }
+        }
+    }
 
     var isQuickLookDocument: Bool {
         imageURL != nil && imageURL == quickLookSourceURL
@@ -315,6 +321,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
 
     @Published public var imageURL: URL? {
         didSet {
+            if !isQuickLookDocument { pptxNavigationController.close() }
             loadedImageCache = nil
             cancelImageTextDetection()
             imageTextDetectedURL = nil
