@@ -195,6 +195,10 @@ extension AppDelegate {
     }
 
     @objc func clearHistoryAction() {
+        // 浮箔总览面板位于 screenSaver 层级，会盖住模态警告框；确认前先收起覆盖层，
+        // 与文件对话框、历史搜索的处理保持一致。
+        FoilExposeController.shared.dismiss()
+
         let alert = NSAlert()
         alert.messageText = NSLocalizedString("Confirm Clear History", comment: "")
         alert.informativeText = NSLocalizedString("This will clear history and cached content for closed windows, plus WebKit website cache, cookies, and stored website data.", comment: "")
