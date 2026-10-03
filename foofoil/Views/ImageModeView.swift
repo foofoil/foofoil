@@ -41,8 +41,9 @@ struct ImageModeView: View {
             }
         }
         .onAppear {
-            // "提取图片主体"要等 Vision 给出结论才可用；ContentView 按图片路径打 id，切图会再次触发。
+            // "提取文字"与"提取图片主体"都要等 Vision 给出结论才可用；ContentView 按图片路径打 id，切图会再次触发。
             if let imageURL = appState.imageURL {
+                appState.detectImageTextIfNeeded(for: imageURL)
                 appState.detectImageSubjectIfNeeded(for: imageURL)
             }
         }

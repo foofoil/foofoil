@@ -118,6 +118,9 @@ extension AppState {
                 self.imageURL = nil
             }
 
+            // 重开历史时直接采用持久化的 OCR 与主体结论，不再重跑 Vision。
+            restoreImageDerivedContent(from: config)
+
             // 扩展音频（DSF/DFF/SACD 经 Hi-Fi 播放，含目录列表）不占用 imageURL，
             // 同目录封面书签必须独立于 imagePath 恢复，否则每次重启都会重新弹出目录授权。
             if config.imagePath == nil, accessingSidecarDirectoryURL == nil {
@@ -160,6 +163,39 @@ extension AppState {
             }
         }
 
+        /// 恢复图片箔的派生内容缓存（OCR 文字与主体抠图）以及菜单可用性判断所需的"已分析"标记。
+        /// 结论存在就让检测直接跳过；主体结论存在但抠图缓存丢失时，保留结论并允许检测重新生成。
+        func restoreImageDerivedContent(from config: WindowConfig) {
+            imageOCRText = config.imageOCRText
+            if let text = config.imageOCRText, imageURL != nil {
+                hasExtractableImageText = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                imageTextDetectedURL = imageURL
+            } else {
+                hasExtractableImageText = false
+                imageTextDetectedURL = nil
+            }
+
+            switch config.imageHasSubject {
+            case true?:
+                hasExtractableImageSubject = true
+                if let path = config.imageSubjectPath, FileManager.default.fileExists(atPath: path) {
+                    imageSubjectCutoutURL = URL(fileURLWithPath: path)
+                    imageSubjectDetectedURL = imageURL
+                } else {
+                    imageSubjectCutoutURL = nil
+                    imageSubjectDetectedURL = nil
+                }
+            case false?:
+                hasExtractableImageSubject = false
+                imageSubjectCutoutURL = nil
+                imageSubjectDetectedURL = imageURL
+            case nil:
+                hasExtractableImageSubject = false
+                imageSubjectCutoutURL = nil
+                imageSubjectDetectedURL = nil
+            }
+        }
+
         public func toConfig() -> WindowConfig {
             return WindowConfig(
                 id: id,
@@ -197,6 +233,9 @@ extension AppState {
                     fileList: fileList?.isPresentable == true ? fileList : nil
                 )),
                 sourceFingerprint: sourceFingerprint,
+                imageOCRText: imageOCRText,
+                imageHasSubject: imageSubjectDetectedURL != nil ? hasExtractableImageSubject : nil,
+                imageSubjectPath: imageSubjectCutoutURL?.path,
                 webZoom: webZoom,
                 documentZoom: documentZoom,
                 mediaPlaybackMode: mediaPlaybackMode,

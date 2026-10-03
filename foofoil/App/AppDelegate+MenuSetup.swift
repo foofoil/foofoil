@@ -677,14 +677,14 @@ extension AppDelegate {
         menu.addItem(item)
     }
 
-    /// 提取文字是内容相关命令：非图片箔要清空键位，避免禁用的菜单项吞掉配置好的快捷键。
-    /// 菜单重建后、内容或窗口切换时都要刷新（与 Go 菜单的键位同步同一处理方式）。
+    /// 提取文字是内容相关命令：非图片箔或图中无字时清空键位，避免禁用的菜单项吞掉配置好的快捷键。
+    /// 文字检测结果在图片载入后异步写入，因此菜单打开前同样要刷新一次。
     func updateExtractTextMenuItem() {
         guard let menu = editMenu,
               let item = menu.items.first(where: { $0.action == #selector(extractTextFromImageAction) }) else {
             return
         }
-        let isAvailable = activeAppState?.canExtractTextFromImage == true
+        let isAvailable = activeAppState?.canExtractImageText == true
         item.isEnabled = isAvailable
         let shortcut = isAvailable ? KeyboardShortcutStore.shared.shortcut(forID: "edit.extractText") : nil
         item.keyEquivalent = shortcut?.keyEquivalent ?? ""

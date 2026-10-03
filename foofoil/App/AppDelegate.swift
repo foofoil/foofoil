@@ -312,6 +312,14 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
                 self.updateExtractImageSubjectMenuItem()
             }
             .store(in: &contentModeCancellables)
+
+        // 文字检测同样在图片载入后才出结论：结论落地时刷新"提取文字"的可用性与键位。
+        controller.appState.$hasExtractableImageText
+            .sink { [weak self, weak controller] _ in
+                guard let self, let controller, self.activeWindowController === controller else { return }
+                self.updateExtractTextMenuItem()
+            }
+            .store(in: &contentModeCancellables)
     }
 
     @objc func handleKeyWindowChanged(_ notification: Notification) {

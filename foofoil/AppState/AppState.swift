@@ -143,6 +143,11 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     private(set) var pendingContentOpenCount = 0
     /// 同一图片箔是否已有 OCR 在途，避免连续触发产生多个文字箔。
     var isExtractingText = false
+    /// 图片文字检测任务与代次：切换内容后丢弃过期结果，与主体检测同一处理方式。
+    var imageTextDetectionTask: Task<Void, Never>?
+    var imageTextDetectionGeneration: UInt64 = 0
+    /// 已做过文字检测的图片，避免视图反复出现时对同一张图重复跑 Vision。
+    var imageTextDetectedURL: URL?
     /// 图片主体检测任务与代次：切换内容后丢弃过期结果，与音频列表检测同一处理方式。
     var imageSubjectDetectionTask: Task<Void, Never>?
     var imageSubjectDetectionGeneration: UInt64 = 0
@@ -150,6 +155,10 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     var imageSubjectDetectedURL: URL?
     /// 同一图片箔是否已有主体提取在途，避免连续触发产生多个主体箔片。
     var isExtractingImageSubject = false
+    /// 当前图片上一次 OCR 的完整结果（nil 表示尚未分析）；提取文字与持久化都复用它，避免重复跑 Vision。
+    var imageOCRText: String?
+    /// 当前图片主体抠图的应用缓存路径；提取主体直接复制它，避免重复跑 Vision。
+    var imageSubjectCutoutURL: URL?
 
     /// 标记一次异步内容打开开始；与 `endPendingContentOpen()` 成对调用。
     func beginPendingContentOpen() {
@@ -298,15 +307,23 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         imageURL != nil && imageURL == quickLookSourceURL
     }
 
+    /// Vision 是否已在本箔当前图片中检测到可提取文字；由 `detectImageTextIfNeeded(for:)` 异步写入。
+    @Published public var hasExtractableImageText = false
+
     /// Vision 是否已在本箔当前图片中检测到可分离主体；由 `detectImageSubjectIfNeeded(for:)` 异步写入。
     @Published public var hasExtractableImageSubject = false
 
     @Published public var imageURL: URL? {
         didSet {
             loadedImageCache = nil
+            cancelImageTextDetection()
+            imageTextDetectedURL = nil
+            hasExtractableImageText = false
+            imageOCRText = nil
             cancelImageSubjectDetection()
             imageSubjectDetectedURL = nil
             hasExtractableImageSubject = false
+            imageSubjectCutoutURL = nil
             if let url = imageURL {
                 // 视频/音频不复制到应用缓存目录，仅记录原始文件路径。
                 if !Self.isExternalMediaFile(url: url) && !isQuickLookDocument {

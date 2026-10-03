@@ -2,7 +2,8 @@ import Foundation
 import Vision
 import ImageIO
 
-enum ImageOCRIndexer {
+/// 图片 OCR 的纯函数入口；项目默认主Actor隔离，这里显式退出，解码与推理都在后台队列执行。
+nonisolated enum ImageOCRIndexer {
     static func recognize(url: URL, maximumPixelSize: Int = 3000) throws -> String {
         guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [

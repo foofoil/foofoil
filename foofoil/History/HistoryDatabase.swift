@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 nonisolated final class HistoryDatabase {
-    static let schemaVersion = 16
+    static let schemaVersion = 17
 
     private let queue = DispatchQueue(label: "com.foofoil.history.database", qos: .utility)
     private var connection: OpaquePointer?
@@ -107,8 +107,9 @@ nonisolated final class HistoryDatabase {
                         media_sidecar_bookmark, custom_cover_path,
                         extension_id, extension_state_reference, navigator_panel_side,
                         navigator_panel_visibility, navigator_panel_width, file_list,
-                        document_zoom, document_scroll_file, document_scroll_fraction, text_fingerprint
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        document_zoom, document_scroll_file, document_scroll_fraction, text_fingerprint,
+                        image_ocr_text, image_has_subject, image_subject_path
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -140,7 +141,10 @@ nonisolated final class HistoryDatabase {
                         document_zoom=excluded.document_zoom,
                         document_scroll_file=excluded.document_scroll_file,
                         document_scroll_fraction=excluded.document_scroll_fraction,
-                        text_fingerprint=excluded.text_fingerprint
+                        text_fingerprint=excluded.text_fingerprint,
+                        image_ocr_text=excluded.image_ocr_text,
+                        image_has_subject=excluded.image_has_subject,
+                        image_subject_path=excluded.image_subject_path
                     """, bindings: [
                         config.id.uuidString, kind.rawValue, title, config.originalImageName,
                         config.imagePath, config.textPath, config.webURLString, config.actualWebURLString,
@@ -160,7 +164,10 @@ nonisolated final class HistoryDatabase {
                         config.documentZoom,
                         config.documentScrollFile,
                         config.documentScrollFraction,
-                        textFingerprint
+                        textFingerprint,
+                        config.imageOCRText,
+                        config.imageHasSubject,
+                        config.imageSubjectPath
                     ])
 
                 let metadata = (
@@ -423,6 +430,10 @@ nonisolated final class HistoryDatabase {
         try addColumnIfMissing("text_fingerprint", definition: "text_fingerprint TEXT")
         // v16 文档样式面板：选中的主题 ID；为空表示自定义或未选中主题。
         try addColumnIfMissing("document_theme_id", definition: "document_theme_id TEXT")
+        // v17 图片派生内容缓存：OCR 文字与主体抠图结果随历史持久化，重开历史时无需重跑 Vision。
+        try addColumnIfMissing("image_ocr_text", definition: "image_ocr_text TEXT")
+        try addColumnIfMissing("image_has_subject", definition: "image_has_subject INTEGER")
+        try addColumnIfMissing("image_subject_path", definition: "image_subject_path TEXT")
         if previousVersion >= 1 && previousVersion < 9 {
             // v9：旧列表 video_looping=1 是单曲循环开关；迁成顺序循环，使列表能自动续播。
             try execute("""
@@ -547,8 +558,28 @@ nonisolated final class HistoryDatabase {
 
     private func deleteItem(id: UUID) throws {
         try deleteChunks(historyID: id, kinds: nil)
+        // 派生主体抠图缓存随历史一起删除，避免遗留孤立文件。
+        deleteSubjectCacheFile(for: id)
         try executePrepared("DELETE FROM history_items WHERE id = ?", bindings: [id.uuidString])
         deleteThumbnailFile(for: id)
+    }
+
+    /// 删除某条历史对应的 `cached_subject_<id>.png`；文件不存在时静默跳过。
+    private func deleteSubjectCacheFile(for id: UUID) {
+        var path: String?
+        try? withStatement(
+            "SELECT image_subject_path FROM history_items WHERE id = ?",
+            bindings: [id.uuidString]
+        ) { statement in
+            if sqlite3_step(statement) == SQLITE_ROW {
+                path = optionalText(statement, 0)
+            }
+        }
+        guard let path else { return }
+        // 仅删除应用自己管理的派生缓存，绝不触碰其它文件。
+        let url = URL(fileURLWithPath: path)
+        guard AppState.isManagedCacheURL(url) else { return }
+        try? FileManager.default.removeItem(at: url)
     }
 
     private func updateIndexStatus(id: UUID, status: Int, error: String?) throws {
@@ -637,6 +668,9 @@ nonisolated final class HistoryDatabase {
                     sourceFingerprint: optionalText(statement, columns["source_fingerprint"]!),
                     storedDisplayTitle: text(statement, columns["display_title"]!),
                     thumbnailPath: optionalText(statement, columns["thumbnail_path"]!),
+                    imageOCRText: columns["image_ocr_text"].flatMap { optionalText(statement, $0) },
+                    imageHasSubject: columns["image_has_subject"].flatMap { optionalBool(statement, $0) },
+                    imageSubjectPath: columns["image_subject_path"].flatMap { optionalText(statement, $0) },
                     documentZoom: sqlite3_column_double(statement, columns["document_zoom"]!),
                     mediaPlaybackMode: MediaPlaybackMode(sqliteValue: Int(sqlite3_column_int(statement, columns["video_looping"]!))),
                     videoBookmark: optionalText(statement, columns["video_bookmark"]!).flatMap { Data(base64Encoded: $0) },
@@ -731,6 +765,11 @@ nonisolated final class HistoryDatabase {
     /// 可空 REAL 列：NULL 表示用户没有自选该样式，保留为 nil 而不是 0。
     private func optionalReal(_ statement: OpaquePointer, _ column: Int32) -> Double? {
         sqlite3_column_type(statement, column) == SQLITE_NULL ? nil : sqlite3_column_double(statement, column)
+    }
+
+    /// 可空布尔列：NULL 表示尚未分析，保留为 nil 而不是 false。
+    private func optionalBool(_ statement: OpaquePointer, _ column: Int32) -> Bool? {
+        sqlite3_column_type(statement, column) == SQLITE_NULL ? nil : sqlite3_column_int(statement, column) != 0
     }
     private func columnMap(_ statement: OpaquePointer) -> [String: Int32] {
         Dictionary(uniqueKeysWithValues: (0..<sqlite3_column_count(statement)).map { (String(cString: sqlite3_column_name(statement, $0)), $0) })

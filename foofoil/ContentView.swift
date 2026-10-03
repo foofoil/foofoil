@@ -307,13 +307,13 @@ public struct ContentView: View {
                 }
             }
 
-            // 提取文字：仅光栅图片箔可用；其它内容仍显示但禁用。
+            // 提取文字：仅光栅图片箔可用；图中无字时也禁用，检测未完成前保持禁用。
             Button(action: {
                 (NSApplication.shared.delegate as? AppDelegate)?.extractTextFromImage(from: appState)
             }) {
                 Label(NSLocalizedString("Extract Text", comment: ""), systemImage: "text.viewfinder")
             }
-            .disabled(!appState.canExtractTextFromImage)
+            .disabled(!appState.canExtractImageText)
             .configuredKeyboardShortcut("edit.extractText")
 
             // 提取主体：还要等图片载入后 Vision 给出结论，检测期间显示但禁用。

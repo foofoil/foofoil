@@ -828,11 +828,15 @@ extension AppDelegate {
     }
 
     /// 对图片箔运行系统 Vision OCR，识别到文字后在新箔片中以纯文本打开。
-    /// OCR 在后台队列执行，避免阻塞主线程；识别期间用户切换内容不影响已捕获的图片。
+    /// OCR 结果已在图片载入检测时缓存，这里直接复用；仅在缓存缺失时才重跑一次。
     func extractTextFromImage(from appState: AppState) {
-        guard appState.canExtractTextFromImage,
+        guard appState.canExtractImageText,
               let imageURL = appState.imageURL,
               !appState.isExtractingText else { return }
+        if let cached = appState.imageOCRText?.trimmingCharacters(in: .whitespacesAndNewlines), !cached.isEmpty {
+            presentExtractedText(cached)
+            return
+        }
         appState.isExtractingText = true
         DispatchQueue.global(qos: .userInitiated).async { [weak self, weak appState] in
             let recognized = ((try? ImageOCRIndexer.recognize(url: imageURL)) ?? "")
@@ -840,11 +844,21 @@ extension AppDelegate {
             DispatchQueue.main.async {
                 appState?.isExtractingText = false
                 guard let self, !recognized.isEmpty else { return }
-                let state = AppState()
-                state.openText(recognized, isMarkdown: false)
-                self.showNewWindow(with: state)
+                // 回填缓存，后续提取与重开历史都无需再跑 OCR。
+                appState?.imageOCRText = recognized
+                appState?.hasExtractableImageText = true
+                appState?.imageTextDetectedURL = imageURL
+                appState?.saveState()
+                self.presentExtractedText(recognized)
             }
         }
+    }
+
+    /// 把识别到的文字在新箔片中以纯文本打开，复用"新建空白箔"的窗口通道。
+    private func presentExtractedText(_ recognized: String) {
+        let state = AppState()
+        state.openText(recognized, isMarkdown: false)
+        showNewWindow(with: state)
     }
 
     @objc func extractImageSubjectAction() {
@@ -853,31 +867,65 @@ extension AppDelegate {
     }
 
     /// 用系统 Vision 的前景实例掩码抠出主体，写成带透明的 PNG，再在新的无边框箔片里打开。
-    /// 推理与编码都在后台队列；结果按新箔片 ID 落在应用缓存目录，复用既有的"从图片新建箔片"通道。
+    /// 抠图已在图片载入检测时生成并缓存，这里直接复制；仅在缓存缺失时才重跑一次。
     func extractImageSubject(from appState: AppState) {
         guard appState.canExtractImageSubject,
               let sourceURL = appState.imageURL,
               !appState.isExtractingImageSubject else { return }
         let newID = UUID()
         guard let destURL = appState.getCachedImageURL(for: newID, extension: "png") else { return }
-        appState.isExtractingImageSubject = true
         let originalName = appState.originalImageName ?? sourceURL.lastPathComponent
-        DispatchQueue.global(qos: .userInitiated).async { [weak appState] in
+
+        if let cachedCutout = appState.imageSubjectCutoutURL,
+           FileManager.default.fileExists(atPath: cachedCutout.path) {
+            appState.isExtractingImageSubject = true
+            DispatchQueue.global(qos: .userInitiated).async { [weak self, weak appState] in
+                let copied = Self.copyCacheFile(from: cachedCutout, to: destURL)
+                DispatchQueue.main.async {
+                    appState?.isExtractingImageSubject = false
+                    guard let self, copied else { return }
+                    self.postExtractedSubjectFoofoil(id: newID, imageURL: destURL, originalName: originalName)
+                }
+            }
+            return
+        }
+
+        appState.isExtractingImageSubject = true
+        DispatchQueue.global(qos: .userInitiated).async { [weak self, weak appState] in
             let extracted = ImageSubjectExtractor.writeSubjectPNG(from: sourceURL, to: destURL)
             DispatchQueue.main.async {
                 appState?.isExtractingImageSubject = false
-                guard extracted else { return }
-                NotificationCenter.default.post(
-                    name: .createNewFoofoilFromImage,
-                    object: nil,
-                    userInfo: [
-                        "id": newID,
-                        "imageURL": destURL,
-                        "originalName": String(format: NSLocalizedString("Image Subject: %@", comment: ""), originalName)
-                    ]
-                )
+                guard let self, extracted else { return }
+                self.postExtractedSubjectFoofoil(id: newID, imageURL: destURL, originalName: originalName)
             }
         }
+    }
+
+    /// 派生缓存到新箔片资源的文件复制；同名目标已存在时先移除再复制。
+    nonisolated private static func copyCacheFile(from source: URL, to dest: URL) -> Bool {
+        let fileManager = FileManager.default
+        do {
+            if fileManager.fileExists(atPath: dest.path) {
+                try fileManager.removeItem(at: dest)
+            }
+            try fileManager.copyItem(at: source, to: dest)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// 主体抠图写入新箔片后，走既有的"从图片新建箔片"通道发布。
+    private func postExtractedSubjectFoofoil(id: UUID, imageURL: URL, originalName: String) {
+        NotificationCenter.default.post(
+            name: .createNewFoofoilFromImage,
+            object: nil,
+            userInfo: [
+                "id": id,
+                "imageURL": imageURL,
+                "originalName": String(format: NSLocalizedString("Image Subject: %@", comment: ""), originalName)
+            ]
+        )
     }
 
     @objc func documentStyleAction() {

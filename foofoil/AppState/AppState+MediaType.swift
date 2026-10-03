@@ -58,6 +58,12 @@ extension AppState {
             return extensionSession == nil
         }
 
+        /// 当前图片箔能否提取文字：先是可提取的光栅图片，其次要 Vision 已经识别到文字。
+        /// 后者由 `detectImageTextIfNeeded(for:)` 在图片载入后异步写入，检测未完成时菜单项保持禁用。
+        public var canExtractImageText: Bool {
+            canExtractTextFromImage && hasExtractableImageText
+        }
+
         /// 当前图片箔能否提取主体：先是可提取的光栅图片，其次要 Vision 已经检测到可与背景分离的主体。
         /// 后者由 `detectImageSubjectIfNeeded(for:)` 在图片载入后异步写入，检测未完成时菜单项保持禁用。
         public var canExtractImageSubject: Bool {

@@ -158,6 +158,13 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     public var storedDisplayTitle: String?
     /// 预先生成并单独存储的 HEIC 缩略图路径，仅用作历史列表展示，不作为窗口内容来源。
     public var thumbnailPath: String?
+    /// 图片箔的派生内容缓存，随历史持久化，重开历史时无需重跑 Vision：
+    /// OCR 文字（nil 表示尚未分析，空串表示已分析且无字）与主体抠图缓存路径。
+    public var imageOCRText: String?
+    /// Vision 是否在该图片中检测到可分离主体；nil 表示尚未分析。
+    public var imageHasSubject: Bool?
+    /// 主体抠图 PNG 的应用缓存路径；仅当 `imageHasSubject == true` 时存在。
+    public var imageSubjectPath: String?
     public var webZoom: Double
     /// 扩展 document 会话的正文缩放；仅文字生效。
     public var documentZoom: Double
@@ -214,6 +221,9 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         sourceFingerprint: String? = nil,
         storedDisplayTitle: String? = nil,
         thumbnailPath: String? = nil,
+        imageOCRText: String? = nil,
+        imageHasSubject: Bool? = nil,
+        imageSubjectPath: String? = nil,
         webZoom: Double = 1.0,
         documentZoom: Double = 1.0,
         mediaPlaybackMode: MediaPlaybackMode = .sequentialLoop,
@@ -257,6 +267,9 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.sourceFingerprint = sourceFingerprint
         self.storedDisplayTitle = storedDisplayTitle
         self.thumbnailPath = thumbnailPath
+        self.imageOCRText = imageOCRText
+        self.imageHasSubject = imageHasSubject
+        self.imageSubjectPath = imageSubjectPath
         self.webZoom = webZoom
         self.documentZoom = documentZoom
         self.mediaPlaybackMode = mediaPlaybackMode
@@ -275,7 +288,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, thumbnailPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction
+        case id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction
     }
 
     public init(from decoder: Decoder) throws {
@@ -307,6 +320,9 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         sourceFingerprint = try container.decodeIfPresent(String.self, forKey: .sourceFingerprint)
         storedDisplayTitle = try container.decodeIfPresent(String.self, forKey: .storedDisplayTitle)
         thumbnailPath = try container.decodeIfPresent(String.self, forKey: .thumbnailPath)
+        imageOCRText = try container.decodeIfPresent(String.self, forKey: .imageOCRText)
+        imageHasSubject = try container.decodeIfPresent(Bool.self, forKey: .imageHasSubject)
+        imageSubjectPath = try container.decodeIfPresent(String.self, forKey: .imageSubjectPath)
         webZoom = try container.decodeIfPresent(Double.self, forKey: .webZoom) ?? 1.0
         documentZoom = try container.decodeIfPresent(Double.self, forKey: .documentZoom) ?? 1.0
         videoBookmark = try container.decodeIfPresent(Data.self, forKey: .videoBookmark)

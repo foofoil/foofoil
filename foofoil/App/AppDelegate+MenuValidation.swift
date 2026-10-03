@@ -232,7 +232,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         }
 
         if menuItem.action == #selector(extractTextFromImageAction) {
-            return activeAppState?.canExtractTextFromImage == true
+            return activeAppState?.canExtractImageText == true
         }
 
         if menuItem.action == #selector(extractImageSubjectAction) {

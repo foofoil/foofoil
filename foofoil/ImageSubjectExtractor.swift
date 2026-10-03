@@ -69,13 +69,29 @@ nonisolated enum ImageSubjectExtractor {
     }
 
     private static func writePNG(_ image: CGImage, to destURL: URL) -> Bool {
+        // 先写同目录临时文件再替换，避免中途失败/退出留下半张图被当成有效抠图。
+        let tempURL = destURL.deletingLastPathComponent()
+            .appendingPathComponent(".\(destURL.lastPathComponent).\(UUID().uuidString).tmp")
         guard let destination = CGImageDestinationCreateWithURL(
-            destURL as CFURL,
+            tempURL as CFURL,
             UTType.png.identifier as CFString,
             1,
             nil
         ) else { return false }
         CGImageDestinationAddImage(destination, image, nil)
-        return CGImageDestinationFinalize(destination)
+        guard CGImageDestinationFinalize(destination) else {
+            try? FileManager.default.removeItem(at: tempURL)
+            return false
+        }
+        do {
+            if FileManager.default.fileExists(atPath: destURL.path) {
+                try FileManager.default.removeItem(at: destURL)
+            }
+            try FileManager.default.moveItem(at: tempURL, to: destURL)
+            return true
+        } catch {
+            try? FileManager.default.removeItem(at: tempURL)
+            return false
+        }
     }
 }

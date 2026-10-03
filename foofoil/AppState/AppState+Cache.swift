@@ -69,7 +69,8 @@ extension AppState {
             return name.hasPrefix("cached_image") ||
                 name.hasPrefix("cached_text_") ||
                 name.hasPrefix("cached_web_") ||
-                name.hasPrefix("cached_cover_")
+                name.hasPrefix("cached_cover_") ||
+                name.hasPrefix("cached_subject_")
         }
 
         /// 当前窗口正在使用的本地缓存路径。
@@ -83,6 +84,12 @@ extension AppState {
 
         func getCachedImageURL(for windowId: UUID? = nil, extension ext: String? = nil, itemToken: String? = nil) -> URL? {
             getCachedContentURL(kind: "image", for: windowId, extension: ext, itemToken: itemToken)
+        }
+
+        /// 主体抠图的派生缓存路径（`cached_subject_<窗口UUID>.png`）。
+        /// 按窗口 UUID 命名，历史删除时随记录一起清理；重开同一历史复用同一路径。
+        func imageSubjectCacheURL() -> URL? {
+            getCachedContentURL(kind: "subject", for: id, extension: "png")
         }
 
         func getCachedContentURL(kind: String, for windowId: UUID? = nil, extension ext: String? = nil, itemToken: String? = nil) -> URL? {

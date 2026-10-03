@@ -73,6 +73,7 @@ struct ImageSubjectTests {
         let task = try #require(state.imageSubjectDetectionTask)
         await task.value
         #expect(!state.hasExtractableImageSubject)
+        #expect(state.imageSubjectCutoutURL == nil)
         #expect(state.imageSubjectDetectedURL == url)
 
         // 同一张图不再起新任务。
@@ -83,6 +84,7 @@ struct ImageSubjectTests {
         state.hasExtractableImageSubject = true
         state.imageURL = URL(fileURLWithPath: "/tmp/foofoil-next-\(UUID().uuidString).png")
         #expect(!state.hasExtractableImageSubject)
+        #expect(state.imageSubjectCutoutURL == nil)
         #expect(state.imageSubjectDetectedURL != state.imageURL)
     }
 
@@ -108,6 +110,49 @@ struct ImageSubjectTests {
         #expect(cutout.hasAlphaChannel, "\(photoURL.lastPathComponent)")
         #expect(cutout.opaquePixels > 0)
         #expect(cutout.transparentPixels > 0)
+    }
+
+    /// 检测阶段即写出抠图缓存；提取时直接复制缓存，不再重跑 Vision，结果应与缓存同源。
+    @Test func detectionCachesSubjectAndExtractionReusesIt() async throws {
+        guard let photoURL = Self.systemPicturesWithSubject().first else { return }
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.originalImageName = photoURL.lastPathComponent
+        state.imageURL = photoURL
+        let url = try #require(state.imageURL)
+
+        state.detectImageSubjectIfNeeded(for: url)
+        let task = try #require(state.imageSubjectDetectionTask)
+        await task.value
+        #expect(state.hasExtractableImageSubject)
+        #expect(state.canExtractImageSubject)
+        let cutoutURL = try #require(state.imageSubjectCutoutURL)
+        #expect(FileManager.default.fileExists(atPath: cutoutURL.path))
+
+        // 提取回调只保留 Sendable 字段。
+        var postedImageURL: URL?
+        let observer = NotificationCenter.default.addObserver(
+            forName: .createNewFoofoilFromImage,
+            object: nil,
+            queue: nil
+        ) { notification in
+            guard postedImageURL == nil else { return }
+            postedImageURL = notification.userInfo?["imageURL"] as? URL
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        let appDelegate = AppDelegate()
+        appDelegate.extractImageSubject(from: state)
+        #expect(state.isExtractingImageSubject)
+        for _ in 0..<200 where postedImageURL == nil {
+            try await Task.sleep(nanoseconds: 100_000_000)
+        }
+        let resultURL = try #require(postedImageURL)
+        defer { try? FileManager.default.removeItem(at: resultURL) }
+        // 提取结果是缓存抠图的一份拷贝，而不是重新推理得到的新文件。
+        #expect(resultURL.path != cutoutURL.path)
+        #expect(FileManager.default.contentsEqual(atPath: resultURL.path, andPath: cutoutURL.path))
+        #expect(!state.isExtractingImageSubject)
     }
 
     /// 动作只走“从图片新建箔片”这条通道：结果 PNG 必须带透明，且剪贴板一个字节都不写。
