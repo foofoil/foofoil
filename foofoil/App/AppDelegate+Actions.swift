@@ -822,6 +822,64 @@ extension AppDelegate {
         activeAppState?.showColorPanel()
     }
 
+    @objc func extractTextFromImageAction() {
+        guard let appState = activeAppState else { return }
+        extractTextFromImage(from: appState)
+    }
+
+    /// 对图片箔运行系统 Vision OCR，识别到文字后在新箔片中以纯文本打开。
+    /// OCR 在后台队列执行，避免阻塞主线程；识别期间用户切换内容不影响已捕获的图片。
+    func extractTextFromImage(from appState: AppState) {
+        guard appState.canExtractTextFromImage,
+              let imageURL = appState.imageURL,
+              !appState.isExtractingText else { return }
+        appState.isExtractingText = true
+        DispatchQueue.global(qos: .userInitiated).async { [weak self, weak appState] in
+            let recognized = ((try? ImageOCRIndexer.recognize(url: imageURL)) ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            DispatchQueue.main.async {
+                appState?.isExtractingText = false
+                guard let self, !recognized.isEmpty else { return }
+                let state = AppState()
+                state.openText(recognized, isMarkdown: false)
+                self.showNewWindow(with: state)
+            }
+        }
+    }
+
+    @objc func extractImageSubjectAction() {
+        guard let appState = activeAppState else { return }
+        extractImageSubject(from: appState)
+    }
+
+    /// 用系统 Vision 的前景实例掩码抠出主体，写成带透明的 PNG，再在新的无边框箔片里打开。
+    /// 推理与编码都在后台队列；结果按新箔片 ID 落在应用缓存目录，复用既有的"从图片新建箔片"通道。
+    func extractImageSubject(from appState: AppState) {
+        guard appState.canExtractImageSubject,
+              let sourceURL = appState.imageURL,
+              !appState.isExtractingImageSubject else { return }
+        let newID = UUID()
+        guard let destURL = appState.getCachedImageURL(for: newID, extension: "png") else { return }
+        appState.isExtractingImageSubject = true
+        let originalName = appState.originalImageName ?? sourceURL.lastPathComponent
+        DispatchQueue.global(qos: .userInitiated).async { [weak appState] in
+            let extracted = ImageSubjectExtractor.writeSubjectPNG(from: sourceURL, to: destURL)
+            DispatchQueue.main.async {
+                appState?.isExtractingImageSubject = false
+                guard extracted else { return }
+                NotificationCenter.default.post(
+                    name: .createNewFoofoilFromImage,
+                    object: nil,
+                    userInfo: [
+                        "id": newID,
+                        "imageURL": destURL,
+                        "originalName": String(format: NSLocalizedString("Image Subject: %@", comment: ""), originalName)
+                    ]
+                )
+            }
+        }
+    }
+
     @objc func documentStyleAction() {
         guard let appState = activeAppState else { return }
         guard appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling else { return }

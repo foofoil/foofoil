@@ -40,6 +40,12 @@ struct ImageModeView: View {
                 .padding(8) // 移至 ScrollView 外部，确保在滚动时边框始终保持同样粗细（12 像素）。
             }
         }
+        .onAppear {
+            // "提取图片主体"要等 Vision 给出结论才可用；ContentView 按图片路径打 id，切图会再次触发。
+            if let imageURL = appState.imageURL {
+                appState.detectImageSubjectIfNeeded(for: imageURL)
+            }
+        }
     }
 
     @ViewBuilder

@@ -591,6 +591,8 @@ extension AppDelegate {
                 copyImageItem.withSymbol("photo.on.rectangle")
                 menu.addItem(copyImageItem)
             }
+            appendExtractTextMenu(to: menu)
+            appendExtractImageSubjectMenu(to: menu)
             appendNavigatorFindMenu(to: menu)
             return
         }
@@ -639,7 +641,68 @@ extension AppDelegate {
         selectAllItem.withSymbol("checkmark.square")
         menu.addItem(selectAllItem)
 
+        appendExtractTextMenu(to: menu)
+        appendExtractImageSubjectMenu(to: menu)
         appendNavigatorFindMenu(to: menu)
+    }
+
+    /// “提取文字”在编辑菜单与右键菜单共用；由 validateMenuItem 按图片内容启用或禁用，禁用时仍显示。
+    private func appendExtractTextMenu(to menu: NSMenu) {
+        if !menu.items.isEmpty {
+            menu.addItem(NSMenuItem.separator())
+        }
+
+        let item = NSMenuItem(
+            title: NSLocalizedString("Extract Text", comment: ""),
+            action: #selector(extractTextFromImageAction),
+            keyEquivalent: ""
+        )
+        item.withSymbol("text.viewfinder")
+        // 稳定标识让键位可由快捷键设置配置；应用与内容切换时的刷新见 updateExtractTextMenuItem()。
+        item.representedObject = "edit.extractText"
+        item.target = self
+        menu.addItem(item)
+    }
+
+    /// “提取图片主体”紧接“提取文字”：菜单项要等 Vision 检测到可与背景分离的主体才启用，未检测到时仍显示但禁用。
+    private func appendExtractImageSubjectMenu(to menu: NSMenu) {
+        let item = NSMenuItem(
+            title: NSLocalizedString("Extract Image Subject", comment: ""),
+            action: #selector(extractImageSubjectAction),
+            keyEquivalent: ""
+        )
+        item.withSymbol("person.and.background.dotted")
+        item.representedObject = "edit.extractImageSubject"
+        item.target = self
+        menu.addItem(item)
+    }
+
+    /// 提取文字是内容相关命令：非图片箔要清空键位，避免禁用的菜单项吞掉配置好的快捷键。
+    /// 菜单重建后、内容或窗口切换时都要刷新（与 Go 菜单的键位同步同一处理方式）。
+    func updateExtractTextMenuItem() {
+        guard let menu = editMenu,
+              let item = menu.items.first(where: { $0.action == #selector(extractTextFromImageAction) }) else {
+            return
+        }
+        let isAvailable = activeAppState?.canExtractTextFromImage == true
+        item.isEnabled = isAvailable
+        let shortcut = isAvailable ? KeyboardShortcutStore.shared.shortcut(forID: "edit.extractText") : nil
+        item.keyEquivalent = shortcut?.keyEquivalent ?? ""
+        item.keyEquivalentModifierMask = shortcut?.modifiers ?? []
+    }
+
+    /// 主体提取也是内容相关命令：非图片箔或还没检测到主体时清空键位，避免禁用的菜单项吞掉配置好的快捷键。
+    /// 检测结果在图片载入后异步写入，因此菜单打开前同样要刷新一次。
+    func updateExtractImageSubjectMenuItem() {
+        guard let menu = editMenu,
+              let item = menu.items.first(where: { $0.action == #selector(extractImageSubjectAction) }) else {
+            return
+        }
+        let isAvailable = activeAppState?.canExtractImageSubject == true
+        item.isEnabled = isAvailable
+        let shortcut = isAvailable ? KeyboardShortcutStore.shared.shortcut(forID: "edit.extractImageSubject") : nil
+        item.keyEquivalent = shortcut?.keyEquivalent ?? ""
+        item.keyEquivalentModifierMask = shortcut?.modifiers ?? []
     }
 
     /// 列表超过阈值时提供查找定位：⌘F 进入/聚焦，⌘G / ⇧⌘G 循环定位匹配标题。

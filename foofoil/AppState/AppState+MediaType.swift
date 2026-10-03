@@ -50,6 +50,20 @@ extension AppState {
             isVideoDocument || isAudioDocument
         }
 
+        /// 当前图片箔能否用系统 OCR 提取文字：仅光栅图片内容可提取。
+        /// 网页（含网页截图缓存）、PDF、音视频、Quick Look 预览、SVG 与扩展会话都不走图片 OCR。
+        public var canExtractTextFromImage: Bool {
+            guard imageURL != nil, webURL == nil else { return false }
+            if isPDFDocument || isSVG || isQuickLookDocument || isExternalMediaDocument { return false }
+            return extensionSession == nil
+        }
+
+        /// 当前图片箔能否提取主体：先是可提取的光栅图片，其次要 Vision 已经检测到可与背景分离的主体。
+        /// 后者由 `detectImageSubjectIfNeeded(for:)` 在图片载入后异步写入，检测未完成时菜单项保持禁用。
+        public var canExtractImageSubject: Bool {
+            canExtractTextFromImage && hasExtractableImageSubject
+        }
+
         /// 扩展 `document` presentation：正文由宿主的只读文档视图承载，缩放作用于文字。
         public var isExtensionDocument: Bool {
             guard let session = extensionSession else { return false }

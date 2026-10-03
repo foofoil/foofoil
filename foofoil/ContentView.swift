@@ -307,6 +307,24 @@ public struct ContentView: View {
                 }
             }
 
+            // 提取文字：仅光栅图片箔可用；其它内容仍显示但禁用。
+            Button(action: {
+                (NSApplication.shared.delegate as? AppDelegate)?.extractTextFromImage(from: appState)
+            }) {
+                Label(NSLocalizedString("Extract Text", comment: ""), systemImage: "text.viewfinder")
+            }
+            .disabled(!appState.canExtractTextFromImage)
+            .configuredKeyboardShortcut("edit.extractText")
+
+            // 提取主体：还要等图片载入后 Vision 给出结论，检测期间显示但禁用。
+            Button(action: {
+                (NSApplication.shared.delegate as? AppDelegate)?.extractImageSubject(from: appState)
+            }) {
+                Label(NSLocalizedString("Extract Image Subject", comment: ""), systemImage: "person.and.background.dotted")
+            }
+            .disabled(!appState.canExtractImageSubject)
+            .configuredKeyboardShortcut("edit.extractImageSubject")
+
             Divider()
 
             Button(action: {

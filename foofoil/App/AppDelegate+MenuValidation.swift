@@ -24,6 +24,8 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
 
         if let editMenu, menu === editMenu {
             rebuildEditMenu(menu)
+            updateExtractTextMenuItem()
+            updateExtractImageSubjectMenuItem()
         } else if let fileMenu, menu === fileMenu {
             updateFileMenu(menu)
         } else if let goMenu, menu === goMenu {
@@ -227,6 +229,14 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
 
         if menuItem.action == #selector(selectColorAction) {
             return activeAppState?.isSVG == true
+        }
+
+        if menuItem.action == #selector(extractTextFromImageAction) {
+            return activeAppState?.canExtractTextFromImage == true
+        }
+
+        if menuItem.action == #selector(extractImageSubjectAction) {
+            return activeAppState?.canExtractImageSubject == true
         }
 
         if menuItem.action == #selector(documentStyleAction) {

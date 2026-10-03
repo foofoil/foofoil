@@ -282,6 +282,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self, weak controller] _ in
                 guard let self, let controller, self.activeWindowController === controller else { return }
                 self.updateGoMenuVisibility()
+                self.updateExtractTextMenuItem()
+                self.updateExtractImageSubjectMenuItem()
             }
             .store(in: &contentModeCancellables)
 
@@ -289,6 +291,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self, weak controller] _ in
                 guard let self, let controller, self.activeWindowController === controller else { return }
                 self.updateGoMenuVisibility()
+                self.updateExtractTextMenuItem()
+                self.updateExtractImageSubjectMenuItem()
             }
             .store(in: &contentModeCancellables)
 
@@ -296,6 +300,16 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
             .sink { [weak self, weak controller] _ in
                 guard let self, let controller, self.activeWindowController === controller else { return }
                 self.updateExtensionMenuVisibility()
+                self.updateExtractTextMenuItem()
+                self.updateExtractImageSubjectMenuItem()
+            }
+            .store(in: &contentModeCancellables)
+
+        // 主体检测要等图片载入后才有结论：结论落地时刷新菜单项的可用性与键位。
+        controller.appState.$hasExtractableImageSubject
+            .sink { [weak self, weak controller] _ in
+                guard let self, let controller, self.activeWindowController === controller else { return }
+                self.updateExtractImageSubjectMenuItem()
             }
             .store(in: &contentModeCancellables)
     }
@@ -305,6 +319,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
         DispatchQueue.main.async { [weak self] in
             self?.updateGoMenuVisibility()
             self?.updateExtensionMenuVisibility()
+            self?.updateExtractTextMenuItem()
+            self?.updateExtractImageSubjectMenuItem()
         }
     }
 }

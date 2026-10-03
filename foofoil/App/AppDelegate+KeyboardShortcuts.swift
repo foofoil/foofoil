@@ -15,6 +15,8 @@ extension AppDelegate {
         applyKeyboardShortcuts(to: editMenu)
         applyKeyboardShortcuts(to: goMenu)
         syncGoMenuKeyEquivalents()
+        updateExtractTextMenuItem()
+        updateExtractImageSubjectMenuItem()
         updateHistoryMenu()
     }
 

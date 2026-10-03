@@ -30,6 +30,7 @@ nonisolated struct KeyboardShortcutDefinition: Identifiable, Hashable {
 nonisolated enum KeyboardShortcutSection: String, CaseIterable, Identifiable {
     case global
     case file
+    case edit
     case go
     case playback
     case history
@@ -42,6 +43,7 @@ nonisolated enum KeyboardShortcutSection: String, CaseIterable, Identifiable {
         switch self {
         case .global: return "Global"
         case .file: return "File"
+        case .edit: return "Edit"
         case .go: return "Go"
         case .playback: return "Shortcut Playback"
         case .history: return "History"
@@ -54,6 +56,7 @@ nonisolated enum KeyboardShortcutSection: String, CaseIterable, Identifiable {
         switch self {
         case .global: return KeyboardShortcutCatalog.global
         case .file: return KeyboardShortcutCatalog.file
+        case .edit: return KeyboardShortcutCatalog.edit
         case .go: return KeyboardShortcutCatalog.go
         case .playback: return KeyboardShortcutCatalog.playback
         case .history: return KeyboardShortcutCatalog.history
@@ -89,6 +92,12 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("file.openInBrowser", "Shortcut Open in Browser", nil, [], "Shortcut Scope Web"),
         definition("file.copyURL", "Copy URL", "c", [.command, .option], "Shortcut Scope Web"),
         definition("file.reset", "Reset", "k", [.command])
+    ]
+
+    /// 编辑菜单命令；图片取字与取主体只对光栅图片箔有效，取主体还要先检测到主体。
+    static let edit: [KeyboardShortcutDefinition] = [
+        definition("edit.extractText", "Extract Text", "e", [.command], "Shortcut Scope Images"),
+        definition("edit.extractImageSubject", "Extract Image Subject", nil, [.command, .option], "Shortcut Scope Images")
     ]
 
     static let go: [KeyboardShortcutDefinition] = [
