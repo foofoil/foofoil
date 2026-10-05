@@ -277,7 +277,7 @@ public class FloatingWindow: NSWindow {
                 let multiplier: CGFloat = event.hasPreciseScrollingDeltas ? 0.003 : 0.03
                 let factor = 1.0 + delta * multiplier
 
-                if appState.imageURL != nil && appState.webURL == nil && !appState.isAudioDocument && !(appState.isVideoDocument && appState.showBorder) {
+                if appState.usesImagePresentation && !appState.isAudioDocument && !(appState.isVideoDocument && appState.showBorder) {
                     // 有边框 PDF 保留 PDFViewer 的原生缩放与滚动响应。
                     if appState.isPDFDocument && appState.showBorder {
                         super.sendEvent(event)
@@ -302,8 +302,7 @@ public class FloatingWindow: NSWindow {
         // 触摸板捏合：图片改内容缩放（无边框时同步窗口）；其余模式只改窗口大小。过程中不写历史。
         if event.type == .magnify, let controller = self.windowController as? FloatingWindowController {
             let appState = controller.appState
-            let isImageMagnify = appState.imageURL != nil
-                && appState.webURL == nil
+            let isImageMagnify = appState.usesImagePresentation
                 && !appState.isExternalMediaDocument
                 && !appState.isPDFDocument
                 && !appState.isQuickLookDocument
@@ -557,6 +556,13 @@ public class FloatingWindow: NSWindow {
             } else {
                 pdfView.copyCurrentPageToPasteboard()
             }
+        } else if controller.appState.isCamera {
+            controller.appState.cameraController?.capture { image in
+                guard let image else { return }
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                pasteboard.writeObjects([image])
+            }
         } else if !controller.appState.isExternalMediaDocument {
             controller.appState.copyCurrentImageToPasteboard()
         }
@@ -565,7 +571,9 @@ public class FloatingWindow: NSWindow {
     public override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(FloatingWindow.copy(_:)) {
             guard let controller = windowController as? FloatingWindowController else { return false }
-            return controller.appState.imageURL != nil && controller.appState.webURL == nil && !controller.appState.isExternalMediaDocument
+            return controller.appState.isCamera
+                ? controller.appState.cameraController?.hasFrame == true
+                : controller.appState.imageURL != nil && controller.appState.webURL == nil && !controller.appState.isExternalMediaDocument
         }
         return super.validateMenuItem(menuItem)
     }
@@ -619,7 +627,7 @@ public class FloatingWindow: NSWindow {
             let identifier = chars == "[" ? "view.fitWindowToImage" : "view.fitImageToWindowWidth"
             if delegate?.isUsingDefaultShortcut(identifier) == true,
                let controller = windowController as? FloatingWindowController {
-                let isImageMode = controller.appState.imageURL != nil && controller.appState.webURL == nil
+                let isImageMode = controller.appState.usesImagePresentation
                 if isImageMode && controller.appState.showBorder {
                     if chars == "[" {
                         controller.fitWindowToCurrentImageSize()

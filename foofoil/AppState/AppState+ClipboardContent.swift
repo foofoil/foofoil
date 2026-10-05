@@ -147,6 +147,7 @@ extension AppState {
         self.originalImageName = isMarkdown ? "\(NSLocalizedString("Untitled Markdown", comment: "")).md" : nil
         self.imageSource = nil
         self.imageURL = nil
+        stopCamera()
         self.webURL = nil
         self.actualWebURL = nil
         self.textURL = nil

@@ -19,6 +19,10 @@ struct FoilExposeShortcutTests {
                 KeyboardShortcut(keyEquivalent: "v", modifiers: [.command, .shift]))
         let ids = KeyboardShortcutCatalog.sections.flatMap { $0.definitions.map(\.id) }
         #expect(Set(ids).count == ids.count)
+        let camera = try? #require(KeyboardShortcutCatalog.definition(withID: "file.openCamera"))
+        #expect(camera?.titleKey == "Open Camera")
+        #expect(camera?.defaultShortcut == nil)
+        #expect(KeyboardShortcutCatalog.file.contains { $0.id == "file.openCamera" })
     }
 
     @Test func indicesZeroThroughEightMapToDigits() {

@@ -25,9 +25,9 @@ public struct ContentView: View {
     public var body: some View {
         // 网页和图片都支持仅隐藏视觉边框；网页切换边框不应改变窗口的缩放规则。
         let shouldHideBorder = appState.isFullScreen
-            || ((appState.imageURL != nil || appState.webURL != nil || appState.isAudioDocument) && !appState.showBorder)
+            || ((appState.isCamera || appState.imageURL != nil || appState.webURL != nil || appState.isAudioDocument) && !appState.showBorder)
         // 网页即使同时保留了截图缓存，也不能套用图片无边框模式的最小尺寸规则。
-        let isImageMode = appState.imageURL != nil && appState.webURL == nil
+        let isImageMode = appState.usesImagePresentation
         let usesCompactMinimumSize = isImageMode && !appState.effectiveShowBorder
         let minimumLength: CGFloat = usesCompactMinimumSize ? 80 : 150
         // 音视频窗口再抬高最小宽度，保证底部播放条单行能放下。
@@ -70,6 +70,9 @@ public struct ContentView: View {
                 } else if appState.extensionSession != nil {
                     ExtensionPresentationView(appState: appState, shouldHideBorder: shouldHideBorder)
                         .transition(.opacity)
+                } else if appState.isCamera, let camera = appState.cameraController {
+                    CameraModeView(appState: appState, controller: camera, shouldHideBorder: shouldHideBorder)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if let webURL = appState.webURL {
                     // 网页支持内容缩放；调整窗口大小只改变可视区域。
                     WebContainerView(url: webURL, zoom: appState.webZoom, appState: appState, onTitleChange: { title in
@@ -201,7 +204,7 @@ public struct ContentView: View {
         }
         // 图片模式下：有边框时鼠标双击作用改为和cmd.一样，无边框时双击作用改为和cmd=一样（放大）
         .onTapGesture(count: 2) {
-            if appState.imageURL != nil {
+            if appState.usesImagePresentation {
                 if appState.effectiveShowBorder {
                     NotificationCenter.default.post(
                         name: .shouldFitImageToWindowWidth,
@@ -221,7 +224,7 @@ public struct ContentView: View {
         .simultaneousGesture(
             MagnificationGesture()
                 .onChanged { value in
-                    guard appState.imageURL == nil || appState.isExternalMediaDocument || appState.isQuickLookDocument || appState.webURL != nil else { return }
+                    guard !appState.isCamera, appState.imageURL == nil || appState.isExternalMediaDocument || appState.isQuickLookDocument || appState.webURL != nil else { return }
 
                     if !isResizingWindowWithPinch {
                         isResizingWindowWithPinch = true
@@ -249,7 +252,7 @@ public struct ContentView: View {
             }
                 .configuredKeyboardShortcut("view.togglePin")
 
-            if !appState.isFullScreen && (appState.imageURL != nil || appState.webURL != nil) {
+            if !appState.isFullScreen && (appState.usesImagePresentation || appState.webURL != nil) {
                 Toggle(isOn: $appState.showBorder) {
                     Label(NSLocalizedString("Border (ContextMenu)", comment: ""), systemImage: "rectangle")
                 }
@@ -266,11 +269,20 @@ public struct ContentView: View {
                 .configuredKeyboardShortcut("view.slideshow")
             }
 
-            if appState.imageURL != nil, appState.webURL == nil {
+            if appState.usesImagePresentation {
                 // 视频/音频没有“拷贝图片”能力
                 if !appState.isExternalMediaDocument {
                     Button(action: {
-                        appState.copyCurrentImageToPasteboard()
+                        if appState.isCamera {
+                            appState.cameraController?.capture { image in
+                                guard let image else { return }
+                                let pasteboard = NSPasteboard.general
+                                pasteboard.clearContents()
+                                pasteboard.writeObjects([image])
+                            }
+                        } else {
+                            appState.copyCurrentImageToPasteboard()
+                        }
                     }) {
                         Label(NSLocalizedString("Copy Image", comment: ""), systemImage: "photo.on.rectangle")
                     }
@@ -311,23 +323,27 @@ public struct ContentView: View {
                 }
             }
 
-            // 提取文字：仅光栅图片箔可用；图中无字时也禁用，检测未完成前保持禁用。
-            Button(action: {
-                (NSApplication.shared.delegate as? AppDelegate)?.extractTextFromImage(from: appState)
-            }) {
-                Label(NSLocalizedString("Extract Text", comment: ""), systemImage: "text.viewfinder")
-            }
-            .disabled(!appState.canExtractImageText)
-            .configuredKeyboardShortcut("edit.extractText")
+            if appState.isCamera {
+                if let camera = appState.cameraController { CameraDeviceContextMenu(controller: camera) }
+            } else {
+                // 提取文字：仅光栅图片箔可用；图中无字时也禁用，检测未完成前保持禁用。
+                Button(action: {
+                    (NSApplication.shared.delegate as? AppDelegate)?.extractTextFromImage(from: appState)
+                }) {
+                    Label(NSLocalizedString("Extract Text", comment: ""), systemImage: "text.viewfinder")
+                }
+                .disabled(!appState.canExtractImageText)
+                .configuredKeyboardShortcut("edit.extractText")
 
-            // 提取主体：还要等图片载入后 Vision 给出结论，检测期间显示但禁用。
-            Button(action: {
-                (NSApplication.shared.delegate as? AppDelegate)?.extractImageSubject(from: appState)
-            }) {
-                Label(NSLocalizedString("Extract Image Subject", comment: ""), systemImage: "person.and.background.dotted")
+                // 提取主体：还要等图片载入后 Vision 给出结论，检测期间显示但禁用。
+                Button(action: {
+                    (NSApplication.shared.delegate as? AppDelegate)?.extractImageSubject(from: appState)
+                }) {
+                    Label(NSLocalizedString("Extract Image Subject", comment: ""), systemImage: "person.and.background.dotted")
+                }
+                .disabled(!appState.canExtractImageSubject)
+                .configuredKeyboardShortcut("edit.extractImageSubject")
             }
-            .disabled(!appState.canExtractImageSubject)
-            .configuredKeyboardShortcut("edit.extractImageSubject")
 
             Divider()
 

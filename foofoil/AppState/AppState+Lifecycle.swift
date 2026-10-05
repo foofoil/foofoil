@@ -26,6 +26,9 @@ extension AppState {
                 object: self
             )
 
+            cameraController?.stop()
+            cameraController = nil
+            isCamera = false
             isBatchUpdating = true
             self.originalImageName = nil
             self.imageSource = nil

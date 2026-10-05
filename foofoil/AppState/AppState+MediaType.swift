@@ -62,7 +62,7 @@ extension AppState {
         /// 当前图片箔能否用系统 OCR 提取文字：仅光栅图片内容可提取。
         /// 网页（含网页截图缓存）、PDF、音视频、Quick Look 预览、SVG 与扩展会话都不走图片 OCR。
         public var canExtractTextFromImage: Bool {
-            guard imageURL != nil, webURL == nil else { return false }
+            guard !isCamera, imageURL != nil, webURL == nil else { return false }
             if isPDFDocument || isSVG || isQuickLookDocument || isExternalMediaDocument { return false }
             return extensionSession == nil
         }

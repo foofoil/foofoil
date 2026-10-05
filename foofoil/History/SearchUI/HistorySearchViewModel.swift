@@ -49,6 +49,9 @@ final class HistorySearchViewModel: ObservableObject {
     private var rawFiles: [SpotlightFileResult] = []
     private var userMovedSelection = false
     private var isResetting = false
+    var openCamera: (() -> Void)?
+    private let cameraAvailable: () -> Bool
+    var showsOpenCamera: Bool { mode == .history && CameraCaptureController.matches(query, available: cameraAvailable()) }
     var openResult: ((UUID) -> Void)?
     var openWebURL: ((URL) -> Void)?
     var openFile: ((URL) -> Void)?
@@ -57,7 +60,9 @@ final class HistorySearchViewModel: ObservableObject {
 
     init(historySearch: @escaping (String) async -> [HistorySearchResult] = { await HistoryRepository.shared.search($0) },
          fileSearch: ((String, @escaping (SpotlightSearchOutcome) -> Void) -> Void)? = nil,
-         cancelFiles: (() -> Void)? = nil) {
+         cancelFiles: (() -> Void)? = nil,
+         cameraAvailable: @escaping () -> Bool = { CameraCaptureController.isAvailable }) {
+        self.cameraAvailable = cameraAvailable
         self.historySearch = historySearch
         let service = SpotlightFileSearch()
         self.fileSearch = fileSearch ?? { text, completion in
@@ -76,10 +81,10 @@ final class HistorySearchViewModel: ObservableObject {
     var showsOverallEmptyState: Bool {
         guard !isSearching else { return false }
         if mode == .url { return resultCount == 0 }
-        return results.isEmpty && files.isEmpty && openURL == nil && fileStatus == nil
+        return results.isEmpty && files.isEmpty && openURL == nil && !showsOpenCamera && fileStatus == nil
     }
     var itemIDs: [String] {
-        results.map { "history:\($0.id)" } + files.map { "file:\($0.id)" }
+        (showsOpenCamera ? ["camera"] : []) + results.map { "history:\($0.id)" } + files.map { "file:\($0.id)" }
             + (openURL.map { ["url:\($0.absoluteString)"] } ?? [])
     }
     var resultCount: Int { itemIDs.count }
@@ -115,7 +120,9 @@ final class HistorySearchViewModel: ObservableObject {
     }
 
     func openSelected() {
-        guard let index = selectedIndex else { return }
+        if selectedID == "camera" { openCamera?(); return }
+        guard let selectedIndex else { return }
+        let index = selectedIndex - (showsOpenCamera ? 1 : 0)
         if results.indices.contains(index) { open(results[index]) }
         else if files.indices.contains(index - results.count) { openFile?(files[index - results.count].url) }
         else { openURLResult() }

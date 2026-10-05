@@ -14,6 +14,7 @@ extension AppState {
     public var supportsContentBackgroundColor: Bool {
         // PDF 复用图片内容通道，但内容是一页页纸张，仍按文档处理。
         if isPDFDocument { return true }
+        if isCamera { return false }
         if webURL != nil { return true }
         if extensionSession != nil { return isExtensionDocument }
         guard imageURL == nil else { return false }
@@ -25,6 +26,7 @@ extension AppState {
     /// 空白箔在用户输入内容前不是文档类型。
     public var supportsDocumentTextStyling: Bool {
         if isPDFDocument || isCSVDocument { return false }
+        if isCamera { return false }
         if webURL != nil { return false }
         if extensionSession != nil { return isExtensionDocument }
         guard imageURL == nil else { return false }

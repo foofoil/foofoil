@@ -123,6 +123,7 @@ public nonisolated enum StartupBehavior: String, Codable, CaseIterable, Sendable
 nonisolated public struct WindowConfig: Codable, Identifiable {
     public let id: UUID
     public var imagePath: String?
+    public var isCamera: Bool
     public var webURLString: String?
     public var actualWebURLString: String?
     public var originalImageName: String?
@@ -196,6 +197,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     public init(
         id: UUID,
         imagePath: String? = nil,
+        isCamera: Bool = false,
         webURLString: String? = nil,
         actualWebURLString: String? = nil,
         originalImageName: String? = nil,
@@ -242,6 +244,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     ) {
         self.id = id
         self.imagePath = imagePath
+        self.isCamera = isCamera
         self.webURLString = webURLString
         self.actualWebURLString = actualWebURLString
         self.originalImageName = originalImageName
@@ -288,13 +291,14 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction
+        case isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         imagePath = try container.decodeIfPresent(String.self, forKey: .imagePath)
+        isCamera = try container.decodeIfPresent(Bool.self, forKey: .isCamera) ?? false
         webURLString = try container.decodeIfPresent(String.self, forKey: .webURLString)
         actualWebURLString = try container.decodeIfPresent(String.self, forKey: .actualWebURLString)
         originalImageName = try container.decodeIfPresent(String.self, forKey: .originalImageName)
@@ -367,6 +371,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
             return fileList.kind.historySymbolName
         }
         if let contentKind { return contentKind.symbolName }
+        if isCamera { return "camera" }
         if self.webURLString != nil {
             return "globe"
         } else if self.imagePath != nil {
@@ -488,6 +493,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
             return markdownHistoryDisplayName
         }
         if let storedDisplayTitle, !storedDisplayTitle.isEmpty { return storedDisplayTitle }
+        if isCamera { return NSLocalizedString("Camera Foil", comment: "") }
         if let webURLString = self.webURLString {
             return self.originalImageName ?? webURLString
         } else if let imagePath = self.imagePath {

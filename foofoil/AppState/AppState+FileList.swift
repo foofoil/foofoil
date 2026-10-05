@@ -14,7 +14,7 @@ extension AppState {
     static let fileListNavigatorID = "builtin.file-list"
 
     var hasOpenedContent: Bool {
-        imageURL != nil
+        isCamera || imageURL != nil
             || webURL != nil
             || textURL != nil
             || extensionSession != nil

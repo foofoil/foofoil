@@ -108,6 +108,12 @@ extension AppDelegate {
         openWebURLItem.representedObject = "file.openURL"
         openWebURLItem.target = self
         fileMenu.addItem(openWebURLItem)
+        let cameraItem = NSMenuItem(title: NSLocalizedString("Open Camera", comment: ""), action: #selector(openCameraAction), keyEquivalent: "")
+        cameraItem.withSymbol("camera")
+        cameraItem.representedObject = "file.openCamera"
+        cameraItem.target = self
+        cameraItem.isHidden = !CameraCaptureController.isAvailable
+        fileMenu.addItem(cameraItem)
 
         let saveAsItem = NSMenuItem(title: NSLocalizedString("Save As...", comment: ""), action: #selector(saveAsAction), keyEquivalent: "s")
         saveAsItem.withSymbol("square.and.arrow.down")

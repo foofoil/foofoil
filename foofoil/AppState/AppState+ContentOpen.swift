@@ -48,6 +48,7 @@ extension AppState {
                 self.showBorder = false
             }
             self.createdAt = Date()
+            self.stopCamera()
             self.webURL = nil
             self.actualWebURL = nil
             if let cachedURL = cacheImage(from: url, itemToken: cacheToken) {
@@ -119,6 +120,7 @@ extension AppState {
                 self.mediaPlaybackMode = .sequentialLoop
             }
             self.createdAt = Date()
+            self.stopCamera()
             self.webURL = nil
             self.actualWebURL = nil
             // 窗口打开期间保持沙盒访问，同目录封面才能作为关联项读取
@@ -521,6 +523,7 @@ extension AppState {
             self.imageScale = 1.0
             self.createdAt = Date()
             self.imageURL = nil
+            self.stopCamera()
             self.webURL = cachedURL
             self.actualWebURL = nil
         }
@@ -583,6 +586,7 @@ extension AppState {
                 self.originalImageName = url.lastPathComponent
                 self.imageSource = nil
                 self.imageURL = nil
+                self.stopCamera()
                 self.webURL = nil
                 self.actualWebURL = nil
                 self.showBorder = true
@@ -733,6 +737,7 @@ extension AppState {
                     self.id = targetID
                     self.stopVideoAccess()
                     self.imageURL = nil
+                    self.stopCamera()
                     self.webURL = nil
                     self.actualWebURL = nil
                     self.textURL = nil
@@ -874,6 +879,7 @@ extension AppState {
                     self.isBatchUpdating = true
                     self.stopVideoAccess()
                     self.imageURL = nil
+                    self.stopCamera()
                     self.webURL = nil
                     self.actualWebURL = nil
                     self.textURL = nil
@@ -1274,7 +1280,8 @@ extension AppState {
         }
 
         public func saveWebScreenshot(_ image: NSImage, triggerSavePanel: Bool = false) {
-            guard webURL != nil else { return }
+            guard webURL != nil || isCamera else { return }
+            let sourceID = id
 
             DispatchQueue.global(qos: .utility).async { [weak self] in
                 guard let self = self else { return }
@@ -1289,7 +1296,7 @@ extension AppState {
                 do {
                     try pngData.write(to: destURL)
                     DispatchQueue.main.async {
-                        guard self.webURL != nil else { return }
+                        guard self.id == sourceID, self.webURL != nil || self.isCamera else { return }
                         self.imageURL = destURL
 
                         if triggerSavePanel {
@@ -1340,6 +1347,7 @@ extension AppState {
                         self.imageSource = imageSource
                         self.showBorder = false
                         self.createdAt = Date()
+                        self.stopCamera()
                         self.webURL = nil
                         self.actualWebURL = nil
                         self.imageURL = destURL

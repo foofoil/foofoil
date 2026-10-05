@@ -65,7 +65,14 @@ extension AppDelegate {
     @objc func saveAsAction() {
         guard let appState = activeAppState else { return }
 
-        if let webURL = appState.webURL, !webURL.isFileURL {
+        if appState.isCamera {
+            let id = appState.id
+            appState.cameraController?.capture { [weak appState] image in
+                guard let appState, appState.id == id, appState.isCamera, let image else { return }
+                NotificationCenter.default.post(name: Notification.Name("flashWindow_\(id.uuidString)"), object: nil)
+                appState.saveWebScreenshot(image, triggerSavePanel: true)
+            }
+        } else if let webURL = appState.webURL, !webURL.isFileURL {
             // 在线网页：先出发截图和闪白信号
             NotificationCenter.default.post(
                 name: Notification.Name("triggerSaveSnapshot_\(appState.id.uuidString)"),
@@ -167,8 +174,16 @@ extension AppDelegate {
         var defaultName = "Untitled"
         var allowedTypes: [UTType] = []
 
-        // 1. 优先判定是否为网页模式 (即便后台已缓存网页截图 imageURL，核心类型依然属于网页)
-        if let webURL = appState.webURL {
+        // 摄像头截图使用本地时间后缀；新打开的箔片名称及历史标题不随保存动作改变。
+        if appState.isCamera {
+            guard appState.imageURL != nil else { return }
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.dateFormat = "yyyyMMdd_HHmmss"
+            defaultName = NSLocalizedString("Camera Foil", comment: "") + "_" + formatter.string(from: Date()) + ".png"
+            allowedTypes = [.png]
+        // 网页模式优先于其截图缓存。
+        } else if let webURL = appState.webURL {
             if webURL.isFileURL {
                 if let name = appState.originalImageName, !name.isEmpty {
                     defaultName = name
@@ -769,7 +784,17 @@ extension AppDelegate {
     }
 
     @objc func captureImageFoofoilAction() {
-        guard let appState = activeAppState, appState.webURL != nil else { return }
+        guard let appState = activeAppState else { return }
+        if appState.isCamera {
+            let id = appState.id
+            appState.cameraController?.capture { [weak appState] image in
+                guard let appState, appState.id == id, appState.isCamera, let image else { return }
+                NotificationCenter.default.post(name: Notification.Name("flashWindow_\(id.uuidString)"), object: nil)
+                appState.createNewFoofoilFromScreenshot(image: image, backingScaleFactor: 1)
+            }
+            return
+        }
+        guard appState.webURL != nil else { return }
         NotificationCenter.default.post(
             name: Notification.Name("captureImageFoofoil_\(appState.id.uuidString)"),
             object: nil

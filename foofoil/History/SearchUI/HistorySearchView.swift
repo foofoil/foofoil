@@ -24,11 +24,21 @@ struct HistorySearchView: View {
                     ScrollViewReader { proxy in
                         ScrollView {
                             VStack(alignment: .leading, spacing: 2) {
+                                if model.showsOpenCamera {
+                                    Button { model.openCamera?() } label: {
+                                        Label(NSLocalizedString("Open Camera", comment: ""), systemImage: "camera")
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                        .buttonStyle(.plain)
+                                        .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+                                        .background(model.selectedID == "camera" ? Color.accentColor.opacity(0.15) : Color.clear)
+                                        .contentShape(Rectangle()).id("camera")
+                                }
                                 if !model.results.isEmpty {
                                     sectionLabel("Search History Section")
                                 }
                                 ForEach(Array(model.results.enumerated()), id: \.element.id) { index, result in
-                                    HistorySearchResultRow(result: result, isSelected: model.selectedIndex == index)
+                                    HistorySearchResultRow(result: result, isSelected: model.selectedID == "history:\(result.id)")
                                         .id("history:\(result.id)")
                                         .onTapGesture { model.open(result) }
                                         .contextMenu {
@@ -40,7 +50,7 @@ struct HistorySearchView: View {
                                 if model.mode == .history {
                                     sectionLabel("Local Files Section")
                                     ForEach(Array(model.files.enumerated()), id: \.element.id) { index, file in
-                                        SpotlightFileResultRow(file: file, isSelected: model.selectedIndex == model.results.count + index)
+                                        SpotlightFileResultRow(file: file, isSelected: model.selectedID == "file:\(file.id)")
                                             .id("file:\(file.id)")
                                             .onTapGesture { model.openFile?(file.url) }
                                     }
@@ -60,7 +70,7 @@ struct HistorySearchView: View {
                                     }
                                 }
                                 if let url = model.openURL {
-                                    OpenURLSearchResultRow(url: url, isSelected: model.selectedIndex == model.results.count + model.files.count)
+                                    OpenURLSearchResultRow(url: url, isSelected: model.selectedID == "url:\(url.absoluteString)")
                                         .id("url:\(url.absoluteString)")
                                         .onTapGesture { model.openURLResult() }
                                 }

@@ -28,6 +28,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             updateExtractImageSubjectMenuItem()
         } else if let fileMenu, menu === fileMenu {
             updateFileMenu(menu)
+            setMenuItem(withAction: #selector(openCameraAction), in: menu, isHidden: !CameraCaptureController.isAvailable)
         } else if let goMenu, menu === goMenu {
             updateGoMenu(goMenu)
         } else if let viewMenu, menu === viewMenu {
@@ -139,7 +140,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             return
         }
 
-        let isImageMode = appState.imageURL != nil && appState.webURL == nil
+        let isImageMode = appState.usesImagePresentation
         let isWebMode = appState.webURL != nil
         // 子菜单已扁平进视图菜单，按 action 逐项控制导航面板两项的显隐。
         let navigatorItemsHidden = appState.navigatorContributions.isEmpty
@@ -150,7 +151,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         setMenuItem(
             withAction: #selector(toggleShowBorderAction),
             in: menu,
-            isHidden: appState.isFullScreen || !(isImageMode || isWebMode)
+            isHidden: appState.isFullScreen || !(isImageMode || isWebMode || appState.isCamera)
         )
 
         setMenuItem(
@@ -163,7 +164,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         setMenuItem(withAction: #selector(reloadPageAction), in: menu, isHidden: !isWebMode)
 
         // 1.6 Capture Image Foofoil 菜单项
-        setMenuItem(withAction: #selector(captureImageFoofoilAction), in: menu, isHidden: !isWebMode)
+        setMenuItem(withAction: #selector(captureImageFoofoilAction), in: menu, isHidden: !(isWebMode || appState.isCamera))
 
         // 2. Select Color 菜单项 (仅在 SVG 且为图片模式下有用)
         let isSVG = isImageMode && appState.isSVG
@@ -213,6 +214,10 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
 
         if menuItem.action == #selector(saveAsAction) {
             guard let appState = activeAppState else { return false }
+            if appState.isCamera {
+                menuItem.title = NSLocalizedString("Save Screenshot...", comment: "")
+                return appState.cameraController?.hasFrame == true
+            }
             if let webURL = appState.webURL, !webURL.isFileURL {
                 menuItem.title = NSLocalizedString("Save Screenshot...", comment: "")
                 return appState.imageURL != nil
@@ -257,7 +262,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             // 仅图片和网页模式支持切换视觉边框。
             guard let appState = activeAppState,
                   !appState.isFullScreen,
-                  appState.imageURL != nil || appState.webURL != nil else {
+                  appState.isCamera || appState.imageURL != nil || appState.webURL != nil else {
                 menuItem.state = .off
                 return false
             }
@@ -308,7 +313,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         if menuItem.action == #selector(fitWindowToImageAction) ||
             menuItem.action == #selector(fitImageToWindowWidthAction) {
             guard let appState = activeAppState else { return false }
-            let isImageMode = appState.imageURL != nil && appState.webURL == nil
+            let isImageMode = appState.usesImagePresentation
             return isImageMode && appState.showBorder
         }
 

@@ -223,7 +223,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     public init(appState: AppState) {
         self.appState = appState
         self.navigatorPanelController = NavigatorPanelController(appState: appState)
-        self.isRestoringSavedImageFrame = (appState.windowFrame != nil && appState.imageURL != nil)
+        self.isRestoringSavedImageFrame = (appState.windowFrame != nil && appState.usesImagePresentation)
         self.isRestoringSavedWebFrame = (appState.windowFrame != nil && appState.webURL != nil)
         self.pendingSavedFrameRestore = self.isRestoringSavedImageFrame
 
@@ -412,7 +412,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         // 监听新图片/视频拖入或载入以进行一次自适应大小调整
         appState.$imageURL
             .sink { [weak self] imageURL in
-                guard let self = self, let url = imageURL else { return }
+                guard let self = self, !self.appState.isCamera, let url = imageURL else { return }
                 let isFirst = self.isFirstImageURLChange
                 self.isFirstImageURLChange = false
 
@@ -504,6 +504,28 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                 }
                 // 同步调整窗口大小，使窗口物理尺寸调整与 SwiftUI 视图的最新状态在同一 RunLoop 内同步渲染完成
                 self.fitWindowToCurrentImageSize(showBorderOverride: showBorder, animated: false)
+            }
+            .store(in: &cancellables)
+
+        // 摄像头首帧才确定原始尺寸；复用图片布局，恢复历史时保留用户保存的窗口大小。
+        appState.$cameraController
+            .map { controller -> AnyPublisher<NSSize?, Never> in
+                controller?.$frameSize.eraseToAnyPublisher() ?? Just(nil).eraseToAnyPublisher()
+            }
+            .switchToLatest()
+            .sink { [weak self] size in
+                DispatchQueue.main.async {
+                    guard let self, self.appState.isCamera, let size,
+                          self.appState.cameraController?.frameSize == size else { return }
+                    self.applyWindowSizeLimits()
+                    if self.appState.isFullScreen || self.isTransitioningFullScreen || self.isLiveResizing { return }
+                    if self.isRestoringFrame || self.pendingSavedFrameRestore {
+                        self.pendingSavedFrameRestore = false
+                        if !self.appState.showBorder { self.restoreSavedMediaFrameIfNeeded(contentSize: size) }
+                    } else {
+                        self.initializeImageLayout(imageSize: size, animated: false)
+                    }
+                }
             }
             .store(in: &cancellables)
 
@@ -777,7 +799,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     /// 与 ContentView 的 `shouldHideBorder` 同源：全屏，或图片/网页/音频箔隐藏了视觉边框。
     private var shouldHideBorder: Bool {
         appState.isFullScreen
-            || ((appState.imageURL != nil || appState.webURL != nil || appState.isAudioDocument) && !appState.showBorder)
+            || ((appState.isCamera || appState.imageURL != nil || appState.webURL != nil || appState.isAudioDocument) && !appState.showBorder)
     }
 
     /// 无边框（含全屏）时关闭系统窗口阴影：透明内容箔片上的阴影会沿内容轮廓描出一圈细黑线。
@@ -1448,6 +1470,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func currentContentSize() -> NSSize? {
+        if appState.isCamera { return appState.cameraController?.frameSize }
         if appState.isPPTXDocument {
             return appState.pptxNavigationController.slideSize
         }
@@ -1673,7 +1696,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func resizeWindowForPinch(magnification: CGFloat) {
-        guard appState.imageURL == nil || appState.isExternalMediaDocument || appState.isQuickLookDocument || appState.webURL != nil, let window = window else { return }
+        guard !appState.isCamera, appState.imageURL == nil || appState.isExternalMediaDocument || appState.isQuickLookDocument || appState.webURL != nil, let window = window else { return }
 
         if pinchResizeInitialSize == nil {
             pinchResizeInitialSize = window.frame.size
@@ -1977,6 +2000,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     public func windowWillClose(_ notification: Notification) {
+        appState.cameraController?.stop()
         pendingFrameSave?.cancel()
         pendingZoomCommit?.cancel()
         pendingNavigatorPanelHide?.cancel()
@@ -2021,7 +2045,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private var isImageMode: Bool {
-        appState.imageURL != nil && appState.webURL == nil
+        appState.usesImagePresentation
     }
 
     /// 音频始终锁定封面/卡片比例；无边框图片与视频拖拽时同样整体等比缩放。
@@ -2124,6 +2148,13 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     /// 历史窗口框已经 setFrame 之后，仅在比例明显不对时按已保存尺寸就近校正。
     private func correctRestoredContentWindowAspect() {
+        if appState.isCamera {
+            if let size = currentContentSize() {
+                pendingSavedFrameRestore = false
+                if !appState.showBorder { restoreSavedMediaFrameIfNeeded(contentSize: size) }
+            }
+            return
+        }
         if appState.isExternalMediaDocument {
             // 媒体展示尺寸异步读取，等尺寸到达后由 applyMediaPresentationSize 完成校正。
             if let size = currentMediaSize {

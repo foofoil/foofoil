@@ -353,6 +353,11 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         }
     }
 
+    @Published var isCamera = false
+    @Published var cameraController: CameraCaptureController?
+    /// 摄像头画面与图片共用窗口布局及缩放规则；截图缓存不决定实时内容类型。
+    var usesImagePresentation: Bool { isCamera || (imageURL != nil && webURL == nil) }
+
     @Published public var webURL: URL? {
         didSet {
             isWebEditableElementFocused = false
@@ -434,7 +439,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     /// 空白箔：尚未加载任何图像、网页、扩展会话或关联文件，且用户尚未输入任何文本内容。
     /// 在用户输入内容前空白箔不是文档类型，不显示文档背景，也不允许配置样式和主题。
     public var isBlank: Bool {
-        imageURL == nil
+        !isCamera && imageURL == nil
             && webURL == nil
             && textURL == nil
             && extensionSession == nil
@@ -693,6 +698,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
             self.actualWebURL = nil
         }
         super.init()
+        if config.isCamera { openCamera() }
         restoreFileList(from: config)
         restoreExtensionSession(from: config)
         restoreCustomCover(from: config)
@@ -750,6 +756,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     }
 
     deinit {
+        cameraController?.stop()
         navigatorMetadataTask?.cancel()
         renderTask?.cancel()
         saveTask?.cancel()

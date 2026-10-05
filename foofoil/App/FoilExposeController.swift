@@ -29,6 +29,7 @@ enum FoilExposeMoveDirection: Equatable {
 /// controller 为 nil 表示占位卡（新建空白箔）或历史记录条目（isHistoryEntry）。
 struct FoilExposeItem: Identifiable {
     /// 文档型卡片正文的截取上限：只作渲染兜底，实际可见行数由卡片布局决定。
+    static let cameraCommandID = UUID(uuidString: "67A8D052-221D-4121-B733-0F66AE5B88DF")!
     static let bodyPreviewCharacterLimit = 600
 
     let id: UUID
@@ -44,7 +45,7 @@ struct FoilExposeItem: Identifiable {
     var bodyPreview: String? = nil
 
     var window: NSWindow? { controller?.window }
-    var isNewFoil: Bool { controller == nil && !isHistoryEntry }
+    var isNewFoil: Bool { controller == nil && !isHistoryEntry && id != Self.cameraCommandID }
 
     /// 文档型条目的正文预览：跳过首尾空白后截取开头；空白正文与非文档类型返回 nil，卡片回退到类型图标。
     static func makeBodyPreview(kind: HistoryContentKind, text: String) -> String? {
@@ -112,6 +113,7 @@ final class FoilExposeModel: ObservableObject {
     /// 面板视图当前可见条目的 id（按显示顺序），随滚动实时回填；编号直选只命中可见项。
     private var visibleIDs: [UUID] = []
     private let fileSearch: (String, @escaping (SpotlightSearchOutcome) -> Void) -> Void
+    private let cameraAvailable: () -> Bool
     private let cancelFiles: () -> Void
     private var fileSearchTask: Task<Void, Never>?
     private var fileGeneration = 0
@@ -121,7 +123,9 @@ final class FoilExposeModel: ObservableObject {
          historyItems: [FoilExposeItem],
          clipboardContent: ClipboardOpenableContent? = nil,
          fileSearch: ((String, @escaping (SpotlightSearchOutcome) -> Void) -> Void)? = nil,
-         cancelFiles: (() -> Void)? = nil) {
+         cancelFiles: (() -> Void)? = nil,
+         cameraAvailable: @escaping () -> Bool = { CameraCaptureController.isAvailable }) {
+        self.cameraAvailable = cameraAvailable
         self.items = items
         self.historyItems = historyItems
         self.clipboardContent = clipboardContent
@@ -143,7 +147,8 @@ final class FoilExposeModel: ObservableObject {
         let openIDs = Set(items.map(\.id))
         let combined = items + historyItems.filter { !openIDs.contains($0.id) }
         guard !searchQuery.isEmpty else { return combined }
-        return combined.filter { $0.matches(query: searchQuery) }
+        let command = CameraCaptureController.matches(searchQuery, available: cameraAvailable()) ? [FoilExposeItem(id: FoilExposeItem.cameraCommandID, controller: nil, isHistoryEntry: false, title: NSLocalizedString("Open Camera", comment: ""), symbolName: "camera", contentKind: .camera, thumbnailPath: nil)] : []
+        return command + combined.filter { $0.matches(query: searchQuery) }
     }
 
     /// 高亮条目：越界时回退到第一项。
@@ -597,7 +602,9 @@ final class FoilExposeController {
             dismiss()
             NSApp.activate(ignoringOtherApps: true)
             let appDelegate = NSApplication.shared.delegate as? AppDelegate
-            if item.isHistoryEntry {
+            if item.id == FoilExposeItem.cameraCommandID {
+                appDelegate?.openCameraAction()
+            } else if item.isHistoryEntry {
                 appDelegate?.openSearchResultInNewWindow(id: item.id)
             } else {
                 appDelegate?.showNewWindow(with: AppState())
@@ -704,7 +711,7 @@ final class FoilExposeController {
             }
             // ⌘O/⌘P/⌘L 会打开文件对话框、历史搜索等新视图：先收起覆盖层再放行给菜单，
             // 避免打开的内容被覆盖层挡住。
-            let opensAnotherView = ["file.openURL", "history.search"].contains {
+            let opensAnotherView = ["file.openURL", "file.openCamera", "history.search"].contains {
                 KeyboardShortcutStore.shared.matches(event, identifier: $0)
             }
             if (onlyCommand && key == "o") || opensAnotherView {

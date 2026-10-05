@@ -1,6 +1,22 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "NSCameraUsageDescription" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Display live camera content in a foil and capture snapshots."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在箔中显示摄像头实时画面并截取图像。"
+          }
+        }
+      }
+    },
   "Open in foofoil": {
     "extractionState": "manual",
     "localizations": {

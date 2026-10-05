@@ -20,7 +20,7 @@ extension AppState {
             guard !isBatchUpdating, !isAdjustingDocumentStyling else { return }
             let config = toConfig()
             let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if imageURL != nil || webURL != nil || textURL != nil || extensionSession != nil || !trimmedText.isEmpty {
+            if isCamera || imageURL != nil || webURL != nil || textURL != nil || extensionSession != nil || !trimmedText.isEmpty {
                 HistoryManager.shared.addToHistory(config)
             }
         }
@@ -133,6 +133,8 @@ extension AppState {
                 }
             }
 
+            stopCamera()
+            if config.isCamera { openCamera() }
             if let webStr = config.webURLString, let url = URL(string: webStr) {
                 self.webURL = url
             } else {
@@ -200,6 +202,7 @@ extension AppState {
             return WindowConfig(
                 id: id,
                 imagePath: imageURL?.path,
+                isCamera: isCamera,
                 webURLString: webURL?.absoluteString,
                 actualWebURLString: actualWebURL?.absoluteString,
                 originalImageName: originalImageName,
@@ -224,6 +227,7 @@ extension AppState {
                 contentKind: isQuickLookDocument ? .quickLook : HistoryContentKind.infer(from: WindowConfig(
                     id: id,
                     imagePath: imageURL?.path,
+                    isCamera: isCamera,
                     webURLString: webURL?.absoluteString,
                     originalImageName: originalImageName,
                     text: text,

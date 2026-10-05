@@ -88,6 +88,7 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("file.addToList", "Add to List...", nil, []),
         openClipboardContent,
         definition("file.openURL", "Open URL Menu Item", "l", [.command]),
+        definition("file.openCamera", "Open Camera", nil, []),
         definition("file.share", "Share...", nil, []),
         definition("file.openInBrowser", "Shortcut Open in Browser", nil, [], "Shortcut Scope Web"),
         definition("file.copyURL", "Copy URL", "c", [.command, .option], "Shortcut Scope Web"),

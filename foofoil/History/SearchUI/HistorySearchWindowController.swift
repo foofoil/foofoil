@@ -54,6 +54,7 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
         model.openResult = { id in
             (NSApplication.shared.delegate as? AppDelegate)?.openSearchResultInNewWindow(id: id)
         }
+        model.openCamera = { (NSApp.delegate as? AppDelegate)?.openCameraAction() }
         model.openWebURL = { url in
             (NSApplication.shared.delegate as? AppDelegate)?.openWebURLInPreferredWindow(url)
         }

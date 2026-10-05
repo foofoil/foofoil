@@ -14,9 +14,11 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
     case extensionContent = 9
     case ebook = 10
     case quickLook = 11
+    case camera = 12
 
     public var symbolName: String {
         switch self {
+        case .camera: return "camera"
         case .quickLook: return "doc"
         case .web: return "globe"
         case .image: return "photo"
@@ -35,7 +37,7 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
     public var storesIndexedText: Bool {
         switch self {
         case .note, .text, .markdown, .csv: return true
-        case .image, .web, .pdf, .video, .audio, .extensionContent, .ebook, .quickLook: return false
+        case .camera, .image, .web, .pdf, .video, .audio, .extensionContent, .ebook, .quickLook: return false
         }
     }
 
@@ -47,6 +49,7 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
         // EPUB 由扩展承载，但历史仍按电子书归类，便于展示书名与书本图标。
         if name.hasSuffix(".epub") { return .ebook }
         if config.extensionID != nil { return .extensionContent }
+        if config.isCamera { return .camera }
         if config.webURLString != nil { return .web }
         if name.hasSuffix(".pdf") { return .pdf }
         if config.imagePath != nil {

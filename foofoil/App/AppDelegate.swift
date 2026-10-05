@@ -47,7 +47,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func isBlank(_ appState: AppState) -> Bool {
-        appState.imageURL == nil
+        !appState.isCamera && appState.imageURL == nil
             && appState.webURL == nil
             && appState.textURL == nil
             && appState.extensionSession == nil
