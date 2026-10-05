@@ -53,6 +53,30 @@ public class FloatingWindow: NSWindow {
 
     }
 
+    public override func setFrame(_ frameRect: NSRect, display flag: Bool) {
+        let controller = windowController as? FloatingWindowController
+        guard !styleMask.contains(.fullScreen), controller?.usesFullScreenFrame != true,
+              let screen = screen ?? NSScreen.main else {
+            super.setFrame(frameRect, display: flag)
+            return
+        }
+        // 所有尺寸入口统一遵守可用屏幕上限，历史恢复和程序化缩放也不能绕过。
+        let size = Self.sizeFittingVisibleScreen(frameRect.size, visibleSize: screen.visibleFrame.size)
+        var target = frameRect
+        target.origin.y += frameRect.height - size.height
+        target.size = size
+        super.setFrame(target, display: flag)
+    }
+
+    nonisolated static func sizeFittingVisibleScreen(_ size: NSSize, visibleSize: NSSize) -> NSSize {
+        guard size.width.isFinite, size.height.isFinite,
+              size.width > 0, size.height > 0,
+              visibleSize.width > 0, visibleSize.height > 0 else { return size }
+        let scale = min(1, visibleSize.width / size.width, visibleSize.height / size.height)
+        return NSSize(width: min(visibleSize.width, size.width * scale),
+                      height: min(visibleSize.height, size.height * scale))
+    }
+
     // 【重点说明】
     // 默认情况下，.borderless 窗口无法成为 key 窗口或 main 窗口，
     // 这会导致无法接受键盘事件（比如 TextEditor 无法打字，Cmd+W / Cmd+Q 快捷键失效）。

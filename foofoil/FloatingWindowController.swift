@@ -209,6 +209,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     private var navigatorHoverGlobalMonitor: Any?
     private var navigatorScrollLocalMonitor: Any?
     private var isTransitioningFullScreen = false
+    var usesFullScreenFrame: Bool { appState.isFullScreen || isTransitioningFullScreen }
     private var insertedResizableForFullScreen = false
     private var windowedFrameDescriptorBeforeFullScreen: String?
     /// 置顶切换光晕的临时面板；仅在做提示动画时存在。
@@ -1616,7 +1617,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         var newHeight = size.height
         let minSize = minimumWindowSize(showBorderOverride: showBorderOverride)
         let maxSize: NSSize? = window.screen.map {
-            NSSize(width: $0.visibleFrame.width * 0.85, height: $0.visibleFrame.height * 0.85)
+            NSSize(width: $0.visibleFrame.width, height: $0.visibleFrame.height)
         }
         let clamped = clampedSizePreservingAspect(
             NSSize(width: newWidth, height: newHeight),
@@ -1755,7 +1756,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
         var fittedSize = targetSize
         if let screen = window.screen {
-            let maximumSize = NSSize(width: screen.visibleFrame.width * 0.85, height: screen.visibleFrame.height * 0.85)
+            let maximumSize = NSSize(width: screen.visibleFrame.width, height: screen.visibleFrame.height)
             let scale = min(1, maximumSize.width / fittedSize.width, maximumSize.height / fittedSize.height)
             fittedSize = NSSize(width: fittedSize.width * scale, height: fittedSize.height * scale)
         }
@@ -2195,7 +2196,9 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             width = max(minSize.width, width)
             height = max(minSize.height, height)
         }
-        return sanitizedWindowSize(NSSize(width: width, height: height), fallback: minSize)
+        let result = sanitizedWindowSize(NSSize(width: width, height: height), fallback: minSize)
+        // 极端比例下最小边长可能再次撑破上限；屏幕上限优先，并保留内容比例。
+        return maxSize.map { FloatingWindow.sizeFittingVisibleScreen(result, visibleSize: $0) } ?? result
     }
 
     private func minimumWindowLength(showBorderOverride: Bool? = nil) -> CGFloat {
