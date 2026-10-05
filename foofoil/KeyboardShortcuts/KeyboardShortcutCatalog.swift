@@ -13,7 +13,7 @@ nonisolated struct KeyboardShortcutDefinition: Identifiable, Hashable {
     let titleKey: String
     /// nil 表示默认没有快捷键，由用户按需设置。
     let defaultShortcut: KeyboardShortcut?
-    /// 仅对部分内容类型有效的命令在此给出说明键；nil 表示对所有箔片都有效。
+    /// 可选的生效范围或使用条件说明；nil 表示没有额外说明。
     let noteKey: String?
 
     var displayName: String {
@@ -30,25 +30,27 @@ nonisolated struct KeyboardShortcutDefinition: Identifiable, Hashable {
 nonisolated enum KeyboardShortcutSection: String, CaseIterable, Identifiable {
     case global
     case file
-    case edit
     case go
-    case playback
-    case history
     case view
+    case image
+    case web
+    case playback
     case window
+    case history
 
     var id: String { rawValue }
 
     var titleKey: String {
         switch self {
-        case .global: return "Global"
-        case .file: return "File"
-        case .edit: return "Edit"
-        case .go: return "Go"
+        case .global: return "Shortcut Group Global"
+        case .file: return "Shortcut Group Content"
+        case .go: return "Shortcut Group Navigation"
+        case .view: return "Shortcut Group Display"
+        case .image: return "Shortcut Group Images"
+        case .web: return "Shortcut Group Web"
         case .playback: return "Shortcut Playback"
-        case .history: return "History"
-        case .view: return "View"
         case .window: return "Window"
+        case .history: return "History"
         }
     }
 
@@ -56,12 +58,13 @@ nonisolated enum KeyboardShortcutSection: String, CaseIterable, Identifiable {
         switch self {
         case .global: return KeyboardShortcutCatalog.global
         case .file: return KeyboardShortcutCatalog.file
-        case .edit: return KeyboardShortcutCatalog.edit
         case .go: return KeyboardShortcutCatalog.go
-        case .playback: return KeyboardShortcutCatalog.playback
-        case .history: return KeyboardShortcutCatalog.history
         case .view: return KeyboardShortcutCatalog.view
+        case .image: return KeyboardShortcutCatalog.image
+        case .web: return KeyboardShortcutCatalog.web
+        case .playback: return KeyboardShortcutCatalog.playback
         case .window: return KeyboardShortcutCatalog.window
+        case .history: return KeyboardShortcutCatalog.history
         }
     }
 }
@@ -77,12 +80,13 @@ nonisolated struct KeyboardShortcutSearchResult: Identifiable {
 nonisolated enum KeyboardShortcutCatalog {
     static var sections: [KeyboardShortcutSection] { KeyboardShortcutSection.allCases }
 
+    static let openClipboardContent = definition("file.openClipboardContent", "Open Clipboard Content", "v", [.command, .shift], "Shortcut Scope App")
+
+    // 设置页按操作目的分组；命令标识和默认键位保持稳定，菜单仍按原有结构组织。
     static let global: [KeyboardShortcutDefinition] = [
         definition("window.showAllFoils", "Foil Overview", "\u{1B}", [.control, .shift]),
-        definition("global.openClipboardContent", "Open Clipboard Content", nil, [])
+        definition("global.openClipboardContent", "Open Clipboard Content", nil, [], "Shortcut Scope Global")
     ]
-
-    static let openClipboardContent = definition("file.openClipboardContent", "Open Clipboard Content", "v", [.command, .shift])
 
     static let file: [KeyboardShortcutDefinition] = [
         definition("file.addToList", "Add to List...", nil, []),
@@ -90,15 +94,7 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("file.openURL", "Open URL Menu Item", "l", [.command]),
         definition("file.openCamera", "Open Camera", nil, []),
         definition("file.share", "Share...", nil, []),
-        definition("file.openInBrowser", "Shortcut Open in Browser", nil, [], "Shortcut Scope Web"),
-        definition("file.copyURL", "Copy URL", "c", [.command, .option], "Shortcut Scope Web"),
         definition("file.reset", "Reset", "k", [.command])
-    ]
-
-    /// 编辑菜单命令；图片取字与取主体只对光栅图片箔有效，取主体还要先检测到主体。
-    static let edit: [KeyboardShortcutDefinition] = [
-        definition("edit.extractText", "Extract Text", "e", [.command], "Shortcut Scope Images"),
-        definition("edit.extractImageSubject", "Extract Image Subject", nil, [.command, .option], "Shortcut Scope Images")
     ]
 
     static let go: [KeyboardShortcutDefinition] = [
@@ -106,7 +102,32 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("go.nextPage", "Next Page", "\u{F703}", [], "Shortcut Scope PDF"),
         definition("go.goToPage", "Go to Page Menu Item", "g", [.command], "Shortcut Scope PDF"),
         definition("go.previousItem", "Previous Item", "\u{F700}", [], "Shortcut Scope Lists"),
-        definition("go.nextItem", "Next Item", "\u{F701}", [], "Shortcut Scope Lists")
+        definition("go.nextItem", "Next Item", "\u{F701}", [], "Shortcut Scope Lists"),
+        definition("view.toggleNavigator", "Always Show Navigator", "l", [.command, .shift], "Shortcut Scope Navigator"),
+        definition("view.moveNavigatorSide", "Shortcut Switch Navigator Side", "l", [.command, .option], "Shortcut Scope Navigator")
+    ]
+
+    static let view: [KeyboardShortcutDefinition] = [
+        definition("view.zoomInContent", "Zoom In Content", "+", [.command]),
+        definition("view.zoomOutContent", "Zoom Out Content", "-", [.command]),
+        definition("view.actualSize", "Actual Size", "0", [.command]),
+        definition("view.documentStyle", "Document Style", "i", [.command], "Shortcut Scope Document Style")
+    ]
+
+    static let image: [KeyboardShortcutDefinition] = [
+        definition("edit.extractText", "Extract Text", "e", [.command], "Shortcut Scope Raster Images"),
+        definition("edit.extractImageSubject", "Extract Image Subject", nil, [.command, .option], "Shortcut Scope Detected Image Subject"),
+        definition("view.selectColor", "Select Color", nil, [], "Shortcut Scope SVG"),
+        definition("view.slideshow", "Slideshow", nil, [], "Shortcut Scope Image Lists"),
+        definition("view.fitWindowToImage", "Fit Window to Image", "[", [.command], "Shortcut Scope Bordered Images"),
+        definition("view.fitImageToWindowWidth", "Fit Image to Window Width", "]", [.command], "Shortcut Scope Bordered Images")
+    ]
+
+    static let web: [KeyboardShortcutDefinition] = [
+        definition("file.openInBrowser", "Shortcut Open in Browser", nil, [], "Shortcut Scope Web"),
+        definition("file.copyURL", "Copy URL", "c", [.command, .option], "Shortcut Scope Web"),
+        definition("view.reloadPage", "Reload Page", "r", [.command], "Shortcut Scope Web"),
+        definition("view.captureImage", "Capture Image foofoil", nil, [], "Shortcut Scope Web")
     ]
 
     static let playback: [KeyboardShortcutDefinition] = [
@@ -115,36 +136,14 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("playback.forward", "Shortcut Seek Forward", "\u{F703}", [], "Shortcut Scope Media")
     ]
 
-    static let history: [KeyboardShortcutDefinition] = [
-        definition("history.search", "Search History Menu Item", "p", [.command]),
-        definition("history.clear", "Clear History Menu Item", nil, [])
-    ]
-
-    /// 视图菜单的全部命令；顺序与菜单一致。默认值与菜单首次建立时保持一致。
-    static let view: [KeyboardShortcutDefinition] = [
-        definition("view.togglePin", "Toggle Pin", "t", [.command]),
-        definition("view.toggleBorder", "Border", "b", [.command], "Shortcut Scope Images and Web"),
-        definition("view.slideshow", "Slideshow", nil, [], "Shortcut Scope Image Lists"),
-        definition("view.toggleFullScreen", "Enter Full Screen", "f", [.command, .control]),
-        definition("view.toggleNavigator", "Always Show Navigator", "l", [.command, .shift], "Shortcut Scope Navigator"),
-        definition("view.moveNavigatorSide", "Move Navigator to Right Side", "l", [.command, .option], "Shortcut Scope Navigator"),
-        definition("view.reloadPage", "Reload Page", "r", [.command], "Shortcut Scope Web"),
-        definition("view.captureImage", "Capture Image foofoil", nil, [], "Shortcut Scope Web"),
-        definition("view.selectColor", "Select Color", nil, [], "Shortcut Scope SVG"),
-        definition("view.zoomInContent", "Zoom In Content", "+", [.command]),
-        definition("view.zoomOutContent", "Zoom Out Content", "-", [.command]),
-        definition("view.actualSize", "Actual Size", "0", [.command]),
-        definition("view.fitWindowToImage", "Fit Window to Image", "[", [.command], "Shortcut Scope Images"),
-        definition("view.fitImageToWindowWidth", "Fit Image to Window Width", "]", [.command], "Shortcut Scope Images"),
-        definition("view.zoomOutWindow", "Zoom Out Window", "-", [.command, .shift]),
-        definition("view.zoomInWindow", "Zoom In Window", "+", [.command, .shift]),
-        definition("view.documentStyle", "Document Style", "i", [.command]),
-        definition("view.increaseOpacity", "Increase Opacity", "\u{F700}", [.command, .shift]),
-        definition("view.decreaseOpacity", "Decrease Opacity", "\u{F701}", [.command, .shift])
-    ]
-
-    /// 窗口菜单的全部命令；默认值与菜单首次建立时保持一致。
     static let window: [KeyboardShortcutDefinition] = [
+        definition("view.togglePin", "Toggle Pin", "t", [.command]),
+        definition("view.toggleBorder", "Border", "b", [.command], "Shortcut Scope Border"),
+        definition("view.toggleFullScreen", "Shortcut Toggle Full Screen", "f", [.command, .control]),
+        definition("view.zoomInWindow", "Zoom In Window", "+", [.command, .shift], "Shortcut Scope Non Full Screen"),
+        definition("view.zoomOutWindow", "Zoom Out Window", "-", [.command, .shift], "Shortcut Scope Non Full Screen"),
+        definition("view.increaseOpacity", "Increase Opacity", "\u{F700}", [.command, .shift]),
+        definition("view.decreaseOpacity", "Decrease Opacity", "\u{F701}", [.command, .shift]),
         definition("window.moveTopLeft", "Top-Left", "q"),
         definition("window.moveTop", "Top", "w"),
         definition("window.moveTopRight", "Top-Right", "e"),
@@ -155,6 +154,11 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("window.moveBottom", "Bottom", "x"),
         definition("window.moveBottomRight", "Bottom-Right", "c"),
         definition("window.moveToNextScreen", "Move to Next Screen", "\t")
+    ]
+
+    static let history: [KeyboardShortcutDefinition] = [
+        definition("history.search", "Search History Menu Item", "p", [.command]),
+        definition("history.clear", "Clear History Menu Item", nil, [])
     ]
 
     static func definition(withID id: String) -> KeyboardShortcutDefinition? {

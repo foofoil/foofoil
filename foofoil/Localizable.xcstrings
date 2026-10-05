@@ -1,50 +1,19 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "Open Camera" : {
+    "Camera Devices" : {
+      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open Camera"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "打开摄像头"
-          }
-        }
-      }
-    },
-    "Camera Foil" : {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Camera"
+            "value": "Cameras"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "摄像头"
-          }
-        }
-      }
-    },
-    "Camera Unavailable" : {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Camera unavailable"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "摄像头不可用"
           }
         }
       }
@@ -65,19 +34,306 @@
         }
       }
     },
-    "Camera Devices" : {
-      "extractionState": "manual",
+    "Camera Unavailable" : {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Cameras"
+            "value": "Camera unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "摄像头不可用"
+          }
+        }
+      }
+    },
+    "Camera Foil" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camera"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "摄像头"
+          }
+        }
+      }
+    },
+    "Open Camera" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Camera"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开摄像头"
+          }
+        }
+      }
+    },
+    "Shortcut Scope Non Full Screen" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available outside full screen"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "非全屏状态下可使用"
+          }
+        }
+      }
+    },
+    "Shortcut Scope Border" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Images and web pages outside full screen"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "适用于非全屏状态下的图片和网页"
+          }
+        }
+      }
+    },
+    "Shortcut Scope Document Style" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Documents and web pages; available options depend on content type"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "适用于文档和网页；可调选项随内容类型变化"
+          }
+        }
+      }
+    },
+    "Shortcut Scope Bordered Images" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Images with a visible border only"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅对显示边框的图片有效"
+          }
+        }
+      }
+    },
+    "Shortcut Scope Detected Image Subject" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raster images with a detected subject only"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅对检测到主体的光栅图片有效"
+          }
+        }
+      }
+    },
+    "Shortcut Scope Raster Images" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raster images only"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅对光栅图片有效"
+          }
+        }
+      }
+    },
+    "Shortcut Scope App" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available when foofoil is active"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foofoil 处于前台时可使用"
+          }
+        }
+      }
+    },
+    "Shortcut Scope Global" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available even when another app is active"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他应用处于前台时也可使用"
+          }
+        }
+      }
+    },
+    "Shortcut Switch Navigator Side" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch Navigator Side"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换导航面板位置"
+          }
+        }
+      }
+    },
+    "Shortcut Toggle Full Screen" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toggle Full Screen"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换全屏"
+          }
+        }
+      }
+    },
+    "Shortcut Group Web" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Web Tools"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网页工具"
+          }
+        }
+      }
+    },
+    "Shortcut Group Images" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Image Tools"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图片工具"
+          }
+        }
+      }
+    },
+    "Shortcut Group Display" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Content Display"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内容显示"
+          }
+        }
+      }
+    },
+    "Shortcut Group Navigation" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Navigation"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导航"
+          }
+        }
+      }
+    },
+    "Shortcut Group Content" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open and Manage Content"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内容打开与管理"
+          }
+        }
+      }
+    },
+    "Shortcut Group Global" : {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Global Shortcuts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全局快捷键"
           }
         }
       }

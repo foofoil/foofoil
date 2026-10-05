@@ -14,13 +14,13 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct TextExtractionTests {
-    /// 取字命令在快捷键设置里可配置：默认 ⌘E，仅对图片有效，改键后存储生效、可恢复默认。
+    /// 取字命令在快捷键设置里可配置：默认 ⌘E，仅对光栅图片有效，改键后存储生效、可恢复默认。
     @Test func extractTextShortcutIsConfigurable() throws {
         let definition = try #require(KeyboardShortcutCatalog.definition(withID: "edit.extractText"))
         #expect(definition.defaultShortcut == KeyboardShortcut(keyEquivalent: "e", modifiers: [.command]))
-        #expect(definition.noteKey == "Shortcut Scope Images")
-        // 编辑分组紧随文件分组，设置面板按目录顺序展示。
-        #expect(KeyboardShortcutCatalog.sections.prefix(3) == [.global, .file, .edit])
+        #expect(definition.noteKey == "Shortcut Scope Raster Images")
+        // 取字按用途归入图片工具分组。
+        #expect(KeyboardShortcutCatalog.image.contains { $0.id == definition.id })
 
         let store = KeyboardShortcutStore.shared
         let wasCustomized = store.isCustomized(definition)
