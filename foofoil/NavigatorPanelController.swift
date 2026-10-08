@@ -128,7 +128,8 @@ final class NavigatorPanelController: NSWindowController {
         )
         panel.isOpaque = false
         panel.backgroundColor = .clear
-        panel.hasShadow = false
+        // 视图阴影会被伴随窗口边界裁切，桌面态使用系统窗口阴影。
+        panel.hasShadow = true
         panel.isReleasedWhenClosed = false
         panel.isMovableByWindowBackground = true
         panel.hidesOnDeactivate = false
@@ -280,9 +281,8 @@ final class NavigatorPanelController: NSWindowController {
         panel.level = parent.level
         panel.alphaValue = parent.alphaValue
         panel.canHide = true
-        // 桌面态“始终显示”时给面板窗口投影，与箔片分层；悬停唤出保持无阴影，全屏覆盖层的
-        // 阴影由 SwiftUI 自绘、不经过这里。
-        panel.hasShadow = appState.navigatorPanelVisibilityMode == .always
+        // 桌面态两种显示模式都保留窗口投影；全屏覆盖层由 SwiftUI 绘制阴影。
+        panel.hasShadow = true
     }
 
     func updateFrame(relativeTo parent: NSWindow) {
