@@ -28,12 +28,21 @@ Customize bindings in Settings → Keyboard Shortcuts. Except for global shortcu
 | --- | --- | --- | --- |
 {{go}}
 
+Navigation lists also support ⌃P / ⌃B for the previous item and ⌃N / ⌃F for the next.
+
 
 ## Content Display
 
 | Action | Default shortcut | Current shortcut | Notes |
 | --- | --- | --- | --- |
 {{view}}
+
+| Mouse / trackpad gesture | Effect |
+| --- | --- |
+| ⌘ + mouse wheel | Zoom images; resize the window for web pages, text, Markdown, and similar content |
+| Two-finger pinch | Zoom images; resize the window for web pages, text, Markdown, audio, and video |
+
+These behaviors apply outside full screen. Borderless PDFs resize the window; bordered PDFs use native content zoom. In full screen, gestures are handled by the content view. Over the navigator, ⌘ + scroll adjusts the panel width.
 
 
 ## Image Tools
@@ -66,6 +75,7 @@ Customize bindings in Settings → Keyboard Shortcuts. Except for global shortcu
 | Close current window | ⌘W | ⌘W | May prompt to close or hide playing audio |
 {{window}}
 
+Default window positioning keys (see the table for custom bindings): Control–Option + Q/W/E selects the top row, A/S/D the middle, and Z/X/C the bottom. These default keys form the leftmost 3×3 grid in the keyboard’s letter area.
 
 ## History
 
@@ -76,14 +86,14 @@ Customize bindings in Settings → Keyboard Shortcuts. Except for global shortcu
 
 ## System and Editing
 
-| Action | Default shortcut | Current shortcut |
-| --- | --- | --- |
-| Settings | ⌘, | ⌘, |
-| Quit | ⌘Q | ⌘Q |
-| Hide other apps | ⌥⌘H | ⌥⌘H |
-| Undo / Redo | ⌘Z / ⇧⌘Z | ⌘Z / ⇧⌘Z |
-| Cut / Copy / Paste | ⌘X / ⌘C / ⌘V | ⌘X / ⌘C / ⌘V |
-| Select all | ⌘A | ⌘A |
+| Action | Shortcut |
+| --- | --- |
+| Settings | ⌘, |
+| Quit | ⌘Q |
+| Hide other apps | ⌥⌘H |
+| Undo / Redo | ⌘Z / ⇧⌘Z |
+| Cut / Copy / Paste | ⌘X / ⌘C / ⌘V |
+| Select all | ⌘A |
 
 Editing shortcuts apply to text fields or selectable content, depending on focus and content type. Hiding keeps foils open and audio playing.
 
@@ -93,6 +103,3 @@ Editing shortcuts apply to text fields or selectable content, depending on focus
 - `/` starts search; while searching, Control + number or letter selects directly.
 - Esc leaves search; press Esc again to dismiss the overview.
 - {{clipboardShortcut}} opens clipboard content.
-
-Default window positioning keys (see the table for custom bindings): Control–Option + Q/W/E selects the top row, A/S/D the middle, and Z/X/C the bottom. Lists also support ⌃P / ⌃B for the previous item and ⌃N / ⌃F for the next.
-

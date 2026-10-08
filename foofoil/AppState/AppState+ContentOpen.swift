@@ -29,6 +29,7 @@ extension AppState {
         ) {
             isBatchUpdating = true
             defer {
+                applyDefaultDocumentThemeIfNeeded()
                 isBatchUpdating = false
                 saveState()
             }
@@ -84,6 +85,7 @@ extension AppState {
         ) {
             isBatchUpdating = true
             defer {
+                applyDefaultDocumentThemeIfNeeded()
                 isBatchUpdating = false
                 saveState()
             }
@@ -512,6 +514,7 @@ extension AppState {
 
             isBatchUpdating = true
             defer {
+                applyDefaultDocumentThemeIfNeeded()
                 isBatchUpdating = false
                 saveState()
             }
@@ -573,6 +576,7 @@ extension AppState {
 
             isBatchUpdating = true
             defer {
+                applyDefaultDocumentThemeIfNeeded()
                 isBatchUpdating = false
                 saveState()
             }
@@ -763,6 +767,7 @@ extension AppState {
                             reference: outcome.session.id.uuidString.lowercased()
                         )
                     }
+                    self.applyDefaultDocumentThemeIfNeeded()
                     self.isBatchUpdating = false
                     self.saveState()
                     self.applyExtensionThumbnail(outcome.session)
@@ -907,6 +912,7 @@ extension AppState {
                             reference: stateReference
                         )
                     }
+                    self.applyDefaultDocumentThemeIfNeeded()
                     self.isBatchUpdating = false
                     self.saveState()
                     self.applyExtensionThumbnail(restoredSession)

@@ -18,7 +18,7 @@ struct DocumentThemeTests {
         let catalog = DocumentThemeCatalog.shared
         #expect(catalog.presets.count >= 6, "预设主题数量不足")
 
-        for preset in catalog.presets {
+        for preset in catalog.presets where preset.id != "none" {
             #expect(!preset.displayName.isEmpty)
 
             // 亮色外观
@@ -33,6 +33,39 @@ struct DocumentThemeTests {
             let darkContrast = contrastRatio(between: darkBg, and: darkFg)
             #expect(darkContrast >= 7.0, "\(preset.name) 暗色对比度过低：\(darkContrast):1")
         }
+    }
+
+    @Test func openedTextUsesMinimalThemeAndNoneSurvivesRestore() throws {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.openText("# 阅读内容", isMarkdown: true)
+        #expect(state.documentThemeId == "minimal")
+        #expect(state.backgroundColorHex != nil)
+        let none = try #require(DocumentThemeCatalog.shared.theme(for: "none"))
+        #expect(DocumentThemeCatalog.shared.theme(for: "obsidian") == nil)
+        state.applyDocumentTheme(none, isDark: false)
+        #expect(state.backgroundColorHex == nil)
+        #expect(state.textColorHex == nil)
+        state.adaptDocumentColorsToAppearanceChange(toDarkAppearance: true)
+        #expect(state.documentThemeId == "none")
+        #expect(state.backgroundColorHex == nil)
+        let restored = AppState(config: state.toConfig())
+        #expect(restored.documentThemeId == "none")
+        #expect(restored.backgroundColorHex == nil)
+        #expect(restored.textColorHex == nil)
+    }
+
+    @Test func openingMarkdownFileUsesDefaultTheme() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".md")
+        try "# 文件正文".write(to: url, atomically: true, encoding: .utf8)
+        let state = AppState()
+        defer {
+            try? FileManager.default.removeItem(at: url)
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        state.openTextFile(url: url)
+        #expect(state.documentThemeId == "minimal")
+        #expect(state.backgroundColorHex == DocumentThemeCatalog.defaultTheme.backgroundHex(isDark: AppState.isDarkMode()))
     }
 
     /// 应用主题时只更新前景色、背景色与主题标识，不干扰其他属性。
@@ -204,7 +237,7 @@ struct DocumentThemeTests {
         #expect(state.documentTextColor == nil)
     }
 
-    /// 用户首次输入内容时成为文档类型，并自动应用默认文档样式「素白」。
+    /// 用户首次输入内容时成为文档类型，并自动应用默认文档样式「素笺」。
     @Test func enteringContentMakesDocumentAndAppliesMinimalTheme() throws {
         let state = AppState()
         defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
@@ -242,7 +275,7 @@ struct DocumentThemeTests {
         #expect(state.textColorHex == nil)
     }
 
-    /// 文档有内容时，单独恢复背景色或文字颜色到默认值，当两色均达到默认时自动重设主题标识为「素白」。
+    /// 文档有内容时，单独恢复背景色或文字颜色到默认值，当两色均达到默认时自动重设主题标识为「素笺」。
     @Test func resetColorsToDefaultRestoresMinimalTheme() throws {
         let state = AppState()
         defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
@@ -257,7 +290,7 @@ struct DocumentThemeTests {
         state.backgroundColorHex = "#FF0000"
         #expect(state.documentThemeId == nil)
 
-        // 恢复默认背景色，由于文字颜色仍为默认值，自动恢复素白主题
+        // 恢复默认背景色，由于文字颜色仍为默认值，自动恢复素笺主题
         state.resetBackgroundColorToDefault(isDark: isDark)
         #expect(state.backgroundColorHex == defaultTheme.backgroundHex(isDark: isDark))
         #expect(state.documentThemeId == "minimal")
@@ -266,7 +299,7 @@ struct DocumentThemeTests {
         state.textColorHex = "#00FF00"
         #expect(state.documentThemeId == nil)
 
-        // 恢复默认文字颜色，由于背景色为默认值，自动恢复素白主题
+        // 恢复默认文字颜色，由于背景色为默认值，自动恢复素笺主题
         state.resetTextColorToDefault(isDark: isDark)
         #expect(state.textColorHex == defaultTheme.textHex(isDark: isDark))
         #expect(state.documentThemeId == "minimal")

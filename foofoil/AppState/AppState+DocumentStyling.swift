@@ -81,15 +81,24 @@ extension AppState {
     /// 应用选中的文档主题（前景色与背景色随当前外观切换）；不改变字体与排版参数。
     public func applyDocumentTheme(_ theme: DocumentTheme, isDark: Bool) {
         isApplyingThemeColors = true
-        backgroundColorHex = theme.backgroundHex(isDark: isDark)
-        if supportsDocumentTextStyling {
+        backgroundColorHex = theme.id == "none" ? nil : theme.backgroundHex(isDark: isDark)
+        if theme.id == "none" {
+            textColorHex = nil
+        } else if supportsDocumentTextStyling {
             textColorHex = theme.textHex(isDark: isDark)
         }
         documentThemeId = theme.id
         isApplyingThemeColors = false
     }
 
-    /// 将背景色恢复为默认样式（素白）；若此时文字颜色亦为默认值（或不支持文字样式），则同步恢复默认主题。
+    /// 新打开的文档默认采用素笺；已有主题（含“无”）或手动色彩保持用户选择。
+    func applyDefaultDocumentThemeIfNeeded() {
+        guard supportsContentBackgroundColor || supportsDocumentTextStyling,
+              documentThemeId == nil, backgroundColorHex == nil, textColorHex == nil else { return }
+        applyDocumentTheme(DocumentThemeCatalog.defaultTheme, isDark: Self.isDarkMode())
+    }
+
+    /// 将背景色恢复为默认样式（素笺）；若此时文字颜色亦为默认值（或不支持文字样式），则同步恢复默认主题。
     public func resetBackgroundColorToDefault(isDark: Bool) {
         let defaultTheme = DocumentThemeCatalog.defaultTheme
         let defBg = defaultTheme.backgroundHex(isDark: isDark)
@@ -104,7 +113,7 @@ extension AppState {
         }
     }
 
-    /// 将文字颜色恢复为默认样式（素白）；若此时背景色亦为默认值（或不支持背景色），则同步恢复默认主题。
+    /// 将文字颜色恢复为默认样式（素笺）；若此时背景色亦为默认值（或不支持背景色），则同步恢复默认主题。
     public func resetTextColorToDefault(isDark: Bool) {
         let defaultTheme = DocumentThemeCatalog.defaultTheme
         let defBg = defaultTheme.backgroundHex(isDark: isDark)
@@ -125,12 +134,7 @@ extension AppState {
     /// 让内容始终可读；中间色与已相符的颜色保持不变。
     func adaptDocumentColorsToAppearanceChange(toDarkAppearance isDark: Bool) {
         if let themeId = documentThemeId, let theme = DocumentThemeCatalog.shared.theme(for: themeId) {
-            isApplyingThemeColors = true
-            backgroundColorHex = theme.backgroundHex(isDark: isDark)
-            if supportsDocumentTextStyling {
-                textColorHex = theme.textHex(isDark: isDark)
-            }
-            isApplyingThemeColors = false
+            applyDocumentTheme(theme, isDark: isDark)
             return
         }
 

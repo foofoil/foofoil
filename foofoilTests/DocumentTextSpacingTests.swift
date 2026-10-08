@@ -13,6 +13,39 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct DocumentTextSpacingTests {
+    @Test func headingAfterTextDoesNotStackParagraphMargins() async throws {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.originalImageName = "heading-spacing.md"
+        state.text = "上节正文\n\n## 下一节\n\n本节正文"
+        state.isMarkdownPreview = true
+        let rendered = await waitForRenderedMarkdown(state)
+        let previousRange = try range(of: "上节正文", in: rendered)
+        let headingRange = try range(of: "下一节", in: rendered)
+        let previous = try #require(paragraphStyle(of: rendered, at: previousRange.location))
+        let heading = try #require(paragraphStyle(of: rendered, at: headingRange.location))
+        #expect(abs(previous.paragraphSpacing + heading.paragraphSpacingBefore - state.textFontSize * 1.35) < 0.001)
+        #expect(abs(heading.paragraphSpacing - state.textFontSize * 0.65) < 0.001)
+    }
+
+    @Test func markdownHeadingsStayCloserToTheirFollowingTable() async throws {
+        for customSpacing in [nil, 2.0] as [Double?] {
+            let state = AppState()
+            defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+            state.originalImageName = "spacing.md"
+            state.text = "| 上节 | 键位 |\n| --- | --- |\n| 内容 | A |\n\n## 本节标题\n\n| 本节 | 键位 |\n| --- | --- |\n| 内容 | B |"
+            state.documentParagraphSpacing = customSpacing
+            state.isMarkdownPreview = true
+            let rendered = await waitForRenderedMarkdown(state)
+            let heading = try range(of: "本节标题", in: rendered)
+            let style = try #require(paragraphStyle(of: rendered, at: heading.location))
+            #expect(abs(style.paragraphSpacingBefore - state.textFontSize * 1.5) < 0.001)
+            #expect(abs(style.paragraphSpacing - state.textFontSize * 0.65) < 0.001)
+            #expect(style.paragraphSpacingBefore > style.paragraphSpacing)
+            #expect(!rendered.string.contains("\u{F0019}"))
+        }
+    }
+
     /// Markdown 预览把自选字体与行距/段距写进渲染结果。
     @Test func markdownPreviewUsesCustomFontAndSpacing() async throws {
         let state = AppState()

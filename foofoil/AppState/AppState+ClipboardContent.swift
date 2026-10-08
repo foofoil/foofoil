@@ -134,6 +134,7 @@ extension AppState {
 
         isBatchUpdating = true
         defer {
+            applyDefaultDocumentThemeIfNeeded()
             isBatchUpdating = false
             saveState()
         }

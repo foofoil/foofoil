@@ -384,7 +384,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         didSet {
             updateRenderedMarkdown()
 
-            // 空白箔在用户首次输入内容时成为文档类型，此时自动应用默认文档样式（素白）。
+            // 空白箔在用户首次输入内容时成为文档类型，此时自动应用默认文档样式（素笺）。
             if oldValue.isEmpty && !text.isEmpty && !isBatchUpdating {
                 if documentThemeId == nil && backgroundColorHex == nil && textColorHex == nil {
                     applyDocumentTheme(DocumentThemeCatalog.defaultTheme, isDark: Self.isDarkMode())

@@ -52,12 +52,14 @@ public struct DocumentTheme: Identifiable, Codable, Equatable {
 
     /// 根据外观返回 SwiftUI 背景色
     public func backgroundColor(isDark: Bool) -> Color {
-        Color(hex: backgroundHex(isDark: isDark)) ?? (isDark ? Color(nsColor: .windowBackgroundColor) : Color.white)
+        if id == "none" { return .clear }
+        return Color(hex: backgroundHex(isDark: isDark)) ?? (isDark ? Color(nsColor: .windowBackgroundColor) : Color.white)
     }
 
     /// 根据外观返回 SwiftUI 文字前景色
     public func textColor(isDark: Bool) -> Color {
-        Color(hex: textHex(isDark: isDark)) ?? (isDark ? Color.white : Color.black)
+        if id == "none" { return .primary }
+        return Color(hex: textHex(isDark: isDark)) ?? (isDark ? Color.white : Color.black)
     }
 
     /// 国际化或自定义显示名
@@ -74,17 +76,17 @@ public struct DocumentTheme: Identifiable, Codable, Equatable {
 public final class DocumentThemeCatalog: ObservableObject {
     public static let shared = DocumentThemeCatalog()
 
-    /// 默认主题标识（素白）
+    /// 默认主题标识（素笺）
     public static let defaultThemeId = "minimal"
 
-    /// 获取默认主题（素白）
+    /// 获取默认主题（素笺）
     public static var defaultTheme: DocumentTheme {
         shared.theme(for: defaultThemeId) ?? shared.presets[0]
     }
 
     /// 内置舒适阅读预设主题
     public let presets: [DocumentTheme] = [
-        // 素白：洁净纯简，经典纸感
+        // 素笺：洁净纯简，经典纸感
         DocumentTheme(
             id: "minimal",
             name: "Minimal",
@@ -134,10 +136,10 @@ public final class DocumentThemeCatalog: ObservableObject {
             darkBackgroundHex: "#161E26",
             darkTextHex: "#CDD9E4"
         ),
-        // 浓墨：深邃纯黑，夜间沉浸
+        // 无：透明背景与系统文字颜色，不固化明暗外观。
         DocumentTheme(
-            id: "obsidian",
-            name: "Obsidian",
+            id: "none",
+            name: "Document Theme None",
             isCustom: false,
             lightBackgroundHex: "#F0F1F3",
             lightTextHex: "#16171A",

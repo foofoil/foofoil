@@ -30,6 +30,8 @@ private enum MarkdownRenderMarker {
     nonisolated static let paragraphEnd = "\u{F0016}"
     nonisolated static let quoteStart = "\u{F0017}"
     nonisolated static let quoteEnd = "\u{F0018}"
+    nonisolated static let headingStart = "\u{F0019}"
+    nonisolated static let headingEnd = "\u{F001A}"
 }
 
 
@@ -111,6 +113,13 @@ extension AppState {
                     )
                     .replacingOccurrences(of: "<p>", with: "<p>\(MarkdownRenderMarker.paragraphStart)")
                     .replacingOccurrences(of: "</p>", with: "\(MarkdownRenderMarker.paragraphEnd)</p>")
+
+                // 标题范围显式标记，避免依赖 HTML 导入器不稳定的 margin 转换。
+                for level in 1...6 {
+                    styledHTMLBody = styledHTMLBody
+                        .replacingOccurrences(of: "<h\(level)>", with: "<h\(level)>\(MarkdownRenderMarker.headingStart)")
+                        .replacingOccurrences(of: "</h\(level)>", with: "\(MarkdownRenderMarker.headingEnd)</h\(level)>")
+                }
 
                 // 构建包含 CSS 的完整 HTML，支持自适应系统明暗主题与字号大小缩放
                 let htmlContent = """
@@ -213,7 +222,7 @@ extension AppState {
                     max-width: 100%;
                     width: 100%;
                     border-collapse: collapse;
-                    margin: 1em 0 1.15em 0;
+                    margin: 0 0 1.15em 0;
                     font-size: 0.9em;
                     line-height: 1.4;
                 }
@@ -324,10 +333,48 @@ extension AppState {
                             Self.applyDocumentFontStyles(to: mutableAttr, family: customFontFamilyName)
                         }
 
+                        // 正文段距设置不应覆盖标题层级：标题上留白大于下留白，贴近所属内容。
+                        Self.applyHeadingRangeStyles(to: mutableAttr, fontSize: fontSize)
                         self.renderedMarkdown = mutableAttr
                     } else {
                         self.renderedMarkdown = NSAttributedString(string: textToRender)
                     }
+                }
+            }
+        }
+
+        /// 普通段落与标题之间按总留白计算，避免上段段后距和标题段前距相加。
+        private static func applyHeadingRangeStyles(to text: NSMutableAttributedString, fontSize: CGFloat) {
+            let pairs = markerPairs(in: text.string as NSString,
+                                    start: MarkdownRenderMarker.headingStart,
+                                    end: MarkdownRenderMarker.headingEnd)
+            for pair in pairs.reversed() {
+                text.deleteCharacters(in: pair.end)
+                text.deleteCharacters(in: pair.start)
+                let range = NSRange(location: pair.start.location,
+                                    length: pair.end.location - NSMaxRange(pair.start))
+                guard range.length > 0 else { continue }
+                let previous = range.location > 0
+                    ? text.attribute(.paragraphStyle, at: range.location - 1, effectiveRange: nil) as? NSParagraphStyle
+                    : nil
+                let before: CGFloat
+                if let previous {
+                    before = previous.textBlocks.isEmpty
+                        ? max(0, fontSize * 1.35 - previous.paragraphSpacing)
+                        : fontSize * 1.5
+                } else {
+                    before = 0
+                }
+                var updates: [(NSRange, NSMutableParagraphStyle)] = []
+                text.enumerateAttribute(.paragraphStyle, in: range) { value, subrange, _ in
+                    let style = ((value as? NSParagraphStyle) ?? .default).mutableCopy() as! NSMutableParagraphStyle
+                    style.paragraphSpacingBefore = before
+                    style.paragraphSpacing = fontSize * 0.65
+                    style.lineHeightMultiple = 1.22
+                    updates.append((subrange, style))
+                }
+                for (subrange, style) in updates {
+                    text.addAttribute(.paragraphStyle, value: style, range: subrange)
                 }
             }
         }
