@@ -14,7 +14,14 @@ import FoofoilExtensionKit
 extension AppDelegate {
     // MARK: - Menu Bar Setup
 
+    @objc func restoreMenuItemImages(_ notification: Notification) {
+        (notification.object as? NSMenu)?.restoreItemImageVisibility()
+    }
+
     func setupMainMenu() {
+        // 跟踪开始时菜单已生成，统一恢复 SwiftUI 和 AppKit 菜单中的已有图标。
+        NotificationCenter.default.removeObserver(self, name: NSMenu.didBeginTrackingNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(restoreMenuItemImages(_:)), name: NSMenu.didBeginTrackingNotification, object: nil)
         let mainMenu = NSMenu()
 
         // 1. App 菜单
@@ -86,6 +93,12 @@ extension AppDelegate {
         openItem.withSymbol("folder")
         openItem.target = self
         fileMenu.addItem(openItem)
+
+        let quickOpenItem = NSMenuItem(title: NSLocalizedString("Search History Menu Item", comment: ""), action: #selector(showHistorySearchAction), keyEquivalent: "p")
+        quickOpenItem.withSymbol("magnifyingglass")
+        quickOpenItem.representedObject = "history.search"
+        quickOpenItem.target = self
+        fileMenu.addItem(quickOpenItem)
 
         let addToListItem = NSMenuItem(
             title: NSLocalizedString("Add to List...", comment: ""),
@@ -468,6 +481,29 @@ extension AppDelegate {
         let windowMenu = NSMenu(title: NSLocalizedString("Window", comment: ""))
         self.windowMenu = windowMenu
 
+        let showAllFoilsItem = NSMenuItem(
+            title: NSLocalizedString("Foil Overview", comment: ""),
+            action: #selector(showAllFoilsAction),
+            keyEquivalent: ""
+        )
+        showAllFoilsItem.withSymbol("rectangle.grid.2x2")
+        showAllFoilsItem.representedObject = "window.showAllFoils"
+        showAllFoilsItem.target = self
+        windowMenu.addItem(showAllFoilsItem)
+
+
+        // 单箔隐藏与应用级隐藏使用不同键位，隐藏后仍可从总览恢复。
+        let hideAppItem = NSMenuItem(
+            title: NSLocalizedString("Hide Current Foil", comment: ""),
+            action: #selector(hideCurrentFoilAction),
+            keyEquivalent: "h"
+        )
+        hideAppItem.target = self
+        hideAppItem.withSymbol("eye.slash")
+        windowMenu.addItem(hideAppItem)
+
+        windowMenu.addItem(NSMenuItem.separator())
+
         // 键位统一由快捷键配置提供，这里只登记稳定标识；见 applyConfiguredKeyboardShortcuts()。
         let windowPositionItems: [(id: String, title: String, action: Selector, symbol: String)] = [
             ("window.moveTopLeft", NSLocalizedString("Top-Left", comment: ""), #selector(moveToTopLeftAction), "arrow.up.left"),
@@ -488,28 +524,6 @@ extension AppDelegate {
             item.target = self
             windowMenu.addItem(item)
         }
-
-        windowMenu.addItem(NSMenuItem.separator())
-
-        // 单箔隐藏与应用级隐藏使用不同键位，隐藏后仍可从总览恢复。
-        let hideAppItem = NSMenuItem(
-            title: NSLocalizedString("Hide Current Foil", comment: ""),
-            action: #selector(hideCurrentFoilAction),
-            keyEquivalent: "h"
-        )
-        hideAppItem.target = self
-        hideAppItem.withSymbol("eye.slash")
-        windowMenu.addItem(hideAppItem)
-
-        let showAllFoilsItem = NSMenuItem(
-            title: NSLocalizedString("Foil Overview", comment: ""),
-            action: #selector(showAllFoilsAction),
-            keyEquivalent: ""
-        )
-        showAllFoilsItem.withSymbol("rectangle.grid.2x2")
-        showAllFoilsItem.representedObject = "window.showAllFoils"
-        showAllFoilsItem.target = self
-        windowMenu.addItem(showAllFoilsItem)
 
         windowMenu.addItem(NSMenuItem.separator())
 

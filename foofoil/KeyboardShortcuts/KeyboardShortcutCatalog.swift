@@ -84,11 +84,12 @@ nonisolated enum KeyboardShortcutCatalog {
 
     // 设置页按操作目的分组；命令标识和默认键位保持稳定，菜单仍按原有结构组织。
     static let global: [KeyboardShortcutDefinition] = [
-        definition("window.showAllFoils", "Foil Overview", "\u{1B}", [.control, .shift]),
+        definition("window.showAllFoils", "Foil Overview", "\u{1B}", [.control, .shift], "Shortcut Overview Purpose"),
         definition("global.openClipboardContent", "Open Clipboard Content", nil, [], "Shortcut Scope Global")
     ]
 
     static let file: [KeyboardShortcutDefinition] = [
+        definition("history.search", "Search History Menu Item", "p", [.command], "Shortcut Quick Open Purpose"),
         definition("file.addToList", "Add to List...", nil, []),
         openClipboardContent,
         definition("file.openURL", "Open URL Menu Item", "l", [.command]),
@@ -157,7 +158,6 @@ nonisolated enum KeyboardShortcutCatalog {
     ]
 
     static let history: [KeyboardShortcutDefinition] = [
-        definition("history.search", "Search History Menu Item", "p", [.command]),
         definition("history.clear", "Clear History Menu Item", nil, [])
     ]
 

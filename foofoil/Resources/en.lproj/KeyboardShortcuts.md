@@ -12,6 +12,8 @@ Customize bindings in Settings → Keyboard Shortcuts. Except for global shortcu
 {{global}}
 
 
+<!-- Quick Open belongs to content opening and management. -->
+
 ## Open and Manage Content
 
 | Action | Default shortcut | Current shortcut | Notes |

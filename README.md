@@ -25,7 +25,7 @@ Built with SwiftUI and AppKit, foofoil favors native macOS capabilities, fast in
 - Save, copy, share, or capture displayed content using native macOS workflows.
 - Restore window state and keep a local content history.
 - Search history by title and content, including on-device OCR for images and extracted text from PDFs and web pages.
-- Use ⌘P to search history alongside Spotlight filename results from authorized folders.
+- Use ⌘P for Quick Open: find and open history content or local files from authorized folders, or enter a URL.
 - Customize keyboard shortcuts in Settings and use English or Simplified Chinese throughout the interface.
 
 Hi-Fi currently supports DSF, raw DFF, uncompressed stereo SACD ISO, and APE/CUE. DSD playback requires a DoP-capable output device, with no DSD-to-PCM fallback; DST and SACD multichannel are not supported yet. EPUB supports table-of-contents navigation and reading-position restore; DRM-protected books are unsupported.
@@ -54,7 +54,7 @@ These default shortcuts cover distinctive features and everyday actions. Except 
 | --- | --- |
 | Foil Overview (Exposé, global) | <kbd>⌃ ⇧ Esc</kbd> |
 | Open clipboard content | <kbd>⇧ ⌘ V</kbd> |
-| Search history and files | <kbd>⌘ P</kbd> |
+| Quick Open | <kbd>⌘ P</kbd> |
 | Hide the active foil | <kbd>⌘ H</kbd> |
 | Hide all foils to clear your workspace temporarily | <kbd>⇧ ⌘ H</kbd> |
 | Extract image text (raster images) | <kbd>⌘ E</kbd> |

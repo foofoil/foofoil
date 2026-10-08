@@ -1,6 +1,22 @@
 {
   "sourceLanguage": "en",
   "strings": {
+  "Shortcut Overview Purpose": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Quickly find, switch to, or open a foil—even from another app."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "快速查找、切换或打开箔片；其他应用在前台时也可使用。"
+        }
+      }
+    }
+  },
   "Document Theme None": {
     "localizations": {
       "en": {
@@ -5331,19 +5347,53 @@
         }
       }
     },
+    "Shortcut Quick Open Purpose": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find and open history content or local files, or enter a URL."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查找并打开历史内容、本机文件，或输入网址打开。"
+          }
+        }
+      }
+    },
     "Search History": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Search History and Files"
+            "value": "Quick Open"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "搜索历史与文件"
+            "value": "快速打开"
+          }
+        }
+      }
+    },
+    "Search History Records Menu Item": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search History…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索历史记录…"
           }
         }
       }
@@ -5354,13 +5404,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Search History and Files…"
+            "value": "Quick Open…"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "搜索历史与文件…"
+            "value": "快速打开…"
           }
         }
       }

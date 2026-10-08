@@ -11,6 +11,22 @@ extension NSMenuItem {
     @discardableResult
     func withSymbol(_ symbolName: String) -> Self {
         image = NSImage(systemSymbolName: symbolName, accessibilityDescription: nil)
+        if #available(macOS 27.0, *) {
+            preferredImageVisibility = .visible
+        }
         return self
+    }
+}
+
+extension NSMenu {
+    /// macOS 27 默认隐藏菜单图标；也处理 SwiftUI 动态生成的右键菜单及子菜单。
+    func restoreItemImageVisibility() {
+        guard #available(macOS 27.0, *) else { return }
+        for item in items {
+            if item.image != nil {
+                item.preferredImageVisibility = .visible
+            }
+            item.submenu?.restoreItemImageVisibility()
+        }
     }
 }

@@ -32,7 +32,7 @@ extension AppDelegate {
                 }
 
                 let item = NSMenuItem(title: title, action: #selector(openHistoryItemAction(_:)), keyEquivalent: "")
-                item.image = NSImage(systemSymbolName: config.historyMenuSymbolName, accessibilityDescription: nil)
+                item.withSymbol(config.historyMenuSymbolName)
                 item.representedObject = config
                 item.target = self
                 dockMenu.addItem(item)
@@ -58,11 +58,8 @@ extension AppDelegate {
         guard let historyMenu = historyMenu else { return }
         historyMenu.removeAllItems()
 
-        let searchItem = NSMenuItem(title: NSLocalizedString("Search History Menu Item", comment: ""), action: #selector(showHistorySearchAction), keyEquivalent: "p")
+        let searchItem = NSMenuItem(title: NSLocalizedString("Search History Records Menu Item", comment: ""), action: #selector(showHistorySearchAction), keyEquivalent: "")
         searchItem.withSymbol("magnifyingglass")
-        let searchShortcut = KeyboardShortcutStore.shared.shortcut(forID: "history.search")
-        searchItem.keyEquivalent = searchShortcut?.keyEquivalent ?? ""
-        searchItem.keyEquivalentModifierMask = searchShortcut?.modifiers ?? []
         searchItem.target = self
         historyMenu.addItem(searchItem)
         historyMenu.addItem(NSMenuItem.separator())
@@ -84,7 +81,7 @@ extension AppDelegate {
 
                 // ⌘1-9 不再作为全局菜单快捷键；打开最近历史仅在空白箔窗口内生效。
                 let item = NSMenuItem(title: title, action: #selector(openHistoryItemAction(_:)), keyEquivalent: "")
-                item.image = NSImage(systemSymbolName: config.historyMenuSymbolName, accessibilityDescription: nil)
+                item.withSymbol(config.historyMenuSymbolName)
                 item.representedObject = config
                 item.target = self
                 historyMenu.addItem(item)

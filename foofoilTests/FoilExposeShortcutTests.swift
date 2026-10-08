@@ -10,6 +10,26 @@ import Testing
 @testable import foofoil
 
 struct FoilExposeShortcutTests {
+    @Test @MainActor func menuImagesRemainVisibleOnMacOS27() {
+        guard #available(macOS 27.0, *) else { return }
+        let symbolItem = NSMenuItem(title: "Symbol", action: nil, keyEquivalent: "").withSymbol("folder")
+        #expect(symbolItem.image != nil)
+        #expect(symbolItem.preferredImageVisibility == .visible)
+
+        let menu = NSMenu()
+        let submenu = NSMenu()
+        let parent = NSMenuItem(title: "Submenu", action: nil, keyEquivalent: "")
+        parent.submenu = submenu
+        menu.addItem(parent)
+        let generatedItem = NSMenuItem(title: "Generated", action: nil, keyEquivalent: "")
+        generatedItem.image = NSImage(systemSymbolName: "pin", accessibilityDescription: nil)
+        submenu.addItem(generatedItem)
+        let delegate = AppDelegate()
+        delegate.restoreMenuItemImages(Notification(name: NSMenu.didBeginTrackingNotification, object: menu))
+        #expect(generatedItem.preferredImageVisibility == .visible)
+        #expect(parent.preferredImageVisibility == .automatic)
+    }
+
     @Test func globalAndFileShortcutGroups() {
         #expect(KeyboardShortcutCatalog.sections.prefix(2) == [.global, .file])
         #expect(KeyboardShortcutCatalog.global.map(\.id) == ["window.showAllFoils", "global.openClipboardContent"])
@@ -57,7 +77,7 @@ struct FoilExposeShortcutTests {
     }
 
     @MainActor
-    @Test func shortcutOverviewRegeneratesOnHistoryRestore() throws {
+    @Test func shortcutOverviewRegeneratesOnHistoryRestore() async throws {
         let definition = try #require(KeyboardShortcutCatalog.definition(withID: "file.openClipboardContent"))
         let store = KeyboardShortcutStore.shared
         let previous = store.shortcut(for: definition)
@@ -75,13 +95,27 @@ struct FoilExposeShortcutTests {
         #expect(HistoryManager.shared.historyConfigs.contains { $0.id == config.id })
         store.setShortcut(KeyboardShortcut(keyEquivalent: "j", modifiers: [.command, .option]), for: definition)
         let restored = AppState(config: config)
-        #expect(restored.text.contains("| ⇧⌘V | ⌥⌘J |"))
+        #expect(restored.text.contains("| ⇧⌘V | \(KeyboardShortcutsOverview.changedKeyStart)⌥⌘J\(KeyboardShortcutsOverview.changedKeyEnd) |"))
         #expect(restored.isMarkdownPreview)
         #expect(restored.id == config.id)
         store.setShortcut(nil, for: definition)
         state.loadConfig(config)
         #expect(state.text != restored.text)
         #expect(!state.text.contains("| ⇧⌘V | ⌥⌘J |"))
+        let none = NSLocalizedString("Shortcut Overview Unassigned", comment: "")
+        #expect(state.text.contains("| ⇧⌘V | \(KeyboardShortcutsOverview.changedKeyStart)\(none)\(KeyboardShortcutsOverview.changedKeyEnd) |"))
+        store.setShortcut(definition.defaultShortcut, for: definition)
+        #expect(KeyboardShortcutsOverview.markdown().contains("| ⇧⌘V | ⇧⌘V |"))
+        restored.updateRenderedMarkdown()
+        for _ in 0..<200 {
+            if restored.renderedMarkdown.string.contains("⌥⌘J") { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let keyRange = (restored.renderedMarkdown.string as NSString).range(of: "⌥⌘J")
+        #expect(keyRange.location != NSNotFound)
+        let color = try #require(restored.renderedMarkdown.attribute(.foregroundColor, at: keyRange.location, effectiveRange: nil) as? NSColor)
+        #expect(color == NSColor.systemRed)
+        #expect(!restored.renderedMarkdown.string.contains(KeyboardShortcutsOverview.changedKeyStart))
         #expect(state.text.contains("⌘W"))
         #expect(!state.text.contains("{{"))
     }

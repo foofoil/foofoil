@@ -13,6 +13,26 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct DocumentTextSpacingTests {
+    @Test func tableCellsKeepContinuousRowsWithCustomParagraphSpacing() async throws {
+        for spacing in [nil, 1.0, 2.0] as [Double?] {
+            let state = AppState()
+            defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+            state.originalImageName = "table-spacing.md"
+            state.text = "| 操作 | 快捷键 |\n| --- | --- |\n| 设置 | ⌘, |\n| 撤销 / 重做 | ⌘Z / ⇧⌘Z |\n| 全选 | ⌘A |"
+            state.documentParagraphSpacing = spacing
+            state.isMarkdownPreview = true
+            let rendered = await waitForRenderedMarkdown(state)
+            var cells = 0
+            rendered.enumerateAttribute(.paragraphStyle, in: NSRange(location: 0, length: rendered.length)) { value, _, _ in
+                guard let style = value as? NSParagraphStyle, !style.textBlocks.isEmpty else { return }
+                cells += 1
+                #expect(style.paragraphSpacing == 0)
+                #expect(style.paragraphSpacingBefore == 0)
+            }
+            #expect(cells >= 8)
+        }
+    }
+
     @Test func headingAfterTextDoesNotStackParagraphMargins() async throws {
         let state = AppState()
         defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }

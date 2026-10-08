@@ -3,6 +3,8 @@ import Foundation
 /// 稳定来源标识让历史恢复重新生成一览，而不是展示持久化的旧键位。
 @MainActor
 enum KeyboardShortcutsOverview {
+    nonisolated static let changedKeyStart = "\u{F001B}"
+    nonisolated static let changedKeyEnd = "\u{F001C}"
     static let sourceFingerprint = "foofoil:keyboard-shortcuts-overview"
 
     static func markdown(
@@ -20,8 +22,13 @@ enum KeyboardShortcutsOverview {
         for section in KeyboardShortcutCatalog.sections {
             let rows = section.definitions.map { definition in
                 let defaultKey = definition.defaultShortcut?.displayString ?? none
-                let currentKey = shortcutProvider(definition)?.displayString ?? none
-                return "| \(cell(definition.displayName)) | \(cell(defaultKey)) | \(cell(currentKey)) | \(cell(definition.note ?? "")) |"
+                let currentShortcut = shortcutProvider(definition)
+                let currentKey = cell(currentShortcut?.displayString ?? none)
+                // 只按实际生效键位比较；自定义为默认值时不标红，显式清除则仍标红。
+                let currentCell = currentShortcut == definition.defaultShortcut
+                    ? currentKey
+                    : "\(changedKeyStart)\(currentKey)\(changedKeyEnd)"
+                return "| \(cell(definition.displayName)) | \(cell(defaultKey)) | \(currentCell) | \(cell(definition.note ?? "")) |"
             }.joined(separator: "\n")
             text = text.replacingOccurrences(of: "{{\(section.rawValue)}}", with: rows)
         }

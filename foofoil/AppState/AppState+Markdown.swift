@@ -300,7 +300,11 @@ extension AppState {
                             let paragraphStyle = (value as? NSParagraphStyle) ?? NSParagraphStyle.default
                             let mutableParagraphStyle = paragraphStyle.mutableCopy() as! NSMutableParagraphStyle
 
-                            if !mutableParagraphStyle.textLists.isEmpty {
+                            if !mutableParagraphStyle.textBlocks.isEmpty {
+                                // 表格单元格的段距会被 TextKit 放到边框之外，形成断开的横线与空带。
+                                mutableParagraphStyle.paragraphSpacing = 0
+                                mutableParagraphStyle.paragraphSpacingBefore = 0
+                            } else if !mutableParagraphStyle.textLists.isEmpty {
                                 mutableParagraphStyle.lineHeightMultiple = 1.5
                                 mutableParagraphStyle.paragraphSpacing = max(
                                     mutableParagraphStyle.paragraphSpacing,
@@ -335,6 +339,19 @@ extension AppState {
 
                         // 正文段距设置不应覆盖标题层级：标题上留白大于下留白，贴近所属内容。
                         Self.applyHeadingRangeStyles(to: mutableAttr, fontSize: fontSize)
+                        // 一览中的改动键位使用语义红色；不需要放开 Markdown 原始 HTML。
+                        let changedKeyPairs = Self.markerPairs(
+                            in: mutableAttr.string as NSString,
+                            start: KeyboardShortcutsOverview.changedKeyStart,
+                            end: KeyboardShortcutsOverview.changedKeyEnd
+                        )
+                        for pair in changedKeyPairs.reversed() {
+                            mutableAttr.deleteCharacters(in: pair.end)
+                            mutableAttr.deleteCharacters(in: pair.start)
+                            let range = NSRange(location: pair.start.location,
+                                                length: pair.end.location - NSMaxRange(pair.start))
+                            mutableAttr.addAttribute(.foregroundColor, value: NSColor.systemRed, range: range)
+                        }
                         self.renderedMarkdown = mutableAttr
                     } else {
                         self.renderedMarkdown = NSAttributedString(string: textToRender)
@@ -399,6 +416,8 @@ extension AppState {
                     at: paragraphRange.location,
                     effectiveRange: nil
                 ) as? NSParagraphStyle) ?? .default
+                // 表格由单元格内边距控制留白；正文段距不能扩张到单元格边框之外。
+                if !current.textBlocks.isEmpty { continue }
                 // 代码块与它前面的间隔行自带紧凑行高，保持原样。
                 guard !hasCodeBlockAttribute(attributedString, in: paragraphRange),
                       current.maximumLineHeight == 0 else { continue }
