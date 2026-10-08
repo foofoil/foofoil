@@ -13,6 +13,62 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct DocumentTextSpacingTests {
+    @Test func partialRedrawIncludesWholeWrappedTable() async throws {
+        let previousAppearance = NSApp.appearance
+        defer { NSApp.appearance = previousAppearance }
+        for appearance in [NSAppearance.Name.aqua, .darkAqua] {
+            NSApp.appearance = NSAppearance(named: appearance)
+            let state = AppState()
+            defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+            state.originalImageName = "wrapped-table.md"
+            state.text = SupportedContentOverview.markdown()
+            state.isMarkdownPreview = true
+            let rendered = await waitForRenderedMarkdown(state)
+            let location = try range(of: "Hi-Fi", in: rendered).location
+            let style = try #require(paragraphStyle(of: rendered, at: location))
+            let audioBlock = try #require(style.textBlocks.last as? NSTextTableBlock)
+            let view = MarkdownNSTextView(frame: NSRect(x: 0, y: 0, width: 850, height: 4000))
+            view.isEditable = false
+            view.drawsBackground = false
+            view.textContainerInset = NSSize(width: 32, height: 32)
+            view.textContainer?.lineFragmentPadding = 0
+            view.textContainer?.widthTracksTextView = true
+            view.textStorage?.setAttributedString(rendered)
+            let manager = try #require(view.layoutManager)
+            let container = try #require(view.textContainer)
+
+            for width: CGFloat in [400, 850] {
+                view.setFrameSize(NSSize(width: width, height: 4000))
+                manager.ensureLayout(for: container)
+                var tableFrame = NSRect.null
+                var lastRowFrame = NSRect.null
+                rendered.enumerateAttribute(.paragraphStyle, in: NSRange(location: 0, length: rendered.length)) { value, range, _ in
+                    guard let style = value as? NSParagraphStyle,
+                          let block = style.textBlocks.last as? NSTextTableBlock,
+                          block.table === audioBlock.table else { return }
+                    let glyphs = manager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+                    let frame = manager.boundsRect(for: block, glyphRange: glyphs)
+                        .offsetBy(dx: view.textContainerOrigin.x, dy: view.textContainerOrigin.y)
+                    tableFrame = tableFrame.union(frame)
+                    if block.startingRow == 5 { lastRowFrame = lastRowFrame.union(frame) }
+                }
+                #expect(!tableFrame.isEmpty)
+                #expect(!lastRowFrame.isEmpty)
+                // 滚动只暴露末行的一小段时，也必须让 TextKit 计算整张表格的合并边框。
+                let dirtyRect = lastRowFrame.insetBy(dx: 2, dy: 2)
+                let redrawRect = view.tableRedrawRect(intersecting: dirtyRect)
+                #expect(redrawRect.contains(tableFrame))
+                let outsideTable = NSRect(x: tableFrame.minX, y: tableFrame.maxY + 2, width: 10, height: 1)
+                #expect(view.tableRedrawRect(intersecting: outsideTable) == outsideTable)
+
+                let bitmap = try #require(view.bitmapImageRepForCachingDisplay(in: tableFrame))
+                view.cacheDisplay(in: tableFrame, to: bitmap)
+                Attachment.record(try #require(bitmap.representation(using: .png, properties: [:])),
+                                  named: "table-\(appearance.rawValue)-\(Int(width)).png")
+            }
+        }
+    }
+
     @Test func tableCellsKeepContinuousRowsWithCustomParagraphSpacing() async throws {
         for spacing in [nil, 1.0, 2.0] as [Double?] {
             let state = AppState()

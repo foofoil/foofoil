@@ -49,6 +49,40 @@
       }
     }
   },
+  "Supported Content Shortcut Format": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": " (%@)"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "（%@）"
+        }
+      }
+    }
+  },
+  "Supported Content Overview": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Supported Content"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "支持内容一览"
+        }
+      }
+    }
+  },
   "Keyboard Shortcuts Overview": {
     "localizations": {
       "en": {

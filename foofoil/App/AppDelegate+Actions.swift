@@ -20,9 +20,36 @@ extension AppDelegate {
 
     /// 根据当前快捷键生成 Markdown，一览沿用文本内容与历史记录管线。
     @objc func showKeyboardShortcutsOverviewAction() {
+        if activateOpenHelpDocument(sourceFingerprint: KeyboardShortcutsOverview.sourceFingerprint,
+                                    titleKey: "Keyboard Shortcuts Overview",
+                                    markdown: KeyboardShortcutsOverview.markdown()) { return }
         let target = clipboardContentTarget()
         target.state.openKeyboardShortcutsOverview()
         presentClipboardTarget(target)
+    }
+
+    @objc func showSupportedContentOverviewAction() {
+        if activateOpenHelpDocument(sourceFingerprint: SupportedContentOverview.sourceFingerprint,
+                                    titleKey: "Supported Content Overview",
+                                    markdown: SupportedContentOverview.markdown()) { return }
+        let target = clipboardContentTarget()
+        target.state.openSupportedContentOverview()
+        presentClipboardTarget(target)
+    }
+
+    /// 同一帮助文档只保留一张打开的箔；刷新时保留历史身份和用户的窗口/阅读样式。
+    private func activateOpenHelpDocument(sourceFingerprint: String, titleKey: String, markdown: String) -> Bool {
+        guard let controller = windowControllers.first(where: { $0.appState.sourceFingerprint == sourceFingerprint }) else { return false }
+        let state = controller.appState
+        state.text = markdown
+        state.originalImageName = NSLocalizedString(titleKey, comment: "") + ".md"
+        state.saveState()
+        if controller.window?.isMiniaturized == true {
+            controller.window?.deminiaturize(nil)
+        }
+        activateWindow(controller)
+        controller.window?.orderFrontRegardless()
+        return true
     }
 
     @objc func showSettingsAction() {

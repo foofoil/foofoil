@@ -15,7 +15,7 @@ private final class MarkdownCopyButton: NSButton {
     }
 }
 
-private final class MarkdownNSTextView: NSTextView {
+final class MarkdownNSTextView: NSTextView {
     private var codeBlockTrackingArea: NSTrackingArea?
     private var hoveredCodeBlockRange: NSRange?
     private var copyFeedbackReset: DispatchWorkItem?
@@ -37,8 +37,27 @@ private final class MarkdownNSTextView: NSTextView {
     override func draw(_ dirtyRect: NSRect) {
         drawInlineCodeBackgrounds(in: dirtyRect)
         drawCodeBlockFrames(in: dirtyRect)
-        super.draw(dirtyRect)
+        super.draw(tableRedrawRect(intersecting: dirtyRect))
         updateCopyButtonFrame()
+    }
+
+    /// TextKit 局部重绘合并边框时会遗漏跨出 dirtyRect 的表格边界；按整张表格计算绘制范围。
+    func tableRedrawRect(intersecting dirtyRect: NSRect) -> NSRect {
+        guard let textStorage, let layoutManager, let textContainer, textStorage.length > 0 else { return dirtyRect }
+        layoutManager.ensureLayout(for: textContainer)
+        var tables: [ObjectIdentifier: NSRect] = [:]
+        textStorage.enumerateAttribute(.paragraphStyle, in: NSRange(location: 0, length: textStorage.length)) { value, range, _ in
+            guard let style = value as? NSParagraphStyle else { return }
+            for case let block as NSTextTableBlock in style.textBlocks {
+                let glyphs = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+                let frame = layoutManager.boundsRect(for: block, glyphRange: glyphs)
+                    .offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.y)
+                guard !frame.isEmpty else { continue }
+                let key = ObjectIdentifier(block.table)
+                tables[key] = tables[key].map { $0.union(frame) } ?? frame
+            }
+        }
+        return tables.values.filter { $0.intersects(dirtyRect) }.reduce(dirtyRect) { $0.union($1) }
     }
 
     override func updateTrackingAreas() {

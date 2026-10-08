@@ -81,6 +81,10 @@ When editing the app together with `extension-kit` or `hifi`, open `foofoil.xcwo
 
 - When adding, removing, or changing any keyboard shortcut, its scope, or its behavior, update both bundled overview documents: `foofoil/Resources/en.lproj/KeyboardShortcuts.md` and `foofoil/Resources/zh-Hans.lproj/KeyboardShortcuts.md`. Keep their categories aligned with Keyboard Shortcuts settings, include common system/menu shortcuts, and update the selected shortcuts in both READMEs when relevant. These files are localized templates: configurable rows are generated from KeyboardShortcutCatalog and KeyboardShortcutStore with default/current columns. The Help menu opens a generated Markdown foil; every history restore regenerates it using the stable source fingerprint. Never store configurable bindings as static template rows.
 
+## Supported Content Documentation Maintenance
+
+- When changing supported content types, opening methods, or playback/preview limitations, update both localized `SupportedContent.md` resources. The Help menu opens this overview as a Markdown foil and history restores read the latest bundled document. Text extension examples are generated from `AppState.textFilenameExtensions`; opening shortcuts use the current `KeyboardShortcutStore` bindings and must not be hard-coded.
+
 ## Change Discipline
 
 - Inspect the surrounding implementation before editing and follow existing naming, formatting, and ownership patterns.

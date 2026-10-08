@@ -10,6 +10,80 @@ import Testing
 @testable import foofoil
 
 struct FoilExposeShortcutTests {
+    @Test @MainActor func helpDocumentsReuseTheirOpenFoilsAndRefreshContent() throws {
+        let delegate = AppDelegate()
+        defer {
+            for controller in delegate.windowControllers {
+                HistoryManager.shared.removeFromHistory(controller.appState.toConfig())
+                controller.close()
+            }
+        }
+        delegate.showKeyboardShortcutsOverviewAction()
+        let shortcuts = try #require(delegate.windowControllers.first)
+        let shortcutsID = shortcuts.appState.id
+        delegate.showSupportedContentOverviewAction()
+        let content = try #require(delegate.windowControllers.last)
+        let contentID = content.appState.id
+        #expect(shortcuts !== content)
+        #expect(delegate.windowControllers.count == 2)
+        shortcuts.appState.text = "Outdated shortcuts"
+        shortcuts.hideFoil()
+        delegate.showKeyboardShortcutsOverviewAction()
+        #expect(delegate.windowControllers.count == 2)
+        #expect(shortcuts.appState.id == shortcutsID)
+        #expect(shortcuts.appState.text == KeyboardShortcutsOverview.markdown())
+        #expect(shortcuts.window?.isVisible == true)
+        content.appState.text = "Outdated content"
+        content.hideFoil()
+        delegate.showSupportedContentOverviewAction()
+        #expect(delegate.windowControllers.count == 2)
+        #expect(content.appState.id == contentID)
+        #expect(content.appState.text == SupportedContentOverview.markdown())
+        #expect(content.window?.isVisible == true)
+    }
+
+    @Test @MainActor func supportedContentShowsCurrentOpeningShortcuts() {
+        let custom = KeyboardShortcut(keyEquivalent: "j", modifiers: [.command, .option])
+        let text = SupportedContentOverview.markdown { definition in
+            definition.id == "file.openClipboardContent" ? custom : definition.defaultShortcut
+        }
+        #expect(text.contains("⌘L"))
+        #expect(text.components(separatedBy: "⌥⌘J").count == 4)
+        #expect(!text.contains("{{"))
+        let disabled = SupportedContentOverview.markdown { _ in nil }
+        #expect(!disabled.contains("⌘L"))
+        #expect(!disabled.contains("⌥⌘J"))
+        #expect(!disabled.contains("()"))
+        #expect(!disabled.contains("（）"))
+        #expect(!disabled.contains("{{"))
+        let camera = SupportedContentOverview.markdown { definition in
+            definition.id == "file.openCamera" ? custom : nil
+        }
+        #expect(camera.components(separatedBy: "⌥⌘J").count == 2)
+    }
+
+    @Test @MainActor func supportedContentOverviewRestoresLatestDocument() {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.openSupportedContentOverview()
+        var config = state.toConfig()
+        #expect(HistoryManager.shared.historyConfigs.contains { $0.id == config.id })
+        #expect(config.sourceFingerprint == SupportedContentOverview.sourceFingerprint)
+        #expect(state.isMarkdownPreview)
+        #expect(state.text.contains(".epub"))
+        #expect(state.text.contains(".swift"))
+        #expect(!state.text.contains("{{"))
+        config.originalImageName = "Old title.md"
+        config.text = "Outdated document"
+        let restored = AppState(config: config)
+        #expect(restored.originalImageName == NSLocalizedString("Supported Content Overview", comment: "") + ".md")
+        #expect(restored.text == SupportedContentOverview.markdown())
+        #expect(restored.isMarkdownPreview)
+        #expect(restored.id == config.id)
+        state.loadConfig(config)
+        #expect(state.text == SupportedContentOverview.markdown())
+    }
+
     @Test @MainActor func menuImagesRemainVisibleOnMacOS27() {
         guard #available(macOS 27.0, *) else { return }
         let symbolItem = NSMenuItem(title: "Symbol", action: nil, keyEquivalent: "").withSymbol("folder")

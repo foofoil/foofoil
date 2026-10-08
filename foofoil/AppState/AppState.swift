@@ -595,6 +595,9 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         if config.sourceFingerprint == KeyboardShortcutsOverview.sourceFingerprint {
             self.textURL = nil
             self.text = KeyboardShortcutsOverview.markdown()
+        } else if config.sourceFingerprint == SupportedContentOverview.sourceFingerprint {
+            self.textURL = nil
+            self.text = SupportedContentOverview.markdown()
         } else if let path = config.textPath {
             let url = URL(fileURLWithPath: path)
             if FileManager.default.fileExists(atPath: url.path) {
@@ -614,7 +617,9 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         }
         self.isMarkdownPreview = config.isMarkdownPreview
         self.windowFrame = config.windowFrame
-        self.originalImageName = config.originalImageName
+        self.originalImageName = config.sourceFingerprint == SupportedContentOverview.sourceFingerprint
+                ? NSLocalizedString("Supported Content Overview", comment: "") + ".md"
+                : config.originalImageName
         self.imageSource = config.imageSource
         self.showBorder = config.showBorder
         self.imageScale = Self.clampImageScale(config.imageScale)

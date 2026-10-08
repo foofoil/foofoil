@@ -560,6 +560,14 @@ extension AppDelegate {
         shortcutsOverviewItem.target = self
         shortcutsOverviewItem.withSymbol("keyboard")
         helpMenu.addItem(shortcutsOverviewItem)
+        let fileTypesOverviewItem = NSMenuItem(
+            title: NSLocalizedString("Supported Content Overview", comment: ""),
+            action: #selector(showSupportedContentOverviewAction),
+            keyEquivalent: ""
+        )
+        fileTypesOverviewItem.target = self
+        fileTypesOverviewItem.withSymbol("doc.on.doc")
+        helpMenu.addItem(fileTypesOverviewItem)
         helpMenu.addItem(.separator())
         helpMenu.addItem(withTitle: String(format: NSLocalizedString("About %@", comment: ""), appName), action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
             .withSymbol("info.circle")
