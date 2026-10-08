@@ -39,6 +39,53 @@ struct FoilExposeShortcutTests {
         #expect(KeyboardShortcutCatalog.definition(withID: "edit.extractImageSubject")?.noteKey == "Shortcut Scope Detected Image Subject")
     }
 
+    @MainActor
+    @Test func hidingOneFoilKeepsOtherFoilsVisibleAndCanBeRestored() throws {
+        let first = FloatingWindowController(appState: AppState())
+        let second = FloatingWindowController(appState: AppState())
+        defer { first.close(); second.close() }
+        let firstWindow = try #require(first.window)
+        let secondWindow = try #require(second.window)
+        firstWindow.orderFront(nil)
+        secondWindow.orderFront(nil)
+        first.hideFoil()
+        #expect(!firstWindow.isVisible)
+        #expect(secondWindow.isVisible)
+        first.showWindow(nil)
+        firstWindow.makeKeyAndOrderFront(nil)
+        #expect(firstWindow.isVisible)
+    }
+
+    @MainActor
+    @Test func shortcutOverviewRegeneratesOnHistoryRestore() throws {
+        let definition = try #require(KeyboardShortcutCatalog.definition(withID: "file.openClipboardContent"))
+        let store = KeyboardShortcutStore.shared
+        let previous = store.shortcut(for: definition)
+        let customized = store.isCustomized(definition)
+        let state = AppState()
+        defer {
+            if customized { store.setShortcut(previous, for: definition) }
+            else { store.reset(definition) }
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        store.reset(definition)
+        state.openKeyboardShortcutsOverview()
+        let config = state.toConfig()
+        #expect(config.sourceFingerprint == KeyboardShortcutsOverview.sourceFingerprint)
+        #expect(HistoryManager.shared.historyConfigs.contains { $0.id == config.id })
+        store.setShortcut(KeyboardShortcut(keyEquivalent: "j", modifiers: [.command, .option]), for: definition)
+        let restored = AppState(config: config)
+        #expect(restored.text.contains("| ⇧⌘V | ⌥⌘J |"))
+        #expect(restored.isMarkdownPreview)
+        #expect(restored.id == config.id)
+        store.setShortcut(nil, for: definition)
+        state.loadConfig(config)
+        #expect(state.text != restored.text)
+        #expect(!state.text.contains("| ⇧⌘V | ⌥⌘J |"))
+        #expect(state.text.contains("⌘W"))
+        #expect(!state.text.contains("{{"))
+    }
+
     @Test func indicesZeroThroughEightMapToDigits() {
         #expect(FoilExposeShortcut.key(forIndex: 0) == "1")
         #expect(FoilExposeShortcut.key(forIndex: 4) == "5")

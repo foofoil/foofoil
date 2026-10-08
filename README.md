@@ -17,7 +17,8 @@ Built with SwiftUI and AppKit, foofoil favors native macOS capabilities, fast in
 - Pin a window above other apps, adjust its opacity, and show or hide its border.
 - Drag, resize, zoom, and position windows across multiple displays.
 - Open images, videos, audio, Hi-Fi audio, EPUB e-books, PDFs, plain text, Markdown, CSV, HTML, and web URLs.
-- Paste or open an image directly from the clipboard.
+- Use ⇧⌘V to open clipboard files, folders, images, URLs, or text, with automatic Markdown and HTML recognition.
+- Use the global ⌃⇧Esc shortcut to open Foil Overview (Exposé), view your open foils, and switch between them.
 - Preview other local documents with embedded macOS Quick Look, including Office and rich text files; available previews depend on the system and installed Quick Look providers.
 - Preview Markdown, browse CSV data as a table, and navigate PDF pages.
 - Zoom images and web content, fit images to a window, and customize SVG colors or the document look: background, text color, font, line spacing and paragraph spacing for plain text, Markdown and EPUB foils, following light/dark appearance changes.
@@ -40,31 +41,39 @@ Launch foofoil and then use any of these methods:
 - Drag a supported file, image, or text onto a foofoil window.
 - Choose **File > Open** (<kbd>⌘ O</kbd>) to open a local file.
 - Choose **File > Open URL** (<kbd>⌘ L</kbd>) to display a web page.
-- Choose **File > Open Clipboard Image** (<kbd>⇧ ⌘ V</kbd>) to create a reference from the clipboard.
+- Choose **File > Open Clipboard Content** (<kbd>⇧ ⌘ V</kbd>) to open copied files, folders, images, URLs, or text as foils; an empty foil is reused when available, otherwise a new window is created.
 - Start typing in an empty window to use it as a note.
 
 Right-click a window to access the most relevant actions for its current content.
 
 ## Useful Keyboard Shortcuts
 
-| Action | Shortcut |
-| --- | --- |
-| New foofoil window | <kbd>⌘ N</kbd> |
-| Open a file | <kbd>⌘ O</kbd> |
-| Open a URL | <kbd>⌘ L</kbd> |
-| Open clipboard image | <kbd>⇧ ⌘ V</kbd> |
-| Search history and files | <kbd>⌘ P</kbd> |
-| Toggle always on top | <kbd>⌘ T</kbd> |
-| Toggle border | <kbd>⌘ B</kbd> |
-| Zoom content in/out | <kbd>⌘ +</kbd> / <kbd>⌘ −</kbd> |
-| Zoom window in/out | <kbd>⇧ ⌘ +</kbd> / <kbd>⇧ ⌘ −</kbd> |
-| Open Settings | <kbd>⌘ ,</kbd> |
-| Reset content size | <kbd>⌘ 0</kbd> |
-| Reset the current window | <kbd>⌘ K</kbd> |
-| Close the current window | <kbd>⌘ W</kbd> |
-| Increase/decrease opacity | <kbd>⇧ ⌘ ↑</kbd> / <kbd>⇧ ⌘ ↓</kbd> |
+These default shortcuts cover distinctive features and everyday actions. Except for the global overview shortcut, use them while foofoil is active; some actions depend on the current content type.
 
-These are the default shortcuts and can be customized in Settings. Additional content-specific and window-position shortcuts are available from the macOS menu bar.
+| Action | Default shortcut |
+| --- | --- |
+| Foil Overview (Exposé, global) | <kbd>⌃ ⇧ Esc</kbd> |
+| Open clipboard content | <kbd>⇧ ⌘ V</kbd> |
+| Search history and files | <kbd>⌘ P</kbd> |
+| Hide the active foil | <kbd>⌘ H</kbd> |
+| Hide all foils to clear your workspace temporarily | <kbd>⇧ ⌘ H</kbd> |
+| Extract image text (raster images) | <kbd>⌘ E</kbd> |
+| Always show navigator (foils with a navigator) | <kbd>⇧ ⌘ L</kbd> |
+| Toggle always on top | <kbd>⌘ T</kbd> |
+| Toggle border (images and web pages outside full screen) | <kbd>⌘ B</kbd> |
+| Zoom content in / out | <kbd>⌘ +</kbd> / <kbd>⌘ −</kbd> |
+| Actual content size | <kbd>⌘ 0</kbd> |
+| Fit window to image / image to window width (visible border required) | <kbd>⌘ [</kbd> / <kbd>⌘ ]</kbd> |
+| Enlarge / shrink window (outside full screen) | <kbd>⇧ ⌘ +</kbd> / <kbd>⇧ ⌘ −</kbd> |
+| Increase / decrease opacity | <kbd>⇧ ⌘ ↑</kbd> / <kbd>⇧ ⌘ ↓</kbd> |
+| Move foil to the next screen | <kbd>⌃ ⌥ Tab</kbd> |
+| Move foil to a position in a 3×3 screen grid | <kbd>⌃ ⌥</kbd> + <kbd>Q W E / A S D / Z X C</kbd> |
+
+The overview shortcut also works while another app is active. Within the overview, ⇧⌘V still opens clipboard content.
+
+In the overview, use arrow keys to select a foil, Return to switch to it, `/` to search, and Esc to leave search or dismiss the overview. The positioning keys follow three keyboard rows: Q/W/E for the top, A/S/D for the middle, and Z/X/C for the bottom of the screen. ⌘H hides only the active foil; select it in the overview to show it again. ⇧⌘H hides the entire app; switch back to foofoil to restore it. Hiding keeps content open and audio playing.
+
+Visit **Settings → Keyboard Shortcuts** for all configurable commands: search by name, scope, or key combination, change a shortcut, or restore its default. The global **Open Clipboard Content** command has no default shortcut; assign one there if needed. Standard menu shortcuts such as Hide, New, and Open File are outside this configuration list. The menu bar shows the shortcuts currently in effect.
 
 ## Open from Finder with a Keyboard Shortcut
 

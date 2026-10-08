@@ -77,6 +77,10 @@ When editing the app together with `extension-kit` or `hifi`, open `foofoil.xcwo
 - Treat new warnings as defects. Do not silence warnings without addressing or documenting the underlying reason.
 - After completing a task that results in app code changes, run `./run` from the repository root to build and launch the app so the user can directly see the result. Skip this only if the change cannot or should not affect the running app.
 
+## Shortcut Documentation Maintenance
+
+- When adding, removing, or changing any keyboard shortcut, its scope, or its behavior, update both bundled overview documents: `foofoil/Resources/en.lproj/KeyboardShortcuts.md` and `foofoil/Resources/zh-Hans.lproj/KeyboardShortcuts.md`. Keep their categories aligned with Keyboard Shortcuts settings, include common system/menu shortcuts, and update the selected shortcuts in both READMEs when relevant. These files are localized templates: configurable rows are generated from KeyboardShortcutCatalog and KeyboardShortcutStore with default/current columns. The Help menu opens a generated Markdown foil; every history restore regenerates it using the stable source fingerprint. Never store configurable bindings as static template rows.
+
 ## Change Discipline
 
 - Inspect the surrounding implementation before editing and follow existing naming, formatting, and ownership patterns.

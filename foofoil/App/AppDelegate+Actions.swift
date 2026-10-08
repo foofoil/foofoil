@@ -18,6 +18,13 @@ extension AppDelegate {
         showNewWindow(with: AppState())
     }
 
+    /// 根据当前快捷键生成 Markdown，一览沿用文本内容与历史记录管线。
+    @objc func showKeyboardShortcutsOverviewAction() {
+        let target = clipboardContentTarget()
+        target.state.openKeyboardShortcutsOverview()
+        presentClipboardTarget(target)
+    }
+
     @objc func showSettingsAction() {
         SettingsWindowController.shared.show()
     }
@@ -679,6 +686,11 @@ extension AppDelegate {
         activeAppState?.resetContent()
     }
 
+    /// 只收起当前箔及其伴随面板，不关闭内容或中断播放；总览仍保留此箔。
+    @objc func hideCurrentFoilAction() {
+        activeWindowController?.hideFoil()
+    }
+
     @objc func closeWindowAction() {
         // 设置、关于等带关闭按钮的窗口走系统 performClose；箔窗口是无边框，仍由控制器关闭。
         if closeStandardKeyWindow(NSApplication.shared.keyWindow) {
@@ -702,7 +714,7 @@ extension AppDelegate {
         alert.informativeText = NSLocalizedString("Close Playing Audio Message", comment: "")
         alert.alertStyle = .informational
         // 默认按钮放在隐藏上：隐藏不中断播放，是更安全的选择。
-        alert.addButton(withTitle: NSLocalizedString("Hide foofoil", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Hide Current Foil", comment: ""))
         alert.addButton(withTitle: NSLocalizedString("Close foofoil", comment: ""))
         alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
         alert.showsSuppressionButton = true
@@ -717,7 +729,7 @@ extension AppDelegate {
 
         switch response {
         case .alertFirstButtonReturn:
-            hideApplicationKeepingAudioPlaying()
+            hideCurrentFoilKeepingAudioPlaying()
             return false
         case .alertSecondButtonReturn:
             return true
@@ -727,14 +739,14 @@ extension AppDelegate {
     }
 
     /// 选择隐藏后先说明 ⌘H：隐藏让音乐继续播放，下次可直接按 ⌘H 而不必关闭箔片。
-    private func hideApplicationKeepingAudioPlaying() {
+    private func hideCurrentFoilKeepingAudioPlaying() {
         let hint = NSAlert()
         hint.messageText = NSLocalizedString("Audio Hidden Hint Title", comment: "")
         hint.informativeText = NSLocalizedString("Audio Hidden Hint Message", comment: "")
         hint.alertStyle = .informational
         hint.addButton(withTitle: NSLocalizedString("OK", comment: ""))
         hint.runModal()
-        NSApp.hide(nil)
+        hideCurrentFoilAction()
     }
 
     @discardableResult

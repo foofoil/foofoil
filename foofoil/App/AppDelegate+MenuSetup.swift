@@ -37,10 +37,11 @@ extension AppDelegate {
         appMenu.addItem(NSMenuItem.separator())
 
         let hideItem = NSMenuItem(
-            title: String(format: NSLocalizedString("Hide %@", comment: ""), appName),
+            title: NSLocalizedString("Hide All Foils", comment: ""),
             action: #selector(NSApplication.hide(_:)),
             keyEquivalent: "h"
         )
+        hideItem.keyEquivalentModifierMask = [.command, .shift]
         hideItem.withSymbol("eye.slash")
         appMenu.addItem(hideItem)
 
@@ -490,12 +491,13 @@ extension AppDelegate {
 
         windowMenu.addItem(NSMenuItem.separator())
 
-        // 与系统 ⌘H 原生隐藏一致；不设 representedObject，避免被快捷键配置改写键位。
+        // 单箔隐藏与应用级隐藏使用不同键位，隐藏后仍可从总览恢复。
         let hideAppItem = NSMenuItem(
-            title: NSLocalizedString("Hide", comment: ""),
-            action: #selector(NSApplication.hide(_:)),
+            title: NSLocalizedString("Hide Current Foil", comment: ""),
+            action: #selector(hideCurrentFoilAction),
             keyEquivalent: "h"
         )
+        hideAppItem.target = self
         hideAppItem.withSymbol("eye.slash")
         windowMenu.addItem(hideAppItem)
 
@@ -536,6 +538,15 @@ extension AppDelegate {
 
         // 5. Help 菜单
         let helpMenu = NSMenu(title: NSLocalizedString("Help", comment: ""))
+        let shortcutsOverviewItem = NSMenuItem(
+            title: NSLocalizedString("Keyboard Shortcuts Overview", comment: ""),
+            action: #selector(showKeyboardShortcutsOverviewAction),
+            keyEquivalent: ""
+        )
+        shortcutsOverviewItem.target = self
+        shortcutsOverviewItem.withSymbol("keyboard")
+        helpMenu.addItem(shortcutsOverviewItem)
+        helpMenu.addItem(.separator())
         helpMenu.addItem(withTitle: String(format: NSLocalizedString("About %@", comment: ""), appName), action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
             .withSymbol("info.circle")
 

@@ -146,7 +146,10 @@ extension AppState {
             } else {
                 self.actualWebURL = nil
             }
-            if let path = config.textPath {
+            if config.sourceFingerprint == KeyboardShortcutsOverview.sourceFingerprint {
+                self.textURL = nil
+                self.text = KeyboardShortcutsOverview.markdown()
+            } else if let path = config.textPath {
                 let url = URL(fileURLWithPath: path)
                 if FileManager.default.fileExists(atPath: url.path) {
                     self.textURL = url

@@ -318,6 +318,12 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         super.close()
     }
 
+    /// 隐藏时先拆除伴随窗口和监听，防止后台状态更新重新显示导航面板。
+    func hideFoil() {
+        prepareForApplicationHide()
+        window?.orderOut(nil)
+    }
+
     /// ⌘H 前停掉 hover 监听并拆掉目录伴随窗口，避免隐藏后再被 orderFront 拉回来。
     func prepareForApplicationHide() {
         pendingNavigatorPanelHide?.cancel()
@@ -982,7 +988,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     /// 1. 不依赖事件归属窗口——Mac Mouse Fix 等会把滚轮投给键盘焦点窗口（箔片）；
     /// 2. 同时覆盖 scrollWheel(⌘+滚轮) 与被转成的 magnify 手势。
     private func updateNavigatorScrollMonitor() {
-        if NSApp.isHidden || appState.navigatorContributions.isEmpty {
+        if NSApp.isHidden || window?.isVisible != true || appState.navigatorContributions.isEmpty {
             removeNavigatorScrollMonitor()
             return
         }
@@ -1020,7 +1026,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     private func updateNavigatorPanelVisibility() {
         updateNavigatorScrollMonitor()
-        guard let window, !NSApp.isHidden else { return }
+        guard let window, window.isVisible, !NSApp.isHidden else { return }
         if appState.isFullScreen || isTransitioningFullScreen {
             pendingNavigatorPanelHide?.cancel()
             pendingNavigatorPanelHide = nil
@@ -1235,7 +1241,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func updateNavigatorHoverMonitors() {
-        if NSApp.isHidden {
+        if NSApp.isHidden || window?.isVisible != true {
             removeNavigatorHoverMonitors()
             return
         }

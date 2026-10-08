@@ -194,6 +194,10 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         }
     }
     public func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(hideCurrentFoilAction) {
+            return activeWindowController?.window?.isVisible == true
+        }
+
         if menuItem.action == #selector(moveToNextScreenAction) {
             return NSScreen.screens.count > 1
         }

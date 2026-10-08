@@ -1,6 +1,70 @@
 {
   "sourceLanguage": "en",
   "strings": {
+  "Shortcut Overview Unassigned": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Unassigned"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未设置"
+        }
+      }
+    }
+  },
+  "Keyboard Shortcuts Overview": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Keyboard Shortcuts Overview"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "快捷键一览"
+        }
+      }
+    }
+  },
+  "Hide All Foils": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Hide All Foils"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "隐藏所有箔片"
+        }
+      }
+    }
+  },
+  "Hide Current Foil": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Hide Current Foil"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "隐藏当前箔片"
+        }
+      }
+    }
+  },
     "Camera Devices" : {
       "extractionState": "manual",
       "localizations": {
@@ -1571,13 +1635,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Music will keep playing. Next time, press ⌘H to hide foofoil without closing the foil."
+            "value": "Music will keep playing. Next time, press ⌘H to hide the current foil without closing it."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "音乐将继续播放。下次可直接按 ⌘H 隐藏 foofoil，无需关闭箔片。"
+            "value": "音乐将继续播放。下次可直接按 ⌘H 隐藏当前箔片，无需关闭。"
           }
         }
       }
@@ -1605,13 +1669,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Closing this foil will stop playback. Hide foofoil instead to keep the music playing."
+            "value": "Closing this foil will stop playback. Hide this foil instead to keep the music playing."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "关闭此箔片会停止播放。改为隐藏 foofoil 可让音乐继续播放。"
+            "value": "关闭此箔片会停止播放。改为隐藏此箔片可让音乐继续播放。"
           }
         }
       }
