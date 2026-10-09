@@ -778,6 +778,8 @@ struct ExtensionKitTests {
         let foilWindow = try #require(controller.window)
         #expect(controller.isNavigatorPanelVisible == false)
 
+        foilWindow.orderFront(nil)
+
         let interior = NSPoint(x: foilWindow.frame.width / 2, y: foilWindow.frame.height / 2)
         controller.updateNavigatorEdgeHover(at: interior)
         #expect(state.isNavigatorEdgeHovered)
@@ -789,6 +791,26 @@ struct ExtensionKitTests {
         #expect(state.isNavigatorPanelHovered == false)
 
         controller.close()
+    }
+
+    @Test func asynchronouslyArrivingNavigatorRefreshesStationaryPointer() async throws {
+        let state = AppState()
+        state.navigatorPanelVisibilityMode = .onHover
+        let controller = FloatingWindowController(appState: state)
+        defer { controller.close() }
+        let window = try #require(controller.window)
+        let pointer = NSEvent.mouseLocation
+        window.setFrame(NSRect(x: pointer.x - 200, y: pointer.y - 200, width: 400, height: 400), display: false)
+        window.orderFront(nil)
+        state.isNavigatorEdgeHovered = false
+        // 模拟专辑异步加载完成，期间指针未产生新的进入窗口事件。
+        state.builtInNavigatorContributions = [
+            NavigatorContribution(id: "builtin.async-queue", titleLocalizationKey: "Navigator", style: .flat,
+                                  items: [NavigatorItem(id: "one", title: "One")])
+        ]
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(state.isNavigatorEdgeHovered)
+        #expect(controller.isNavigatorPanelVisible)
     }
 
     @Test func fullScreenControlsReserveOnlyVisibleNavigatorWidth() {

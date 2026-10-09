@@ -102,7 +102,7 @@ struct SpotlightSearchTests {
     @Test func lateResultsCannotOverwriteNewQueryOrClosedPanel() async throws {
         var callbacks: [String: (SpotlightSearchOutcome) -> Void] = [:]
         var cancellations = 0
-        let model = HistorySearchViewModel(historySearch: { _ in [] }, fileSearch: { callbacks[$0] = $1 }, cancelFiles: { cancellations += 1 })
+        let model = HistorySearchViewModel(historySearch: { _ in [] }, fileSearch: { callbacks[$0] = $1 }, cancelFiles: { cancellations += 1 }, musicEnabled: { false })
         model.query = "old"
         try await eventually { callbacks["old"] != nil }
         model.query = "new"
@@ -123,7 +123,7 @@ struct SpotlightSearchTests {
         var callback: ((SpotlightSearchOutcome) -> Void)?
         let model = HistorySearchViewModel(historySearch: { _ in
             await withCheckedContinuation { historyContinuation = $0 }
-        }, fileSearch: { _, value in callback = value }, cancelFiles: {})
+        }, fileSearch: { _, value in callback = value }, cancelFiles: {}, musicEnabled: { false })
         model.query = "report"
         try await eventually { callback != nil && historyContinuation != nil }
         callback?(.progress([file("/a/report.txt"), file("/b/report.txt")]))
@@ -149,7 +149,7 @@ struct SpotlightSearchTests {
         let hit = history("report")
         var callback: ((SpotlightSearchOutcome) -> Void)?
         var starts = 0
-        let model = HistorySearchViewModel(historySearch: { _ in [hit] }, fileSearch: { _, value in starts += 1; callback = value }, cancelFiles: {})
+        let model = HistorySearchViewModel(historySearch: { _ in [hit] }, fileSearch: { _, value in starts += 1; callback = value }, cancelFiles: {}, musicEnabled: { false })
         model.query = "report"
         try await eventually { callback != nil && !model.isHistorySearching }
         callback?(.timedOut)
@@ -173,7 +173,7 @@ struct SpotlightSearchTests {
         var callback: ((SpotlightSearchOutcome) -> Void)?
         let model = HistorySearchViewModel(historySearch: { _ in
             await withCheckedContinuation { historyContinuation = $0 }
-        }, fileSearch: { _, value in callback = value }, cancelFiles: {})
+        }, fileSearch: { _, value in callback = value }, cancelFiles: {}, musicEnabled: { false })
         model.query = "nothing"
         try await eventually { callback != nil && historyContinuation != nil }
         // 历史仍在加载时不能抢先显示空态。

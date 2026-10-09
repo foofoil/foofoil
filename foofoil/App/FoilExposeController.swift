@@ -43,9 +43,10 @@ struct FoilExposeItem: Identifiable {
     var sourcePath: String? = nil
     /// 文档型箔片（笔记/文本/Markdown/CSV）的截断正文，供缩略图位置直接展示内容；其余类型为 nil。
     var bodyPreview: String? = nil
+    var musicItem: AppleMusicLibraryItem? = nil
 
     var window: NSWindow? { controller?.window }
-    var isNewFoil: Bool { controller == nil && !isHistoryEntry && id != Self.cameraCommandID }
+    var isNewFoil: Bool { controller == nil && !isHistoryEntry && musicItem == nil && id != Self.cameraCommandID }
 
     /// 文档型条目的正文预览：跳过首尾空白后截取开头；空白正文与非文档类型返回 nil，卡片回退到类型图标。
     static func makeBodyPreview(kind: HistoryContentKind, text: String) -> String? {
@@ -86,6 +87,7 @@ final class FoilExposeModel: ObservableObject {
             // 过滤结果变化后回到第一项，避免高亮落在已被过滤掉的条目上。
             if selectedIndex != 0 { selectedIndex = 0 }
             scheduleFileSearch()
+            scheduleMusicSearch()
         }
     }
     /// 是否处于搜索输入状态：Esc 只退出输入并保留关键字，不关闭覆盖层。
@@ -100,6 +102,23 @@ final class FoilExposeModel: ObservableObject {
     @Published private(set) var fileStatus: FileSearchStatus?
     /// 打开文件失败等一次性说明；下一次搜索或重新开启文件搜索时清除。
     @Published var fileSearchNotice: String?
+    @Published private(set) var musicItems: [FoilExposeItem] = []
+    @Published private(set) var expandedMusicCategories: Set<AppleMusicSearchCategory> = []
+    @Published private(set) var musicDisplayCounts: [AppleMusicSearchCategory: Int] = [:]
+    @Published var resultFilter: SearchResultFilter = .all {
+        didSet {
+            if oldValue != resultFilter {
+                selectedIndex = 0
+                scheduleFileSearch()
+                scheduleMusicSearch()
+            }
+        }
+    }
+    private var musicHasMoreCategories: Set<AppleMusicSearchCategory> = []
+    @Published private(set) var isMusicSearching = false
+    @Published private(set) var musicError: String?
+    @Published private(set) var isMusicSearchEnabled = false
+    @Published private(set) var isMusicAuthorized = false
     /// 网格实际列数，由面板视图从卡片外框推导回填，供上下移动跨行使用。
     var columnCount: Int = 4
     var onSelect: (FoilExposeItem) -> Void = { _ in }
@@ -118,14 +137,33 @@ final class FoilExposeModel: ObservableObject {
     private var fileSearchTask: Task<Void, Never>?
     private var fileGeneration = 0
     private var rawFiles: [SpotlightFileResult] = []
+    private let musicSearch: @MainActor (String, SearchResultFilter) async throws -> AppleMusicSearchPage
+    private let musicAuthorized: @MainActor () -> Bool
+    private let musicEnabled: @MainActor () -> Bool
+    private var musicTask: Task<Void, Never>?
+    private var musicGeneration = 0
+    private var musicIDs: [String: UUID] = [:]
+    private var musicSettingsCancellable: AnyCancellable?
+    private var isStopped = false
 
     init(items: [FoilExposeItem],
          historyItems: [FoilExposeItem],
          clipboardContent: ClipboardOpenableContent? = nil,
          fileSearch: ((String, @escaping (SpotlightSearchOutcome) -> Void) -> Void)? = nil,
          cancelFiles: (() -> Void)? = nil,
-         cameraAvailable: @escaping () -> Bool = { CameraCaptureController.isAvailable }) {
+         cameraAvailable: @escaping () -> Bool = { CameraCaptureController.isAvailable },
+         musicSearch: (@MainActor (String) async throws -> [AppleMusicLibraryItem])? = nil,
+         musicAuthorized: @escaping @MainActor () -> Bool = { AppleMusicLibrary.shared.isAuthorized },
+         musicEnabled: @escaping @MainActor () -> Bool = { SettingsStore.shared.appleMusicSearchEnabled }) {
         self.cameraAvailable = cameraAvailable
+        self.musicSearch = { term, filter in
+            if let musicSearch { return .init(items: try await musicSearch(term)) }
+            return try await AppleMusicLibrary.shared.searchPage(term, filter: filter)
+        }
+        self.musicAuthorized = musicAuthorized
+        self.musicEnabled = musicEnabled
+        self.isMusicSearchEnabled = musicEnabled()
+        self.isMusicAuthorized = musicAuthorized()
         self.items = items
         self.historyItems = historyItems
         self.clipboardContent = clipboardContent
@@ -134,6 +172,13 @@ final class FoilExposeModel: ObservableObject {
             service.start(text: text, completion: completion)
         }
         self.cancelFiles = cancelFiles ?? { service.cancel() }
+        musicSettingsCancellable = NotificationCenter.default.publisher(for: .appleMusicSearchDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, !self.isStopped else { return }
+                if !self.musicEnabled() && self.resultFilter.musicCategory != nil { self.resultFilter = .all }
+                self.scheduleMusicSearch()
+            }
     }
 
     /// 去掉首尾空白后的搜索关键字；空字符串表示不过滤。
@@ -143,12 +188,30 @@ final class FoilExposeModel: ObservableObject {
 
     /// 打开的箔片在前、历史记录在后的完整列表；已在打开的箔片中出现的条目不再重复显示；
     /// 有关键字时只保留标题匹配项。
-    var currentItems: [FoilExposeItem] {
+    private var matchedFoilItems: [FoilExposeItem] {
         let openIDs = Set(items.map(\.id))
         let combined = items + historyItems.filter { !openIDs.contains($0.id) }
         guard !searchQuery.isEmpty else { return combined }
+        guard resultFilter == .all else { return [] }
         let command = CameraCaptureController.matches(searchQuery, available: cameraAvailable()) ? [FoilExposeItem(id: FoilExposeItem.cameraCommandID, controller: nil, isHistoryEntry: false, title: NSLocalizedString("Open Camera", comment: ""), symbolName: "camera", contentKind: .camera, thumbnailPath: nil)] : []
-        return command + combined.filter { $0.matches(query: searchQuery) }
+        let query = searchQuery
+        return command + combined.lazy.filter { $0.matches(query: query) }.prefix(SearchResultLimits.probe)
+    }
+    var budget: SearchResultBudget {
+        SearchResultBudget(baseCount: matchedFoilItems.count, fileCount: files.count,
+                           musicCounts: Dictionary(uniqueKeysWithValues: AppleMusicSearchCategory.allCases.map { ($0, musicItems(in: $0).count) }),
+                           desiredMusicCounts: musicDisplayCounts, filter: resultFilter)
+    }
+    var currentItems: [FoilExposeItem] {
+        guard !searchQuery.isEmpty else { return matchedFoilItems }
+        return Array(matchedFoilItems.prefix(budget.base)) + visibleMusicItems
+    }
+    var visibleFiles: [SpotlightFileResult] { Array(files.prefix(budget.files)) }
+    var displayedResultCount: Int { currentItems.count + visibleFiles.count }
+    var showsResultLimitNotice: Bool {
+        let hasExtra = budget.base < matchedFoilItems.count || visibleFiles.count < files.count
+            || AppleMusicSearchCategory.allCases.contains { resultFilter.includes($0) && (budget.music[$0, default: 0] < musicItems(in: $0).count || musicHasMoreCategories.contains($0)) }
+        return hasExtra && (displayedResultCount == SearchResultLimits.maximum || !AppleMusicSearchCategory.allCases.contains { canExpandMusicResults(in: $0) })
     }
 
     /// 高亮条目：越界时回退到第一项。
@@ -180,7 +243,78 @@ final class FoilExposeModel: ObservableObject {
     }
 
     /// 关键字非空时才呈现 Spotlight 文件结果区；空关键字不展示、不查询。
-    var showsFileResults: Bool { !searchQuery.isEmpty }
+    var showsFileResults: Bool { !searchQuery.isEmpty && resultFilter.includesFiles }
+    var showsMusicResults: Bool { !searchQuery.isEmpty && isMusicSearchEnabled && resultFilter != .files }
+    func musicItems(in category: AppleMusicSearchCategory) -> [FoilExposeItem] {
+        musicItems.filter { $0.musicItem?.searchCategory == category }
+    }
+    var visibleMusicItems: [FoilExposeItem] {
+        AppleMusicSearchCategory.allCases.flatMap { category in
+            let values = musicItems(in: category)
+            return Array(values.prefix(budget.music[category, default: 0]))
+        }
+    }
+    func canExpandMusicResults(in category: AppleMusicSearchCategory) -> Bool {
+        displayedResultCount < SearchResultLimits.maximum && budget.music[category, default: 0] < musicItems(in: category).count
+    }
+    func expandMusicResults(in category: AppleMusicSearchCategory) {
+        guard canExpandMusicResults(in: category) else { return }
+        // 专辑组展开会把后面的歌曲向下推；按身份保留键盘高亮，避免误打开其它曲目。
+        let selectedID = highlightedItem?.id
+        expandedMusicCategories.insert(category)
+        musicDisplayCounts[category] = min(SearchResultLimits.maximum, musicDisplayCounts[category, default: SearchResultLimits.initial] + SearchResultLimits.increment)
+        if let selectedID, let index = currentItems.firstIndex(where: { $0.id == selectedID }) {
+            selectedIndex = index
+        }
+    }
+
+    /// 音乐结果加入同一键盘导航网格；独立取消与代际校验，防止旧查询覆盖新输入。
+    private func scheduleMusicSearch() {
+        let selectedID = highlightedItem?.id
+        musicTask?.cancel()
+        musicGeneration += 1
+        let generation = musicGeneration
+        musicItems = []
+        expandedMusicCategories = []; musicDisplayCounts = [:]; musicHasMoreCategories = []
+        musicError = nil
+        isMusicSearching = false
+        isMusicSearchEnabled = musicEnabled()
+        isMusicAuthorized = musicAuthorized()
+        if let selectedID, let index = currentItems.firstIndex(where: { $0.id == selectedID }) {
+            selectedIndex = index
+        } else {
+            selectedIndex = min(selectedIndex, max(0, currentItems.count - 1))
+        }
+        let query = searchQuery
+        guard !isStopped, resultFilter != .files, !query.isEmpty, isMusicSearchEnabled, isMusicAuthorized else { return }
+        isMusicSearching = true
+        musicTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .milliseconds(250))
+                guard let self, !Task.isCancelled else { return }
+                let page = try await self.musicSearch(query, self.resultFilter)
+                guard !Task.isCancelled, generation == self.musicGeneration else { return }
+                self.musicHasMoreCategories = page.hasMoreCategories
+                let results = AppleMusicSearchCategory.allCases.filter { self.resultFilter.includes($0) }.flatMap { category in
+                    page.items.lazy.filter { $0.searchCategory == category }.prefix(SearchResultLimits.probe)
+                }
+                let incomingIDs = Set(results.map(\.id))
+                self.musicIDs = self.musicIDs.filter { incomingIDs.contains($0.key) }
+                self.musicItems = results.map { item in
+                    let id = self.musicIDs[item.id] ?? UUID()
+                    self.musicIDs[item.id] = id
+                    return FoilExposeItem(id: id, controller: nil, isHistoryEntry: false,
+                                          title: item.title, symbolName: AppleMusicReference.symbolName, contentKind: .audio,
+                                          thumbnailPath: nil, musicItem: item)
+                }
+                self.isMusicSearching = false
+            } catch {
+                guard let self, !Task.isCancelled, generation == self.musicGeneration else { return }
+                self.musicError = error.localizedDescription
+                self.isMusicSearching = false
+            }
+        }
+    }
 
     /// 关键字变化后防抖查询 Spotlight；空关键字立即清空并取消，避免结果与输入不一致。
     private func scheduleFileSearch() {
@@ -190,7 +324,7 @@ final class FoilExposeModel: ObservableObject {
         let generation = fileGeneration
         fileSearchNotice = nil
         let query = searchQuery
-        guard !query.isEmpty else {
+        guard !query.isEmpty && resultFilter.includesFiles else {
             cancelFiles()
             rawFiles = []
             files = []
@@ -209,10 +343,10 @@ final class FoilExposeModel: ObservableObject {
                 guard let self, generation == self.fileGeneration else { return }
                 switch outcome {
                 case .progress(let files):
-                    self.rawFiles = files
+                    self.rawFiles = Array(files.prefix(SearchResultLimits.probe))
                     self.mergeFiles()
                     return
-                case .results(let files): self.rawFiles = files
+                case .results(let files): self.rawFiles = Array(files.prefix(SearchResultLimits.probe))
                 case .needsAuthorization: self.fileStatus = .needsAuthorization
                 case .authorizationUnavailable: self.fileStatus = .authorizationUnavailable
                 case .unavailable: self.fileStatus = .unavailable
@@ -231,6 +365,11 @@ final class FoilExposeModel: ObservableObject {
 
     /// 覆盖层关闭时停止查询并释放主目录访问。
     func stopFileSearch() {
+        isStopped = true
+        musicTask?.cancel()
+        musicTask = nil
+        musicGeneration += 1
+        isMusicSearching = false
         fileSearchTask?.cancel()
         fileSearchTask = nil
         fileGeneration += 1
@@ -241,7 +380,7 @@ final class FoilExposeModel: ObservableObject {
     /// 文件结果按相关度排序，并排除已在箔片/历史条目中展示的同一源文件。
     private func mergeFiles() {
         let excluded = Set(currentItems.compactMap(\.sourcePath).map { URL(fileURLWithPath: $0).standardizedFileURL.path })
-        files = SpotlightFileResult.ranked(rawFiles, query: searchQuery, excluding: excluded)
+        files = SpotlightFileResult.ranked(rawFiles, query: searchQuery, excluding: excluded, limit: SearchResultLimits.probe)
     }
 
     /// 请求开启文件搜索：交给控制器弹出系统面板确认用户主目录。
@@ -598,6 +737,12 @@ final class FoilExposeController {
 
     /// 选择箔片：覆盖层先退场，再把目标窗口调度到最前；占位卡新建空白箔，历史条目恢复历史内容。
     private func select(_ item: FoilExposeItem) {
+        if let music = item.musicItem {
+            dismiss()
+            NSApp.activate(ignoringOtherApps: true)
+            (NSApp.delegate as? AppDelegate)?.openAppleMusic(music)
+            return
+        }
         guard let controller = item.controller, let window = item.window else {
             dismiss()
             NSApp.activate(ignoringOtherApps: true)

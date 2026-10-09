@@ -321,6 +321,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
 
     @Published public var imageURL: URL? {
         didSet {
+            if imageURL != nil { appleMusicItem = nil }
             if !isQuickLookDocument { pptxNavigationController.close() }
             loadedImageCache = nil
             cancelImageTextDetection()
@@ -354,12 +355,22 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     }
 
     @Published var isCamera = false
+    @Published var appleMusicReference: AppleMusicReference?
+    @Published var appleMusicRestoreError: String?
+    @Published var appleMusicItem: AppleMusicLibraryItem? {
+        didSet {
+            appleMusicReference = appleMusicItem?.reference
+            appleMusicRestoreError = nil
+            if appleMusicItem == nil { clearAppleMusicNavigator() }
+        }
+    }
     @Published var cameraController: CameraCaptureController?
     /// 摄像头画面与图片共用窗口布局及缩放规则；截图缓存不决定实时内容类型。
     var usesImagePresentation: Bool { isCamera || (imageURL != nil && webURL == nil) }
 
     @Published public var webURL: URL? {
         didSet {
+            if webURL != nil { appleMusicItem = nil }
             isWebEditableElementFocused = false
             saveState()
         }
@@ -382,6 +393,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
 
     @Published public var text: String {
         didSet {
+            if !text.isEmpty { appleMusicItem = nil }
             updateRenderedMarkdown()
 
             // 空白箔在用户首次输入内容时成为文档类型，此时自动应用默认文档样式（素笺）。
@@ -439,7 +451,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     /// 空白箔：尚未加载任何图像、网页、扩展会话或关联文件，且用户尚未输入任何文本内容。
     /// 在用户输入内容前空白箔不是文档类型，不显示文档背景，也不允许配置样式和主题。
     public var isBlank: Bool {
-        !isCamera && imageURL == nil
+        appleMusicReference == nil && !isCamera && imageURL == nil
             && webURL == nil
             && textURL == nil
             && extensionSession == nil
@@ -710,6 +722,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         restoreFileList(from: config)
         restoreExtensionSession(from: config)
         restoreCustomCover(from: config)
+        appleMusicReference = config.appleMusicReference
         // 在调用 saveState 时避免触发死循环；视频经书签恢复后可能重建了书签，也需要落盘
         if let path = config.imagePath, !FileManager.default.fileExists(atPath: path) {
             if Self.findCachedImageInDirectory(for: config.id) != nil || Self.findLegacyCachedImageInDirectory() != nil {

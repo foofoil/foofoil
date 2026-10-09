@@ -133,7 +133,9 @@ extension AppDelegate {
     }
 
     func openHistoryConfig(config: WindowConfig, id: UUID) {
-        if let controller = availableBlankWindowController {
+        let musicController = config.appleMusicReference == nil ? nil : windowControllers.first { $0.appState.appleMusicReference != nil }
+        if let controller = musicController ?? availableBlankWindowController {
+            controller.appState.saveState()
             controller.appState.loadConfig(config)
             activateWindow(controller)
         } else {
@@ -152,10 +154,14 @@ extension AppDelegate {
         guard let config = sender.representedObject as? WindowConfig else { return }
 
         NSApp.activate(ignoringOtherApps: true)
+        if config.appleMusicReference != nil {
+            openHistoryConfig(config: config, id: config.id)
+            return
+        }
 
         // 优先在当前活跃的空白窗口中加载
         if let activeState = activeAppState {
-            if activeState.imageURL == nil && activeState.webURL == nil && activeState.text.isEmpty {
+            if isBlank(activeState) {
                 withAnimation(.easeInOut(duration: 0.35)) {
                     activeState.loadConfig(config)
                 }

@@ -822,7 +822,11 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
         appState.$builtInNavigatorContributions
             .sink { [weak self] _ in
-                DispatchQueue.main.async { self?.updateNavigatorPanelVisibility() }
+                DispatchQueue.main.async {
+                    // 异步列表到达时指针可能早已在箔窗内，不能等待下一次 entered 事件。
+                    self?.refreshNavigatorHoverFromPointer()
+                    self?.updateNavigatorPanelVisibility()
+                }
             }
             .store(in: &cancellables)
 
@@ -2022,6 +2026,12 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             appState.windowFrame = windowedFrameDescriptorBeforeFullScreen
         } else if let window = window {
             appState.windowFrame = window.frameDescriptor
+        }
+        if appState.appleMusicReference != nil,
+           ((NSApp.delegate as? AppDelegate)?.windowControllers.contains(where: {
+               $0 !== self && $0.appState.appleMusicReference != nil
+           }) ?? false) == false {
+            AppleMusicPlaybackController.stopIfActive()
         }
         appState.endExtensionSessionOnWindowClose()
         appState.saveState()

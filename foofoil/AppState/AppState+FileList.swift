@@ -528,10 +528,14 @@ extension AppState {
 
     /// 图片列表与 PPT 共用“上一项/下一项”命令和快捷键，PPT 首尾不循环。
     var supportsItemNavigation: Bool {
-        fileList?.isPresentable == true || (isPPTXDocument && !pptxNavigationController.slides.isEmpty)
+        hasAppleMusicItemNavigation || fileList?.isPresentable == true || (isPPTXDocument && !pptxNavigationController.slides.isEmpty)
     }
 
     func activateAdjacentFileListItem(delta: Int, wraps: Bool = false) {
+        if appleMusicItem != nil {
+            activateAdjacentAppleMusicItem(delta: delta, wraps: wraps)
+            return
+        }
         if isPPTXDocument {
             pptxNavigationController.selectAdjacent(delta: delta)
             return
@@ -656,6 +660,10 @@ extension AppState {
     /// 系统上一首/下一首媒体键仅切换当前音视频列表；单文件时报告命令不可用。
     @discardableResult
     func activateMediaListItem(delta: Int) -> Bool {
+        if hasAppleMusicItemNavigation {
+            activateAdjacentAppleMusicItem(delta: delta, wraps: true)
+            return true
+        }
         guard isExternalMediaDocument, fileList?.isPresentable == true else { return false }
         activateAdjacentFileListItem(delta: delta, wraps: true)
         return true

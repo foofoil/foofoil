@@ -20,12 +20,13 @@ extension AppState {
             guard !isBatchUpdating, !isAdjustingDocumentStyling else { return }
             let config = toConfig()
             let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if isCamera || imageURL != nil || webURL != nil || textURL != nil || extensionSession != nil || !trimmedText.isEmpty {
+            if appleMusicReference != nil || isCamera || imageURL != nil || webURL != nil || textURL != nil || extensionSession != nil || !trimmedText.isEmpty {
                 HistoryManager.shared.addToHistory(config)
             }
         }
 
         public func loadConfig(_ config: WindowConfig) {
+            appleMusicItem = nil
             // 即使连续载入同一条历史，也必须使上一轮异步恢复失效。
             currentMediaRouteGeneration &+= 1
             isLoading = false
@@ -171,6 +172,7 @@ extension AppState {
                 self.textURL = nil
                 self.text = config.text
             }
+            self.appleMusicReference = config.appleMusicReference
         }
 
         /// 恢复图片箔的派生内容缓存（OCR 文字与主体抠图）以及菜单可用性判断所需的"已分析"标记。
@@ -232,7 +234,7 @@ extension AppState {
                 documentParagraphSpacing: documentParagraphSpacing,
                 documentThemeId: documentThemeId,
                 textPath: textURL?.path,
-                contentKind: isQuickLookDocument ? .quickLook : HistoryContentKind.infer(from: WindowConfig(
+                contentKind: appleMusicReference != nil ? .audio : isQuickLookDocument ? .quickLook : HistoryContentKind.infer(from: WindowConfig(
                     id: id,
                     imagePath: imageURL?.path,
                     isCamera: isCamera,
@@ -261,7 +263,8 @@ extension AppState {
                 navigatorPanelWidth: navigatorPanelWidth,
                 fileList: fileList?.isPresentable == true ? fileList : nil,
                 documentScrollFile: extensionDocumentScrollFile,
-                documentScrollFraction: extensionDocumentScrollFraction
+                documentScrollFraction: extensionDocumentScrollFraction,
+                appleMusicReference: appleMusicReference
             )
         }
 

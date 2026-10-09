@@ -17,6 +17,7 @@ import FoofoilExtensionKit
 
 extension AppState {
         public func openImage(url: URL) {
+            appleMusicItem = nil
             applyImage(url: url, originalName: url.lastPathComponent, rotatesIdentity: true, clearsFileList: true)
         }
 
@@ -61,11 +62,13 @@ extension AppState {
 
         /// 打开本地视频；与图片不同，视频不复制到缓存目录，仅记录原始路径。
         public func openVideo(url: URL) {
+            appleMusicItem = nil
             openExternalMedia(url: url, holdsSecurityAccess: false)
         }
 
         /// 打开本地音频；与视频相同，不复制到缓存目录，仅记录原始路径。
         public func openAudio(url: URL) {
+            appleMusicItem = nil
             openExternalMedia(url: url, holdsSecurityAccess: false)
         }
 
@@ -499,6 +502,7 @@ extension AppState {
         }
 
         public func openWeb(url: URL, originalName: String? = nil) {
+            appleMusicItem = nil
             resetFileList()
             let targetID = (imageURL != nil || webURL != nil || textURL != nil || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 ? UUID()
@@ -568,6 +572,7 @@ extension AppState {
         }
 
         public func openTextFile(url: URL) {
+            appleMusicItem = nil
             resetFileList()
             let targetID = (imageURL != nil || webURL != nil || textURL != nil || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 ? UUID()
@@ -644,6 +649,7 @@ extension AppState {
         }
 
         public func openFile(url: URL) {
+            appleMusicItem = nil
             guard canOpenFile(url: url) else { return }
             currentMediaRouteGeneration &+= 1
 

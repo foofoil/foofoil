@@ -20,7 +20,7 @@ nonisolated struct SpotlightFileResult: Identifiable, Sendable, Equatable {
 
     /// 多关键字查询：整串吻合最优先，其余按每个关键字在文件名中的匹配质量求和，
     /// 同级再按修改时间与路径稳定排序。
-    static func ranked(_ files: [Self], query: String, excluding paths: Set<String> = []) -> [Self] {
+    static func ranked(_ files: [Self], query: String, excluding paths: Set<String> = [], limit: Int = Self.displayLimit) -> [Self] {
         let locale = Locale(identifier: "en_US_POSIX")
         func folded(_ value: String) -> String {
             value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: locale)
@@ -45,7 +45,7 @@ nonisolated struct SpotlightFileResult: Identifiable, Sendable, Equatable {
             if rank($0) != rank($1) { return rank($0) < rank($1) }
             if $0.modifiedAt != $1.modifiedAt { return $0.modifiedAt > $1.modifiedAt }
             return $0.id < $1.id
-        }.prefix(Self.displayLimit).map { $0 }
+        }.prefix(limit).map { $0 }
     }
 }
 
@@ -190,6 +190,7 @@ final class SpotlightFileSearch {
                   let identifier = item.value(forAttribute: "kMDItemContentType") as? String,
                   Self.supports(url: url, typeIdentifier: identifier, extensions: extensions) else { continue }
             files.append(.init(url: url, modifiedAt: item.value(forAttribute: "kMDItemFSContentChangeDate") as? Date ?? .distantPast))
+            if files.count >= SearchResultLimits.probe { break }
         }
         return files
     }

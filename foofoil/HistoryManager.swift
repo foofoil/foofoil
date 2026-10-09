@@ -163,6 +163,6 @@ public final class HistoryManager: ObservableObject {
     }
 
     private func hasPersistableContent(_ config: WindowConfig) -> Bool {
-        config.extensionID != nil || config.imagePath != nil || config.webURLString != nil || config.textPath != nil || !config.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        config.appleMusicReference != nil || config.extensionID != nil || config.imagePath != nil || config.webURLString != nil || config.textPath != nil || !config.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }

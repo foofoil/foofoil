@@ -43,4 +43,5 @@ extension Notification.Name {
     public static let navigatorPanelSideDidChange = Notification.Name("navigatorPanelSideDidChange")
     public static let navigatorPanelVisibilityModeDidChange = Notification.Name("navigatorPanelVisibilityModeDidChange")
     public static let spotlightSearchAuthorizationDidChange = Notification.Name("spotlightSearchAuthorizationDidChange")
+    public static let appleMusicSearchDidChange = Notification.Name("appleMusicSearchDidChange")
 }

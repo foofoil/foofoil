@@ -30,6 +30,23 @@ final class HistorySearchViewModel: ObservableObject {
     @Published var query = "" { didSet { if !isResetting { performSearch() } } }
     @Published private(set) var mode: HistorySearchMode = .history
     @Published private(set) var results: [HistorySearchResult] = []
+    @Published private(set) var musicResults: [AppleMusicLibraryItem] = []
+    @Published private(set) var expandedMusicCategories: Set<AppleMusicSearchCategory> = []
+    @Published var resultFilter: SearchResultFilter = .all { didSet { if oldValue != resultFilter && !isResetting { performSearch() } } }
+    @Published private(set) var musicDisplayCounts: [AppleMusicSearchCategory: Int] = [:]
+    private var musicHasMoreCategories: Set<AppleMusicSearchCategory> = []
+    @Published private(set) var isMusicSearching = false
+    @Published private(set) var musicError: String?
+    @Published private(set) var isMusicAuthorized = false
+    @Published private(set) var isMusicSearchEnabled = false
+    var openMusic: ((AppleMusicLibraryItem) -> Void)?
+    var enableMusicSearch: (() -> Void)?
+    private var musicTask: Task<Void, Never>?
+    private let musicSearch: @MainActor (String, SearchResultFilter) async throws -> AppleMusicSearchPage
+    private let musicAuthorized: @MainActor () -> Bool
+    private let musicEnabled: @MainActor () -> Bool
+    private var musicSettingsCancellable: AnyCancellable?
+    private var isActive = false
     @Published private(set) var files: [SpotlightFileResult] = []
     @Published private(set) var openURL: URL?
     @Published private(set) var selectedID: String?
@@ -51,17 +68,27 @@ final class HistorySearchViewModel: ObservableObject {
     private var isResetting = false
     var openCamera: (() -> Void)?
     private let cameraAvailable: () -> Bool
-    var showsOpenCamera: Bool { mode == .history && CameraCaptureController.matches(query, available: cameraAvailable()) }
+    var showsOpenCamera: Bool { mode == .history && resultFilter == .all && CameraCaptureController.matches(query, available: cameraAvailable()) }
     var openResult: ((UUID) -> Void)?
     var openWebURL: ((URL) -> Void)?
     var openFile: ((URL) -> Void)?
     var enableFileSearch: (() -> Void)?
     var isFileSearchAuthorized: Bool { SpotlightSearchAccess.shared.isAuthorized }
 
-    init(historySearch: @escaping (String) async -> [HistorySearchResult] = { await HistoryRepository.shared.search($0) },
+    init(historySearch: @escaping (String) async -> [HistorySearchResult] = { await HistoryRepository.shared.search($0, limit: SearchResultLimits.probe) },
          fileSearch: ((String, @escaping (SpotlightSearchOutcome) -> Void) -> Void)? = nil,
          cancelFiles: (() -> Void)? = nil,
-         cameraAvailable: @escaping () -> Bool = { CameraCaptureController.isAvailable }) {
+         cameraAvailable: @escaping () -> Bool = { CameraCaptureController.isAvailable },
+         musicSearch: (@MainActor (String) async throws -> [AppleMusicLibraryItem])? = nil,
+         musicAuthorized: @escaping @MainActor () -> Bool = { AppleMusicLibrary.shared.isAuthorized },
+         musicEnabled: @escaping @MainActor () -> Bool = { SettingsStore.shared.appleMusicSearchEnabled }) {
+        self.musicSearch = { term, filter in
+            if let musicSearch { return .init(items: try await musicSearch(term)) }
+            return try await AppleMusicLibrary.shared.searchPage(term, filter: filter)
+        }
+        self.musicAuthorized = musicAuthorized
+        self.musicEnabled = musicEnabled
+        self.isMusicSearchEnabled = musicEnabled()
         self.cameraAvailable = cameraAvailable
         self.historySearch = historySearch
         let service = SpotlightFileSearch()
@@ -74,17 +101,62 @@ final class HistorySearchViewModel: ObservableObject {
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
             }
+        musicSettingsCancellable = NotificationCenter.default.publisher(for: .appleMusicSearchDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.isMusicSearchEnabled = self.musicEnabled()
+                if !self.isMusicSearchEnabled && self.resultFilter.musicCategory != nil {
+                    self.isResetting = true
+                    self.resultFilter = .all
+                    self.isResetting = false
+                }
+                if self.isActive { self.performSearch() }
+            }
     }
 
-    var isSearching: Bool { isHistorySearching || isFileSearching }
-    /// 两个来源都结束且没有任何候选时显示整体空态；来源仍加载或已给出具体状态时不抢先下结论。
+    var isSearching: Bool { isHistorySearching || isFileSearching || isMusicSearching }
+    func musicResults(in category: AppleMusicSearchCategory) -> [AppleMusicLibraryItem] {
+        musicResults.filter { $0.searchCategory == category }
+    }
+    var budget: SearchResultBudget {
+        SearchResultBudget(baseCount: results.count + (showsOpenCamera ? 1 : 0) + (openURL == nil ? 0 : 1),
+                           fileCount: files.count,
+                           musicCounts: Dictionary(uniqueKeysWithValues: AppleMusicSearchCategory.allCases.map { ($0, musicResults(in: $0).count) }),
+                           desiredMusicCounts: musicDisplayCounts, filter: resultFilter)
+    }
+    var visibleResults: [HistorySearchResult] {
+        Array(results.prefix(max(0, budget.base - (showsOpenCamera ? 1 : 0) - (openURL == nil ? 0 : 1))))
+    }
+    var visibleFiles: [SpotlightFileResult] { Array(files.prefix(budget.files)) }
+    func visibleMusicResults(in category: AppleMusicSearchCategory) -> [AppleMusicLibraryItem] {
+        Array(musicResults(in: category).prefix(budget.music[category, default: 0]))
+    }
+    var visibleMusicResults: [AppleMusicLibraryItem] {
+        AppleMusicSearchCategory.allCases.flatMap { visibleMusicResults(in: $0) }
+    }
+    func canExpandMusicResults(in category: AppleMusicSearchCategory) -> Bool {
+        resultCount < SearchResultLimits.maximum && visibleMusicResults(in: category).count < musicResults(in: category).count
+    }
+    func expandMusicResults(in category: AppleMusicSearchCategory) {
+        guard canExpandMusicResults(in: category) else { return }
+        expandedMusicCategories.insert(category)
+        musicDisplayCounts[category] = min(SearchResultLimits.maximum, musicDisplayCounts[category, default: SearchResultLimits.initial] + SearchResultLimits.increment)
+    }
+    var showsResultLimitNotice: Bool {
+        let hasExtra = visibleResults.count < results.count || visibleFiles.count < files.count
+            || AppleMusicSearchCategory.allCases.contains { resultFilter.includes($0) && (visibleMusicResults(in: $0).count < musicResults(in: $0).count || musicHasMoreCategories.contains($0)) }
+        return hasExtra && (resultCount == SearchResultLimits.maximum || !AppleMusicSearchCategory.allCases.contains { canExpandMusicResults(in: $0) })
+    }
+    /// 所有来源都结束且没有任何候选时显示整体空态；来源仍加载或已给出具体状态时不抢先下结论。
     var showsOverallEmptyState: Bool {
         guard !isSearching else { return false }
         if mode == .url { return resultCount == 0 }
-        return results.isEmpty && files.isEmpty && openURL == nil && !showsOpenCamera && fileStatus == nil
+        return results.isEmpty && files.isEmpty && musicResults.isEmpty && musicError == nil && openURL == nil && !showsOpenCamera && fileStatus == nil
     }
     var itemIDs: [String] {
-        (showsOpenCamera ? ["camera"] : []) + results.map { "history:\($0.id)" } + files.map { "file:\($0.id)" }
+        (showsOpenCamera ? ["camera"] : []) + visibleResults.map { "history:\($0.id)" } + visibleFiles.map { "file:\($0.id)" }
+            + visibleMusicResults.map { "music:\($0.id)" }
             + (openURL.map { ["url:\($0.absoluteString)"] } ?? [])
     }
     var resultCount: Int { itemIDs.count }
@@ -94,6 +166,7 @@ final class HistorySearchViewModel: ObservableObject {
         stop()
         isResetting = true
         self.mode = mode
+        resultFilter = .all
         query = initialQuery?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         isResetting = false
         shouldSelectAll = !query.isEmpty
@@ -102,6 +175,10 @@ final class HistorySearchViewModel: ObservableObject {
     }
 
     func stop() {
+        isActive = false
+        musicTask?.cancel()
+        musicTask = nil
+        isMusicSearching = false
         searchTask?.cancel()
         searchTask = nil
         generation += 1
@@ -121,10 +198,10 @@ final class HistorySearchViewModel: ObservableObject {
 
     func openSelected() {
         if selectedID == "camera" { openCamera?(); return }
-        guard let selectedIndex else { return }
-        let index = selectedIndex - (showsOpenCamera ? 1 : 0)
-        if results.indices.contains(index) { open(results[index]) }
-        else if files.indices.contains(index - results.count) { openFile?(files[index - results.count].url) }
+        guard let selectedID else { return }
+        if let row = visibleResults.first(where: { "history:\($0.id)" == selectedID }) { open(row) }
+        else if let file = visibleFiles.first(where: { "file:\($0.id)" == selectedID }) { openFile?(file.url) }
+        else if let music = visibleMusicResults.first(where: { "music:\($0.id)" == selectedID }) { openMusic?(music) }
         else { openURLResult() }
     }
 
@@ -146,35 +223,62 @@ final class HistorySearchViewModel: ObservableObject {
 
     private func mergeFiles() {
         let paths = Set(results.compactMap(\.sourcePath).map { URL(fileURLWithPath: $0).standardizedFileURL.path })
-        files = SpotlightFileResult.ranked(rawFiles, query: query.trimmingCharacters(in: .whitespacesAndNewlines), excluding: paths)
+        files = SpotlightFileResult.ranked(rawFiles, query: query.trimmingCharacters(in: .whitespacesAndNewlines), excluding: paths, limit: SearchResultLimits.probe)
     }
 
     private func performSearch() {
         stop()
+        isActive = true
         let currentGeneration = generation
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         results = []; files = []; rawFiles = []
+        musicResults = []; musicError = nil
+        expandedMusicCategories = []; musicDisplayCounts = [:]; musicHasMoreCategories = []
+        isMusicAuthorized = musicAuthorized()
+        isMusicSearchEnabled = musicEnabled()
         fileStatus = nil; openError = nil
         userMovedSelection = false
-        openURL = trimmed.isEmpty ? nil : Self.url(from: trimmed)
+        openURL = trimmed.isEmpty || resultFilter != .all ? nil : Self.url(from: trimmed)
         selectedID = itemIDs.first
         guard !trimmed.isEmpty else { return }
-        isHistorySearching = true
-        isFileSearching = mode == .history
+        if mode == .history && resultFilter != .files && isMusicSearchEnabled && isMusicAuthorized {
+            isMusicSearching = true
+            musicTask = Task { [weak self] in
+                do {
+                    try await Task.sleep(for: .milliseconds(250))
+                    guard let self, !Task.isCancelled else { return }
+                    let page = try await self.musicSearch(trimmed, self.resultFilter)
+                    guard !Task.isCancelled, currentGeneration == self.generation else { return }
+                    let previousIndex = self.selectedIndex
+                    self.musicResults = AppleMusicSearchCategory.allCases.filter { self.resultFilter.includes($0) }.flatMap { category in
+                        page.items.lazy.filter { $0.searchCategory == category }.prefix(SearchResultLimits.probe)
+                    }
+                    self.musicHasMoreCategories = page.hasMoreCategories
+                    self.isMusicSearching = false
+                    self.reconcileSelection(previousIndex: previousIndex)
+                } catch {
+                    guard let self, !Task.isCancelled, currentGeneration == self.generation else { return }
+                    self.musicError = error.localizedDescription
+                    self.isMusicSearching = false
+                }
+            }
+        }
+        isHistorySearching = resultFilter == .all
+        isFileSearching = mode == .history && resultFilter.includesFiles
         searchTask = Task { [weak self] in
             do { try await Task.sleep(for: .milliseconds(150)) } catch { return }
             guard let self, !Task.isCancelled, currentGeneration == self.generation else { return }
-            if self.mode == .history {
+            if self.mode == .history && self.resultFilter.includesFiles {
                 self.fileSearch(trimmed) { [weak self] outcome in
                     guard let self, currentGeneration == self.generation else { return }
                     let previousIndex = self.selectedIndex
                     switch outcome {
                     case .progress(let files):
-                        self.rawFiles = files
+                        self.rawFiles = Array(files.prefix(SearchResultLimits.probe))
                         self.mergeFiles()
                         self.reconcileSelection(previousIndex: previousIndex)
                         return
-                    case .results(let files): self.rawFiles = files
+                    case .results(let files): self.rawFiles = Array(files.prefix(SearchResultLimits.probe))
                     case .needsAuthorization: self.fileStatus = .needsAuthorization
                     case .authorizationUnavailable: self.fileStatus = .authorizationUnavailable
                     case .unavailable: self.fileStatus = .unavailable
@@ -185,10 +289,10 @@ final class HistorySearchViewModel: ObservableObject {
                     self.reconcileSelection(previousIndex: previousIndex)
                 }
             }
-            let values = await self.historySearch(trimmed)
+            let values = self.resultFilter == .all ? await self.historySearch(trimmed) : []
             guard !Task.isCancelled, currentGeneration == self.generation else { return }
             let previousIndex = self.selectedIndex
-            self.results = self.mode == .url ? values.filter { $0.contentKind == .web } : values
+            self.results = Array((self.mode == .url ? values.filter { $0.contentKind == .web } : values).prefix(SearchResultLimits.probe))
             self.isHistorySearching = false
             self.mergeFiles()
             self.reconcileSelection(previousIndex: previousIndex)

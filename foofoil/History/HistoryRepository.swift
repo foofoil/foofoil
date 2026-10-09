@@ -30,6 +30,8 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
             let configs = try database.recent(limit: limit)
             // 音视频历史仅记录原始文件路径；源文件已不存在（且书签也无法解析）时移除该条历史记录。
             return configs.filter { config in
+                // 资料库来源由 MusicKit 判断可用性；没有磁盘路径不代表内容已丢失。
+                if config.appleMusicReference != nil { return true }
                 let kind = config.contentKind ?? HistoryContentKind.infer(from: config)
                 guard kind == .video || kind == .audio || kind == .quickLook else { return true }
                 // 路径当前可达（进程内仍有授权），或安全范围书签仍可解析出存在的文件，均保留
@@ -104,7 +106,8 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                         matchedSnippet: self.snippet(from: best.originalText, keywords: keywords),
                         matchedPageNumber: best.pageNumber,
                         score: self.score(best, query: normalizedQuery),
-                        sourcePath: best.sourceFingerprint.flatMap { $0.hasPrefix("file:") ? String($0.dropFirst(5)) : nil }
+                        sourcePath: best.sourceFingerprint.flatMap { $0.hasPrefix("file:") ? String($0.dropFirst(5)) : nil },
+                        isAppleMusic: best.isAppleMusic
                     ))
                 }
                 return results.sorted { lhs, rhs in

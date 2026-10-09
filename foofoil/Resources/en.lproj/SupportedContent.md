@@ -45,3 +45,9 @@ You can also type directly into a blank foil to write a note.
 Preview Word, Excel, PowerPoint, rich text, and other documents with macOS Quick Look.
 
 You can also open a folder or drag in several files to browse them as a list.
+
+## Apple Music Library
+
+Choose File → Open Apple Music Library to authorize music access and browse albums, songs, and playlists. Quick Open and the overview’s `/` search search your library after authorization. Apple Music search can be enabled or disabled in Settings → General → Search. Playback requires account eligibility and uses MusicKit; device selection and audio quality switching are not offered. Opened music is saved to history with a locally cached cover thumbnail and restored on restart. Music foils open borderless by default; the View menu, context menu, and border shortcut toggle borders, and history preserves your choice. Search results show user files first, then music grouped by albums, songs, and playlists. Albums and songs initially show six results each; More Albums or More Songs adds 18 results at a time. The entire search view shows at most 60 results. Use All, User Files, Albums, or Songs to narrow the source; a notice appears when additional matches are known to exist.
+
+Apple Music uses the same audio playback bar and side navigation list. The list supports track selection, previous/next item commands, and search when it contains more than 12 items. The playback mode button cycles through sequential, repeat queue, shuffle, and repeat one.

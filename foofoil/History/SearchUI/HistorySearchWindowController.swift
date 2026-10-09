@@ -50,6 +50,22 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
         panel.delegate = self
         panel.dismissSearch = { [weak self] in self?.dismiss() }
         model.enableFileSearch = { [weak self] in self?.enableFileSearch() }
+        model.openMusic = { item in (NSApp.delegate as? AppDelegate)?.openAppleMusic(item) }
+        model.enableMusicSearch = { [weak self] in
+            guard let self else { return }
+            self.isOpeningFile = true
+            self.model.stop()
+            Task { [weak self] in
+                await AppleMusicLibrary.shared.authorize()
+                guard let self else { return }
+                self.isOpeningFile = false
+                if !AppleMusicLibrary.shared.isAuthorized {
+                    self.model.openError = NSLocalizedString("Music Authorization Denied", comment: "")
+                    AppleMusicLibraryWindowController.shared.show()
+                    self.dismiss()
+                } else { self.restoreSearch() }
+            }
+        }
         model.openFile = { [weak self] url in self?.openFile(url) }
         model.openResult = { id in
             (NSApplication.shared.delegate as? AppDelegate)?.openSearchResultInNewWindow(id: id)
@@ -85,6 +101,7 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
                 ?? delegate?.windowControllers.first(where: { $0.window?.isVisible == true })?.window
         }()
 
+        AppleMusicLibrary.shared.refreshAuthorization()
         model.reset(mode: mode, initialQuery: initialQuery)
         NSApp.activate(ignoringOtherApps: true)
 

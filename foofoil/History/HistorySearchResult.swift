@@ -9,6 +9,8 @@ nonisolated public struct HistorySearchResult: Identifiable, Sendable, Equatable
     public let matchedPageNumber: Int?
     public let score: Double
     public var sourcePath: String? = nil
+    public var isAppleMusic: Bool = false
+    public var symbolName: String { isAppleMusic ? AppleMusicReference.symbolName : contentKind.symbolName }
 }
 
 nonisolated struct HistorySearchCandidate: Sendable {
@@ -21,4 +23,5 @@ nonisolated struct HistorySearchCandidate: Sendable {
     let pageNumber: Int?
     let lastOpenedAt: Date
     var sourceFingerprint: String? = nil
+    var isAppleMusic: Bool = false
 }

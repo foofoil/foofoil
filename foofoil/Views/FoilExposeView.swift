@@ -282,10 +282,11 @@ struct FoilExposeView: View {
                 .foregroundStyle(.white.opacity(0.6))
                 .padding(.top, 120)
         } else {
-            let openEntries = entries.filter { !$0.item.isHistoryEntry }
+            let openEntries = entries.filter { !$0.item.isHistoryEntry && $0.item.musicItem == nil }
             let historyEntries = entries.filter { $0.item.isHistoryEntry }
+            let musicEntries = entries.filter { $0.item.musicItem != nil }
             VStack(spacing: 32) {
-                if entries.isEmpty {
+                if entries.isEmpty && model.resultFilter == .all {
                     // 关键字有输入但没有匹配的箔片/历史：提示居中占住网格区域的一行位置，
                     // 文件结果仍紧接在其下方，不被推到屏幕底部。
                     Text(String(format: NSLocalizedString("No Matching Foils Format", comment: ""), model.searchQuery))
@@ -308,6 +309,59 @@ struct FoilExposeView: View {
                     }
                 }
                 fileResultsSection
+                if model.showsMusicResults {
+                    VStack(alignment: .leading, spacing: 10) {
+                        sectionHeader("Music Library", symbol: AppleMusicReference.symbolName, count: nil, tint: .pink)
+                        ForEach(AppleMusicSearchCategory.allCases) { category in
+                            if !model.musicItems(in: category).isEmpty {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    sectionHeader(category.localizationKey, symbol: category.symbolName,
+                                                  count: nil, tint: .pink)
+                                    musicResultsGrid(
+                                        for: musicEntries.filter { $0.item.musicItem?.searchCategory == category },
+                                        shortcutByID: shortcutByID
+                                    )
+                                    if model.canExpandMusicResults(in: category) {
+                                        fileActionButton(category.moreLocalizationKey) {
+                                            model.expandMusicResults(in: category)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if model.isMusicSearching {
+                            ProgressView().controlSize(.small).tint(.white)
+                        } else if !model.isMusicAuthorized {
+                            Text("Music Search Authorization Note").foregroundStyle(.white.opacity(0.6))
+                        } else if let error = model.musicError {
+                            Text(error).foregroundStyle(.white.opacity(0.6))
+                        } else if musicEntries.isEmpty {
+                            Text("Music No Search Results").foregroundStyle(.white.opacity(0.6))
+                        }
+                    }
+                }
+                if model.showsResultLimitNotice {
+                    Text(String(format: NSLocalizedString("Search Result Limit Notice Format", comment: ""), model.displayedResultCount))
+                        .font(.system(size: 12)).foregroundStyle(.white.opacity(0.62))
+                }
+            }
+        }
+    }
+
+    private func musicResultsGrid(
+        for entries: [(offset: Int, item: FoilExposeItem)], shortcutByID: [UUID: String]
+    ) -> some View {
+        LazyVGrid(columns: Self.fileColumns, spacing: 10) {
+            ForEach(entries, id: \.item.id) { entry in
+                if let music = entry.item.musicItem {
+                    FoilExposeSearchResultView(
+                        symbolName: entry.item.symbolName, title: music.title,
+                        subtitle: music.searchSubtitle,
+                        isHighlighted: entry.offset == model.selectedIndex,
+                        shortcut: shortcutByID[entry.item.id], showsSearchModifier: model.isSearching
+                    ) { model.onSelect(entry.item) }
+                    .background(ItemFrameReporter(id: entry.item.id))
+                }
             }
         }
     }
@@ -318,11 +372,19 @@ struct FoilExposeView: View {
         Group {
             if model.showsFileResults {
                 VStack(alignment: .leading, spacing: 10) {
-                    sectionHeader("Local Files Section", symbol: "magnifyingglass", count: model.files.count, tint: .cyan)
+                    sectionHeader("Local Files Section", symbol: "magnifyingglass", count: model.visibleFiles.count, tint: .cyan)
                     // 关键字变化会先清空再补结果；网格常驻才能让行的增删都走同一段过渡。
                     LazyVGrid(columns: Self.fileColumns, spacing: 10) {
-                        ForEach(model.files) { file in
-                            FoilExposeFileView(file: file) { model.onOpenFile(file.url) }
+                        ForEach(model.visibleFiles) { file in
+                            FoilExposeSearchResultView(
+                                symbolName: file.symbolName, title: file.name,
+                                subtitle: file.url.deletingLastPathComponent().path
+                            ) { model.onOpenFile(file.url) }
+                            .help(file.url.path)
+                            .accessibilityLabel(String(
+                                format: NSLocalizedString("Search File Accessibility Format", comment: ""),
+                                file.name, file.url.deletingLastPathComponent().path
+                            ))
                         }
                     }
                     .animation(.smooth(duration: 0.25), value: model.files)
@@ -409,7 +471,7 @@ struct FoilExposeView: View {
     }
 
     /// 来源标题不依赖卡片透明度，选中和搜索时仍保持清晰的分区。
-    private func sectionHeader(_ key: String, symbol: String, count: Int, tint: Color) -> some View {
+    private func sectionHeader(_ key: String, symbol: String, count: Int?, tint: Color) -> some View {
         HStack(spacing: 10) {
             Image(systemName: symbol)
                 .font(.system(size: 13, weight: .semibold))
@@ -419,6 +481,7 @@ struct FoilExposeView: View {
             Text(NSLocalizedString(key, comment: ""))
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.9))
+            if let count {
             Text(count, format: .number)
                 .font(.system(size: 11, weight: .medium, design: .rounded))
                 .monospacedDigit()
@@ -426,6 +489,7 @@ struct FoilExposeView: View {
                 .padding(.horizontal, 7)
                 .padding(.vertical, 3)
                 .background(.white.opacity(0.08), in: Capsule())
+            }
             Rectangle().fill(.white.opacity(0.12)).frame(height: 1)
         }
         .accessibilityElement(children: .combine)
@@ -440,6 +504,13 @@ struct FoilExposeView: View {
                 searchControl
             }
             .frame(height: 32)
+            if !model.searchQuery.isEmpty {
+                Picker(NSLocalizedString("Search Result Type", comment: ""), selection: $model.resultFilter) {
+                    ForEach(model.isMusicSearchEnabled ? SearchResultFilter.allCases : [.all, .files]) { filter in
+                        Text(NSLocalizedString(filter.localizationKey, comment: "")).tag(filter)
+                    }
+                }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 440).environment(\.colorScheme, .dark)
+            }
             HStack(spacing: 16) {
                 Text(model.isSearching
                      ? NSLocalizedString("Search Foils Hint", comment: "")
@@ -798,9 +869,14 @@ struct FoilExposeItemView: View {
     }
 }
 
-/// 覆盖层里的 Spotlight 文件结果：类型图标 + 文件名 + 父目录，悬停反馈与卡片一致，点击打开。
-private struct FoilExposeFileView: View {
-    let file: SpotlightFileResult
+/// 用户文件与音乐搜索共用紧凑结果行，统一尺寸、文字层级和悬停反馈。
+private struct FoilExposeSearchResultView: View {
+    let symbolName: String
+    let title: String
+    let subtitle: String
+    var isHighlighted = false
+    var shortcut: String? = nil
+    var showsSearchModifier = false
     var onOpen: () -> Void
 
     @State private var isHovered = false
@@ -808,39 +884,40 @@ private struct FoilExposeFileView: View {
     var body: some View {
         Button(action: onOpen) {
             HStack(spacing: 10) {
-                Image(systemName: file.symbolName)
+                Image(systemName: symbolName)
                     .font(.system(size: 15, weight: .medium))
                     .foregroundStyle(.white.opacity(0.85))
                     .frame(width: 30, height: 30)
                     .background(RoundedRectangle(cornerRadius: 7).fill(Color.white.opacity(0.1)))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(file.name)
+                    Text(title)
                         .font(.system(size: 13, weight: .medium))
                         .foregroundStyle(.white.opacity(0.92))
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    Text(file.url.deletingLastPathComponent().path)
+                    Text(subtitle)
                         .font(.system(size: 11))
                         .foregroundStyle(.white.opacity(0.5))
                         .lineLimit(1)
                         .truncationMode(.middle)
                 }
                 Spacer(minLength: 0)
+                if let shortcut {
+                    Text("\(showsSearchModifier ? "⌃" : "")\(shortcut)")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(.white.opacity(0.65))
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(RoundedRectangle(cornerRadius: 9).fill(Color.white.opacity(isHovered ? 0.12 : 0.06)))
+            .background(RoundedRectangle(cornerRadius: 9).fill(Color.white.opacity(isHovered || isHighlighted ? 0.12 : 0.06)))
             .contentShape(RoundedRectangle(cornerRadius: 9))
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }
-        .help(file.url.path)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(String(
-            format: NSLocalizedString("Search File Accessibility Format", comment: ""),
-            file.name,
-            file.url.deletingLastPathComponent().path
-        ))
+        .accessibilityLabel("\(title) \(subtitle)")
+        .accessibilityAddTraits(isHighlighted ? [.isButton, .isSelected] : .isButton)
     }
 }
 

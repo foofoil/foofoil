@@ -7,7 +7,7 @@ struct HistorySearchResultRow: View {
 
     var body: some View {
         SearchResultRow(
-            symbolName: result.contentKind.symbolName,
+            symbolName: result.symbolName,
             title: result.title,
             snippet: result.matchedSnippet,
             pageNumber: result.matchedPageNumber,
@@ -94,5 +94,18 @@ struct SpotlightFileResultRow: View {
                 file.name,
                 file.url.deletingLastPathComponent().path
             ))
+    }
+}
+
+/// 音乐搜索与用户文件共用结果行；资料库浏览仍保留封面展示。
+struct AppleMusicSearchResultRow: View {
+    let item: AppleMusicLibraryItem
+    let isSelected: Bool
+
+    var body: some View {
+        SearchResultRow(symbolName: item.searchCategory.symbolName, title: item.title,
+                        snippet: item.searchSubtitle,
+                        pageNumber: nil, thumbnailPath: nil,
+                        showsInlineIcon: false, isSelected: isSelected)
     }
 }

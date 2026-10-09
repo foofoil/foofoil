@@ -341,6 +341,9 @@ struct NavigatorPanelView: View {
 
     /// 内置文件列表显示用户标题或分区推导标题（不附数量）；无列表时回退到类型名称。
     private func headerTitle(for contribution: NavigatorContribution) -> String {
+        if contribution.id == AppleMusicNavigator.contributionID, let item = appState.appleMusicItem {
+            return item.title
+        }
         if contribution.id == AppState.fileListNavigatorID,
            let list = appState.fileList, list.isPresentable {
             return list.displayTitle
@@ -633,6 +636,7 @@ struct NavigatorPanelView: View {
 
     /// 内置音视频与扩展播放贡献的当前项共用“正在播放”波形图标。
     private func showsPlaybackIndicator(for contribution: NavigatorContribution) -> Bool {
+        if contribution.id == AppleMusicNavigator.contributionID { return true }
         if ExtensionPlaybackSupport.showsPlaybackIndicator(
             for: contribution, session: appState.extensionSession
         ) {

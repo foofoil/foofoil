@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 nonisolated final class HistoryDatabase {
-    static let schemaVersion = 17
+    static let schemaVersion = 18
 
     private let queue = DispatchQueue(label: "com.foofoil.history.database", qos: .utility)
     private var connection: OpaquePointer?
@@ -108,8 +108,8 @@ nonisolated final class HistoryDatabase {
                         extension_id, extension_state_reference, navigator_panel_side,
                         navigator_panel_visibility, navigator_panel_width, file_list,
                         document_zoom, document_scroll_file, document_scroll_fraction, text_fingerprint,
-                        image_ocr_text, image_has_subject, image_subject_path
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        image_ocr_text, image_has_subject, image_subject_path, apple_music_reference
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -144,7 +144,8 @@ nonisolated final class HistoryDatabase {
                         text_fingerprint=excluded.text_fingerprint,
                         image_ocr_text=excluded.image_ocr_text,
                         image_has_subject=excluded.image_has_subject,
-                        image_subject_path=excluded.image_subject_path
+                        image_subject_path=excluded.image_subject_path,
+                        apple_music_reference=excluded.apple_music_reference
                     """, bindings: [
                         config.id.uuidString, kind.rawValue, title, config.originalImageName,
                         config.imagePath, config.textPath, config.webURLString, config.actualWebURLString,
@@ -167,11 +168,12 @@ nonisolated final class HistoryDatabase {
                         textFingerprint,
                         config.imageOCRText,
                         config.imageHasSubject,
-                        config.imageSubjectPath
+                        config.imageSubjectPath,
+                        try config.appleMusicReference.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) }
                     ])
 
                 let metadata = (
-                    [config.webURLString, config.actualWebURLString].compactMap { $0 }
+                    [config.webURLString, config.actualWebURLString, config.appleMusicReference?.subtitle].compactMap { $0 }
                     + (config.fileList?.items.map(\.displayName) ?? [])
                 ).joined(separator: " ")
                 try insertChunk(historyID: config.id, title: title, kind: 0, ordinal: 0, pageNumber: nil, text: metadata)
@@ -270,7 +272,7 @@ nonisolated final class HistoryDatabase {
             var values: [HistorySearchCandidate] = []
             try withStatement("""
                 SELECT h.id, h.display_title, h.content_kind, COALESCE(h.thumbnail_path, h.image_path),
-                       c.original_text, c.normalized_text, c.page_number, h.last_opened_at, h.source_fingerprint
+                       c.original_text, c.normalized_text, c.page_number, h.last_opened_at, h.source_fingerprint, h.apple_music_reference IS NOT NULL
                 FROM search_fts f
                 JOIN search_chunks c ON c.id = f.rowid
                 JOIN history_items h ON h.id = c.history_id
@@ -289,7 +291,8 @@ nonisolated final class HistoryDatabase {
                         normalizedText: text(statement, 5),
                         pageNumber: sqlite3_column_type(statement, 6) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 6)),
                         lastOpenedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 7)),
-                        sourceFingerprint: optionalText(statement, 8)
+                        sourceFingerprint: optionalText(statement, 8),
+                        isAppleMusic: sqlite3_column_int(statement, 9) != 0
                     ))
                 }
             }
@@ -434,6 +437,8 @@ nonisolated final class HistoryDatabase {
         try addColumnIfMissing("image_ocr_text", definition: "image_ocr_text TEXT")
         try addColumnIfMissing("image_has_subject", definition: "image_has_subject INTEGER")
         try addColumnIfMissing("image_subject_path", definition: "image_subject_path TEXT")
+        // v18 资料库身份独立保存，不伪造文件路径，也不缓存 MusicKit 曲目队列。
+        try addColumnIfMissing("apple_music_reference", definition: "apple_music_reference TEXT")
         if previousVersion >= 1 && previousVersion < 9 {
             // v9：旧列表 video_looping=1 是单曲循环开关；迁成顺序循环，使列表能自动续播。
             try execute("""
@@ -697,7 +702,10 @@ nonisolated final class HistoryDatabase {
                         sqlite3_column_type(statement, $0) == SQLITE_NULL
                             ? nil
                             : sqlite3_column_double(statement, $0)
-                    } ?? nil
+                    } ?? nil,
+                    appleMusicReference: columns["apple_music_reference"].flatMap { optionalText(statement, $0) }.flatMap {
+                        try? JSONDecoder().decode(AppleMusicReference.self, from: Data($0.utf8))
+                    }
                 ))
             }
         }

@@ -47,7 +47,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func isBlank(_ appState: AppState) -> Bool {
-        !appState.isCamera && appState.imageURL == nil
+        appState.appleMusicReference == nil && !appState.isCamera && appState.imageURL == nil
             && appState.webURL == nil
             && appState.textURL == nil
             && appState.extensionSession == nil
@@ -203,6 +203,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
 
         HistoryManager.shared.flushPendingListSaves()
         // 进程退出只会自动归还 hog，不会恢复采样率；先停 PCM 引擎，再等待扩展恢复设备。
+        AppleMusicPlaybackController.stopIfActive()
         AudioPlaybackController.stopAllOutputsForTermination()
         Task { @MainActor in
             await ExtensionHost.shared.shutdownAndWait()
@@ -302,6 +303,16 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
                 self.updateExtensionMenuVisibility()
                 self.updateExtractTextMenuItem()
                 self.updateExtractImageSubjectMenuItem()
+            }
+            .store(in: &contentModeCancellables)
+
+        // MusicKit 队列异步投影完成后刷新通用导航快捷键；@Published 发出时状态尚未提交。
+        controller.appState.$builtInNavigatorContributions
+            .sink { [weak self, weak controller] _ in
+                DispatchQueue.main.async {
+                    guard let self, let controller, self.activeWindowController === controller else { return }
+                    self.updateGoMenuVisibility()
+                }
             }
             .store(in: &contentModeCancellables)
 

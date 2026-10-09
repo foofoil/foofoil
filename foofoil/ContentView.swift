@@ -67,6 +67,8 @@ public struct ContentView: View {
                         .progressViewStyle(.circular)
                         .scaleEffect(1.2)
                         .transition(.opacity)
+                } else if appState.appleMusicReference != nil {
+                    AppleMusicModeView(appState: appState, shouldHideBorder: shouldHideBorder)
                 } else if appState.extensionSession != nil {
                     ExtensionPresentationView(appState: appState, shouldHideBorder: shouldHideBorder)
                         .transition(.opacity)
@@ -252,7 +254,7 @@ public struct ContentView: View {
             }
                 .configuredKeyboardShortcut("view.togglePin")
 
-            if !appState.isFullScreen && (appState.usesImagePresentation || appState.webURL != nil) {
+            if !appState.isFullScreen && (appState.usesImagePresentation || appState.webURL != nil || appState.isAudioDocument) {
                 Toggle(isOn: $appState.showBorder) {
                     Label(NSLocalizedString("Border (ContextMenu)", comment: ""), systemImage: "rectangle")
                 }

@@ -116,7 +116,7 @@ struct HistoryCardView: View {
     }
 
     private var audioPlaceholder: some View {
-        mediaPlaceholder(systemName: "music.note")
+        mediaPlaceholder(systemName: config.appleMusicReference != nil ? AppleMusicReference.symbolName : "music.note")
     }
 
     private var videoPlaceholder: some View {
@@ -160,7 +160,7 @@ struct HistoryCardView: View {
     @ViewBuilder
     private var mediaKindOverlay: some View {
         if isAudioHistory || isVideoHistory {
-            Image(systemName: isAudioHistory ? "music.note" : "play.fill")
+            Image(systemName: isAudioHistory ? (config.appleMusicReference != nil ? AppleMusicReference.symbolName : "music.note") : "play.fill")
                 .font(.system(size: 22, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.82))
                 .shadow(color: .black.opacity(0.5), radius: 3, y: 1)

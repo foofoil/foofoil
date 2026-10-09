@@ -34,12 +34,12 @@ struct FoilExposeModelTests {
             items: (0..<openCount).map { _ in makeItem() },
             historyItems: (0..<historyCount).map { _ in makeItem(isHistoryEntry: true) },
             fileSearch: { _, _ in },
-            cancelFiles: {}
+            cancelFiles: {}, musicEnabled: { false }
         )
     }
 
     private func makeModel(items: [FoilExposeItem], historyItems: [FoilExposeItem]) -> FoilExposeModel {
-        FoilExposeModel(items: items, historyItems: historyItems, fileSearch: { _, _ in }, cancelFiles: {})
+        FoilExposeModel(items: items, historyItems: historyItems, fileSearch: { _, _ in }, cancelFiles: {}, musicEnabled: { false })
     }
 
     @Test func currentItemsCombineOpenFoilsBeforeHistory() {
@@ -202,7 +202,7 @@ struct FoilExposeModelTests {
             items: [makeItem(title: "Alpha")],
             historyItems: [],
             fileSearch: { callbacks[$0] = $1 },
-            cancelFiles: { cancellations += 1 }
+            cancelFiles: { cancellations += 1 }, musicEnabled: { false }
         )
         // 空关键字不查询、不呈现文件结果区。
         #expect(!model.showsFileResults)
@@ -230,7 +230,7 @@ struct FoilExposeModelTests {
     @Test func lateFileResultsCannotOverwriteANewQuery() async throws {
         var callbacks: [String: (SpotlightSearchOutcome) -> Void] = [:]
         let model = FoilExposeModel(items: [], historyItems: [],
-                                    fileSearch: { callbacks[$0] = $1 }, cancelFiles: {})
+                                    fileSearch: { callbacks[$0] = $1 }, cancelFiles: {}, musicEnabled: { false })
         model.searchText = "old"
         try await eventually { callbacks["old"] != nil }
         model.searchText = "new"
@@ -250,7 +250,7 @@ struct FoilExposeModelTests {
         var callback: ((SpotlightSearchOutcome) -> Void)?
         let history = makeItem(title: "Report", isHistoryEntry: true, sourcePath: "/docs/report.txt")
         let model = FoilExposeModel(items: [], historyItems: [history],
-                                    fileSearch: { _, value in callback = value }, cancelFiles: {})
+                                    fileSearch: { _, value in callback = value }, cancelFiles: {}, musicEnabled: { false })
         model.searchText = "report"
         try await eventually { callback != nil }
         callback?(.results([file("/docs/report.txt"), file("/docs/report-old.txt", date: 5)]))
@@ -260,7 +260,7 @@ struct FoilExposeModelTests {
     @Test func fileStatusReportsMissingAuthorization() async throws {
         var callback: ((SpotlightSearchOutcome) -> Void)?
         let model = FoilExposeModel(items: [], historyItems: [],
-                                    fileSearch: { _, value in callback = value }, cancelFiles: {})
+                                    fileSearch: { _, value in callback = value }, cancelFiles: {}, musicEnabled: { false })
         model.searchText = "report"
         try await eventually { callback != nil }
         callback?(.needsAuthorization)

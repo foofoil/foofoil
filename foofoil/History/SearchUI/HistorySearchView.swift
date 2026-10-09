@@ -17,6 +17,13 @@ struct HistorySearchView: View {
 
             if !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Divider()
+                if model.mode == .history {
+                    Picker(NSLocalizedString("Search Result Type", comment: ""), selection: $model.resultFilter) {
+                        ForEach(model.isMusicSearchEnabled ? SearchResultFilter.allCases : [.all, .files]) { filter in
+                            Text(NSLocalizedString(filter.localizationKey, comment: "")).tag(filter)
+                        }
+                    }.pickerStyle(.segmented).labelsHidden().padding(.horizontal, 18).padding(.vertical, 8)
+                }
                 if model.showsOverallEmptyState {
                     Text(NSLocalizedString("No Search Results", comment: ""))
                         .foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 28)
@@ -34,10 +41,10 @@ struct HistorySearchView: View {
                                         .background(model.selectedID == "camera" ? Color.accentColor.opacity(0.15) : Color.clear)
                                         .contentShape(Rectangle()).id("camera")
                                 }
-                                if !model.results.isEmpty {
+                                if !model.visibleResults.isEmpty {
                                     sectionLabel("Search History Section")
                                 }
-                                ForEach(Array(model.results.enumerated()), id: \.element.id) { index, result in
+                                ForEach(Array(model.visibleResults.enumerated()), id: \.element.id) { index, result in
                                     HistorySearchResultRow(result: result, isSelected: model.selectedID == "history:\(result.id)")
                                         .id("history:\(result.id)")
                                         .onTapGesture { model.open(result) }
@@ -47,9 +54,9 @@ struct HistorySearchView: View {
                                             }
                                         }
                                 }
-                                if model.mode == .history {
+                                if model.mode == .history && model.resultFilter.includesFiles {
                                     sectionLabel("Local Files Section")
-                                    ForEach(Array(model.files.enumerated()), id: \.element.id) { index, file in
+                                    ForEach(Array(model.visibleFiles.enumerated()), id: \.element.id) { index, file in
                                         SpotlightFileResultRow(file: file, isSelected: model.selectedID == "file:\(file.id)")
                                             .id("file:\(file.id)")
                                             .onTapGesture { model.openFile?(file.url) }
@@ -69,6 +76,32 @@ struct HistorySearchView: View {
                                             .foregroundStyle(.secondary).padding(10)
                                     }
                                 }
+                                if model.mode == .history, model.resultFilter != .files, model.isMusicSearchEnabled, model.isMusicAuthorized {
+                                    sectionLabel("Music Library")
+                                    ForEach(AppleMusicSearchCategory.allCases) { category in
+                                        if !model.musicResults(in: category).isEmpty {
+                                            sectionLabel(category.localizationKey)
+                                            ForEach(model.visibleMusicResults(in: category)) { item in
+                                                AppleMusicSearchResultRow(item: item, isSelected: model.selectedID == "music:\(item.id)")
+                                                    .id("music:\(item.id)")
+                                                    .onTapGesture { model.openMusic?(item) }
+                                            }
+                                            if model.canExpandMusicResults(in: category) {
+                                                Button(NSLocalizedString(category.moreLocalizationKey, comment: "")) {
+                                                    model.expandMusicResults(in: category)
+                                                }.font(.caption).padding(10)
+                                            }
+                                        }
+                                    }
+                                    if model.isMusicSearching { ProgressView().controlSize(.small).padding(10) }
+                                    if let error = model.musicError {
+                                        Text(error).foregroundStyle(.secondary).padding(10)
+                                    }
+                                }
+                                if model.showsResultLimitNotice {
+                                    Text(String(format: NSLocalizedString("Search Result Limit Notice Format", comment: ""), model.resultCount))
+                                        .font(.caption).foregroundStyle(.secondary).padding(10)
+                                }
                                 if let url = model.openURL {
                                     OpenURLSearchResultRow(url: url, isSelected: model.selectedID == "url:\(url.absoluteString)")
                                         .id("url:\(url.absoluteString)")
@@ -80,15 +113,23 @@ struct HistorySearchView: View {
                             if let id { proxy.scrollTo(id) }
                         }
                         .onChange(of: model.itemIDs) { _, _ in
+                            // 点击「更多」时保留阅读位置，避免新增结果把列表拉回高亮的首项。
+                            guard model.expandedMusicCategories.isEmpty else { return }
                             if let id = model.selectedID { proxy.scrollTo(id) }
                         }
                     }
                 }
             }
             // ⌘P 面板只提供开启文件搜索的入口；关闭文件搜索在设置中完成。
-            if model.mode == .history, !model.isFileSearchAuthorized {
+            if model.mode == .history, model.resultFilter.includesFiles, !model.isFileSearchAuthorized {
                 HStack {
                     Button(NSLocalizedString("Enable File Search", comment: "")) { model.enableFileSearch?() }
+                    Spacer()
+                }.font(.caption).padding(.horizontal, 18).padding(.bottom, 12)
+            }
+            if model.mode == .history, model.resultFilter != .files, model.isMusicSearchEnabled, !model.isMusicAuthorized {
+                HStack {
+                    Button("Music Enable Search") { model.enableMusicSearch?() }
                     Spacer()
                 }.font(.caption).padding(.horizontal, 18).padding(.bottom, 12)
             }
@@ -125,7 +166,7 @@ struct HistorySearchView: View {
 
     private var placeholder: String {
         switch model.mode {
-        case .history: NSLocalizedString("Search History Placeholder", comment: "")
+        case .history: NSLocalizedString(model.isMusicSearchEnabled && model.isMusicAuthorized ? "Music Quick Open Placeholder" : "Search History Placeholder", comment: "")
         case .url: NSLocalizedString("Enter URL Placeholder", comment: "")
         }
     }

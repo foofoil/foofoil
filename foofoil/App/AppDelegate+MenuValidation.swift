@@ -147,11 +147,11 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         setMenuItem(withAction: #selector(toggleNavigatorPanelAction), in: menu, isHidden: navigatorItemsHidden)
         setMenuItem(withAction: #selector(moveNavigatorToOppositeSideAction), in: menu, isHidden: navigatorItemsHidden)
 
-        // 1. 图片和网页模式均可切换视觉边框。
+        // 图片、网页、摄像头和音频箔均可切换视觉边框。
         setMenuItem(
             withAction: #selector(toggleShowBorderAction),
             in: menu,
-            isHidden: appState.isFullScreen || !(isImageMode || isWebMode || appState.isCamera)
+            isHidden: appState.isFullScreen || !(isImageMode || isWebMode || appState.isCamera || appState.isAudioDocument)
         )
 
         setMenuItem(
@@ -263,10 +263,10 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         }
 
         if menuItem.action == #selector(toggleShowBorderAction) {
-            // 仅图片和网页模式支持切换视觉边框。
+            // 音频也走通用视觉边框，包括无磁盘路径的资料库内容。
             guard let appState = activeAppState,
                   !appState.isFullScreen,
-                  appState.isCamera || appState.imageURL != nil || appState.webURL != nil else {
+                  appState.isCamera || appState.imageURL != nil || appState.webURL != nil || appState.isAudioDocument else {
                 menuItem.state = .off
                 return false
             }

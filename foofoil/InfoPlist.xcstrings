@@ -1,6 +1,23 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+  "NSAppleMusicUsageDescription": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Browse and play songs, albums, and playlists from your music library in a foil."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "在浮箔中浏览和播放音乐资料库里的歌曲、专辑和歌单。"
+        }
+      }
+    }
+  },
     "NSCameraUsageDescription" : {
       "localizations": {
         "en": {

@@ -94,6 +94,12 @@ extension AppDelegate {
         openItem.target = self
         fileMenu.addItem(openItem)
 
+        let musicItem = NSMenuItem(title: NSLocalizedString("Open Apple Music Library", comment: ""),
+                                   action: #selector(openAppleMusicLibraryAction), keyEquivalent: "")
+        musicItem.withSymbol("music.note.list")
+        musicItem.target = self
+        fileMenu.addItem(musicItem)
+
         let quickOpenItem = NSMenuItem(title: NSLocalizedString("Search History Menu Item", comment: ""), action: #selector(showHistorySearchAction), keyEquivalent: "p")
         quickOpenItem.withSymbol("magnifyingglass")
         quickOpenItem.representedObject = "history.search"

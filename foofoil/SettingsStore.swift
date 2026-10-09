@@ -192,6 +192,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     /// 重开历史时据此恢复阅读位置。文件名跨会话稳定，目录路径随会话临时目录变化。
     public var documentScrollFile: String?
     public var documentScrollFraction: Double?
+    public var appleMusicReference: AppleMusicReference?
 
 
     public init(
@@ -240,7 +241,8 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         navigatorPanelWidth: Double = 260.0,
         fileList: FileListState? = nil,
         documentScrollFile: String? = nil,
-        documentScrollFraction: Double? = nil
+        documentScrollFraction: Double? = nil,
+        appleMusicReference: AppleMusicReference? = nil
     ) {
         self.id = id
         self.imagePath = imagePath
@@ -288,10 +290,11 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.fileList = fileList?.isPresentable == true ? fileList : nil
         self.documentScrollFile = documentScrollFile
         self.documentScrollFraction = documentScrollFraction
+        self.appleMusicReference = appleMusicReference
     }
 
     private enum CodingKeys: String, CodingKey {
-        case isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction
+        case isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference
     }
 
     public init(from decoder: Decoder) throws {
@@ -346,6 +349,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         fileList = decodedList?.isPresentable == true ? decodedList : nil
         documentScrollFile = try container.decodeIfPresent(String.self, forKey: .documentScrollFile)
         documentScrollFraction = try container.decodeIfPresent(Double.self, forKey: .documentScrollFraction)
+        appleMusicReference = try container.decodeIfPresent(AppleMusicReference.self, forKey: .appleMusicReference)
         if let mode = try container.decodeIfPresent(MediaPlaybackMode.self, forKey: .mediaPlaybackMode) {
             mediaPlaybackMode = mode
         } else {
@@ -367,6 +371,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     }
 
     public var historyMenuSymbolName: String {
+        if appleMusicReference != nil { return AppleMusicReference.symbolName }
         if let fileList, fileList.isPresentable {
             return fileList.kind.historySymbolName
         }
@@ -543,7 +548,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         case "globe": emoji = "🌐"
         case "photo", "photo.on.rectangle", "text.document": emoji = "🏞️"
         case "play.rectangle", "film.stack": emoji = "🎬"
-        case "music.note", "music.note.list": emoji = "🎵"
+        case "music.note", "music.note.list", "music.pages.fill": emoji = "🎵"
         case "tablecells": emoji = "▦"
         case "arrow.down.document": emoji = "Ⓜ️"
         default: emoji = "📝"
@@ -573,11 +578,13 @@ public class SettingsStore {
             Keys.mediaSeekStepInterval: MediaSeekStep.defaultInterval,
             Keys.showsMediaBottomProgressBar: true,
             Keys.confirmClosingPlayingAudio: true,
+            Keys.appleMusicSearchEnabled: true,
             Keys.startupBehavior: StartupBehavior.newWindow.rawValue
         ])
     }
 
     private enum Keys {
+        static let appleMusicSearchEnabled = "appleMusicSearchEnabled"
         static let isPinned = "isPinned"
         static let opacity = "opacity"
         static let text = "text"
@@ -601,6 +608,15 @@ public class SettingsStore {
         static let customDocumentThemes = "customDocumentThemes"
         static let startupBehavior = "startupBehavior"
         static let lastOpenWindowConfigs = "lastOpenWindowConfigs"
+    }
+
+    var appleMusicSearchEnabled: Bool {
+        get { userDefaults.bool(forKey: Keys.appleMusicSearchEnabled) }
+        set {
+            guard newValue != appleMusicSearchEnabled else { return }
+            userDefaults.set(newValue, forKey: Keys.appleMusicSearchEnabled)
+            NotificationCenter.default.post(name: .appleMusicSearchDidChange, object: nil)
+        }
     }
 
     /// 用户自建的文档主题列表

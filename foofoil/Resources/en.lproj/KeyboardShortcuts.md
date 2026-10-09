@@ -23,12 +23,18 @@ Customize bindings in Settings → Keyboard Shortcuts. Except for global shortcu
 | Save as | ⌘S | ⌘S | Depends on content |
 {{file}}
 
+Quick Open and the overview’s `/` search also search songs, albums, and playlists in your Apple Music library. Enable or disable Apple Music search in Settings → General → Search; music access authorization is required. Select a result and press Return to play it in a foil. Search results show user files first, then music grouped by albums, songs, and playlists. Albums and songs initially show six results each; More Albums or More Songs adds 18 results at a time. The entire search view shows at most 60 results. Use All, User Files, Albums, or Songs to narrow the source; a notice appears when additional matches are known to exist.
+
+
 
 ## Navigation
 
 | Action | Default shortcut | Current shortcut | Notes |
 | --- | --- | --- | --- |
 {{go}}
+
+Apple Music queues also use the common list navigation shortcuts and list search. Apple Music foils support the common border toggle shortcut.
+
 
 Navigation lists also support ⌃P / ⌃B for the previous item and ⌃N / ⌃F for the next.
 

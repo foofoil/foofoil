@@ -98,6 +98,29 @@ public enum HistoryThumbnailGenerator {
         return write(image, to: destinationURL)
     }
 
+    /// 远程音乐封面仅解码缩略尺寸，并沿用历史统一的正方形 HEIC 缓存。
+    nonisolated static func generateArtworkThumbnail(data: Data, destinationURL: URL) -> Bool {
+        guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
+              let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceThumbnailMaxPixelSize: 512,
+                kCGImageSourceCreateThumbnailWithTransform: true
+              ] as CFDictionary),
+              let thumbnail = cropAndResize(image, to: 128) else { return false }
+        // 完整写入后再改名，列表读取时不会碰到尚未编码完成的文件。
+        let temporary = destinationURL.deletingLastPathComponent().appendingPathComponent("\(UUID().uuidString).heic")
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        guard write(thumbnail, to: temporary) else { return false }
+        do {
+            if FileManager.default.fileExists(atPath: destinationURL.path) {
+                _ = try FileManager.default.replaceItemAt(destinationURL, withItemAt: temporary)
+            } else {
+                try FileManager.default.moveItem(at: temporary, to: destinationURL)
+            }
+            return true
+        } catch { return false }
+    }
+
     /// 多分区音频列表的历史缩略图：按分区顺序把各分区封面铺进固定四宫格（最多四张）。
     /// 不足四张时右下留空，画布始终保持方形，避免横向图片被历史卡片裁切。
     /// 少于两张封面时不生成，由调用方回退到单封面缩略图。
@@ -140,7 +163,7 @@ public enum HistoryThumbnailGenerator {
     }
 
     /// 以 HEIC 格式写入目标文件（质量 70%）。
-    private static func write(_ image: CGImage, to destinationURL: URL) -> Bool {
+    nonisolated private static func write(_ image: CGImage, to destinationURL: URL) -> Bool {
         // 确保目标的父级目录存在
         let directory = destinationURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -185,7 +208,7 @@ public enum HistoryThumbnailGenerator {
     }
 
     /// 将 CGImage 居中裁剪为正方形，并使用高插值质量缩放到 targetSize × targetSize 像素
-    private static func cropAndResize(_ image: CGImage, to targetSize: Int) -> CGImage? {
+    nonisolated private static func cropAndResize(_ image: CGImage, to targetSize: Int) -> CGImage? {
         let width = image.width
         let height = image.height
         let size = min(width, height)
