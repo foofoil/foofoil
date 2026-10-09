@@ -206,9 +206,12 @@ final class AppleMusicLibraryWindowController: NSWindowController {
 struct AppleMusicModeView: View {
     @ObservedObject var appState: AppState
     @ObservedObject private var controller = AppleMusicPlaybackController.shared
+    @StateObject private var output = SystemAudioOutputController()
     let shouldHideBorder: Bool
     var body: some View {
         AudioPresentationView(appState: appState, controller: controller, info: presentationInfo, shouldHideBorder: shouldHideBorder)
+            .overlay(alignment: .topTrailing) { outputDeviceOverlay }
+            .onAppear { output.start() }
             .overlay(alignment: .center) {
                 if controller.isLoading || (appState.appleMusicItem == nil && appState.appleMusicRestoreError == nil) { ProgressView().padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10)) }
                 else if let error = appState.appleMusicRestoreError ?? controller.error {
@@ -237,6 +240,7 @@ struct AppleMusicModeView: View {
                 controller.applyPlaybackMode(appState.mediaPlaybackMode)
             }
             .onDisappear {
+                output.stop()
                 appState.isMediaPlaying = false
                 let hasMusicWindow = (NSApp.delegate as? AppDelegate)?.windowControllers.contains { $0.appState.appleMusicReference != nil } ?? false
                 if !hasMusicWindow { controller.stop() }
@@ -251,6 +255,51 @@ struct AppleMusicModeView: View {
             }
             .onReceive(controller.$isPlaying) { appState.isMediaPlaying = $0 }
     }
+    private var outputDeviceOverlay: some View {
+        VStack(alignment: .trailing, spacing: 6) {
+            AppKitPopupMenuButton(title: outputStatus, symbolName: "hifispeaker.2", items: outputMenuItems,
+                                  tint: presentationInfo.artwork == nil ? .labelColor : .white)
+                .fixedSize()
+            if let error = output.error {
+                Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
+            }
+        }
+        .font(.caption)
+        .shadow(color: .black.opacity(presentationInfo.artwork == nil ? 0 : 1), radius: 2)
+        .padding(14)
+    }
+
+    private var outputStatus: String {
+        guard let device = output.selectedDevice else { return NSLocalizedString("System Output Device", comment: "") }
+        guard let rate = device.sampleRate else { return device.name }
+        return "\(device.name) · \(AudioMetadataLoader.formatSampleRate(rate))"
+    }
+
+    private var outputMenuItems: [AppKitPopupMenuButton.Item] {
+        var items: [AppKitPopupMenuButton.Item] = [
+            .command(id: "devices", title: NSLocalizedString("System Output Device", comment: ""), enabled: false) {}
+        ]
+        items += output.devices.map { device in
+            .command(id: device.id, title: device.name, selected: output.selectedID == device.id,
+                     enabled: output.canSelectDevice && device.isAvailable) {
+                output.selectDevice(id: device.id)
+            }
+        }
+        items += [.separator(), .command(id: "rates", title: NSLocalizedString("Device Sample Rate", comment: ""), enabled: false) {}]
+        if let device = output.selectedDevice, !device.rates.isEmpty {
+            items += device.rates.map { rate in
+                .command(id: "rate-\(rate)", title: AudioMetadataLoader.formatSampleRate(rate),
+                         selected: device.sampleRate.map { abs($0 - rate) < 0.5 } ?? false,
+                         enabled: device.canSetRate) {
+                    output.selectSampleRate(rate, deviceID: device.id)
+                }
+            }
+        } else {
+            items.append(.command(id: "unavailable", title: NSLocalizedString("Device Sample Rate Unavailable", comment: ""), enabled: false) {})
+        }
+        return items
+    }
+
     private var presentationInfo: AudioTrackInfo {
         guard appState.appleMusicItem == nil, let reference = appState.appleMusicReference else { return controller.info }
         var info = AudioTrackInfo.fallback(fileName: reference.title)

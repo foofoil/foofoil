@@ -27,6 +27,27 @@ struct AudioPresentationView<Controller: MediaTransportControlling>: View {
                 .clipped()
                 .allowsHitTesting(false)
 
+            if let quality = info.qualitySummary {
+                VStack {
+                    HStack {
+                        Text(quality)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(info.artwork == nil ? Color.primary : .white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background {
+                                Capsule().fill(info.artwork == nil ? Color.primary.opacity(0.08) : .black.opacity(0.45))
+                            }
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 12)
+                    }
+                    Spacer()
+                }
+                .padding(12)
+                .allowsHitTesting(false)
+            }
+
             if appState.isMediaPlaybackControlsVisible {
                 VStack {
                     Spacer(minLength: 0)

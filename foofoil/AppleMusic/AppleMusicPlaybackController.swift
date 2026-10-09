@@ -26,6 +26,8 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
     private var timer: Timer?
     private var loadingTask: Task<Void, Never>?
     private var artworkTask: Task<Void, Never>?
+    private var qualityTask: Task<Void, Never>?
+    private var availableAudioVariants: [AudioVariant]?
     private var displayedEntryID: String?
     private var isQueueReady = false
 
@@ -43,6 +45,12 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
     func load(_ item: AppleMusicLibraryItem, startingAt track: Track? = nil, playbackMode: MediaPlaybackMode = .sequentialLoop) {
         startObserving()
         loadingTask?.cancel()
+        artworkTask?.cancel()
+        qualityTask?.cancel()
+        availableAudioVariants = nil
+        displayedEntryID = nil
+        info = AudioTrackInfo.fallback(fileName: item.title)
+        info.artist = item.subtitle
         error = nil
         isLoading = true
         isQueueReady = false
@@ -85,6 +93,7 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
         let playing = player.state.playbackStatus == .playing
         if isPlaying != playing { isPlaying = playing }
         if !isScrubbing { currentTime = player.playbackTime }
+        guard isQueueReady else { return }
         let entry = player.queue.currentEntry
         if case .song(let song) = entry?.item {
             duration = song.duration ?? 0
@@ -95,11 +104,17 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
             )
             if updated != navigator { navigator = updated }
         }
-        guard displayedEntryID != entry?.id else { return }
+        let entryChanged = displayedEntryID != entry?.id
+        if entryChanged { availableAudioVariants = nil }
+        let quality = AppleMusicAudioQuality.summary(current: player.state.audioVariant, available: availableAudioVariants)
+        if info.qualitySummary != quality { info.qualitySummary = quality }
+        guard entryChanged else { return }
         displayedEntryID = entry?.id
         artworkTask?.cancel()
         info = AudioTrackInfo.fallback(fileName: entry?.title ?? "Apple Music")
         info.artist = entry?.subtitle
+        info.qualitySummary = quality
+        fetchAvailableAudioVariants(for: entry)
         if case .song(let song) = entry?.item { info.album = song.albumTitle }
         MediaRemoteCommandCoordinator.shared.update(self, title: info.title)
         guard let url = entry?.artwork?.url(width: 800, height: 800) else { return }
@@ -109,6 +124,31 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
                 guard !Task.isCancelled, let self else { return }
                 self.info.artwork = NSImage(data: data)
             } catch { /* 封面失败不影响播放，继续显示音乐占位图。 */ }
+        }
+    }
+
+    /// 每次换曲只补查一次扩展元数据；失败不影响播放，迟到响应不能覆盖新曲目。
+    private func fetchAvailableAudioVariants(for entry: MusicKit.MusicPlayer.Queue.Entry?) {
+        qualityTask?.cancel()
+        guard let entry, case .song(let song) = entry.item else { return }
+        if let variants = song.audioVariants { availableAudioVariants = variants }
+        qualityTask = Task { [weak self] in
+            do {
+                let detailed = try await song.with([.audioVariants])
+                guard !Task.isCancelled, let self, self.displayedEntryID == entry.id, self.isQueueReady else { return }
+                self.availableAudioVariants = detailed.audioVariants
+                #if DEBUG
+                NSLog("Apple Music audio metadata: playing=%@; available=%@", self.player.state.audioVariant?.description ?? "unavailable", detailed.audioVariants?.map(\.description).joined(separator: ", ") ?? "unavailable")
+                #endif
+                self.refresh()
+            } catch {
+                #if DEBUG
+                if !Task.isCancelled {
+                    NSLog("Apple Music audio metadata: extended attributes unavailable; playing=%@", self?.player.state.audioVariant?.description ?? "unavailable")
+                }
+                #endif
+                // 曲目未提供音质元数据时保留播放器标签，不推测音源规格。
+            }
         }
     }
 
@@ -125,6 +165,7 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
         timer = nil
         loadingTask?.cancel()
         artworkTask?.cancel()
+        qualityTask?.cancel()
         isLoading = false
         player.stop()
         refresh()
