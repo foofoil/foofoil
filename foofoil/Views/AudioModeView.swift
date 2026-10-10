@@ -94,9 +94,15 @@ struct AudioModeView: View {
                 AppKitPopupMenuButton(
                     title: pcmOutputStatus(snapshot),
                     symbolName: "hifispeaker.2",
-                    items: pcmOutputMenuItems(snapshot)
+                    items: pcmOutputMenuItems(snapshot),
+                    tint: info.artwork == nil ? .labelColor : .white
                 )
                 .fixedSize()
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background {
+                    Capsule().fill(info.artwork == nil ? Color.primary.opacity(0.08) : .black.opacity(0.45))
+                }
 
                 if let failure = controller.deviceFailureMessage, !failure.isEmpty {
                     Label(failure, systemImage: "exclamationmark.triangle")
@@ -104,9 +110,8 @@ struct AudioModeView: View {
                 }
             }
             .font(.caption)
-            .foregroundStyle(Color.white)
-            .shadow(color: .black, radius: 2)
-            .padding(14)
+            .foregroundStyle(info.artwork == nil ? Color.primary : .white)
+            .padding(12)
         }
     }
 

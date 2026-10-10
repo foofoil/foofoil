@@ -85,9 +85,15 @@ struct ExtensionAudioModeView: View {
                         AppKitPopupMenuButton(
                             title: status,
                             symbolName: "hifispeaker.2",
-                            items: deviceMenuItems(selection: selection, session: session)
+                            items: deviceMenuItems(selection: selection, session: session),
+                            tint: info.artwork == nil ? .labelColor : .white
                         )
                         .fixedSize()
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background {
+                            Capsule().fill(info.artwork == nil ? Color.primary.opacity(0.08) : .black.opacity(0.45))
+                        }
                     }
                 }
                 if !controller.supportsVolumeControl, session.audioDeviceSelection != nil {
@@ -114,9 +120,8 @@ struct ExtensionAudioModeView: View {
                 }
             }
             .font(.caption)
-            .foregroundStyle(Color.white)
-            .shadow(color: .black.opacity(0.9), radius: 2)
-            .padding(14)
+            .foregroundStyle(info.artwork == nil ? Color.primary : .white)
+            .padding(12)
         }
     }
 

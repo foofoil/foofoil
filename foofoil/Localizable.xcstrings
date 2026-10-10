@@ -1,6 +1,118 @@
 {
   "sourceLanguage": "en",
   "strings": {
+  "Search More Files": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "More Files"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "更多文件"
+        }
+      }
+    }
+  },
+  "Search More History": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "More History"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "更多历史记录"
+        }
+      }
+    }
+  },
+  "Open Directory...": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Open Directory..."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "打开目录…"
+        }
+      }
+    }
+  },
+  "Open File...": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Open File..."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "打开文件…"
+        }
+      }
+    }
+  },
+  "Music Untitled Playlist": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Untitled Playlist"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未命名歌单"
+        }
+      }
+    }
+  },
+  "Music Untitled Song": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Untitled Song"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未命名歌曲"
+        }
+      }
+    }
+  },
+  "Music Untitled Album": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Untitled Album"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未命名专辑"
+        }
+      }
+    }
+  },
   "System Audio": {
     "localizations": {
       "en": {

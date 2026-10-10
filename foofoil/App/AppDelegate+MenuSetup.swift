@@ -89,39 +89,17 @@ extension AppDelegate {
 
         fileMenu.addItem(NSMenuItem.separator())
 
-        let openItem = NSMenuItem(title: NSLocalizedString("Open...", comment: ""), action: #selector(openFileAction), keyEquivalent: "o")
+        let openItem = NSMenuItem(title: NSLocalizedString("Open File...", comment: ""), action: #selector(openFileAction), keyEquivalent: "o")
         openItem.withSymbol("folder")
         openItem.target = self
         fileMenu.addItem(openItem)
 
-        let musicItem = NSMenuItem(title: NSLocalizedString("Open Apple Music Library", comment: ""),
-                                   action: #selector(openAppleMusicLibraryAction), keyEquivalent: "")
-        musicItem.withSymbol("music.note.list")
-        musicItem.target = self
-        fileMenu.addItem(musicItem)
-
-        let quickOpenItem = NSMenuItem(title: NSLocalizedString("Search History Menu Item", comment: ""), action: #selector(showHistorySearchAction), keyEquivalent: "p")
-        quickOpenItem.withSymbol("magnifyingglass")
-        quickOpenItem.representedObject = "history.search"
-        quickOpenItem.target = self
-        fileMenu.addItem(quickOpenItem)
-
-        let addToListItem = NSMenuItem(
-            title: NSLocalizedString("Add to List...", comment: ""),
-            action: #selector(addToFileListAction),
-            keyEquivalent: ""
-        )
-        addToListItem.withSymbol("plus.rectangle.on.folder")
-        addToListItem.representedObject = "file.addToList"
-        addToListItem.target = self
-        fileMenu.addItem(addToListItem)
-
-        let openClipboardContentItem = NSMenuItem(title: NSLocalizedString("Open Clipboard Content", comment: ""), action: #selector(openClipboardContentAction), keyEquivalent: "v")
-        openClipboardContentItem.withSymbol("doc.on.clipboard")
-        openClipboardContentItem.keyEquivalentModifierMask = [.command, .shift]
-        openClipboardContentItem.representedObject = KeyboardShortcutCatalog.openClipboardContent.id
-        openClipboardContentItem.target = self
-        fileMenu.addItem(openClipboardContentItem)
+        let openDirectoryItem = NSMenuItem(title: NSLocalizedString("Open Directory...", comment: ""), action: #selector(openDirectoryAction), keyEquivalent: "o")
+        openDirectoryItem.withSymbol("folder")
+        openDirectoryItem.keyEquivalentModifierMask = [.command, .shift]
+        openDirectoryItem.representedObject = "file.openDirectory"
+        openDirectoryItem.target = self
+        fileMenu.addItem(openDirectoryItem)
 
         let openWebURLItem = NSMenuItem(title: NSLocalizedString("Open URL Menu Item", comment: ""), action: #selector(openWebURLAction), keyEquivalent: "l")
         openWebURLItem.withSymbol("link")
@@ -134,6 +112,39 @@ extension AppDelegate {
         cameraItem.target = self
         cameraItem.isHidden = !CameraCaptureController.isAvailable
         fileMenu.addItem(cameraItem)
+
+        let musicItem = NSMenuItem(title: NSLocalizedString("Open Apple Music Library", comment: ""),
+                                   action: #selector(openAppleMusicLibraryAction), keyEquivalent: "")
+        musicItem.withSymbol("music.note.list")
+        musicItem.target = self
+        fileMenu.addItem(musicItem)
+
+        let openClipboardContentItem = NSMenuItem(title: NSLocalizedString("Open Clipboard Content", comment: ""), action: #selector(openClipboardContentAction), keyEquivalent: "v")
+        openClipboardContentItem.withSymbol("doc.on.clipboard")
+        openClipboardContentItem.keyEquivalentModifierMask = [.command, .shift]
+        openClipboardContentItem.representedObject = KeyboardShortcutCatalog.openClipboardContent.id
+        openClipboardContentItem.target = self
+        fileMenu.addItem(openClipboardContentItem)
+
+        fileMenu.addItem(NSMenuItem.separator())
+
+        let quickOpenItem = NSMenuItem(title: NSLocalizedString("Search History Menu Item", comment: ""), action: #selector(showHistorySearchAction), keyEquivalent: "p")
+        quickOpenItem.withSymbol("magnifyingglass")
+        quickOpenItem.representedObject = "history.search"
+        quickOpenItem.target = self
+        fileMenu.addItem(quickOpenItem)
+
+        fileMenu.addItem(NSMenuItem.separator())
+
+        let addToListItem = NSMenuItem(
+            title: NSLocalizedString("Add to List...", comment: ""),
+            action: #selector(addToFileListAction),
+            keyEquivalent: ""
+        )
+        addToListItem.withSymbol("plus.rectangle.on.folder")
+        addToListItem.representedObject = "file.addToList"
+        addToListItem.target = self
+        fileMenu.addItem(addToListItem)
 
         let saveAsItem = NSMenuItem(title: NSLocalizedString("Save As...", comment: ""), action: #selector(saveAsAction), keyEquivalent: "s")
         saveAsItem.withSymbol("square.and.arrow.down")

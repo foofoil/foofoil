@@ -37,29 +37,30 @@ struct SearchResultBudget {
     var music: [AppleMusicSearchCategory: Int] = [:]
 
     init(baseCount: Int, fileCount: Int, musicCounts: [AppleMusicSearchCategory: Int],
-         desiredMusicCounts: [AppleMusicSearchCategory: Int], filter: SearchResultFilter) {
+         desiredMusicCounts: [AppleMusicSearchCategory: Int], filter: SearchResultFilter,
+         initialCount: Int = SearchResultLimits.initial, desiredBaseCount: Int? = nil, desiredFileCount: Int? = nil) {
         var remaining = SearchResultLimits.maximum
         let categories = AppleMusicSearchCategory.allCases.filter { filter.includes($0) }
         for category in categories {
-            let count = min(musicCounts[category, default: 0], SearchResultLimits.initial, remaining)
+            let count = min(musicCounts[category, default: 0], initialCount, remaining)
             music[category] = count
             remaining -= count
         }
         if filter.includesFiles {
-            files = min(fileCount, SearchResultLimits.initial, remaining)
+            files = min(fileCount, initialCount, remaining)
             remaining -= files
         }
         if filter == .all {
-            base = min(baseCount, remaining)
+            base = min(baseCount, desiredBaseCount ?? baseCount, remaining)
             remaining -= base
         }
         if filter.includesFiles {
-            let extra = min(max(0, fileCount - files), remaining)
+            let extra = min(max(0, min(fileCount, desiredFileCount ?? fileCount) - files), remaining)
             files += extra
             remaining -= extra
         }
         for category in categories {
-            let desired = min(musicCounts[category, default: 0], desiredMusicCounts[category, default: SearchResultLimits.initial])
+            let desired = min(musicCounts[category, default: 0], desiredMusicCounts[category, default: initialCount])
             let extra = min(max(0, desired - music[category, default: 0]), remaining)
             music[category, default: 0] += extra
             remaining -= extra

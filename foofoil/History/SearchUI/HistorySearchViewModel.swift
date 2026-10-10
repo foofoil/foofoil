@@ -119,11 +119,28 @@ final class HistorySearchViewModel: ObservableObject {
     func musicResults(in category: AppleMusicSearchCategory) -> [AppleMusicLibraryItem] {
         musicResults.filter { $0.searchCategory == category }
     }
+    private static let initialCount = 12
+    @Published private(set) var historyDisplayCount = 12
+    @Published private(set) var fileDisplayCount = 12
+    var hasExpandedResults: Bool { !expandedMusicCategories.isEmpty || historyDisplayCount > Self.initialCount || fileDisplayCount > Self.initialCount }
+    var canExpandHistoryResults: Bool { resultCount < SearchResultLimits.maximum && visibleResults.count < results.count }
+    var canExpandFileResults: Bool { resultCount < SearchResultLimits.maximum && visibleFiles.count < files.count }
+    func expandHistoryResults() {
+        guard canExpandHistoryResults else { return }
+        historyDisplayCount = min(SearchResultLimits.maximum, historyDisplayCount + SearchResultLimits.increment)
+    }
+    func expandFileResults() {
+        guard canExpandFileResults else { return }
+        fileDisplayCount = min(SearchResultLimits.maximum, fileDisplayCount + SearchResultLimits.increment)
+    }
     var budget: SearchResultBudget {
         SearchResultBudget(baseCount: results.count + (showsOpenCamera ? 1 : 0) + (openURL == nil ? 0 : 1),
                            fileCount: files.count,
                            musicCounts: Dictionary(uniqueKeysWithValues: AppleMusicSearchCategory.allCases.map { ($0, musicResults(in: $0).count) }),
-                           desiredMusicCounts: musicDisplayCounts, filter: resultFilter)
+                           desiredMusicCounts: musicDisplayCounts, filter: resultFilter,
+                           initialCount: resultFilter == .all ? Self.initialCount : SearchResultLimits.initial,
+                           desiredBaseCount: mode == .history ? historyDisplayCount + (showsOpenCamera ? 1 : 0) + (openURL == nil ? 0 : 1) : nil,
+                           desiredFileCount: resultFilter == .all ? fileDisplayCount : nil)
     }
     var visibleResults: [HistorySearchResult] {
         Array(results.prefix(max(0, budget.base - (showsOpenCamera ? 1 : 0) - (openURL == nil ? 0 : 1))))
@@ -141,12 +158,12 @@ final class HistorySearchViewModel: ObservableObject {
     func expandMusicResults(in category: AppleMusicSearchCategory) {
         guard canExpandMusicResults(in: category) else { return }
         expandedMusicCategories.insert(category)
-        musicDisplayCounts[category] = min(SearchResultLimits.maximum, musicDisplayCounts[category, default: SearchResultLimits.initial] + SearchResultLimits.increment)
+        musicDisplayCounts[category] = min(SearchResultLimits.maximum, musicDisplayCounts[category, default: resultFilter == .all ? Self.initialCount : SearchResultLimits.initial] + SearchResultLimits.increment)
     }
     var showsResultLimitNotice: Bool {
         let hasExtra = visibleResults.count < results.count || visibleFiles.count < files.count
             || AppleMusicSearchCategory.allCases.contains { resultFilter.includes($0) && (visibleMusicResults(in: $0).count < musicResults(in: $0).count || musicHasMoreCategories.contains($0)) }
-        return hasExtra && (resultCount == SearchResultLimits.maximum || !AppleMusicSearchCategory.allCases.contains { canExpandMusicResults(in: $0) })
+        return hasExtra && (resultCount == SearchResultLimits.maximum || (!canExpandHistoryResults && !canExpandFileResults && !AppleMusicSearchCategory.allCases.contains { canExpandMusicResults(in: $0) }))
     }
     /// 所有来源都结束且没有任何候选时显示整体空态；来源仍加载或已给出具体状态时不抢先下结论。
     var showsOverallEmptyState: Bool {
@@ -234,6 +251,7 @@ final class HistorySearchViewModel: ObservableObject {
         results = []; files = []; rawFiles = []
         musicResults = []; musicError = nil
         expandedMusicCategories = []; musicDisplayCounts = [:]; musicHasMoreCategories = []
+        historyDisplayCount = Self.initialCount; fileDisplayCount = Self.initialCount
         isMusicAuthorized = musicAuthorized()
         isMusicSearchEnabled = musicEnabled()
         fileStatus = nil; openError = nil

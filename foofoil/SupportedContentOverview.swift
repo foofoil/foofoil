@@ -22,7 +22,8 @@ enum SupportedContentOverview {
             .sorted().map { "." + $0 }.joined(separator: ", ")
         text = text.replacingOccurrences(of: "{{textExtensions}}", with: extensions)
         // 使用当前生效键位；未设置时省略括号，历史恢复也会重新生成。
-        for (placeholder, identifier) in [("openURLShortcut", "file.openURL"),
+        for (placeholder, identifier) in [("openDirectoryShortcut", "file.openDirectory"),
+                                          ("openURLShortcut", "file.openURL"),
                                           ("openCameraShortcut", "file.openCamera"),
                                           ("openClipboardShortcut", "file.openClipboardContent")] {
             let shortcut = KeyboardShortcutCatalog.definition(withID: identifier).flatMap(shortcutProvider)

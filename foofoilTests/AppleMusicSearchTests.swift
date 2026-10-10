@@ -34,6 +34,27 @@ struct AppleMusicSearchTests {
         #expect(condition())
     }
 
+    @Test func missingLibraryMetadataStillHasVisibleTitles() throws {
+        for (type, key) in [("library-albums", "Music Untitled Album"),
+                            ("library-songs", "Music Untitled Song"),
+                            ("library-playlists", "Music Untitled Playlist")] {
+            let data = try JSONSerialization.data(withJSONObject: [
+                "id": "untitled", "type": type,
+                "attributes": ["name": "  ", "artistName": "", "trackCount": 0]
+            ])
+            let item: AppleMusicLibraryItem
+            switch type {
+            case "library-albums": item = .album(try JSONDecoder().decode(Album.self, from: data))
+            case "library-songs": item = .song(try JSONDecoder().decode(Song.self, from: data))
+            default: item = .playlist(try JSONDecoder().decode(Playlist.self, from: data))
+            }
+            #expect(item.displayTitle == NSLocalizedString(key, comment: ""))
+            #expect(!item.displayTitle.isEmpty)
+            #expect(item.title == "  ")
+        }
+        #expect(try song("named", title: "Song title").displayTitle == "Song title")
+    }
+
     @Test func unauthorizedSearchNeverRequestsMusic() async throws {
         var requests = 0
         let model = HistorySearchViewModel(historySearch: { _ in [] }, fileSearch: { _, done in done(.results([])) },
@@ -196,9 +217,9 @@ struct AppleMusicSearchTests {
         model.stopFileSearch()
     }
 
-    @Test func musicGroupsPrioritizeAlbumsLimitEachToSixAndExpandIndependently() async throws {
-        let albums = try (0..<7).map { try album("album-\($0)") }
-        let songs = try (0..<7).map { try song("song-\($0)", title: "Song \($0)") }
+    @Test func musicGroupsPrioritizeAlbumsAndExpandIndependently() async throws {
+        let albums = try (0..<13).map { try album("album-\($0)") }
+        let songs = try (0..<13).map { try song("song-\($0)", title: "Song \($0)") }
         // 服务先返回歌曲，展示层仍须把专辑放在前面；用户文件保持最前。
         let file = SpotlightFileResult(url: URL(fileURLWithPath: "/tmp/music.txt"), modifiedAt: Date())
         let quick = HistorySearchViewModel(historySearch: { _ in [] }, fileSearch: { _, done in done(.results([file])) },
@@ -211,17 +232,17 @@ struct AppleMusicSearchTests {
         expose.searchText = "music"
         try await waitUntil { !quick.isSearching && !expose.isMusicSearching }
         #expect(quick.itemIDs.first == "file:\(file.id)")
-        #expect(quick.visibleMusicResults.map(\.id) == albums.prefix(6).map(\.id) + songs.prefix(6).map(\.id))
-        #expect(expose.currentItems.compactMap { $0.musicItem?.id } == quick.visibleMusicResults.map(\.id))
-        #expect(!quick.itemIDs.contains("music:\(songs[6].id)"))
+        #expect(quick.visibleMusicResults.map(\.id) == albums.prefix(12).map(\.id) + songs.prefix(12).map(\.id))
+        #expect(expose.currentItems.compactMap { $0.musicItem?.id } == albums.prefix(6).map(\.id) + songs.prefix(6).map(\.id))
+        #expect(!quick.itemIDs.contains("music:\(songs[12].id)"))
         // 高亮第一首歌曲后展开专辑，仍选中同一首歌曲，而非变成新加入的第七张专辑。
-        quick.moveSelection(by: 7)
+        quick.moveSelection(by: 13)
         expose.selectedIndex = 6
         let selected = expose.highlightedItem?.id
         quick.expandMusicResults(in: .albums)
         expose.expandMusicResults(in: .albums)
-        #expect(quick.visibleMusicResults(in: .albums).count == 7)
-        #expect(quick.visibleMusicResults(in: .songs).count == 6)
+        #expect(quick.visibleMusicResults(in: .albums).count == 13)
+        #expect(quick.visibleMusicResults(in: .songs).count == 12)
         #expect(quick.selectedID == "music:\(songs[0].id)")
         #expect(expose.highlightedItem?.id == selected)
         #expect(expose.highlightedItem?.musicItem?.id == songs[0].id)
@@ -231,15 +252,39 @@ struct AppleMusicSearchTests {
         #expect(opened == songs[0].id)
         quick.expandMusicResults(in: .songs)
         expose.expandMusicResults(in: .songs)
-        #expect(quick.visibleMusicResults.count == 14 && expose.currentItems.count == 14)
-        #expect(quick.itemIDs.contains("music:\(songs[6].id)"))
+        #expect(quick.visibleMusicResults.count == 26 && expose.currentItems.count == 26)
+        #expect(quick.itemIDs.contains("music:\(songs[12].id)"))
         quick.query = "new"
         expose.searchText = "new"
         try await waitUntil { !quick.isSearching && !expose.isMusicSearching }
         #expect(quick.expandedMusicCategories.isEmpty && expose.expandedMusicCategories.isEmpty)
-        #expect(quick.visibleMusicResults.count == 12 && expose.currentItems.count == 12)
+        #expect(quick.visibleMusicResults.count == 24 && expose.currentItems.count == 12)
         quick.stop()
         expose.stopFileSearch()
+    }
+
+    @Test func quickOpenHistoryAndFilesExpandByEighteenAndReset() async throws {
+        let notes = (0..<40).map { history("Note \($0)") }
+        let files = (0..<40).map { SpotlightFileResult(url: URL(fileURLWithPath: "/tmp/quick-\($0).txt"), modifiedAt: Date()) }
+        let model = HistorySearchViewModel(historySearch: { _ in notes }, fileSearch: { _, done in done(.results(files)) },
+                                           cameraAvailable: { false }, musicAuthorized: { false }, musicEnabled: { false })
+        model.query = "quick"
+        try await waitUntil { !model.isSearching }
+        #expect(model.visibleResults.count == 12 && model.visibleFiles.count == 12)
+        #expect(!model.showsResultLimitNotice)
+        model.moveSelection(by: 12)
+        let selection = model.selectedID
+        model.expandHistoryResults()
+        #expect(model.visibleResults.count == 30 && model.visibleFiles.count == 12)
+        #expect(model.selectedID == selection)
+        model.expandFileResults()
+        #expect(model.visibleResults.count == 30 && model.visibleFiles.count == 30)
+        #expect(model.showsResultLimitNotice)
+        model.query = "new"
+        try await waitUntil { !model.isSearching }
+        #expect(model.visibleResults.count == 12 && model.visibleFiles.count == 12)
+        #expect(!model.hasExpandedResults)
+        model.stop()
     }
 
     @Test func resultBudgetCapsAllSourcesAndFiltersExpandByEighteen() async throws {
@@ -260,11 +305,15 @@ struct AppleMusicSearchTests {
         quick.query = "music"
         expose.searchText = "music"
         try await waitUntil { !quick.isSearching && !expose.isMusicSearching }
-        #expect(quick.resultCount == 60 && expose.displayedResultCount == 60)
-        #expect(quick.showsResultLimitNotice && expose.showsResultLimitNotice)
+        #expect(quick.resultCount == 48 && expose.displayedResultCount == 60)
+        #expect(!quick.showsResultLimitNotice && expose.showsResultLimitNotice)
+        #expect(quick.visibleResults.count == 12 && quick.visibleFiles.count == 12)
+        quick.expandFileResults()
+        #expect(quick.resultCount == 60 && quick.visibleFiles.count == 24)
+        #expect(quick.showsResultLimitNotice)
         #expect(quick.files.count == 61 && expose.files.count == 61)
         #expect(quick.musicResults.count == 122 && expose.musicItems.count == 122)
-        #expect(quick.visibleMusicResults(in: .albums).count == 6 && quick.visibleMusicResults(in: .songs).count == 6)
+        #expect(quick.visibleMusicResults(in: .albums).count == 12 && quick.visibleMusicResults(in: .songs).count == 12)
         quick.resultFilter = .albums
         expose.resultFilter = .albums
         try await waitUntil { !quick.isSearching && !expose.isMusicSearching }

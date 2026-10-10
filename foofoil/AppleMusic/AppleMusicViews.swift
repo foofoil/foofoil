@@ -8,7 +8,7 @@ struct AppleMusicResultRow: View {
         HStack(spacing: 12) {
             musicArtwork(item.artwork, size: 42)
             VStack(alignment: .leading, spacing: 3) {
-                Text(item.title).lineLimit(1)
+                Text(item.displayTitle).lineLimit(1)
                 Text(item.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             Spacer()
@@ -20,15 +20,22 @@ struct AppleMusicResultRow: View {
     }
 }
 
-@ViewBuilder
 private func musicArtwork(_ artwork: Artwork?, size: CGFloat) -> some View {
-    if let artwork {
-        ArtworkImage(artwork, width: size, height: size).clipShape(RoundedRectangle(cornerRadius: 6))
-    } else {
-        RoundedRectangle(cornerRadius: 6).fill(.quaternary)
-            .overlay { Image(systemName: "music.note").foregroundStyle(.secondary) }
-            .frame(width: size, height: size)
+    ZStack {
+        // 资料库封面由 MusicKit 加载；底层占位覆盖无封面、加载中和加载失败的情况。
+        RoundedRectangle(cornerRadius: 6)
+            .fill(Color(nsColor: .quaternaryLabelColor).opacity(0.5))
+            .overlay {
+                Image(systemName: "music.note")
+                    .font(.system(size: size * 0.28, weight: .light))
+                    .foregroundStyle(.secondary)
+            }
+        if let artwork {
+            ArtworkImage(artwork, width: size, height: size)
+        }
     }
+    .frame(width: size, height: size)
+    .clipShape(RoundedRectangle(cornerRadius: 6))
 }
 
 struct AppleMusicLibraryView: View {
@@ -46,78 +53,25 @@ struct AppleMusicLibraryView: View {
     @State private var hasMore = false
     @State private var page = 0
     @State private var loadedFilter: String?
-    private let categories = ["Music Albums", "Music Songs", "Music Playlists"]
     private var filterIdentity: String { "\(library.authorization)|\(category)|\(query)" }
     private var requestIdentity: String { "\(library.authorization)|\(category)|\(query)|\(page)" }
 
     var body: some View {
-        VStack(spacing: 0) {
+        Group {
             if library.isAuthorized {
-                if let selection {
-                    detail(selection)
-                } else {
-                    HStack {
-                        Picker("Music Library", selection: $category) {
-                            ForEach(categories, id: \.self) { Text(NSLocalizedString($0, comment: "")).tag($0) }
-                        }.pickerStyle(.segmented).frame(width: 280)
-                        Spacer()
-                        TextField("Music Search Library", text: $query).textFieldStyle(.roundedBorder).frame(width: 230)
-                    }.padding(18)
-                    Divider()
-                    ScrollView {
-                        if category == "Music Songs" || !query.isEmpty {
-                            LazyVStack(spacing: 2) {
-                                ForEach(items) { item in
-                                    Button { choose(item) } label: { AppleMusicResultRow(item: item) }.buttonStyle(.plain)
-                                }
-                            }.padding(10)
-                        } else {
-                            LazyVGrid(columns: [GridItem(.adaptive(minimum: 145), alignment: .top)], alignment: .leading, spacing: 20) {
-                                ForEach(items) { item in
-                                    Button { choose(item) } label: {
-                                        VStack(alignment: .leading, spacing: 6) {
-                                            musicArtwork(item.artwork, size: 145)
-                                            Text(item.title).lineLimit(2)
-                                            Text(item.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                                        }.frame(width: 145, alignment: .leading)
-                                    }.buttonStyle(.plain)
-                                }
-                            }.padding(20)
-                        }
-                        if hasMore && query.isEmpty {
-                            Button("Music Load More") { page += 1 }.disabled(loading).padding()
-                        }
-                        if !loading && items.isEmpty && error == nil {
-                            Text("Music Library Empty").foregroundStyle(.secondary).padding(30)
-                        }
-                    }
+                NavigationSplitView {
+                    sidebar
+                        .navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 260)
+                } detail: {
+                    libraryContent
                 }
+                .navigationSplitViewStyle(.balanced)
+                .toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
             } else {
-                Spacer()
-                Image(systemName: "music.note.list").font(.system(size: 44)).foregroundStyle(.secondary)
-                Text("Music Library").font(.title2).padding(.top, 12)
-                Text(library.authorization == .denied || library.authorization == .restricted
-                     ? "Music Authorization Denied" : "Music Authorization Message")
-                    .foregroundStyle(.secondary).multilineTextAlignment(.center).padding()
-                if library.authorization == .notDetermined {
-                    Button("Music Authorize") { Task { await library.authorize() } }.buttonStyle(.borderedProminent)
-                } else {
-                    Button("Music Refresh Authorization") { library.refreshAuthorization() }
-                }
-                Spacer()
-            }
-            if loading || detailLoading { ProgressView().controlSize(.small).padding(8) }
-            if let error {
-                HStack {
-                    Text(error).foregroundStyle(.secondary).textSelection(.enabled)
-                    Button("Music Retry") {
-                        if selection != nil { detailRevision += 1 }
-                        else { offset = 0; library.refreshAuthorization(); page += 1 }
-                    }
-                }.padding(12)
+                libraryContent
             }
         }
-        .frame(minWidth: 620, minHeight: 440)
+        .frame(minWidth: 700, minHeight: 480)
         .task(id: requestIdentity) { await load() }
         .task(id: "\(selection?.id ?? "")|\(detailRevision)") {
             tracks = []; error = nil; detailLoading = false
@@ -131,32 +85,188 @@ struct AppleMusicLibraryView: View {
         }
     }
 
-    private func detail(_ item: AppleMusicLibraryItem) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button { selection = nil } label: { Label("Music Back", systemImage: "chevron.left") }
-            HStack(spacing: 18) {
-                musicArtwork(item.artwork, size: 130)
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(item.title).font(.title2).lineLimit(2)
-                    Text(item.subtitle).foregroundStyle(.secondary)
-                    Button("Music Play") { open(item) }.buttonStyle(.borderedProminent).disabled(detailLoading || tracks.isEmpty)
+    private var libraryContent: some View {
+            VStack(spacing: 0) {
+                if library.isAuthorized {
+                    if let selection {
+                        detail(selection)
+                    } else {
+                        browser
+                    }
+                } else {
+                    authorizationView
+                }
+                if let error {
+                    HStack(spacing: 12) {
+                        Image(systemName: "exclamationmark.circle").foregroundStyle(.secondary)
+                        Text(error).font(.callout).foregroundStyle(.secondary).textSelection(.enabled)
+                        Spacer()
+                        Button("Music Retry") {
+                            if selection != nil { detailRevision += 1 }
+                            else { offset = 0; library.refreshAuthorization(); page += 1 }
+                        }
+                    }
+                    .padding(16)
+                    .background(.background.secondary)
                 }
             }
-            List(Array(tracks.enumerated()), id: \.element.id) { index, track in
-                Button { open(item, track: track) } label: {
-                    HStack {
-                        Text("\(index + 1)").foregroundStyle(.secondary).frame(width: 25)
-                        Text(track.title)
-                        Spacer()
-                        if let duration = track.duration { Text(VideoPlayerController.formatPlaybackTime(duration)).foregroundStyle(.secondary) }
-                    }.contentShape(Rectangle())
-                }.buttonStyle(.plain)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color(nsColor: .textBackgroundColor))
+            .ignoresSafeArea(.container, edges: .top)
+    }
+
+    private var sidebar: some View {
+        List(selection: Binding<String?>(
+            get: { category },
+            set: { value in
+                guard let value else { return }
+                category = value
+                selection = nil
             }
-        }.padding(18)
+        )) {
+            Section("Music Library") {
+                ForEach(AppleMusicSearchCategory.allCases) { entry in
+                    Label(LocalizedStringKey(entry.localizationKey), systemImage: entry.symbolName)
+                        .tag(entry.localizationKey)
+                }
+            }
+        }
+        .listStyle(.sidebar)
+    }
+
+    private var browser: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 20) {
+                Text(NSLocalizedString(category, comment: "")).font(.system(size: 25, weight: .bold))
+                Spacer(minLength: 8)
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                    TextField("Music Search Library", text: $query).textFieldStyle(.plain)
+                    if !query.isEmpty {
+                        Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }
+                            .buttonStyle(.plain).accessibilityLabel(Text("Clear"))
+                    }
+                }
+                .padding(9)
+                .frame(width: 190)
+                .background(.background.secondary, in: RoundedRectangle(cornerRadius: 8))
+            }
+            .padding(.horizontal, 24).padding(.top, 16).padding(.bottom, 20)
+            Divider().padding(.horizontal, 24)
+            if loading && items.isEmpty {
+                Spacer()
+                ProgressView().controlSize(.regular)
+                Spacer()
+            } else if items.isEmpty && error == nil {
+                Spacer()
+                VStack(spacing: 12) {
+                    Image(systemName: query.isEmpty ? "music.note.list" : "magnifyingglass")
+                        .font(.system(size: 36, weight: .light)).foregroundStyle(.tertiary)
+                    Text("Music Library Empty").foregroundStyle(.secondary)
+                }
+                Spacer()
+            } else {
+                ScrollView {
+                    if category == "Music Songs" || !query.isEmpty {
+                        LazyVStack(spacing: 4) {
+                            ForEach(items) { item in
+                                Button { choose(item) } label: { AppleMusicResultRow(item: item) }
+                                    .buttonStyle(MusicLibraryRowButtonStyle())
+                            }
+                        }.padding(16)
+                    } else {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 190), spacing: 20, alignment: .top)],
+                                  alignment: .leading, spacing: 24) {
+                            ForEach(items) { item in
+                                Button { choose(item) } label: { MusicLibraryCard(item: item) }
+                                    .buttonStyle(.plain)
+                            }
+                        }.padding(24)
+                    }
+                    if hasMore && query.isEmpty {
+                        Button("Music Load More") { page += 1 }
+                            .buttonStyle(.bordered).disabled(loading).padding(.bottom, 24)
+                    }
+                    if loading { ProgressView().controlSize(.small).padding(.bottom, 20) }
+                }
+            }
+        }
+    }
+
+    private var authorizationView: some View {
+        VStack(spacing: 20) {
+            Spacer()
+            Image(systemName: "music.note")
+                .font(.system(size: 42, weight: .medium))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 96, height: 96)
+                .background(Color.accentColor.opacity(0.10), in: RoundedRectangle(cornerRadius: 24))
+            VStack(spacing: 10) {
+                Text("Music Library").font(.system(size: 28, weight: .bold))
+                Text(library.authorization == .denied || library.authorization == .restricted
+                     ? "Music Authorization Denied" : "Music Authorization Message")
+                    .font(.body).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center).frame(maxWidth: 360)
+            }
+            if library.authorization == .notDetermined {
+                Button("Music Authorize") { Task { await library.authorize() } }
+                    .buttonStyle(.borderedProminent).controlSize(.large)
+            } else {
+                Button("Music Refresh Authorization") { library.refreshAuthorization() }
+                    .buttonStyle(.bordered).controlSize(.large)
+            }
+            Spacer()
+        }.padding(40)
+    }
+
+    private func detail(_ item: AppleMusicLibraryItem) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button { selection = nil } label: { Label("Music Back", systemImage: "chevron.left") }
+                .buttonStyle(.plain).foregroundStyle(.secondary).padding(.bottom, 24)
+            HStack(alignment: .center, spacing: 24) {
+                musicArtwork(item.artwork, size: 160)
+                    .shadow(color: .black.opacity(0.12), radius: 10, y: 5)
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(NSLocalizedString(item.typeKey, comment: "")).font(.caption).foregroundStyle(.secondary)
+                    Text(item.displayTitle).font(.system(size: 26, weight: .bold)).lineLimit(3)
+                    Text(item.subtitle).foregroundStyle(.secondary).lineLimit(2)
+                    Button { open(item) } label: { Label("Music Play", systemImage: "play.fill") }
+                        .buttonStyle(.borderedProminent).controlSize(.large)
+                        .disabled(detailLoading || tracks.isEmpty).padding(.top, 6)
+                }
+                Spacer(minLength: 0)
+            }.padding(.bottom, 24)
+            Divider()
+            if detailLoading {
+                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
+                            Button { open(item, track: track) } label: {
+                                HStack(spacing: 14) {
+                                    Text("\(index + 1)").monospacedDigit().foregroundStyle(.tertiary).frame(width: 26)
+                                    Text(track.title).lineLimit(1)
+                                    Spacer()
+                                    if let duration = track.duration {
+                                        Text(VideoPlayerController.formatPlaybackTime(duration))
+                                            .monospacedDigit().font(.callout).foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.horizontal, 12).padding(.vertical, 12).contentShape(Rectangle())
+                            }.buttonStyle(MusicLibraryRowButtonStyle())
+                        }
+                    }.padding(.top, 12)
+                }
+            }
+        }.padding(24)
     }
 
     private func choose(_ item: AppleMusicLibraryItem) {
-        if case .song = item { open(item) } else { selection = item }
+        switch item {
+        case .song, .album: open(item)
+        case .playlist: selection = item
+        }
     }
     private func open(_ item: AppleMusicLibraryItem, track: Track? = nil) {
         (NSApp.delegate as? AppDelegate)?.openAppleMusic(item, startingAt: track)
@@ -172,7 +282,7 @@ struct AppleMusicLibraryView: View {
             try await Task.sleep(for: .milliseconds(200))
             let values = query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? try await library.browse(category, offset: offset)
-                : try await library.search(query)
+                : try await library.search(query, category: category)
             try Task.checkCancellation()
             if append { items += values } else { items = values }
             loadedFilter = filterIdentity
@@ -182,15 +292,93 @@ struct AppleMusicLibraryView: View {
     }
 }
 
+private struct MusicLibraryCard: View {
+    let item: AppleMusicLibraryItem
+    @State private var hovering = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            musicArtwork(item.artwork, size: 150)
+                    .overlay(alignment: .bottomTrailing) {
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 14, weight: .semibold)).foregroundStyle(.primary)
+                            .padding(10).background(.regularMaterial, in: Circle())
+                            .padding(10).opacity(hovering ? 1 : 0)
+                    }
+                .shadow(color: .black.opacity(hovering ? 0.16 : 0.08), radius: hovering ? 9 : 4, y: 3)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item.displayTitle).font(.system(size: 13, weight: .medium)).lineLimit(2)
+                Text(item.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.15), value: hovering)
+    }
+}
+
+private struct MusicLibraryRowButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        Row(configuration: configuration)
+    }
+
+    private struct Row: View {
+        let configuration: Configuration
+        @State private var hovering = false
+        var body: some View {
+            configuration.label
+                .background(Color.primary.opacity(configuration.isPressed ? 0.08 : hovering ? 0.04 : 0),
+                            in: RoundedRectangle(cornerRadius: 8))
+                .onHover { hovering = $0 }
+        }
+    }
+}
+
+@MainActor
+private final class AppleMusicLibraryWindow: NSWindow {
+    override func sendEvent(_ event: NSEvent) {
+        // 搜索框获得焦点时也让 Esc 关闭资料库，而不是只清空输入。
+        if event.type == .keyDown, event.keyCode == 53,
+           event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty {
+            performClose(nil)
+            return
+        }
+        // 原生 List 的空白会接收鼠标事件，显式把这部分交给系统窗口拖动。
+        if event.type == .leftMouseDown, let contentView {
+            var hitView = contentView.hitTest(contentView.convert(event.locationInWindow, from: nil))
+            while let view = hitView {
+                if let table = view as? NSTableView,
+                   table.row(at: table.convert(event.locationInWindow, from: nil)) == -1 {
+                    performDrag(with: event)
+                    return
+                }
+                hitView = view.superview
+            }
+        }
+        super.sendEvent(event)
+    }
+}
+
 @MainActor
 final class AppleMusicLibraryWindowController: NSWindowController {
     static let shared = AppleMusicLibraryWindowController()
     private init() {
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 700, height: 540),
-                              styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
+        let window = AppleMusicLibraryWindow(contentRect: NSRect(x: 0, y: 0, width: 1000, height: 620),
+                              styleMask: [.titled, .closable, .resizable, .fullSizeContentView], backing: .buffered, defer: false)
         window.title = NSLocalizedString("Music Library", comment: "")
+        // 让系统侧栏延伸到窗口顶部，隐藏独立标题文字并保留原生窗口按钮。
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.toolbarStyle = .automatic
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        window.standardWindowButton(.zoomButton)?.isHidden = true
+        window.collectionBehavior = [.fullScreenNone]
+        window.isMovableByWindowBackground = true
         window.isReleasedWhenClosed = false
         window.contentViewController = NSHostingController(rootView: AppleMusicLibraryView())
+        // HostingController 安装时会按内容最小尺寸重算窗口，随后设置四列所需的初始宽度。
+        window.setContentSize(NSSize(width: 1000, height: 620))
         window.center()
         super.init(window: window)
     }

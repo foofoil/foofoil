@@ -72,6 +72,16 @@ enum AppleMusicLibraryItem: Identifiable, Sendable {
         case .playlist(let item): item.name
         }
     }
+    var displayTitle: String {
+        guard title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return title }
+        let key: String
+        switch self {
+        case .album: key = "Music Untitled Album"
+        case .song: key = "Music Untitled Song"
+        case .playlist: key = "Music Untitled Playlist"
+        }
+        return NSLocalizedString(key, comment: "")
+    }
     var subtitle: String {
         switch self {
         case .song(let item): item.artistName
@@ -128,6 +138,26 @@ final class AppleMusicLibrary: ObservableObject {
 
     func search(_ term: String) async throws -> [AppleMusicLibraryItem] {
         try await searchPage(term, filter: .all).items
+    }
+
+    /// 资料库窗口只向 MusicKit 请求当前分类；快速打开仍保留跨分类搜索。
+    func search(_ term: String, category: String) async throws -> [AppleMusicLibraryItem] {
+        guard isAuthorized else { return [] }
+        let types: [any MusicLibrarySearchable.Type]
+        switch category {
+        case "Music Songs": types = [Song.self]
+        case "Music Playlists": types = [Playlist.self]
+        default: types = [Album.self]
+        }
+        var request = MusicLibrarySearchRequest(term: term, types: types)
+        request.limit = 60
+        let response = try await request.response()
+        try Task.checkCancellation()
+        switch category {
+        case "Music Songs": return response.songs.map(AppleMusicLibraryItem.song)
+        case "Music Playlists": return response.playlists.map(AppleMusicLibraryItem.playlist)
+        default: return response.albums.map(AppleMusicLibraryItem.album)
+        }
     }
 
     func searchPage(_ term: String, filter: SearchResultFilter) async throws -> AppleMusicSearchPage {

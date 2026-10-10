@@ -23,6 +23,10 @@ Customize bindings in Settings → Keyboard Shortcuts. Except for global shortcu
 | Save as | ⌘S | ⌘S | Depends on content |
 {{file}}
 
+In the Apple Music library window, Esc closes the window, including while the search field is focused. Drag the blank area of the sidebar to move the window.
+
+Open directories with File → Open Directory. The configurable shortcut is listed in this section; directories use the same handling as dragging them into a foil.
+
 Quick Open and the overview’s `/` search also search songs, albums, and playlists in your Apple Music library. Enable or disable Apple Music search in Settings → General → Search; music access authorization is required. Select a result and press Return to play it in a foil. Search results show user files first, then music grouped by albums, songs, and playlists. Albums and songs initially show six results each; More Albums or More Songs adds 18 results at a time. The entire search view shows at most 60 results. Use All, User Files, Albums, or Songs to narrow the source; a notice appears when additional matches are known to exist.
 
 

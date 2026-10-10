@@ -17,13 +17,6 @@ struct HistorySearchView: View {
 
             if !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Divider()
-                if model.mode == .history {
-                    Picker(NSLocalizedString("Search Result Type", comment: ""), selection: $model.resultFilter) {
-                        ForEach(model.isMusicSearchEnabled ? SearchResultFilter.allCases : [.all, .files]) { filter in
-                            Text(NSLocalizedString(filter.localizationKey, comment: "")).tag(filter)
-                        }
-                    }.pickerStyle(.segmented).labelsHidden().padding(.horizontal, 18).padding(.vertical, 8)
-                }
                 if model.showsOverallEmptyState {
                     Text(NSLocalizedString("No Search Results", comment: ""))
                         .foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 28)
@@ -54,12 +47,20 @@ struct HistorySearchView: View {
                                             }
                                         }
                                 }
+                                if model.canExpandHistoryResults {
+                                    Button(NSLocalizedString("Search More History", comment: "")) { model.expandHistoryResults() }
+                                        .font(.caption).padding(10)
+                                }
                                 if model.mode == .history && model.resultFilter.includesFiles {
                                     sectionLabel("Local Files Section")
                                     ForEach(Array(model.visibleFiles.enumerated()), id: \.element.id) { index, file in
                                         SpotlightFileResultRow(file: file, isSelected: model.selectedID == "file:\(file.id)")
                                             .id("file:\(file.id)")
                                             .onTapGesture { model.openFile?(file.url) }
+                                    }
+                                    if model.canExpandFileResults {
+                                        Button(NSLocalizedString("Search More Files", comment: "")) { model.expandFileResults() }
+                                            .font(.caption).padding(10)
                                     }
                                     if model.isFileSearching {
                                         Text(NSLocalizedString("Searching Local Files", comment: ""))
@@ -114,7 +115,7 @@ struct HistorySearchView: View {
                         }
                         .onChange(of: model.itemIDs) { _, _ in
                             // 点击「更多」时保留阅读位置，避免新增结果把列表拉回高亮的首项。
-                            guard model.expandedMusicCategories.isEmpty else { return }
+                            guard !model.hasExpandedResults else { return }
                             if let id = model.selectedID { proxy.scrollTo(id) }
                         }
                     }

@@ -380,6 +380,24 @@ extension AppDelegate {
         }
     }
 
+    @objc func openDirectoryAction() {
+        let appState = activeAppState
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.treatsFilePackagesAsDirectories = false
+
+        panel.begin { response in
+            if response == .OK {
+                DispatchQueue.main.async {
+                    // 复用目录拖入入口，保持内容筛选、列表追加和空箔打开行为一致。
+                    self.openDroppedFiles(panel.urls, into: appState)
+                }
+            }
+        }
+    }
+
     @objc func addToFileListAction() {
         guard let appState = activeAppState, let kind = appState.listableKind else { return }
         let panel = NSOpenPanel()
