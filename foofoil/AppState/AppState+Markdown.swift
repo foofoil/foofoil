@@ -245,8 +245,6 @@ extension AppState {
                 }
                 table {
                     box-sizing: border-box;
-                    max-width: 100%;
-                    width: 100%;
                     border-collapse: collapse;
                     margin: 0 0 1.15em 0;
                     font-size: 0.9em;

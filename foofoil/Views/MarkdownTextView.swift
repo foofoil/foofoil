@@ -21,6 +21,8 @@ final class MarkdownNSTextView: NSTextView {
     private var copyFeedbackReset: DispatchWorkItem?
     private var scrollHighlightReset: DispatchWorkItem?
     private var scrollHighlightRange: NSRange?
+    /// 表格单元格的块、列号与自然宽度，用于随容器宽度重新分配列宽。
+    private var tableCells: [(block: NSTextTableBlock, column: Int, width: CGFloat)] = []
     private lazy var copyCodeButton: NSButton = {
         let button = MarkdownCopyButton()
         button.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)
@@ -41,6 +43,52 @@ final class MarkdownNSTextView: NSTextView {
         drawCodeBlockFrames(in: dirtyRect)
         super.draw(tableRedrawRect(intersecting: dirtyRect))
         updateCopyButtonFrame()
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        let widthChanged = newSize.width != frame.width
+        super.setFrameSize(newSize)
+        if widthChanged { updateTableColumnWidths() }
+    }
+
+    /// 采集表格单元格的自然文本宽度（不含段落样式），文本替换时调用一次。
+    func collectTableCells() {
+        tableCells.removeAll()
+        guard let textStorage, textStorage.length > 0 else { return }
+        textStorage.enumerateAttribute(.paragraphStyle, in: NSRange(location: 0, length: textStorage.length)) { value, range, _ in
+            guard let style = value as? NSParagraphStyle else { return }
+            for case let block as NSTextTableBlock in style.textBlocks {
+                let text = NSMutableAttributedString(attributedString: textStorage.attributedSubstring(from: range))
+                text.removeAttribute(.paragraphStyle, range: NSRange(location: 0, length: text.length))
+                tableCells.append((block, block.startingColumn, text.size().width))
+            }
+        }
+    }
+
+    /// 内容放得下时各列按自然宽度收缩、不折行；放不下时按各列自然宽度比例占满可用宽度。
+    func updateTableColumnWidths() {
+        guard !tableCells.isEmpty, let textStorage else { return }
+        let available = bounds.width - textContainerInset.width * 2
+        var columns: [ObjectIdentifier: [Int: CGFloat]] = [:]
+        for cell in tableCells {
+            let table = ObjectIdentifier(cell.block.table)
+            columns[table, default: [:]][cell.column] = max(columns[table]?[cell.column] ?? 0, cell.width)
+        }
+        for cell in tableCells {
+            let widths = columns[ObjectIdentifier(cell.block.table)] ?? [:]
+            let total = widths.values.reduce(0, +)
+            let width = widths[cell.column] ?? 0
+            guard total > 0 else { continue }
+            if total <= available {
+                cell.block.setContentWidth(width.rounded(.up), type: .absolute)
+            } else {
+                cell.block.setContentWidth(width / total * 100, type: .percentage)
+            }
+        }
+        layoutManager?.invalidateLayout(
+            forCharacterRange: NSRange(location: 0, length: textStorage.length),
+            actualCharacterRange: nil
+        )
     }
 
     /// TextKit 局部重绘合并边框时会遗漏跨出 dirtyRect 的表格边界；按整张表格计算绘制范围。
@@ -311,6 +359,8 @@ struct MarkdownTextView: NSViewRepresentable {
                 context.coordinator.appliedText = attributedText
                 // 颜色语义化已在 AppState 渲染阶段完成，这里直接替换文本存储，避免每次更新全量复制与枚举。
                 textView.layoutManager?.replaceTextStorage(NSTextStorage(attributedString: attributedText))
+                textView.collectTableCells()
+                textView.updateTableColumnWidths()
                 textView.resetCodeBlockHover()
                 // 替换后同步一次目录位置；放到下一轮主循环，避免在视图更新中修改外部状态。
                 DispatchQueue.main.async { [weak coordinator = context.coordinator] in
