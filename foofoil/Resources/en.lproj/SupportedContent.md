@@ -57,3 +57,5 @@ All audio and video foils share one playback slot. Starting another foil pauses 
 MusicKit audio quality labels are shown when available. Playing quality takes priority; available formats are labeled separately. Numeric source sample rate, bit depth, and bitrate are not exposed and are not inferred from quality labels.
 
 Quick Open shows all sources without category tabs. Each group initially shows 12 results; More adds 18 at a time, up to 60 results across the view. The overview search retains its category filters and initial limits.
+
+Paste an Apple Music song, album, or public playlist sharing link into Quick Open to preview it and press Return to open a music foil. Open Clipboard Content also opens these links directly as music. Explicit links work when Apple Music library search is disabled; music access authorization and content availability in your region still apply. Shared content does not need to be added to your library and can be restored from history.

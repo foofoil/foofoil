@@ -1,6 +1,54 @@
 {
   "sourceLanguage": "en",
   "strings": {
+  "Music Open Shared Link": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Open in Apple Music Foil"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "在音乐箔中打开"
+        }
+      }
+    }
+  },
+  "Music Link Open Failed": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Unable to Open Apple Music Link"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法打开 Apple Music 链接"
+        }
+      }
+    }
+  },
+  "Music Link Unavailable": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "This Apple Music content is unavailable or cannot be accessed in your region."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "此 Apple Music 内容不可用，或无法在你的地区访问。"
+        }
+      }
+    }
+  },
   "Search More Files": {
     "localizations": {
       "en": {

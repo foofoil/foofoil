@@ -40,6 +40,11 @@ final class HistorySearchViewModel: ObservableObject {
     @Published private(set) var isMusicAuthorized = false
     @Published private(set) var isMusicSearchEnabled = false
     var openMusic: ((AppleMusicLibraryItem) -> Void)?
+    var openMusicLink: ((URL) -> Void)?
+    @Published private(set) var musicLink: AppleMusicLink?
+    @Published private(set) var linkedMusicItem: AppleMusicLibraryItem?
+    @Published private(set) var musicLinkError: String?
+    private let resolveMusicLink: @MainActor (AppleMusicLink) async throws -> AppleMusicLibraryItem
     var enableMusicSearch: (() -> Void)?
     private var musicTask: Task<Void, Never>?
     private let musicSearch: @MainActor (String, SearchResultFilter) async throws -> AppleMusicSearchPage
@@ -80,8 +85,10 @@ final class HistorySearchViewModel: ObservableObject {
          cancelFiles: (() -> Void)? = nil,
          cameraAvailable: @escaping () -> Bool = { CameraCaptureController.isAvailable },
          musicSearch: (@MainActor (String) async throws -> [AppleMusicLibraryItem])? = nil,
+         resolveMusicLink: @escaping @MainActor (AppleMusicLink) async throws -> AppleMusicLibraryItem = { try await AppleMusicLibrary.shared.resolve($0) },
          musicAuthorized: @escaping @MainActor () -> Bool = { AppleMusicLibrary.shared.isAuthorized },
          musicEnabled: @escaping @MainActor () -> Bool = { SettingsStore.shared.appleMusicSearchEnabled }) {
+        self.resolveMusicLink = resolveMusicLink
         self.musicSearch = { term, filter in
             if let musicSearch { return .init(items: try await musicSearch(term)) }
             return try await AppleMusicLibrary.shared.searchPage(term, filter: filter)
@@ -167,12 +174,13 @@ final class HistorySearchViewModel: ObservableObject {
     }
     /// 所有来源都结束且没有任何候选时显示整体空态；来源仍加载或已给出具体状态时不抢先下结论。
     var showsOverallEmptyState: Bool {
-        guard !isSearching else { return false }
+        guard !isSearching, musicLink == nil else { return false }
         if mode == .url { return resultCount == 0 }
         return results.isEmpty && files.isEmpty && musicResults.isEmpty && musicError == nil && openURL == nil && !showsOpenCamera && fileStatus == nil
     }
     var itemIDs: [String] {
-        (showsOpenCamera ? ["camera"] : []) + visibleResults.map { "history:\($0.id)" } + visibleFiles.map { "file:\($0.id)" }
+        if let musicLink { return ["music-link:\(musicLink.url.absoluteString)"] }
+        return (showsOpenCamera ? ["camera"] : []) + visibleResults.map { "history:\($0.id)" } + visibleFiles.map { "file:\($0.id)" }
             + visibleMusicResults.map { "music:\($0.id)" }
             + (openURL.map { ["url:\($0.absoluteString)"] } ?? [])
     }
@@ -214,12 +222,18 @@ final class HistorySearchViewModel: ObservableObject {
     }
 
     func openSelected() {
+        if musicLink != nil { openLinkedMusic(); return }
         if selectedID == "camera" { openCamera?(); return }
         guard let selectedID else { return }
         if let row = visibleResults.first(where: { "history:\($0.id)" == selectedID }) { open(row) }
         else if let file = visibleFiles.first(where: { "file:\($0.id)" == selectedID }) { openFile?(file.url) }
         else if let music = visibleMusicResults.first(where: { "music:\($0.id)" == selectedID }) { openMusic?(music) }
         else { openURLResult() }
+    }
+
+    func openLinkedMusic() {
+        if let linkedMusicItem { openMusic?(linkedMusicItem) }
+        else if let musicLink { openMusicLink?(musicLink.url) }
     }
 
     func open(_ result: HistorySearchResult) { openResult?(result.id) }
@@ -250,6 +264,7 @@ final class HistorySearchViewModel: ObservableObject {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         results = []; files = []; rawFiles = []
         musicResults = []; musicError = nil
+        musicLink = nil; linkedMusicItem = nil; musicLinkError = nil
         expandedMusicCategories = []; musicDisplayCounts = [:]; musicHasMoreCategories = []
         historyDisplayCount = Self.initialCount; fileDisplayCount = Self.initialCount
         isMusicAuthorized = musicAuthorized()
@@ -257,6 +272,29 @@ final class HistorySearchViewModel: ObservableObject {
         fileStatus = nil; openError = nil
         userMovedSelection = false
         openURL = trimmed.isEmpty || resultFilter != .all ? nil : Self.url(from: trimmed)
+        if let url = Self.url(from: trimmed), let link = AppleMusicLink(url: url) {
+            musicLink = link
+            openURL = nil
+            selectedID = itemIDs.first
+            // 明确输入链接不受资料库搜索开关限制，也不启动无关来源搜索。
+            guard isMusicAuthorized else { return }
+            isMusicSearching = true
+            musicTask = Task { [weak self] in
+                do {
+                    try await Task.sleep(for: .milliseconds(150))
+                    guard let self, !Task.isCancelled else { return }
+                    let item = try await self.resolveMusicLink(link)
+                    guard !Task.isCancelled, currentGeneration == self.generation else { return }
+                    self.linkedMusicItem = item
+                    self.isMusicSearching = false
+                } catch {
+                    guard let self, !Task.isCancelled, currentGeneration == self.generation else { return }
+                    self.musicLinkError = error.localizedDescription
+                    self.isMusicSearching = false
+                }
+            }
+            return
+        }
         selectedID = itemIDs.first
         guard !trimmed.isEmpty else { return }
         if mode == .history && resultFilter != .files && isMusicSearchEnabled && isMusicAuthorized {

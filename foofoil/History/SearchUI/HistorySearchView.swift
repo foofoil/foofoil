@@ -17,7 +17,18 @@ struct HistorySearchView: View {
 
             if !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Divider()
-                if model.showsOverallEmptyState {
+                if let link = model.musicLink {
+                    VStack(alignment: .leading, spacing: 8) {
+                        AppleMusicLinkResultRow(link: link, item: model.linkedMusicItem,
+                                               isSelected: model.selectedID != nil)
+                            .contentShape(Rectangle()).onTapGesture { model.openLinkedMusic() }
+                        if let error = model.musicLinkError {
+                            Text(error).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 10)
+                            Button(NSLocalizedString("Retry File Search", comment: "")) { model.retry() }
+                                .font(.caption).padding(.horizontal, 10)
+                        }
+                    }.padding(8)
+                } else if model.showsOverallEmptyState {
                     Text(NSLocalizedString("No Search Results", comment: ""))
                         .foregroundStyle(.secondary).frame(maxWidth: .infinity).padding(.vertical, 28)
                 } else {
@@ -122,15 +133,15 @@ struct HistorySearchView: View {
                 }
             }
             // ⌘P 面板只提供开启文件搜索的入口；关闭文件搜索在设置中完成。
-            if model.mode == .history, model.resultFilter.includesFiles, !model.isFileSearchAuthorized {
+            if model.musicLink == nil, model.mode == .history, model.resultFilter.includesFiles, !model.isFileSearchAuthorized {
                 HStack {
                     Button(NSLocalizedString("Enable File Search", comment: "")) { model.enableFileSearch?() }
                     Spacer()
                 }.font(.caption).padding(.horizontal, 18).padding(.bottom, 12)
             }
-            if model.mode == .history, model.resultFilter != .files, model.isMusicSearchEnabled, !model.isMusicAuthorized {
+            if (model.musicLink != nil || (model.mode == .history && model.resultFilter != .files && model.isMusicSearchEnabled)), !model.isMusicAuthorized {
                 HStack {
-                    Button("Music Enable Search") { model.enableMusicSearch?() }
+                    Button(NSLocalizedString(model.musicLink == nil ? "Music Enable Search" : "Music Authorize", comment: "")) { model.enableMusicSearch?() }
                     Spacer()
                 }.font(.caption).padding(.horizontal, 18).padding(.bottom, 12)
             }

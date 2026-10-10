@@ -1,4 +1,5 @@
 import SwiftUI
+import MusicKit
 import ImageIO
 
 struct HistorySearchResultRow: View {
@@ -107,5 +108,31 @@ struct AppleMusicSearchResultRow: View {
                         snippet: item.searchSubtitle,
                         pageNumber: nil, thumbnailPath: nil,
                         showsInlineIcon: false, isSelected: isSelected)
+    }
+}
+
+/// 分享链接解析前后保留同一个结果位置；目录封面直接使用 MusicKit 的 artwork URL。
+struct AppleMusicLinkResultRow: View {
+    let link: AppleMusicLink
+    let item: AppleMusicLibraryItem?
+    let isSelected: Bool
+
+    var body: some View {
+        HStack(spacing: 12) {
+            AsyncImage(url: item?.artwork?.url(width: 112, height: 112)) { image in
+                image.resizable().scaledToFill()
+            } placeholder: {
+                Image(systemName: AppleMusicReference.symbolName).font(.title2).foregroundStyle(.secondary)
+            }
+            .frame(width: 56, height: 56).clipped().clipShape(RoundedRectangle(cornerRadius: 5))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(item?.displayTitle ?? NSLocalizedString("Music Open Shared Link", comment: "")).lineLimit(2)
+                Text(item?.searchSubtitle ?? link.url.absoluteString)
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(10).frame(maxWidth: .infinity, alignment: .leading)
+        .background(isSelected ? Color.accentColor.opacity(0.15) : Color.clear)
     }
 }

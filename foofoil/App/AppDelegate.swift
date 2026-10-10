@@ -23,6 +23,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     var extensionMenuItem: NSMenuItem?
     var windowMenu: NSMenu?
     var contentModeCancellables = Set<AnyCancellable>()
+    var appleMusicLinkTask: Task<Void, Never>?
     var didOpenFiles = false
     private var isTerminating = false
     /// hide: 漏掉的箔窗，在 didHide 里补 orderOut，unhide 时再还原。

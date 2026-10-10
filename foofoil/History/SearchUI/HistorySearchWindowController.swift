@@ -50,6 +50,7 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
         panel.delegate = self
         panel.dismissSearch = { [weak self] in self?.dismiss() }
         model.enableFileSearch = { [weak self] in self?.enableFileSearch() }
+        model.openMusicLink = { url in (NSApp.delegate as? AppDelegate)?.openAppleMusicLink(url) }
         model.openMusic = { item in (NSApp.delegate as? AppDelegate)?.openAppleMusic(item) }
         model.enableMusicSearch = { [weak self] in
             guard let self else { return }

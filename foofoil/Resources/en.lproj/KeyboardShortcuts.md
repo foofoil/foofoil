@@ -27,7 +27,7 @@ In the Apple Music library window, Esc closes the window, including while the se
 
 Open directories with File → Open Directory. The configurable shortcut is listed in this section; directories use the same handling as dragging them into a foil.
 
-Quick Open and the overview’s `/` search also search songs, albums, and playlists in your Apple Music library. Enable or disable Apple Music search in Settings → General → Search; music access authorization is required. Select a result and press Return to play it in a foil. Search results show user files first, then music grouped by albums, songs, and playlists. Albums and songs initially show six results each; More Albums or More Songs adds 18 results at a time. The entire search view shows at most 60 results. Use All, User Files, Albums, or Songs to narrow the source; a notice appears when additional matches are known to exist.
+Quick Open and the overview’s `/` search also search songs, albums, and playlists in your Apple Music library. Enable or disable Apple Music search in Settings → General → Search; music access authorization is required. Select a result and press Return to play it in a foil. Search results show user files first, then music grouped by albums, songs, and playlists. In the overview search, albums and songs initially show six results each; More Albums or More Songs adds 18 results at a time. The entire search view shows at most 60 results. In the overview search, use All, User Files, Albums, or Songs to narrow the source; a notice appears when additional matches are known to exist.
 
 
 
@@ -115,3 +115,7 @@ Editing shortcuts apply to text fields or selectable content, depending on focus
 - `/` starts search; while searching, Control + number or letter selects directly.
 - Esc leaves search; press Esc again to dismiss the overview.
 - {{clipboardShortcut}} opens clipboard content.
+
+Paste an Apple Music song, album, or public playlist sharing link into Quick Open to preview it and press Return to open a music foil. Open Clipboard Content also opens these links directly as music. Explicit links work when Apple Music library search is disabled; music access authorization and content availability in your region still apply. Shared content does not need to be added to your library and can be restored from history.
+
+Quick Open shows all sources without category tabs, initially 12 results per group; More adds 18 at a time within the shared 60-result limit.

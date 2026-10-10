@@ -539,6 +539,8 @@ extension AppDelegate {
 
     /// 在空白窗口中打开网页；若没有空白窗口，则创建新窗口。
     public func openWebURLInPreferredWindow(_ url: URL) {
+        appleMusicLinkTask?.cancel()
+        appleMusicLinkTask = nil
         if let controller = availableBlankWindowController {
             controller.appState.openWeb(url: url)
             activateWindow(controller)
@@ -557,6 +559,8 @@ extension AppDelegate {
     /// 直接打开剪贴板内容：文件/文件夹/图片复用拖入箔片的处理管线，文本按 Markdown / 网址 / HTML / 笔记区分。
     @discardableResult
     func openClipboardContentInNewWindow() -> Bool {
+        appleMusicLinkTask?.cancel()
+        appleMusicLinkTask = nil
         let fileURLs = clipboardFileURLs()
         if !fileURLs.isEmpty {
             return openClipboardFileURLs(fileURLs)
@@ -612,6 +616,10 @@ extension AppDelegate {
             }
             // 剪贴板内容整体是一个网址时直接作为网站打开，不落为纯文本笔记。
             if let url = AppState.websiteURL(fromClipboardText: text) {
+                if AppleMusicLink(url: url) != nil {
+                    openAppleMusicLink(url)
+                    return true
+                }
                 let target = clipboardContentTarget()
                 target.state.openWeb(url: url)
                 presentClipboardTarget(target)
@@ -1174,7 +1182,7 @@ extension AppDelegate {
 /// 判定与 openClipboardContentInNewWindow 保持一致，保证“提示什么就打开什么”。
 struct ClipboardOpenableContent: Equatable {
     enum Kind: Equatable {
-        case folder, file, image, imageList, audio, audioList, video, videoList, pdf, web, htmlFragment, website, markdown, text
+        case folder, file, image, imageList, audio, audioList, appleMusic, video, videoList, pdf, web, htmlFragment, website, markdown, text
 
         /// 提示文案中的基础类型名（“打开剪贴板里的图片”中的“图片”）。
         var localizedName: String {
@@ -1185,6 +1193,7 @@ struct ClipboardOpenableContent: Equatable {
             case .imageList: return NSLocalizedString("Image List", comment: "")
             case .audio: return NSLocalizedString("Clipboard Type Audio", comment: "")
             case .audioList: return NSLocalizedString("Audio List", comment: "")
+            case .appleMusic: return "Apple Music"
             case .video: return NSLocalizedString("Video", comment: "")
             case .videoList: return NSLocalizedString("Video List", comment: "")
             case .pdf: return NSLocalizedString("Clipboard Type PDF", comment: "")
@@ -1271,7 +1280,9 @@ struct ClipboardOpenableContent: Equatable {
         let text = isDeclaredMarkdown ? declaredMarkdown : plainText
         if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             if isDeclaredMarkdown || AppState.looksLikeMarkdown(text) { return ClipboardOpenableContent(.markdown) }
-            if AppState.websiteURL(fromClipboardText: text) != nil { return ClipboardOpenableContent(.website) }
+            if let url = AppState.websiteURL(fromClipboardText: text) {
+                return ClipboardOpenableContent(AppleMusicLink(url: url) == nil ? .website : .appleMusic)
+            }
             if html != nil || AppState.looksLikeHTML(text) { return ClipboardOpenableContent(.htmlFragment) }
             return ClipboardOpenableContent(.text)
         }

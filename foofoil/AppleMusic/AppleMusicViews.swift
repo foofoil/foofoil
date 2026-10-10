@@ -263,7 +263,7 @@ struct AppleMusicLibraryView: View {
     }
 
     private func choose(_ item: AppleMusicLibraryItem) {
-        switch item {
+        switch item.content {
         case .song, .album: open(item)
         case .playlist: selection = item
         }
@@ -503,7 +503,31 @@ struct AppleMusicModeView: View {
 extension AppDelegate {
     @objc func openAppleMusicLibraryAction() { AppleMusicLibraryWindowController.shared.show() }
 
+    /// 快捷键直接打开时按需授权；连续粘贴只允许最后一个请求生效。
+    func openAppleMusicLink(_ url: URL) {
+        guard let link = AppleMusicLink(url: url) else { return }
+        appleMusicLinkTask?.cancel()
+        appleMusicLinkTask = Task { @MainActor [weak self] in
+            do {
+                AppleMusicLibrary.shared.refreshAuthorization()
+                if !AppleMusicLibrary.shared.isAuthorized { await AppleMusicLibrary.shared.authorize() }
+                try Task.checkCancellation()
+                let item = try await AppleMusicLibrary.shared.resolve(link)
+                try Task.checkCancellation()
+                self?.openAppleMusic(item)
+            } catch {
+                guard !Task.isCancelled else { return }
+                let alert = NSAlert()
+                alert.messageText = NSLocalizedString("Music Link Open Failed", comment: "")
+                alert.informativeText = error.localizedDescription
+                alert.runModal()
+            }
+        }
+    }
+
     func openAppleMusic(_ item: AppleMusicLibraryItem, startingAt track: Track? = nil) {
+        appleMusicLinkTask?.cancel()
+        appleMusicLinkTask = nil
         HistorySearchWindowController.shared.dismiss()
         let existing = windowControllers.first { $0.appState.appleMusicReference != nil } ?? availableBlankWindowController
         let state = existing?.appState ?? AppState()
