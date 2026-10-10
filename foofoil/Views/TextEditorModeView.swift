@@ -41,7 +41,9 @@ struct TextEditorModeView: View {
                         if appState.isMarkdownPreview && appState.isMarkdownDocument && !appState.text.isEmpty {
                             MarkdownTextView(
                                 attributedText: appState.renderedMarkdown,
-                                calculatedHeight: $textHeight
+                                calculatedHeight: $textHeight,
+                                scrollRequest: appState.markdownScrollRequest,
+                                onVisibleLocationChange: { appState.markdownVisibleLocationDidChange($0, settledLocation: $1) }
                             )
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 // 整个滚动视图避开四边缩放热区，滚动条首尾也不会触发角部缩放。

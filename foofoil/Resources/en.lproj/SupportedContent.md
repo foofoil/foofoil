@@ -24,7 +24,7 @@ You can also type directly into a blank foil to write a note.
 | Type | Common formats | What you can do |
 | --- | --- | --- |
 | PDF | .pdf | Read, turn pages, and jump to a page |
-| Markdown | .md, .markdown | Read formatted content and adjust reading styles |
+| Markdown | .md, .markdown | Read formatted content, jump to headings from the Outline in the navigator, and adjust reading styles |
 | Tables | .csv | Browse data in rows and columns |
 | Text and code | {{textExtensions}}, etc. | Read text and adjust fonts, colors, and spacing |
 | Web pages and archives | .html, .htm, .xhtml, .webarchive | Browse web content; you can also enter a URL directly |

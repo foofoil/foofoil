@@ -19,6 +19,8 @@ final class MarkdownNSTextView: NSTextView {
     private var codeBlockTrackingArea: NSTrackingArea?
     private var hoveredCodeBlockRange: NSRange?
     private var copyFeedbackReset: DispatchWorkItem?
+    private var scrollHighlightReset: DispatchWorkItem?
+    private var scrollHighlightRange: NSRange?
     private lazy var copyCodeButton: NSButton = {
         let button = MarkdownCopyButton()
         button.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)
@@ -97,6 +99,26 @@ final class MarkdownNSTextView: NSTextView {
     func resetCodeBlockHover() {
         hoveredCodeBlockRange = nil
         copyCodeButton.isHidden = true
+    }
+
+    /// 目录跳转后短暂高亮目标标题；新的跳转会替换上一次的高亮，超时后自动清除。
+    func flashScrollHighlight(_ range: NSRange) {
+        clearScrollHighlight()
+        guard let textStorage, range.length > 0, NSMaxRange(range) <= textStorage.length else { return }
+        textStorage.addAttribute(.backgroundColor, value: NSColor.findHighlightColor, range: range)
+        scrollHighlightRange = range
+        let reset = DispatchWorkItem { [weak self] in self?.clearScrollHighlight() }
+        scrollHighlightReset = reset
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: reset)
+    }
+
+    private func clearScrollHighlight() {
+        scrollHighlightReset?.cancel()
+        scrollHighlightReset = nil
+        guard let range = scrollHighlightRange else { return }
+        scrollHighlightRange = nil
+        guard let textStorage, NSMaxRange(range) <= textStorage.length else { return }
+        textStorage.removeAttribute(.backgroundColor, range: range)
     }
 
     @objc private func copyHoveredCodeBlock() {
@@ -242,6 +264,12 @@ final class MarkdownNSTextView: NSTextView {
 struct MarkdownTextView: NSViewRepresentable {
     let attributedText: NSAttributedString
     @Binding var calculatedHeight: CGFloat
+    var scrollRequest: MarkdownScrollRequest?
+    /// 滚动时回传两个字符位置：可视区顶部，以及再往上 `headingSettleDistance` 处的位置。
+    /// 目录向下切换需要后者也越过标题，避免标题刚滚过顶部就频繁切换。
+    var onVisibleLocationChange: (_ location: Int, _ settledLocation: Int) -> Void = { _, _ in }
+    /// 向下滚动时，标题需要再滚过顶部这么多点才切换为当前节。
+    static let headingSettleDistance: CGFloat = 40
     private let documentPadding: CGFloat = 24
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -271,15 +299,53 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.textContainer?.lineFragmentPadding = 0
 
         scrollView.documentView = textView
+        context.coordinator.observeScroll(of: scrollView)
         return scrollView
     }
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
+        context.coordinator.parent = self
         if let textView = nsView.documentView as? MarkdownNSTextView {
-            // 颜色语义化已在 AppState 渲染阶段完成，这里直接替换文本存储，避免每次更新全量复制与枚举。
-            textView.layoutManager?.replaceTextStorage(NSTextStorage(attributedString: attributedText))
-            textView.resetCodeBlockHover()
+            // 目录滚动等无关刷新不应重建文本存储；只有渲染结果变化（新对象）时才替换。
+            if context.coordinator.appliedText !== attributedText {
+                context.coordinator.appliedText = attributedText
+                // 颜色语义化已在 AppState 渲染阶段完成，这里直接替换文本存储，避免每次更新全量复制与枚举。
+                textView.layoutManager?.replaceTextStorage(NSTextStorage(attributedString: attributedText))
+                textView.resetCodeBlockHover()
+                // 替换后同步一次目录位置；放到下一轮主循环，避免在视图更新中修改外部状态。
+                DispatchQueue.main.async { [weak coordinator = context.coordinator] in
+                    coordinator?.reportVisibleLocation(nsView)
+                }
+            }
             context.coordinator.updateHeight(nsView)
+
+            if let scrollRequest, scrollRequest.id != context.coordinator.handledScrollRequestID {
+                context.coordinator.handledScrollRequestID = scrollRequest.id
+                scrollToTop(ofCharacterAt: scrollRequest.location, in: nsView, textView: textView)
+            }
+        }
+    }
+
+    /// 把标题滚动到可视区顶部并高亮整段标题；位置由布局管理器计算，与 documentPadding 的内边距保持一致。
+    private func scrollToTop(ofCharacterAt location: Int, in scrollView: NSScrollView, textView: MarkdownNSTextView) {
+        guard let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer,
+              let length = textView.textStorage?.length,
+              location < length else { return }
+        layoutManager.ensureLayout(for: textContainer)
+        let glyphRange = layoutManager.glyphRange(
+            forCharacterRange: NSRange(location: location, length: 1),
+            actualCharacterRange: nil
+        )
+        let rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+        // 标题略低于顶边（4 点），保证目录的顶部探测点仍落在该标题内，不会误判为上一节。
+        let y = max(0, rect.minY + textView.textContainerOrigin.y - 4)
+        scrollView.contentView.scroll(to: NSPoint(x: 0, y: y))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+
+        var headingRange = NSRange(location: location, length: 0)
+        if textView.textStorage?.attribute(.markdownHeadingLevel, at: location, effectiveRange: &headingRange) != nil {
+            textView.flashScrollHighlight(headingRange)
         }
     }
 
@@ -289,9 +355,45 @@ struct MarkdownTextView: NSViewRepresentable {
 
     class Coordinator: NSObject {
         var parent: MarkdownTextView
+        /// 已执行过的目录滚动请求；updateNSView 每次刷新都会调用，避免重复滚动。
+        var handledScrollRequestID: UInt64 = 0
+        /// 当前已写入文本存储的富文本；与 AppState 的渲染结果做身份比较。
+        var appliedText: NSAttributedString?
+        private var scrollObserver: NSObjectProtocol?
 
         init(_ parent: MarkdownTextView) {
             self.parent = parent
+        }
+
+        deinit {
+            if let scrollObserver { NotificationCenter.default.removeObserver(scrollObserver) }
+        }
+
+        func observeScroll(of scrollView: NSScrollView) {
+            scrollView.contentView.postsBoundsChangedNotifications = true
+            scrollObserver = NotificationCenter.default.addObserver(
+                forName: NSView.boundsDidChangeNotification,
+                object: scrollView.contentView,
+                queue: .main
+            ) { [weak self, weak scrollView] _ in
+                // 目录跳转会在视图更新中触发滚动；异步回传，避免在视图更新期间修改 AppState。
+                DispatchQueue.main.async { [weak self, weak scrollView] in
+                    guard let self, let scrollView else { return }
+                    self.reportVisibleLocation(scrollView)
+                }
+            }
+        }
+
+        /// 取可视区顶部附近的字符位置（略低于边缘，避免顶边恰好落在上一节末尾），并附带更靠上的“已越过”位置。
+        func reportVisibleLocation(_ scrollView: NSScrollView) {
+            guard let textView = scrollView.documentView as? NSTextView else { return }
+            let x = textView.textContainerOrigin.x + 1
+            let top = scrollView.contentView.bounds.minY + 8
+            let settledTop = max(0, top - MarkdownTextView.headingSettleDistance)
+            parent.onVisibleLocationChange(
+                textView.characterIndexForInsertion(at: NSPoint(x: x, y: top)),
+                textView.characterIndexForInsertion(at: NSPoint(x: x, y: settledTop))
+            )
         }
 
         func updateHeight(_ scrollView: NSScrollView) {

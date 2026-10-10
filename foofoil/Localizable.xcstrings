@@ -1759,6 +1759,23 @@
         }
       }
     },
+    "Markdown Outline": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outline"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目录"
+          }
+        }
+      }
+    },
     "PPTX Page Count": {
       "extractionState": "manual",
       "localizations": {

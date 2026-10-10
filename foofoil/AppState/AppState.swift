@@ -229,7 +229,9 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     }
 
     @Published var activeNavigatorContributionID: String?
-    @Published var expandedNavigatorItemIDs: Set<String> = []
+    @Published var expandedNavigatorItemIDs: Set<String> = [] {
+        didSet { refreshMarkdownOutlineSelection() }
+    }
     /// 导航列表搜索：仅当前会话有效，不持久化；⌘F 进入并聚焦，⌘G/⇧⌘G 定位匹配。
     @Published var isNavigatorSearchActive = false
     @Published var navigatorSearchQuery = ""
@@ -434,12 +436,20 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     /// 当前 `renderedMarkdown` 对应的内容身份（来源文件指纹、缓存路径或未命名箔的 id）。
     /// 换成另一篇文档时先清空上一次的排版结果，避免新文档渲染完成前显示上一篇内容。
     var renderedMarkdownIdentity: String?
+    /// 目录点击产生的滚动请求；MarkdownTextView 按 id 只处理一次。
+    @Published var markdownScrollRequest: MarkdownScrollRequest?
+    /// 目录标题在渲染文本中的位置与节点 ID（按文档顺序），用于随滚动定位当前节。
+    var markdownOutlineAnchors: [(location: Int, id: String)] = []
+    /// 阅读位置所在的真实标题；列表中高亮的行由它与分组折叠状态共同决定。
+    var markdownCurrentHeadingID: String?
 
     @Published public var isMarkdownPreview: Bool {
         didSet {
             saveState()
             if isMarkdownPreview {
                 updateRenderedMarkdown()
+            } else {
+                clearMarkdownOutline()
             }
         }
     }

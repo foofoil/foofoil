@@ -12,12 +12,21 @@ import AVFoundation
 import UniformTypeIdentifiers
 import ImageIO
 import SwiftUI
+import FoofoilExtensionKit
 
 extension NSAttributedString.Key {
     /// 由 MarkdownTextView 绘制无底色圆角代码框，并在框内显示语言标签。
     static let markdownCodeBlockLanguage = NSAttributedString.Key("foofoil.markdownCodeBlockLanguage")
     /// 精确绘制行内代码背景，避免 AppKit 把背景扩张到整行或列表项目符号。
     static let markdownInlineCodeBackground = NSAttributedString.Key("foofoil.markdownInlineCodeBackground")
+    /// 标题范围的层级（Int），渲染完成后据此生成导航目录。
+    static let markdownHeadingLevel = NSAttributedString.Key("foofoil.markdownHeadingLevel")
+}
+
+/// 目录点击后请求 MarkdownTextView 把某个字符位置滚动到顶部；id 递增以区分重复点击同一标题。
+struct MarkdownScrollRequest: Equatable {
+    let id: UInt64
+    let location: Int
 }
 
 private enum MarkdownRenderMarker {
@@ -65,6 +74,7 @@ extension AppState {
             if identity != renderedMarkdownIdentity {
                 renderedMarkdownIdentity = identity
                 renderedMarkdown = NSAttributedString()
+                clearMarkdownOutline()
             }
 
             let textToRender = self.text
@@ -134,6 +144,8 @@ extension AppState {
                         .replacingOccurrences(of: "<h\(level)>", with: "<h\(level)>\(MarkdownRenderMarker.headingStart)")
                         .replacingOccurrences(of: "</h\(level)>", with: "\(MarkdownRenderMarker.headingEnd)</h\(level)>")
                 }
+                // 标记与 HTML 中的标题按文档顺序一一对应，层级随之绑定到渲染后的范围上。
+                let headingLevels = Self.markdownHeadingLevels(in: styledHTMLBody)
 
                 // 构建包含 CSS 的完整 HTML，支持自适应系统明暗主题与字号大小缩放
                 let htmlContent = """
@@ -352,7 +364,7 @@ extension AppState {
                         }
 
                         // 正文段距设置不应覆盖标题层级：标题上留白大于下留白，贴近所属内容。
-                        Self.applyHeadingRangeStyles(to: mutableAttr, fontSize: fontSize)
+                        Self.applyHeadingRangeStyles(to: mutableAttr, fontSize: fontSize, levels: headingLevels)
                         // 一览中的改动键位使用语义红色；不需要放开 Markdown 原始 HTML。
                         let changedKeyPairs = Self.markerPairs(
                             in: mutableAttr.string as NSString,
@@ -367,19 +379,21 @@ extension AppState {
                             mutableAttr.addAttribute(.foregroundColor, value: NSColor.systemRed, range: range)
                         }
                         self.renderedMarkdown = mutableAttr
+                        self.publishMarkdownOutline(from: mutableAttr)
                     } else {
                         self.renderedMarkdown = NSAttributedString(string: textToRender)
+                        self.clearMarkdownOutline()
                     }
                 }
             }
         }
 
         /// 普通段落与标题之间按总留白计算，避免上段段后距和标题段前距相加。
-        private static func applyHeadingRangeStyles(to text: NSMutableAttributedString, fontSize: CGFloat) {
+        private static func applyHeadingRangeStyles(to text: NSMutableAttributedString, fontSize: CGFloat, levels: [Int]) {
             let pairs = markerPairs(in: text.string as NSString,
                                     start: MarkdownRenderMarker.headingStart,
                                     end: MarkdownRenderMarker.headingEnd)
-            for pair in pairs.reversed() {
+            for (index, pair) in pairs.enumerated().reversed() {
                 text.deleteCharacters(in: pair.end)
                 text.deleteCharacters(in: pair.start)
                 let range = NSRange(location: pair.start.location,
@@ -407,6 +421,141 @@ extension AppState {
                 for (subrange, style) in updates {
                     text.addAttribute(.paragraphStyle, value: style, range: subrange)
                 }
+                text.addAttribute(.markdownHeadingLevel, value: index < levels.count ? levels[index] : 1, range: range)
+            }
+        }
+
+        /// 按文档顺序提取 HTML 中的标题层级，与 `headingStart` 标记一一对应。
+        nonisolated private static func markdownHeadingLevels(in html: String) -> [Int] {
+            guard let regularExpression = try? NSRegularExpression(pattern: #"<h([1-6])>"#) else { return [] }
+            let source = html as NSString
+            return regularExpression.matches(in: html, range: NSRange(location: 0, length: source.length)).compactMap {
+                Int(source.substring(with: $0.range(at: 1)))
+            }
+        }
+
+        // MARK: - Markdown 目录（导航面板）
+
+        static let markdownOutlineNavigatorID = "builtin.markdown-outline"
+
+        /// 把渲染结果中的标题投影为大纲式导航列表；标题层级决定父子关系，点击时滚动到对应位置。
+        func publishMarkdownOutline(from attributed: NSAttributedString) {
+            let source = attributed.string as NSString
+            var headings: [(level: Int, title: String, location: Int)] = []
+            attributed.enumerateAttribute(
+                .markdownHeadingLevel,
+                in: NSRange(location: 0, length: attributed.length)
+            ) { value, range, _ in
+                guard let level = value as? Int else { return }
+                let title = source.substring(with: range).trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !title.isEmpty else { return }
+                headings.append((level, title, range.location))
+            }
+
+            var items: [NavigatorItem] = []
+            var locations: [String: Int] = [:]
+            var anchors: [(location: Int, id: String)] = []
+            var ancestors: [(level: Int, id: String)] = []
+            for heading in headings {
+                let id = "markdown-heading-\(heading.location)"
+                while let last = ancestors.last, last.level >= heading.level {
+                    ancestors.removeLast()
+                }
+                items.append(NavigatorItem(id: id, parentID: ancestors.last?.id, title: heading.title))
+                locations[id] = heading.location
+                anchors.append((heading.location, id))
+                ancestors.append((heading.level, id))
+            }
+
+            guard !items.isEmpty else {
+                clearMarkdownOutline()
+                return
+            }
+
+            let isNewOutline = builtInNavigatorContributions.first { $0.id == Self.markdownOutlineNavigatorID }?.items != items
+            // 新目录默认展开全部分组并清空当前节；同一文档重渲染（如切换外观）时保留用户的折叠状态与当前节。
+            if isNewOutline {
+                markdownCurrentHeadingID = nil
+                expandedNavigatorItemIDs = Set(items.compactMap(\.parentID))
+            }
+            markdownOutlineAnchors = anchors
+            builtInNavigatorContributions = [NavigatorContribution(
+                id: Self.markdownOutlineNavigatorID,
+                titleLocalizationKey: "Markdown Outline",
+                style: .outline,
+                items: items,
+                allowedActions: [.activate]
+            )]
+            refreshMarkdownOutlineSelection()
+            if activeNavigatorContributionID != Self.markdownOutlineNavigatorID {
+                endNavigatorSearch()
+                activeNavigatorContributionID = Self.markdownOutlineNavigatorID
+            }
+            builtInNavigatorActionHandler = { [weak self] action in
+                guard action.kind == .activate,
+                      let id = action.itemIDs.first,
+                      let location = locations[id] else { return }
+                // 点击目录即视为当前节，不等待滚动后的位置回传，避免被多滚一段的规则延后。
+                self?.markdownCurrentHeadingID = id
+                self?.refreshMarkdownOutlineSelection()
+                self?.markdownScrollRequest = MarkdownScrollRequest(
+                    id: (self?.markdownScrollRequest?.id ?? 0) &+ 1,
+                    location: location
+                )
+            }
+        }
+
+        /// 可视区顶部位置变化。向上滚动或首次定位时立即切换到顶部所在的标题；
+        /// 向下滚动时，下一节还需要 `settledLocation`（更靠上的位置）也越过它，才切换，减少目录的频繁跳动。
+        func markdownVisibleLocationDidChange(_ location: Int, settledLocation: Int) {
+            let anchors = markdownOutlineAnchors
+            guard let candidate = anchors.lastIndex(where: { $0.location <= location }) else {
+                markdownCurrentHeadingID = nil
+                refreshMarkdownOutlineSelection()
+                return
+            }
+            var next = candidate
+            if let id = markdownCurrentHeadingID,
+               let currentIndex = anchors.firstIndex(where: { $0.id == id }),
+               candidate > currentIndex {
+                let settled = anchors.lastIndex(where: { $0.location <= settledLocation }) ?? currentIndex
+                next = max(settled, currentIndex)
+            }
+            markdownCurrentHeadingID = anchors[next].id
+            refreshMarkdownOutlineSelection()
+        }
+
+        /// 把当前标题映射为列表中可见的行：若它位于折叠分组内，则高亮最外层被折叠的祖先。
+        func refreshMarkdownOutlineSelection() {
+            guard let index = builtInNavigatorContributions.firstIndex(where: {
+                $0.id == Self.markdownOutlineNavigatorID
+            }) else { return }
+            let items = builtInNavigatorContributions[index].items
+            let selected = markdownCurrentHeadingID.map { [visibleMarkdownOutlineID(for: $0, in: items)] } ?? []
+            guard builtInNavigatorContributions[index].selectedItemIDs != selected else { return }
+            builtInNavigatorContributions[index].selectedItemIDs = selected
+        }
+
+        private func visibleMarkdownOutlineID(for id: String, in items: [NavigatorItem]) -> String {
+            var visible = id
+            var parentID = items.first { $0.id == id }?.parentID
+            while let parent = parentID {
+                if !expandedNavigatorItemIDs.contains(parent) { visible = parent }
+                parentID = items.first { $0.id == parent }?.parentID
+            }
+            return visible
+        }
+
+        func clearMarkdownOutline() {
+            guard builtInNavigatorContributions.contains(where: { $0.id == Self.markdownOutlineNavigatorID }) else { return }
+            builtInNavigatorContributions = []
+            builtInNavigatorActionHandler = nil
+            markdownScrollRequest = nil
+            markdownOutlineAnchors = []
+            markdownCurrentHeadingID = nil
+            if activeNavigatorContributionID == Self.markdownOutlineNavigatorID {
+                activeNavigatorContributionID = nil
+                endNavigatorSearch()
             }
         }
 

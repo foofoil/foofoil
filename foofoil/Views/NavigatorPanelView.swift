@@ -404,6 +404,15 @@ struct NavigatorPanelView: View {
                             }
                         }
                     }
+                    // 目录随正文滚动时，把当前节滚入可见区；未指定 anchor 时只做最小滚动，避免列表跳动。
+                    .onChange(of: contribution.selectedItemIDs) { _, ids in
+                        guard contribution.id == AppState.markdownOutlineNavigatorID, let id = ids.first else { return }
+                        Task { @MainActor in
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                proxy.scrollTo(id)
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -412,31 +421,10 @@ struct NavigatorPanelView: View {
     private func navigatorRow(_ row: VisibleRow, contribution: NavigatorContribution) -> some View {
         let isSelected = contribution.selectedItemIDs.contains(row.item.id)
         let thumbnailPath = imageThumbnailPath(for: row.item.id, contribution: contribution)
-        let rowContent = HStack(spacing: 7) {
-            Color.clear.frame(width: CGFloat(row.depth) * 14, height: 1)
-
-            if row.hasChildren {
-                Button {
-                    if appState.expandedNavigatorItemIDs.contains(row.item.id) {
-                        appState.expandedNavigatorItemIDs.remove(row.item.id)
-                    } else {
-                        appState.expandedNavigatorItemIDs.insert(row.item.id)
-                    }
-                } label: {
-                    Image(systemName: appState.expandedNavigatorItemIDs.contains(row.item.id)
-                          ? "chevron.down" : "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        // chevron 视觉居中不变，外层整块 28pt 都可点：
-                        // contentShape 外扩超不出布局边界，必须用真实 frame 扩大才有效。
-                        .frame(width: 28, height: 28)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(NSLocalizedString("Toggle Navigator Group", comment: ""))
-            } else if contribution.style == .outline {
-                Color.clear.frame(width: 28, height: 28)
-            }
-
+        let indent = CGFloat(row.depth) * 14
+        // 层级缩进与箭头槽位（大纲叶子的对齐占位）计入按钮标签，使整行都是点击区域，文字位置不变。
+        let gutter: CGFloat = (row.hasChildren || contribution.style == .outline) ? 35 : 0
+        let rowContent = HStack(spacing: 0) {
             Button {
                 appState.performNavigatorAction(
                     NavigatorAction(
@@ -491,11 +479,38 @@ struct NavigatorPanelView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
+                // 内边距与填充都在标签内，按钮撑满整行，行内空白处也能点中。
+                .padding(.leading, 7 + indent + gutter)
+                .padding(.trailing, 7)
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .disabled(!row.item.isEnabled || !contribution.allowedActions.contains(.activate))
             .accessibilityLabel(row.item.title)
+            // 箭头叠在整行按钮之上：点箭头只切换分组，点其他位置仍激活条目。
+            .overlay(alignment: .leading) {
+                if row.hasChildren {
+                    Button {
+                        if appState.expandedNavigatorItemIDs.contains(row.item.id) {
+                            appState.expandedNavigatorItemIDs.remove(row.item.id)
+                        } else {
+                            appState.expandedNavigatorItemIDs.insert(row.item.id)
+                        }
+                    } label: {
+                        Image(systemName: appState.expandedNavigatorItemIDs.contains(row.item.id)
+                              ? "chevron.down" : "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            // 外层整块 28pt 都可点：contentShape 外扩超不出布局边界，必须用真实 frame 扩大才有效。
+                            .frame(width: 28, height: 28)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.leading, 7 + indent)
+                    .accessibilityLabel(NSLocalizedString("Toggle Navigator Group", comment: ""))
+                }
+            }
             .contextMenu {
                 if contribution.allowedActions.contains(.remove) {
                     Button(role: .destructive) {
@@ -512,8 +527,6 @@ struct NavigatorPanelView: View {
                 }
             }
         }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 6)
         .background(
             isSelected ? Color.accentColor.opacity(0.20) : Color.clear,
             in: RoundedRectangle(cornerRadius: 7, style: .continuous)

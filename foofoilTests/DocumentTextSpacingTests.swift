@@ -7,6 +7,7 @@
 import AppKit
 import SwiftUI
 import Testing
+import FoofoilExtensionKit
 @testable import foofoil
 
 /// 无排版文档（纯文本/笔记、Markdown）的行距与段距。
@@ -365,6 +366,62 @@ struct DocumentTextSpacingTests {
             let paragraph = text.substring(with: text.paragraphRange(for: NSRange(location: location, length: 0)))
             #expect(paragraph.hasPrefix(label))
         }
+    }
+
+    /// 标题层级映射为导航目录的父子关系；点击目录项请求滚动到对应标题，关闭预览后目录撤下。
+    @Test func markdownOutlineFollowsHeadingLevels() async throws {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.originalImageName = "outline.md"
+        state.text = "# 第一章\n\n正文\n\n## 第一节\n\n内容\n\n### 细分\n\n## 第二节\n\n# 附录"
+        state.isMarkdownPreview = true
+        _ = await waitForRenderedMarkdown(state)
+
+        let contribution = try #require(state.navigatorContributions.first)
+        #expect(contribution.id == AppState.markdownOutlineNavigatorID)
+        #expect(contribution.style == .outline)
+        let items = contribution.items
+        #expect(items.map(\.title) == ["第一章", "第一节", "细分", "第二节", "附录"])
+        #expect(items[0].parentID == nil)
+        #expect(items[1].parentID == items[0].id)
+        #expect(items[2].parentID == items[1].id)
+        #expect(items[3].parentID == items[0].id)
+        #expect(items[4].parentID == nil)
+        #expect(state.expandedNavigatorItemIDs == [items[0].id, items[1].id])
+
+        let handler = try #require(state.builtInNavigatorActionHandler)
+        handler(NavigatorAction(contributionID: contribution.id, kind: .activate, itemIDs: [items[2].id]))
+        let request = try #require(state.markdownScrollRequest)
+        #expect(request.location == (state.renderedMarkdown.string as NSString).range(of: "细分").location)
+
+        // 可视区顶部落在哪一节，就选中哪一节；落在正文中则选中其所属标题。
+        func selectedAfterScrolling(to needle: String) throws -> [String] {
+            let location = try range(of: needle, in: state.renderedMarkdown).location
+            state.markdownVisibleLocationDidChange(location, settledLocation: location)
+            return state.navigatorContributions.first?.selectedItemIDs ?? []
+        }
+        // 向下滚动：顶部越过“第一节”，但未越过其更靠上的已越过位置前，仍停留在“第一章”。
+        _ = try selectedAfterScrolling(to: "正文")
+        let secondLocation = try range(of: "第一节", in: state.renderedMarkdown).location
+        let settledBefore = try range(of: "正文", in: state.renderedMarkdown).location
+        state.markdownVisibleLocationDidChange(secondLocation, settledLocation: settledBefore)
+        #expect(state.navigatorContributions.first?.selectedItemIDs == [items[0].id])
+        state.markdownVisibleLocationDidChange(secondLocation, settledLocation: secondLocation)
+        #expect(state.navigatorContributions.first?.selectedItemIDs == [items[1].id])
+        #expect(try selectedAfterScrolling(to: "正文") == [items[0].id])
+        #expect(try selectedAfterScrolling(to: "内容") == [items[1].id])
+        #expect(try selectedAfterScrolling(to: "第二节") == [items[3].id])
+        #expect(try selectedAfterScrolling(to: "附录") == [items[4].id])
+
+        // 当前节位于折叠分组内时，列表中可见的是最外层被折叠的祖先；展开后回到真实的当前节。
+        _ = try selectedAfterScrolling(to: "细分")
+        state.expandedNavigatorItemIDs.remove(items[0].id)
+        #expect(state.navigatorContributions.first?.selectedItemIDs == [items[0].id])
+        state.expandedNavigatorItemIDs.insert(items[0].id)
+        #expect(state.navigatorContributions.first?.selectedItemIDs == [items[2].id])
+
+        state.isMarkdownPreview = false
+        #expect(state.navigatorContributions.isEmpty)
     }
 
     /// 等待后台 Markdown 渲染完成；超时返回当前（可能为空的）结果，由断言给出失败信息。
