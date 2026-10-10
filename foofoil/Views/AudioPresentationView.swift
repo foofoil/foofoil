@@ -30,7 +30,15 @@ struct AudioPresentationView<Controller: MediaTransportControlling>: View {
             if let quality = info.qualitySummary {
                 VStack {
                     HStack {
-                        Text(quality)
+                        HStack(spacing: 5) {
+                            if info.qualityIsLossless {
+                                LosslessAudioSymbol()
+                                    .stroke(style: StrokeStyle(lineWidth: 1.6, lineCap: .round, lineJoin: .round))
+                                    .frame(width: 20, height: 13)
+                                    .accessibilityHidden(true)
+                            }
+                            Text(quality)
+                        }
                             .font(.system(size: 11, weight: .medium))
                             .foregroundStyle(info.artwork == nil ? Color.primary : .white)
                             .padding(.horizontal, 10)
@@ -185,5 +193,27 @@ struct AudioPresentationView<Controller: MediaTransportControlling>: View {
             .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
         return values.isEmpty ? nil : values.joined(separator: "  ·  ")
+    }
+}
+
+/// Apple Music 无损标记的三条平滑波形；使用矢量路径保持小尺寸与缩放时清晰。
+private struct LosslessAudioSymbol: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: 3, y: 33))
+        path.addCurve(to: CGPoint(x: 15, y: 7), control1: CGPoint(x: 6, y: 14), control2: CGPoint(x: 10, y: 7))
+        path.addCurve(to: CGPoint(x: 33, y: 44), control1: CGPoint(x: 23, y: 7), control2: CGPoint(x: 28, y: 27))
+        path.addCurve(to: CGPoint(x: 51, y: 59), control1: CGPoint(x: 38, y: 61), control2: CGPoint(x: 44, y: 64))
+        path.move(to: CGPoint(x: 21, y: 8))
+        path.addCurve(to: CGPoint(x: 33, y: 5), control1: CGPoint(x: 25, y: 3), control2: CGPoint(x: 29, y: 3))
+        path.addCurve(to: CGPoint(x: 51, y: 44), control1: CGPoint(x: 41, y: 9), control2: CGPoint(x: 46, y: 30))
+        path.addCurve(to: CGPoint(x: 69, y: 54), control1: CGPoint(x: 56, y: 60), control2: CGPoint(x: 63, y: 63))
+        path.addCurve(to: CGPoint(x: 79, y: 26), control1: CGPoint(x: 76, y: 44), control2: CGPoint(x: 77, y: 33))
+        path.move(to: CGPoint(x: 41, y: 4))
+        path.addCurve(to: CGPoint(x: 58, y: 13), control1: CGPoint(x: 47, y: 1), control2: CGPoint(x: 53, y: 4))
+        path.addCurve(to: CGPoint(x: 67, y: 44), control1: CGPoint(x: 63, y: 23), control2: CGPoint(x: 64, y: 34))
+        path.addCurve(to: CGPoint(x: 94, y: 26), control1: CGPoint(x: 75, y: 65), control2: CGPoint(x: 88, y: 61))
+        return path.applying(CGAffineTransform(scaleX: rect.width / 100, y: rect.height / 65))
+            .applying(CGAffineTransform(translationX: rect.minX, y: rect.minY))
     }
 }

@@ -23,6 +23,7 @@ nonisolated struct AudioTrackInfo {
     var formatName: String?
     /// MusicKit 的音质标签；不代替实际采样率、位深或编码格式。
     var qualitySummary: String?
+    var qualityIsLossless = false
     var sampleRate: Double?
     var bitDepth: Int?
     var bitRate: Double?

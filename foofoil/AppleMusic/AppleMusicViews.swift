@@ -260,19 +260,23 @@ struct AppleMusicModeView: View {
             AppKitPopupMenuButton(title: outputStatus, symbolName: "hifispeaker.2", items: outputMenuItems,
                                   tint: presentationInfo.artwork == nil ? .labelColor : .white)
                 .fixedSize()
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background {
+                    Capsule().fill(presentationInfo.artwork == nil ? Color.primary.opacity(0.08) : .black.opacity(0.45))
+                }
             if let error = output.error {
                 Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
             }
         }
         .font(.caption)
-        .shadow(color: .black.opacity(presentationInfo.artwork == nil ? 0 : 1), radius: 2)
-        .padding(14)
+        .padding(12)
     }
 
     private var outputStatus: String {
-        guard let device = output.selectedDevice else { return NSLocalizedString("System Output Device", comment: "") }
-        guard let rate = device.sampleRate else { return device.name }
-        return "\(device.name) · \(AudioMetadataLoader.formatSampleRate(rate))"
+        guard let device = output.selectedDevice else { return NSLocalizedString("System Audio", comment: "") }
+        let details = device.sampleRate.map { "\(device.name) · \(AudioMetadataLoader.formatSampleRate($0))" } ?? device.name
+        return String(format: NSLocalizedString("System Audio Status Format", comment: ""), details)
     }
 
     private var outputMenuItems: [AppKitPopupMenuButton.Item] {

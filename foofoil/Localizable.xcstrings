@@ -1,6 +1,38 @@
 {
   "sourceLanguage": "en",
   "strings": {
+  "System Audio": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "System Audio"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "系统音频"
+        }
+      }
+    }
+  },
+  "System Audio Status Format": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "System Audio (%@)"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "系统音频（%@）"
+        }
+      }
+    }
+  },
   "System Output Device": {
     "localizations": {
       "en": {

@@ -5,12 +5,17 @@ import MusicKit
 nonisolated enum AppleMusicAudioQuality {
     static func summary(current: AudioVariant?, available: [AudioVariant]?) -> String? {
         if let current, let label = label(current) {
-            return String(format: NSLocalizedString("Music Playing Quality Format", comment: ""), label)
+            return label
         }
         let order: [AudioVariant] = [.highResolutionLossless, .lossless, .dolbyAtmos, .dolbyAudio, .spatialAudio, .lossyStereo]
         let labels = order.filter { available?.contains($0) == true }.compactMap(label)
         guard !labels.isEmpty else { return nil }
         return String(format: NSLocalizedString("Music Available Quality Format", comment: ""), labels.joined(separator: " / "))
+    }
+
+    static func isLossless(current: AudioVariant?, available: [AudioVariant]?) -> Bool {
+        if let current { return current == .lossless || current == .highResolutionLossless }
+        return available?.contains { $0 == .lossless || $0 == .highResolutionLossless } ?? false
     }
 
     static func label(_ variant: AudioVariant) -> String? {

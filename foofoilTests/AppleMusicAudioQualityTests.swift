@@ -6,8 +6,7 @@ import Testing
 struct AppleMusicAudioQualityTests {
     @Test func currentPlaybackQualityTakesPriorityOverAvailableHiRes() {
         let result = AppleMusicAudioQuality.summary(current: .lossyStereo, available: [.lossless, .highResolutionLossless])
-        #expect(result == String(format: NSLocalizedString("Music Playing Quality Format", comment: ""),
-                                NSLocalizedString("Music Quality Lossy Stereo", comment: "")))
+        #expect(result == NSLocalizedString("Music Quality Lossy Stereo", comment: ""))
         #expect(result?.contains("192") == false)
         #expect(result?.contains("Music Playing Quality Format") == false)
         #expect(AppleMusicAudioQuality.label(.lossyStereo)?.contains("Music Quality") == false)
@@ -21,6 +20,16 @@ struct AppleMusicAudioQualityTests {
         info.qualitySummary = result
         #expect(info.sampleRate == nil && info.bitDepth == nil && info.bitRate == nil && info.channelCount == nil)
         #expect(info.formatName == nil)
+    }
+
+    @Test func losslessMarkFollowsActualQualityBeforeAvailableVersions() {
+        #expect(AppleMusicAudioQuality.isLossless(current: .lossless, available: nil))
+        #expect(AppleMusicAudioQuality.isLossless(current: .highResolutionLossless, available: nil))
+        #expect(!AppleMusicAudioQuality.isLossless(current: .lossyStereo, available: [.lossless]))
+        #expect(!AppleMusicAudioQuality.isLossless(current: .dolbyAtmos, available: [.highResolutionLossless]))
+        #expect(AppleMusicAudioQuality.isLossless(current: nil, available: [.lossless]))
+        #expect(!AppleMusicAudioQuality.isLossless(current: nil, available: nil))
+        #expect(AppleMusicAudioQuality.summary(current: .lossless, available: nil) == AppleMusicAudioQuality.label(.lossless))
     }
 
     @Test func unavailableMetadataDoesNotCreateQualityLabel() {

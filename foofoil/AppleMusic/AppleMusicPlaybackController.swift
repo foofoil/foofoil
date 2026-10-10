@@ -108,12 +108,15 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
         if entryChanged { availableAudioVariants = nil }
         let quality = AppleMusicAudioQuality.summary(current: player.state.audioVariant, available: availableAudioVariants)
         if info.qualitySummary != quality { info.qualitySummary = quality }
+        let isLossless = AppleMusicAudioQuality.isLossless(current: player.state.audioVariant, available: availableAudioVariants)
+        if info.qualityIsLossless != isLossless { info.qualityIsLossless = isLossless }
         guard entryChanged else { return }
         displayedEntryID = entry?.id
         artworkTask?.cancel()
         info = AudioTrackInfo.fallback(fileName: entry?.title ?? "Apple Music")
         info.artist = entry?.subtitle
         info.qualitySummary = quality
+        info.qualityIsLossless = isLossless
         fetchAvailableAudioVariants(for: entry)
         if case .song(let song) = entry?.item { info.album = song.albumTitle }
         MediaRemoteCommandCoordinator.shared.update(self, title: info.title)
