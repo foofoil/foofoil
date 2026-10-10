@@ -869,7 +869,21 @@ extension AppDelegate {
     public func application(_ application: NSApplication, open urls: [URL]) {
         var filePaths: [String] = []
         for url in urls {
-            if url.scheme == "foofoil" {
+            if let shared = SharedContentLink(url: url) {
+                didOpenFiles = true
+                NSApp.activate(ignoringOtherApps: true)
+                switch shared {
+                case .website(let website): openSharedWebsite(website)
+                case .text(let text):
+                    if let website = AppState.websiteURL(fromClipboardText: text) { openSharedWebsite(website) }
+                    else {
+                        let state = AppState()
+                        if AppState.looksLikeHTML(text) { _ = state.openHTML(text, originalName: NSLocalizedString("Clipboard Web Page", comment: "")) }
+                        else { state.openText(text, isMarkdown: AppState.looksLikeMarkdown(text)) }
+                        showNewWindow(with: state)
+                    }
+                }
+            } else if url.scheme == "foofoil" {
                 if url.host == "open-clipboard" {
                     NSApp.activate(ignoringOtherApps: true)
                     _ = openClipboardContentInNewWindow()
@@ -881,6 +895,11 @@ extension AppDelegate {
         if !filePaths.isEmpty {
             self.application(application, openFiles: filePaths)
         }
+    }
+
+    private func openSharedWebsite(_ url: URL) {
+        if AppleMusicLink(url: url) != nil { openAppleMusicLink(url) }
+        else { openWebURLInPreferredWindow(url) }
     }
 
     @objc func handleCreateNewFoofoilFromImage(_ notification: Notification) {

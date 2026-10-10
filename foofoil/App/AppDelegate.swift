@@ -72,7 +72,19 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     public func application(_ sender: NSApplication, openFiles filenames: [String]) {
         didOpenFiles = true
         let urls = filenames.map { URL(fileURLWithPath: $0) }
-        openFilesInNewFoil(urls)
+        if urls.contains(where: ShareStaging.isStaged) {
+            Task { @MainActor [weak self] in
+                do {
+                    let imported = try await Task.detached { try SharedFileImport.persist(urls) }.value
+                    self?.openFilesInNewFoil(imported)
+                } catch {
+                    let alert = NSAlert()
+                    alert.messageText = NSLocalizedString("Share Import Failed", comment: "")
+                    alert.informativeText = error.localizedDescription
+                    alert.runModal()
+                }
+            }
+        } else { openFilesInNewFoil(urls) }
     }
 
     /// 先建好新箔片作为目标，再走拖放管线：多文件分组时首个分组落入该箔片，

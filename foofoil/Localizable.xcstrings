@@ -1,6 +1,90 @@
 {
   "sourceLanguage": "en",
   "strings": {
+  "Share Menu Entry": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Open in foofoil"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "在浮箔中打开"
+        }
+      }
+    }
+  },
+  "Share Menu Entry Note": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Enable foofoil under Sharing in System Settings to open content from Finder, Preview, Apple Music, and other apps."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "在系统设置的共享列表中启用「浮箔」，即可从 Finder、预览、Apple Music 等应用打开内容。"
+        }
+      }
+    }
+  },
+  "Open Sharing Settings": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Open System Settings…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "打开系统设置…"
+        }
+      }
+    }
+  },
+  "Sharing Section": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Share Menu"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "共享菜单"
+        }
+      }
+    }
+  },
+  "Share Import Failed": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Unable to Save Shared Content"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法保存共享内容"
+        }
+      }
+    }
+  },
   "Music Open Shared Link": {
     "localizations": {
       "en": {

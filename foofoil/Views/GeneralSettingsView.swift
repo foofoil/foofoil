@@ -50,6 +50,26 @@ struct GeneralSettingsView: View {
             }
 
             Section {
+                HStack(alignment: .center, spacing: 12) {
+                    SettingsRowLabel(
+                        title: NSLocalizedString("Share Menu Entry", comment: ""),
+                        note: NSLocalizedString("Share Menu Entry Note", comment: "")
+                    )
+                    Spacer(minLength: 16)
+                    Button("Open Sharing Settings") {
+                        // 定位到共享扩展列表；启用开关由用户在系统设置中控制。
+                        let url = URL(string: "x-apple.systempreferences:com.apple.ExtensionsPreferences?extensionPointIdentifier=com.apple.share-services")!
+                        if !NSWorkspace.shared.open(url) {
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension")!)
+                        }
+                    }
+                    .fixedSize()
+                }
+            } header: {
+                Text(NSLocalizedString("Sharing Section", comment: ""))
+            }
+
+            Section {
                 SettingsPickerRow(
                     title: NSLocalizedString("Panel Side", comment: ""),
                     note: NSLocalizedString("Panel Side Note", comment: "")

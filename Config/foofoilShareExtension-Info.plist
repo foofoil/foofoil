@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>foofoil</string>
+	<key>CFBundleDisplayName</key>
+	<string>foofoil</string>
+	<key>CFBundlePackageType</key>
+	<string>XPC!</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>NSExtension</key>
+	<dict>
+		<key>NSExtensionPointIdentifier</key>
+		<string>com.apple.share-services</string>
+		<key>NSExtensionPrincipalClass</key>
+		<string>$(PRODUCT_MODULE_NAME).ShareViewController</string>
+		<key>NSExtensionAttributes</key>
+		<dict>
+			<key>NSExtensionActivationRule</key>
+			<!-- 具体类型按内容能力筛选；只有通用文件 URL 时保留入口，不把文件 URL 当作网页。 -->
+			<string>extensionItems.@count &gt; 0 AND SUBQUERY(extensionItems, $item, $item.attachments.@count &gt; 0 AND SUBQUERY($item.attachments, $attachment, (ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.image" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.movie" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.audio" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.adobe.pdf" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.text" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.json" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.xml" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.apple.property-list" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.yaml" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.apple.webarchive" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.folder" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "org.idpf.epub-container" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "app.foofoil.audio.dsf" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "app.foofoil.audio.dff" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.monkeysaudio.ape" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.goldenhawk.cdrwin-cuesheet" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.iso-image" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.microsoft.word.doc" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "org.openxmlformats.wordprocessingml.document" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.microsoft.excel.xls" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "org.openxmlformats.spreadsheetml.sheet" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.microsoft.powerpoint.ppt" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "org.openxmlformats.presentationml.presentation" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.apple.iwork.pages.pages" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.apple.iwork.numbers.numbers" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.apple.iwork.keynote.key" OR (ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.url" AND NOT (ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.file-url")) OR (ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.file-url" AND NOT (ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.archive" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.apple.disk-image-udif" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.apple.application-bundle" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "public.executable" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.apple.installer-package" OR ANY $attachment.registeredTypeIdentifiers UTI-CONFORMS-TO "com.apple.installer-package-archive")))).@count == $item.attachments.@count).@count == extensionItems.@count</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

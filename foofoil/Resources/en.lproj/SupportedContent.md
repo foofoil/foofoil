@@ -59,3 +59,9 @@ Only the current playback quality reported by MusicKit is shown. The quality bad
 Quick Open shows all sources without category tabs. Each group initially shows 12 results; More adds 18 at a time, up to 60 results across the view. The overview search retains its category filters and initial limits.
 
 Paste an Apple Music song, album, or public playlist sharing link into Quick Open to preview it and press Return to open a music foil. Open Clipboard Content also opens these links directly as music. Explicit links work when Apple Music library search is disabled; music access authorization and content availability in your region still apply. Shared content does not need to be added to your library and can be restored from history.
+
+Share menus in compatible macOS apps can open URLs, text, images, documents, audio, video, and folders in foofoil. Multiple attachments are passed together to the existing opening flow; temporary exported content is saved locally for history restoration. Apple Music links open music foils. The source app controls which content is supplied and macOS controls which share extensions are shown; enable foofoil in the system sharing extension settings if needed. The share extension accepts up to 100 attachments per invocation.
+
+You can open the system sharing settings directly from Settings > General > Share Menu and enable foofoil.
+
+The Share menu filters attachments with a known content type. Apps that supply only a generic file URL may still show foofoil. A mixed selection containing a known unsupported type hides the entry; ISO disc images remain available for SACD content.

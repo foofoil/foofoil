@@ -1,6 +1,13 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Folder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Folder" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "文件夹" } }
+      }
+    },
   "NSAppleMusicUsageDescription": {
     "extractionState": "manual",
     "localizations": {
