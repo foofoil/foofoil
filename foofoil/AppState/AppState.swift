@@ -195,6 +195,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         }
     }
     @Published var isNavigatorPanelExplicitlyVisible = false
+    /// 最近一次侧边栏模式切换的反馈，面板据此闪一下红框（始终显示）或灰框（自动）。
+    @Published var navigatorModeFeedback: NavigatorModeFeedback?
     let navigatorHover = NavigatorHoverState()
     var isNavigatorPanelHovered: Bool {
         get { navigatorHover.isPanelHovered }
@@ -208,9 +210,10 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     /// 调宽期间强制可见：拖拽中指针会随边缘移出面板，否则悬停判定会误把面板收起。
     var isFullScreenNavigatorVisible: Bool {
         isFullScreen && !navigatorContributions.isEmpty && !isNavigatorHiddenForVideoInactivity
-            && (navigatorPanelVisibilityMode == .always || isNavigatorPanelExplicitlyVisible
-                || isNavigatorPanelHovered || isNavigatorEdgeHovered || isNavigatorSearchActive
-                || isAdjustingNavigatorPanelWidth)
+            && (navigatorPanelVisibilityMode == .always
+                || (navigatorPanelVisibilityMode == .onHover
+                    && (isNavigatorPanelExplicitlyVisible || isNavigatorPanelHovered || isNavigatorEdgeHovered
+                        || isNavigatorSearchActive || isAdjustingNavigatorPanelWidth)))
     }
 
     var fullScreenNavigatorInset: CGFloat {
@@ -784,7 +787,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.extensionFallbackProviderID = nil
         self.extensionStateReference = nil
         self.navigatorPanelSide = SettingsStore.shared.navigatorPanelSide
-        self.navigatorPanelVisibilityMode = SettingsStore.shared.navigatorPanelVisibilityMode
+        // 侧边栏显示模式按箔保存：新箔默认自动，不继承其他箔的设置。
+        self.navigatorPanelVisibilityMode = .onHover
         self.navigatorPanelWidth = SettingsStore.shared.navigatorPanelWidth
         self.fileList = nil
         self.fileListRevision = 0

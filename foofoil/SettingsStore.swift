@@ -569,7 +569,6 @@ public class SettingsStore {
             Keys.isPinned: false,
             Keys.text: "",
             Keys.navigatorPanelSide: NavigatorPanelSide.left.rawValue,
-            Keys.navigatorPanelVisibilityMode: NavigatorPanelVisibilityMode.onHover.rawValue,
             Keys.navigatorPanelWidth: NavigatorPanelMetrics.defaultWidth,
             Keys.extensionAutoCheckUpdates: true,
             Keys.extensionAutoDownloadUpdates: false,
@@ -596,7 +595,6 @@ public class SettingsStore {
         static let windowConfigs = "windowConfigs"
         static let historyConfigs = "historyConfigs"
         static let navigatorPanelSide = "navigatorPanelSide"
-        static let navigatorPanelVisibilityMode = "navigatorPanelVisibilityMode"
         static let navigatorPanelWidth = "navigatorPanelWidth"
         static let preferredProvidersByDomain = "preferredProvidersByDomain"
         static let extensionAutoCheckUpdates = "extensionAutoCheckUpdates"
@@ -673,18 +671,6 @@ public class SettingsStore {
         }
     }
 
-    var navigatorPanelVisibilityMode: NavigatorPanelVisibilityMode {
-        get {
-            NavigatorPanelVisibilityMode(
-                rawValue: userDefaults.string(forKey: Keys.navigatorPanelVisibilityMode) ?? ""
-            ) ?? .onHover
-        }
-        set {
-            guard newValue != navigatorPanelVisibilityMode else { return }
-            userDefaults.set(newValue.rawValue, forKey: Keys.navigatorPanelVisibilityMode)
-            NotificationCenter.default.post(name: .navigatorPanelVisibilityModeDidChange, object: nil)
-        }
-    }
 
     public var startupBehavior: StartupBehavior {
         get {

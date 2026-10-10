@@ -2630,35 +2630,18 @@
         }
       }
     },
-    "Always Show": {
-      "extractionState": "manual",
+    "Cycle Navigator Visibility": {
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Always Show"
+            "value": "Cycle Navigator Visibility"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "始终显示"
-          }
-        }
-      }
-    },
-    "Always Show Navigator": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Always Show Navigator"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "始终显示导航面板"
+            "value": "循环切换导航面板显示"
           }
         }
       }
@@ -8404,53 +8387,36 @@
         }
       }
     },
-    "Visibility Mode": {
+    "Visibility Mode Automatic": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Visibility Mode"
+            "value": "Automatic"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "显示模式"
+            "value": "自动"
           }
         }
       }
     },
-    "Visibility Mode Note": {
+    "Visibility Mode Hidden": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "How the navigator panel appears and hides."
+            "value": "Hidden"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "控制鼠标指针移入移出时导航面板的显隐行为。"
-          }
-        }
-      }
-    },
-    "Visibility Mode On Hover": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Expand on Hover"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "鼠标悬停时展开"
+            "value": "不显示"
           }
         }
       }

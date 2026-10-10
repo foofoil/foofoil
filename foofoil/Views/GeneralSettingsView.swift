@@ -13,7 +13,6 @@ struct GeneralSettingsView: View {
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @State private var startupBehavior = SettingsStore.shared.startupBehavior
     @State private var navigatorPanelSide = SettingsStore.shared.navigatorPanelSide
-    @State private var navigatorPanelVisibilityMode = SettingsStore.shared.navigatorPanelVisibilityMode
     @State private var isFileSearchAuthorized = SpotlightSearchAccess.shared.isAuthorized
     @State private var appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
     @State private var appleMusicSearchEnabled = SettingsStore.shared.appleMusicSearchEnabled
@@ -81,15 +80,6 @@ struct GeneralSettingsView: View {
                     }
                 }
 
-                SettingsPickerRow(
-                    title: NSLocalizedString("Visibility Mode", comment: ""),
-                    note: NSLocalizedString("Visibility Mode Note", comment: "")
-                ) {
-                    Picker("", selection: $navigatorPanelVisibilityMode) {
-                        Text(NSLocalizedString("Visibility Mode On Hover", comment: "")).tag(NavigatorPanelVisibilityMode.onHover)
-                        Text(NSLocalizedString("Visibility Mode Always", comment: "")).tag(NavigatorPanelVisibilityMode.always)
-                    }
-                }
             } header: {
                 Text(NSLocalizedString("Navigator Section", comment: ""))
             }
@@ -147,7 +137,6 @@ struct GeneralSettingsView: View {
             launchAtLogin = LaunchAtLogin.isEnabled
             startupBehavior = SettingsStore.shared.startupBehavior
             navigatorPanelSide = SettingsStore.shared.navigatorPanelSide
-            navigatorPanelVisibilityMode = SettingsStore.shared.navigatorPanelVisibilityMode
             isFileSearchAuthorized = SpotlightSearchAccess.shared.isAuthorized
             appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
             appleMusicSearchEnabled = SettingsStore.shared.appleMusicSearchEnabled
@@ -158,9 +147,6 @@ struct GeneralSettingsView: View {
         }
         .onChange(of: navigatorPanelSide) { _, value in
             SettingsStore.shared.navigatorPanelSide = value
-        }
-        .onChange(of: navigatorPanelVisibilityMode) { _, value in
-            SettingsStore.shared.navigatorPanelVisibilityMode = value
         }
         .onChange(of: appleMusicSearchEnabled) { _, value in
             guard appleMusicLibraryEnabled else { return }

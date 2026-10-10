@@ -1752,7 +1752,13 @@ struct FoofoilTests {
         )
     }
 
-    @Test func navigatorMenuUsesAlwaysShowToggle() throws {
+    @Test func navigatorVisibilityModeCyclesThroughThreeStates() {
+        #expect(NavigatorPanelVisibilityMode.always.next == .onHover)
+        #expect(NavigatorPanelVisibilityMode.onHover.next == .hidden)
+        #expect(NavigatorPanelVisibilityMode.hidden.next == .always)
+    }
+
+    @Test func navigatorMenuUsesVisibilitySubmenu() throws {
         let appDelegate = AppDelegate()
         appDelegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))
 
@@ -1763,33 +1769,34 @@ struct FoofoilTests {
             return
         }
 
-        // 导航面板两项直接放在视图菜单一层，不再有子菜单。
-        #expect(viewMenu.items.contains { $0.submenu?.title == NSLocalizedString("Navigator", comment: "") } == false)
+        // 显示模式收进“导航面板”子菜单：循环切换项在顶部，其后是三个单选模式。
+        let navigatorSubmenu = try #require(viewMenu.items.first {
+            $0.submenu?.title == NSLocalizedString("Navigator", comment: "")
+        }?.submenu)
+        let cycle = try #require(navigatorSubmenu.items.first { $0.action == #selector(AppDelegate.toggleNavigatorPanelAction) })
+        #expect(cycle.title == NSLocalizedString("Cycle Navigator Visibility", comment: ""))
+        #expect(cycle.keyEquivalent == "l")
+        #expect(cycle.keyEquivalentModifierMask == [.command, .shift])
+        #expect(appDelegate.validateMenuItem(cycle) == false)
+        #expect(cycle.state == .off)
 
-        let alwaysShow = try #require(viewMenu.items.first { $0.action == #selector(AppDelegate.toggleNavigatorPanelAction) })
-        #expect(alwaysShow.title == NSLocalizedString("Always Show Navigator", comment: ""))
-        #expect(alwaysShow.keyEquivalent == "l")
-        #expect(alwaysShow.keyEquivalentModifierMask == [.command, .shift])
-        #expect(appDelegate.validateMenuItem(alwaysShow) == false)
-        #expect(alwaysShow.state == .off)
+        let modes = navigatorSubmenu.items.filter { $0.action == #selector(AppDelegate.setNavigatorVisibilityModeAction(_:)) }
+        #expect(modes.compactMap { $0.representedObject as? String } == ["always", "onHover", "hidden"])
+        #expect(modes.allSatisfy { appDelegate.validateMenuItem($0) == false })
 
         // 挂左/挂右两项合并为单个换边动作，⌘⌥L 触发。
         let moveSide = try #require(viewMenu.items.first { $0.action == #selector(AppDelegate.moveNavigatorToOppositeSideAction) })
         #expect(moveSide.keyEquivalent == "l")
         #expect(moveSide.keyEquivalentModifierMask == [.command, .option])
 
-        // 换边项紧跟总显开关，中间不插分割线。
-        if let alwaysIndex = viewMenu.items.firstIndex(of: alwaysShow),
+        // 换边项紧跟导航子菜单，中间不插分割线。
+        if let submenuIndex = viewMenu.items.firstIndex(where: { $0.submenu === navigatorSubmenu }),
            let moveIndex = viewMenu.items.firstIndex(of: moveSide) {
-            #expect(moveIndex == alwaysIndex + 1)
+            #expect(moveIndex == submenuIndex + 1)
         }
 
         #expect(viewMenu.items.contains { $0.title == NSLocalizedString("Toggle Navigator", comment: "") } == false)
         #expect(viewMenu.items.contains { $0.title == NSLocalizedString("Show Navigator on Hover", comment: "") } == false)
-        #expect(viewMenu.items.contains {
-            $0.title == NSLocalizedString("Always Show Navigator", comment: "")
-                && $0.action != #selector(AppDelegate.toggleNavigatorPanelAction)
-        } == false)
     }
 
     @Test func testWebModeMenuItemsInFileAndEditMenu() {

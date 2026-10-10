@@ -23,11 +23,14 @@ extension AppDelegate {
     func applyKeyboardShortcuts(to menu: NSMenu?) {
         guard let menu else { return }
         for item in menu.items {
-            guard let identifier = item.representedObject as? String,
-                  let definition = KeyboardShortcutCatalog.definition(withID: identifier) else { continue }
-            let shortcut = KeyboardShortcutStore.shared.shortcut(for: definition)
-            item.keyEquivalent = shortcut?.keyEquivalent ?? ""
-            item.keyEquivalentModifierMask = shortcut?.modifiers ?? []
+            if let identifier = item.representedObject as? String,
+               let definition = KeyboardShortcutCatalog.definition(withID: identifier) {
+                let shortcut = KeyboardShortcutStore.shared.shortcut(for: definition)
+                item.keyEquivalent = shortcut?.keyEquivalent ?? ""
+                item.keyEquivalentModifierMask = shortcut?.modifiers ?? []
+            }
+            // 子菜单（如侧边栏）中的命令同样需要套用快捷键配置。
+            applyKeyboardShortcuts(to: item.submenu)
         }
     }
 

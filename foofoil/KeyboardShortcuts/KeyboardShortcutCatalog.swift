@@ -105,7 +105,7 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("go.goToPage", "Go to Page Menu Item", "g", [.command], "Shortcut Scope PDF"),
         definition("go.previousItem", "Previous Item", "\u{F700}", [], "Shortcut Scope Lists"),
         definition("go.nextItem", "Next Item", "\u{F701}", [], "Shortcut Scope Lists"),
-        definition("view.toggleNavigator", "Always Show Navigator", "l", [.command, .shift], "Shortcut Scope Navigator"),
+        definition("view.toggleNavigator", "Cycle Navigator Visibility", "l", [.command, .shift], "Shortcut Scope Navigator"),
         definition("view.moveNavigatorSide", "Shortcut Switch Navigator Side", "l", [.command, .option], "Shortcut Scope Navigator")
     ]
 

@@ -135,16 +135,16 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             setMenuItem(withAction: #selector(fitImageToWindowWidthAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(zoomOutWindowAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(zoomInWindowAction), in: menu, isHidden: true)
-            setMenuItem(withAction: #selector(toggleNavigatorPanelAction), in: menu, isHidden: true)
+            setNavigatorSubmenuHidden(true, in: menu)
             setMenuItem(withAction: #selector(moveNavigatorToOppositeSideAction), in: menu, isHidden: true)
             return
         }
 
         let isImageMode = appState.usesImagePresentation
         let isWebMode = appState.webURL != nil
-        // 子菜单已扁平进视图菜单，按 action 逐项控制导航面板两项的显隐。
+        // 导航子菜单与换边项随导航内容显隐。
         let navigatorItemsHidden = appState.navigatorContributions.isEmpty
-        setMenuItem(withAction: #selector(toggleNavigatorPanelAction), in: menu, isHidden: navigatorItemsHidden)
+        setNavigatorSubmenuHidden(navigatorItemsHidden, in: menu)
         setMenuItem(withAction: #selector(moveNavigatorToOppositeSideAction), in: menu, isHidden: navigatorItemsHidden)
 
         // 图片、网页、摄像头和音频箔均可切换视觉边框。
@@ -192,6 +192,13 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         if let item = menu.items.first(where: { $0.action == action }) {
             item.isHidden = isHidden
         }
+    }
+
+    /// 侧边栏子菜单整体显隐：其中的模式项都依赖导航内容存在，因此整组随之隐藏。
+    func setNavigatorSubmenuHidden(_ isHidden: Bool, in menu: NSMenu) {
+        menu.items.first { item in
+            item.submenu?.items.contains { $0.action == #selector(toggleNavigatorPanelAction) } == true
+        }?.isHidden = isHidden
     }
     public func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(hideCurrentFoilAction) {
@@ -292,12 +299,16 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             return false
         }
 
+        // 循环切换项不是勾选项，当前模式由下方单选项表示。
         if menuItem.action == #selector(toggleNavigatorPanelAction) {
-            guard let appState = activeAppState, !appState.navigatorContributions.isEmpty else {
-                menuItem.state = .off
-                return false
-            }
-            menuItem.state = appState.navigatorPanelVisibilityMode == .always ? .on : .off
+            guard let appState = activeAppState, !appState.navigatorContributions.isEmpty else { return false }
+            menuItem.state = .off
+            return true
+        }
+
+        if menuItem.action == #selector(setNavigatorVisibilityModeAction(_:)) {
+            guard let appState = activeAppState, !appState.navigatorContributions.isEmpty else { return false }
+            menuItem.state = menuItem.representedObject as? String == appState.navigatorPanelVisibilityMode.rawValue ? .on : .off
             return true
         }
 

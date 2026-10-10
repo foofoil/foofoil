@@ -18,6 +18,9 @@ struct NavigatorPanelView: View {
     /// 鼠标是否悬停在固定标题上，触发标题跑马灯。
     @State private var isHoveringNavigatorHeader = false
     @FocusState private var isSearchFieldFocused: Bool
+    /// 模式切换反馈的闪烁透明度，以及本视图已播放过的反馈 id。
+    @State private var feedbackOpacity = 0.0
+    @State private var playedFeedbackID: UUID?
 
     private struct VisibleRow: Identifiable {
         let item: NavigatorItem
@@ -72,6 +75,12 @@ struct NavigatorPanelView: View {
             resizeHandle
         }
         .clipShape(RoundedRectangle(cornerRadius: isFullScreenOverlay ? 0 : 12, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: isFullScreenOverlay ? 0 : 12, style: .continuous)
+                .strokeBorder(navigatorFeedbackColor, lineWidth: 2)
+                .opacity(feedbackOpacity)
+                .allowsHitTesting(false)
+        }
         .shadow(
             color: .black.opacity(isFullScreenOverlay ? 0.34 : 0.24),
             radius: isFullScreenOverlay ? 18 : 12,
@@ -86,11 +95,17 @@ struct NavigatorPanelView: View {
         // 空白处默认右键菜单；行与标题各自提供更具体的菜单覆盖此处。
         .contextMenu {
             if !contributions.isEmpty {
-                alwaysShowNavigatorMenuItem
+                navigatorVisibilityMenu
             }
             moveToOppositeSideMenuItem
         }
-        .onAppear { selectFirstContributionIfNeeded() }
+        .onAppear {
+            selectFirstContributionIfNeeded()
+            playNavigatorModeFeedbackIfNeeded()
+        }
+        .onChange(of: appState.navigatorModeFeedback) { _, _ in
+            playNavigatorModeFeedbackIfNeeded()
+        }
         .onChange(of: contributions.map(\.id)) { _, _ in
             selectFirstContributionIfNeeded()
         }
@@ -255,7 +270,7 @@ struct NavigatorPanelView: View {
         // 整条标题区命中悬停，与列表行的整行命中保持一致。
         .onHover { isHoveringNavigatorHeader = $0 }
         .contextMenu {
-            alwaysShowNavigatorMenuItem
+            navigatorVisibilityMenu
             moveToOppositeSideMenuItem
             if contribution.id == AppState.fileListNavigatorID {
                 Button {
@@ -267,28 +282,51 @@ struct NavigatorPanelView: View {
         }
     }
 
-    /// “始终显示”开关项：勾选状态即当前显示模式，切换写法与菜单栏同名命令一致。
-    private var alwaysShowNavigatorMenuItem: some View {
-        Toggle(
-            isOn: Binding(
-                get: { appState.navigatorPanelVisibilityMode == .always },
-                set: { enabled in
-                    let next: NavigatorPanelVisibilityMode = enabled ? .always : .onHover
-                    appState.navigatorPanelVisibilityMode = next
-                    SettingsStore.shared.navigatorPanelVisibilityMode = next
-                    if next != .always {
-                        appState.isNavigatorPanelExplicitlyVisible = false
-                    }
+    /// 显示模式子菜单，与视图菜单同构：循环切换项带快捷键，下面是三个单选模式。
+    private var navigatorVisibilityMenu: some View {
+        Menu(NSLocalizedString("Navigator", comment: "")) {
+            Button {
+                appState.cycleNavigatorPanelVisibilityMode()
+            } label: {
+                Label(
+                    NSLocalizedString("Cycle Navigator Visibility", comment: ""),
+                    systemImage: "sidebar.squares.leading"
+                )
+            }
+            // 挂在控件本身而非标题 Label 上，右键菜单才会渲染出快捷键提示；键位取自快捷键配置。
+            .optionalKeyboardShortcut(configuredShortcut("view.toggleNavigator"))
+            Divider()
+            Picker(
+                selection: Binding(
+                    get: { appState.navigatorPanelVisibilityMode },
+                    set: { appState.setNavigatorPanelVisibilityMode($0) }
+                )
+            ) {
+                ForEach([NavigatorPanelVisibilityMode.always, .onHover, .hidden], id: \.self) { mode in
+                    Text(mode.localizedTitle).tag(mode)
                 }
-            )
-        ) {
-            Label(
-                NSLocalizedString("Always Show", comment: ""),
-                systemImage: "sidebar.squares.leading"
-            )
+            } label: {
+                Text(NSLocalizedString("Navigator", comment: ""))
+            }
+            .labelsHidden()
+            .pickerStyle(.inline)
         }
-        // 挂在控件本身而非标题 Label 上，右键菜单才会渲染出快捷键提示；键位取自快捷键配置。
-        .optionalKeyboardShortcut(configuredShortcut("view.toggleNavigator"))
+    }
+
+    /// 模式切换反馈：始终显示为红框，自动为灰框，与置顶光晕的颜色约定一致。
+    private var navigatorFeedbackColor: Color {
+        appState.navigatorModeFeedback?.tone == .automatic ? Color(nsColor: .systemGray) : Color(nsColor: .systemRed)
+    }
+
+    /// 瞬间显色后渐隐，与置顶光晕的节奏一致；只播放刚发生的反馈，面板因悬停重新出现时不会重复闪烁。
+    private func playNavigatorModeFeedbackIfNeeded() {
+        guard let feedback = appState.navigatorModeFeedback, feedback.id != playedFeedbackID,
+              Date().timeIntervalSince(feedback.date) < 1.5 else { return }
+        playedFeedbackID = feedback.id
+        feedbackOpacity = 1
+        withAnimation(.easeOut(duration: 0.6)) {
+            feedbackOpacity = 0
+        }
     }
 
     /// 面板空白处与标题共用的右键菜单项：把面板挂到另一侧。

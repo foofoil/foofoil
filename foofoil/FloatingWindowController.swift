@@ -297,15 +297,6 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                 }
             }
             .store(in: &cancellables)
-        NotificationCenter.default.publisher(for: .navigatorPanelVisibilityModeDidChange)
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                guard let self else { return }
-                if self.appState.navigatorPanelVisibilityMode != SettingsStore.shared.navigatorPanelVisibilityMode {
-                    self.appState.navigatorPanelVisibilityMode = SettingsStore.shared.navigatorPanelVisibilityMode
-                }
-            }
-            .store(in: &cancellables)
     }
 
     required init?(coder: NSCoder) {
@@ -891,6 +882,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         guard !appState.navigatorContributions.isEmpty,
               !appState.isNavigatorHiddenForVideoInactivity else { return false }
         if appState.navigatorPanelVisibilityMode == .always { return true }
+        // 不显示模式不响应悬停与边缘触发，面板只能通过切换模式出现。
+        if appState.navigatorPanelVisibilityMode == .hidden { return false }
         // 调宽期间拖拽指针会随边缘移出面板，悬停判定会瞬时为 false；强制保持显示。
         if appState.isAdjustingNavigatorPanelWidth { return true }
         return appState.isNavigatorPanelExplicitlyVisible

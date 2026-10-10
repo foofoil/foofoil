@@ -348,16 +348,32 @@ extension AppDelegate {
         viewMenu.addItem(toggleFullScreenItem)
         viewMenu.addItem(NSMenuItem.separator())
 
-        // 导航面板两项直接放在视图菜单一层；换边项标题随当前侧动态更新（见 MenuValidation）。
-        let alwaysShowNavigatorItem = NSMenuItem(
-            title: NSLocalizedString("Always Show Navigator", comment: ""),
+        // 侧边栏显示模式收进子菜单：顶部为循环切换项（带快捷键），下面是三个单选模式；换边项仍在视图菜单一层。
+        let navigatorMenu = NSMenu(title: NSLocalizedString("Navigator", comment: ""))
+        let cycleNavigatorItem = NSMenuItem(
+            title: NSLocalizedString("Cycle Navigator Visibility", comment: ""),
             action: #selector(toggleNavigatorPanelAction),
             keyEquivalent: ""
         )
-        alwaysShowNavigatorItem.withSymbol("sidebar.squares.leading")
-        alwaysShowNavigatorItem.representedObject = "view.toggleNavigator"
-        alwaysShowNavigatorItem.target = self
-        viewMenu.addItem(alwaysShowNavigatorItem)
+        cycleNavigatorItem.withSymbol("sidebar.squares.leading")
+        cycleNavigatorItem.representedObject = "view.toggleNavigator"
+        cycleNavigatorItem.target = self
+        navigatorMenu.addItem(cycleNavigatorItem)
+        navigatorMenu.addItem(NSMenuItem.separator())
+        for mode in [NavigatorPanelVisibilityMode.always, .onHover, .hidden] {
+            let modeItem = NSMenuItem(
+                title: mode.localizedTitle,
+                action: #selector(setNavigatorVisibilityModeAction(_:)),
+                keyEquivalent: ""
+            )
+            modeItem.representedObject = mode.rawValue
+            modeItem.target = self
+            navigatorMenu.addItem(modeItem)
+        }
+        let navigatorMenuItem = NSMenuItem(title: NSLocalizedString("Navigator", comment: ""), action: nil, keyEquivalent: "")
+        navigatorMenuItem.withSymbol("sidebar.squares.leading")
+        navigatorMenuItem.submenu = navigatorMenu
+        viewMenu.addItem(navigatorMenuItem)
 
         let moveNavigatorSideItem = NSMenuItem(
             title: NSLocalizedString("Move Navigator to Right Side", comment: ""),

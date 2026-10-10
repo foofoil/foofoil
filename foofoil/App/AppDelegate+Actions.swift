@@ -841,14 +841,18 @@ extension AppDelegate {
         activeWindowController?.toggleFullScreen()
     }
 
+    /// 按 始终显示 → 自动 → 不显示 循环切换侧边栏模式。
     @objc func toggleNavigatorPanelAction() {
         guard let appState = activeAppState, !appState.navigatorContributions.isEmpty else { return }
-        let next: NavigatorPanelVisibilityMode = appState.navigatorPanelVisibilityMode == .always ? .onHover : .always
-        appState.navigatorPanelVisibilityMode = next
-        SettingsStore.shared.navigatorPanelVisibilityMode = next
-        if next != .always {
-            appState.isNavigatorPanelExplicitlyVisible = false
-        }
+        appState.cycleNavigatorPanelVisibilityMode()
+    }
+
+    /// 子菜单中的单选项：representedObject 为目标模式的原始值。
+    @objc func setNavigatorVisibilityModeAction(_ sender: NSMenuItem) {
+        guard let appState = activeAppState, !appState.navigatorContributions.isEmpty,
+              let raw = sender.representedObject as? String,
+              let mode = NavigatorPanelVisibilityMode(rawValue: raw) else { return }
+        appState.setNavigatorPanelVisibilityMode(mode)
     }
 
     /// 把导航面板移到另一侧；菜单栏 ⇧⌘L/⌥⌘L 家族中的换边动作，与面板右键菜单一致。

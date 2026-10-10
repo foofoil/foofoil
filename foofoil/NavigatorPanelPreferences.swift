@@ -19,8 +19,29 @@ nonisolated public enum NavigatorPanelSide: String, Codable, Sendable {
 }
 
 nonisolated public enum NavigatorPanelVisibilityMode: String, Codable, Sendable {
+    /// 自动：鼠标移入边缘或面板时显示，离开后收起。
     case onHover
+    /// 始终显示：嵌平全屏时占据内容空间。
     case always
+    /// 不显示：不因悬停显示，也不占据空间。
+    case hidden
+
+    /// 快捷键循环顺序：始终显示 → 自动 → 不显示 → 始终显示。
+    nonisolated var next: NavigatorPanelVisibilityMode {
+        switch self {
+        case .always: .onHover
+        case .onHover: .hidden
+        case .hidden: .always
+        }
+    }
+
+    nonisolated var localizedTitle: String {
+        switch self {
+        case .onHover: NSLocalizedString("Visibility Mode Automatic", comment: "")
+        case .always: NSLocalizedString("Visibility Mode Always", comment: "")
+        case .hidden: NSLocalizedString("Visibility Mode Hidden", comment: "")
+        }
+    }
 }
 
 nonisolated enum NavigatorPanelMetrics {

@@ -47,7 +47,8 @@ extension AppState {
 
     /// 进入搜索并聚焦输入框；没有可搜索列表时不改变状态。
     func beginNavigatorSearch() {
-        guard (activeNavigatorContribution?.items.count ?? 0) > Self.navigatorSearchMinimumItemCount else { return }
+        guard navigatorPanelVisibilityMode != .hidden,
+              (activeNavigatorContribution?.items.count ?? 0) > Self.navigatorSearchMinimumItemCount else { return }
         isNavigatorSearchActive = true
         navigatorSearchFocusRequest &+= 1
     }
