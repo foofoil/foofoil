@@ -52,4 +52,6 @@ Choose File → Open Apple Music Library to authorize music access and browse al
 
 Apple Music uses the same audio playback bar and side navigation list. The list supports track selection, previous/next item commands, and search when it contains more than 12 items. The playback mode button cycles through sequential, repeat queue, shuffle, and repeat one.
 
+All audio and video foils share one playback slot. Starting another foil pauses the previous output and waits for any exclusive device lease to be released.
+
 MusicKit audio quality labels are shown when available. Playing quality takes priority; available formats are labeled separately. Numeric source sample rate, bit depth, and bitrate are not exposed and are not inferred from quality labels.

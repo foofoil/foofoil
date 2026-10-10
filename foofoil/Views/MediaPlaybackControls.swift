@@ -62,6 +62,8 @@ final class VideoPlayerController: ObservableObject, MediaTransportControlling {
     private var fileDuration: CMTime = .invalid
     private var isHandlingEnd = false
     private var seekGeneration: UInt64 = 0
+    private var playbackGeneration: UInt64 = 0
+    private let playbackOwnerID = UUID()
     private var mediaTitle: String
     private let previousItemAction: @MainActor () -> Bool
     private let nextItemAction: @MainActor () -> Bool
@@ -135,6 +137,29 @@ final class VideoPlayerController: ObservableObject, MediaTransportControlling {
 
     func play() {
         playbackIntentHandler?(true)
+        playbackGeneration &+= 1
+        let generation = playbackGeneration
+        let requestToken = AudioPlaybackCoordinator.shared.request(ownerID: playbackOwnerID)
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let token = try await AudioPlaybackCoordinator.shared.acquire(
+                    ownerID: self.playbackOwnerID, requestToken: requestToken,
+                    pause: { [weak self] in self?.pause() },
+                    isCurrent: { [weak self] in self?.playbackGeneration == generation }
+                )
+                guard generation == self.playbackGeneration,
+                      AudioPlaybackCoordinator.shared.isCurrent(ownerID: self.playbackOwnerID, token: token) else { return }
+                self.startPlaybackNow()
+            } catch is CancellationError {
+                // 过期播放请求不再起播。
+            } catch {
+                NSLog("Video playback handoff failed: %@", error.localizedDescription)
+            }
+        }
+    }
+
+    private func startPlaybackNow() {
         MediaRemoteCommandCoordinator.shared.activate(self, title: mediaTitle)
         // 已播到结尾时再次播放从头开始。
         if duration > 0, currentTime >= duration - 0.05 {
@@ -162,6 +187,9 @@ final class VideoPlayerController: ObservableObject, MediaTransportControlling {
 
     /// 视图卸载或自然播完时停输出，不改写用户的播放/暂停意图。
     func stopOutput() {
+        AudioPlaybackCoordinator.shared.cancel(ownerID: playbackOwnerID)
+        playbackGeneration &+= 1
+        seekGeneration &+= 1
         player.pause()
         isPlaying = false
         MediaRemoteCommandCoordinator.shared.update(self)
@@ -223,9 +251,11 @@ final class VideoPlayerController: ObservableObject, MediaTransportControlling {
             DispatchQueue.main.async {
                 guard let self, self.seekGeneration == generation, finished else { return }
                 if thenPlay == true {
-                    self.player.play()
-                    self.isPlaying = true
-                    MediaRemoteCommandCoordinator.shared.update(self)
+                    guard AudioPlaybackCoordinator.shared.isOwner(self.playbackOwnerID) else {
+                        self.isHandlingEnd = false
+                        return
+                    }
+                    self.play()
                 } else if thenPlay == false {
                     self.stopOutput()
                 }
@@ -294,7 +324,8 @@ final class VideoPlayerController: ObservableObject, MediaTransportControlling {
         }
         apply(range)
         MediaRemoteCommandCoordinator.shared.activate(self, title: mediaTitle)
-        seek(to: 0, thenPlay: autoplay)
+        seek(to: 0, thenPlay: nil)
+        if autoplay { play() } else { stopOutput() }
     }
 
     func apply(_ range: MediaPlaybackRange?) {

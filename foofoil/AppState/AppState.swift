@@ -77,6 +77,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
                     try await ExtensionHost.shared.closeSessionAndWait(oldValue)
                     if let oldID { ExtensionHost.shared.releaseSession(extensionID: oldID) }
                 }
+                AudioPlaybackCoordinator.shared.cancel(ownerID: oldValue.id)
+                AudioPlaybackCoordinator.shared.retainPendingRelease(ownerID: oldValue.id, pending: pending)
                 ExclusivePlaybackCoordinator.shared.retainPendingRelease(
                     deviceID: oldValue.audioDeviceSelection?.selectedDeviceID,
                     ownerID: oldValue.id, pending: pending

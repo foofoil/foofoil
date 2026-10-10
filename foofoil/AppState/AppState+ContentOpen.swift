@@ -1096,7 +1096,10 @@ extension AppState {
                 NSLog("Extension media action rejected: \(error.localizedDescription)")
                 return
             }
-            if operation.mediaAction == .pause { exclusivePlaybackGeneration &+= 1 }
+            if operation.mediaAction == .pause {
+                exclusivePlaybackGeneration &+= 1
+                if let session = extensionSession { AudioPlaybackCoordinator.shared.cancel(ownerID: session.id) }
+            }
             // 写操作完成前不发起读取；写前已发出的读取由递增版本丢弃。
             if operation.mediaAction == .refresh, !extensionPlaybackPendingWrites.isEmpty { return }
             // refresh 是只读同步，不推进序号；其它动作递增序号，使过期回包在完成时被丢弃。
@@ -1105,6 +1108,9 @@ extension AppState {
             guard let currentSession = extensionSession else { return }
             let session = sessionByApplyingHostPlaybackSequence(currentSession)
             let commandGeneration = exclusivePlaybackGeneration
+            let claimsPlayback = operation.mediaAction == .play
+                || (operation.selectedDeviceID != nil && session.mediaPlayback?.state == .playing)
+            let requestToken = claimsPlayback ? AudioPlaybackCoordinator.shared.request(ownerID: session.id) : nil
             let isWrite = operation.mediaAction != .refresh
             if isWrite { extensionPlaybackPendingWrites.insert(operationVersion) }
             Task { @MainActor [weak self] in
@@ -1117,6 +1123,24 @@ extension AppState {
                     let deviceID = isDeviceChange
                         ? operation.selectedDeviceID
                         : session.audioDeviceSelection?.selectedDeviceID
+                    if isStart || isDeviceChange {
+                        _ = try await AudioPlaybackCoordinator.shared.acquire(
+                            ownerID: session.id, requestToken: requestToken,
+                            pause: { [weak self] in
+                                if let self, self.extensionSession?.id == session.id {
+                                    try await self.pauseExtensionForExclusiveHandoff(sessionID: session.id)
+                                } else {
+                                    try await ExtensionHost.shared.closeSessionAndWait(session)
+                                }
+                                try await ExclusivePlaybackCoordinator.shared.releasePendingOutputs(ownerID: session.id)
+                            },
+                            isCurrent: { [weak self] in
+                                self?.extensionSession?.id == session.id
+                                    && self?.exclusivePlaybackGeneration == commandGeneration
+                                    && self?.extensionPlaybackOperationVersion == operationVersion
+                            }
+                        )
+                    }
                     let needsHandoff = ExtensionPlaybackSupport.requiresExclusiveHandoff(session)
                         || (isDeviceChange && ExtensionPlaybackSupport.usesDeviceService(session))
                     if needsHandoff, (isStart || isDeviceChange), let deviceID {

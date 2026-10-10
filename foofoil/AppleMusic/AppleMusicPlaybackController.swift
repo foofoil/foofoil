@@ -25,6 +25,11 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
     let supportsPlaybackModeControl = true
     private var timer: Timer?
     private var loadingTask: Task<Void, Never>?
+    private var playbackTask: Task<Void, Never>?
+    private var skipTask: Task<Void, Never>?
+    private let playbackOwnerID = UUID()
+    private var playbackGeneration: UInt64 = 0
+    private var loadedSelection: (item: AppleMusicLibraryItem, track: Track?, mode: MediaPlaybackMode)?
     private var artworkTask: Task<Void, Never>?
     private var qualityTask: Task<Void, Never>?
     private var availableAudioVariants: [AudioVariant]?
@@ -44,7 +49,17 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
 
     func load(_ item: AppleMusicLibraryItem, startingAt track: Track? = nil, playbackMode: MediaPlaybackMode = .sequentialLoop) {
         startObserving()
+        playbackGeneration &+= 1
+        let generation = playbackGeneration
+        let requestToken = AudioPlaybackCoordinator.shared.request(ownerID: playbackOwnerID)
+        loadedSelection = (item, track, playbackMode)
+        let precedingLoad = loadingTask
+        let precedingPlayback = playbackTask
+        let precedingSkip = skipTask
         loadingTask?.cancel()
+        playbackTask?.cancel()
+        skipTask?.cancel()
+        player.pause()
         artworkTask?.cancel()
         qualityTask?.cancel()
         availableAudioVariants = nil
@@ -58,7 +73,12 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
         loadingTask = Task { [weak self] in
             guard let self else { return }
             defer { if !Task.isCancelled { self.isLoading = false } }
+            // MusicKit 的 prepare/play/skip 按调用顺序执行，避免同一应用播放器并发替换队列。
+            await precedingLoad?.value
+            await precedingPlayback?.value
+            await precedingSkip?.value
             do {
+                try Task.checkCancellation()
                 AppleMusicLibrary.shared.refreshAuthorization()
                 guard AppleMusicLibrary.shared.isAuthorized else {
                     self.error = NSLocalizedString("Music Authorization Required", comment: "")
@@ -70,19 +90,22 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
                     self.error = NSLocalizedString("Music No Playable Tracks", comment: "")
                     return
                 }
+                let token = try await self.acquirePlayback(generation: generation, requestToken: requestToken)
+                try Task.checkCancellation()
+                // 先完成其它音频的暂停/设备释放，再让 MusicKit 准备系统输出。
                 // 本地导入曲目不依赖订阅；订阅歌曲的资格由 MusicKit 在播放时检查。
                 self.player.queue = ApplicationMusicPlayer.Queue(for: tracks, startingAt: track)
                 self.applyPlaybackMode(playbackMode)
                 // MusicKit 异步替换队列；准备完成前读取 entries 可能仍是上一张专辑。
                 try await self.player.prepareToPlay()
                 try Task.checkCancellation()
+                guard generation == self.playbackGeneration,
+                      AudioPlaybackCoordinator.shared.isCurrent(ownerID: self.playbackOwnerID, token: token) else { return }
                 self.isQueueReady = true
                 self.refresh()
-                try await self.player.play()
-                if !Task.isCancelled {
-                    MediaRemoteCommandCoordinator.shared.activate(self, title: item.title)
-                    self.refresh()
-                }
+                try await self.startPlayback(generation: generation, token: token)
+            } catch is CancellationError {
+                // 新输出或用户暂停已取代本次准备。
             } catch {
                 if !Task.isCancelled { self.error = error.localizedDescription }
             }
@@ -90,7 +113,11 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
     }
 
     private func refresh() {
-        let playing = player.state.playbackStatus == .playing
+        var playing = player.state.playbackStatus == .playing
+        if playing, !AudioPlaybackCoordinator.shared.isOwner(playbackOwnerID) {
+            player.pause()
+            playing = false
+        }
         if isPlaying != playing { isPlaying = playing }
         if !isScrubbing { currentTime = player.playbackTime }
         guard isQueueReady else { return }
@@ -155,15 +182,62 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
         }
     }
 
-    func play() {
-        startObserving()
-        Task {
-            do { try await player.play(); error = nil; refresh() }
-            catch { self.error = error.localizedDescription }
+    private func acquirePlayback(generation: UInt64, requestToken: UInt64) async throws -> UInt64 {
+        try await AudioPlaybackCoordinator.shared.acquire(
+            ownerID: playbackOwnerID, requestToken: requestToken,
+            pause: { [weak self] in self?.pause() },
+            isCurrent: { [weak self] in self?.playbackGeneration == generation }
+        )
+    }
+
+    private func startPlayback(generation: UInt64, token: UInt64) async throws {
+        guard generation == playbackGeneration,
+              AudioPlaybackCoordinator.shared.isCurrent(ownerID: playbackOwnerID, token: token) else { throw CancellationError() }
+        try Task.checkCancellation()
+        try await player.play()
+        // MusicKit 可能在取消后才返回；失去播放权时不能让迟到请求重新发声。
+        guard !Task.isCancelled, generation == playbackGeneration,
+              AudioPlaybackCoordinator.shared.isCurrent(ownerID: playbackOwnerID, token: token) else {
+            if !AudioPlaybackCoordinator.shared.isOwner(playbackOwnerID) { player.pause() }
+            refresh()
+            return
         }
+        error = nil
         MediaRemoteCommandCoordinator.shared.activate(self, title: info.title)
+        refresh()
+    }
+
+    func play() {
+        if !isQueueReady, let selection = loadedSelection {
+            load(selection.item, startingAt: selection.track, playbackMode: selection.mode)
+            return
+        }
+        startObserving()
+        playbackGeneration &+= 1
+        let generation = playbackGeneration
+        let requestToken = AudioPlaybackCoordinator.shared.request(ownerID: playbackOwnerID)
+        let precedingLoad = loadingTask
+        let precedingPlayback = playbackTask
+        let precedingSkip = skipTask
+        playbackTask?.cancel()
+        playbackTask = Task { [weak self] in
+            guard let self else { return }
+            await precedingLoad?.value
+            await precedingPlayback?.value
+            await precedingSkip?.value
+            do {
+                try Task.checkCancellation()
+                let token = try await self.acquirePlayback(generation: generation, requestToken: requestToken)
+                try await self.startPlayback(generation: generation, token: token)
+            } catch is CancellationError {
+                // 新播放或暂停已取代此请求。
+            } catch {
+                if !Task.isCancelled, generation == self.playbackGeneration { self.error = error.localizedDescription }
+            }
+        }
     }
     func stop() {
+        pause()
         timer?.invalidate()
         timer = nil
         loadingTask?.cancel()
@@ -174,7 +248,16 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
         refresh()
         MediaRemoteCommandCoordinator.shared.deactivate(self)
     }
-    func pause() { player.pause(); refresh() }
+    func pause() {
+        AudioPlaybackCoordinator.shared.cancel(ownerID: playbackOwnerID)
+        playbackGeneration &+= 1
+        loadingTask?.cancel()
+        playbackTask?.cancel()
+        skipTask?.cancel()
+        isLoading = false
+        player.pause()
+        refresh()
+    }
     func togglePlayPause() { isPlaying ? pause() : play() }
     func seek(to time: Double) { player.playbackTime = max(0, min(time, duration)); refresh() }
     func adjustTime(by delta: Double) { seek(to: player.playbackTime + delta) }
@@ -184,12 +267,25 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
     func playPreviousItem() -> Bool { skip(forward: false); return true }
     func playNextItem() -> Bool { skip(forward: true); return true }
     private func skip(forward: Bool) {
-        Task {
+        let generation = playbackGeneration
+        let precedingLoad = loadingTask
+        let precedingPlayback = playbackTask
+        let precedingSkip = skipTask
+        skipTask?.cancel()
+        skipTask = Task { [weak self] in
+            guard let self else { return }
+            await precedingLoad?.value
+            await precedingPlayback?.value
+            await precedingSkip?.value
             do {
-                if forward { try await player.skipToNextEntry() }
-                else { try await player.skipToPreviousEntry() }
-                refresh()
-            } catch { self.error = error.localizedDescription }
+                try Task.checkCancellation()
+                if forward { try await self.player.skipToNextEntry() }
+                else { try await self.player.skipToPreviousEntry() }
+                if !AudioPlaybackCoordinator.shared.isOwner(self.playbackOwnerID) { self.player.pause() }
+                self.refresh()
+            } catch {
+                if !Task.isCancelled, generation == self.playbackGeneration { self.error = error.localizedDescription }
+            }
         }
     }
     /// 直接选择已有队列项，保留队列身份和重复歌曲的位置。

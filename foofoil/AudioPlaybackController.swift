@@ -80,6 +80,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     private var exclusiveIORefreshGeneration: UInt64 = 0
     /// 同控制器发往设备服务的命令尾链，保证暂停释放先于获取到达扩展侧。
     private var deviceCommandTail: Task<Void, Never>?
+    private var routeTask: Task<Void, Never>?
     private var progressTimer: Timer?
     private var observers: [NSObjectProtocol] = []
     private var systemDevicesListener: AudioObjectPropertyListenerBlock?
@@ -226,27 +227,42 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     func play() {
         playbackIntentHandler?(true)
         guard audioFile != nil, segmentFrames > 0 else { return }
-        NSLog(
-            "AudioPlaybackController play resumed=%d selected=%@ lease=%@ sr=%.0f",
-            isPlaying, selectedOutputDeviceID ?? "-",
-            activeLeaseClientID?.uuidString ?? "-", sampleRate
-        )
-        if ExtensionHost.shared.isAudioDeviceServiceAvailable {
-            // 同一独占租约内切歌直接重排：跳过异步设备命令与协调器往返，缩短曲间间隙；
-            // 采样率变化或租约不在时仍走完整准备流程。
-            if let deviceID = selectedOutputDeviceID,
-               isLeaseReusable(deviceID: deviceID),
-               engineStorage != nil {
-                routeGeneration &+= 1
-                schedule(from: currentTime, play: true, keepsLeaseOnFailure: true)
-                return
+        routeGeneration &+= 1
+        let generation = routeGeneration
+        let ownerID = deviceServiceClientID
+        let requestToken = AudioPlaybackCoordinator.shared.request(ownerID: ownerID)
+        routeTask = Task { [weak self] in
+            guard let self else { return }
+            do {
+                _ = try await AudioPlaybackCoordinator.shared.acquire(
+                    ownerID: ownerID, requestToken: requestToken,
+                    pause: { [weak self] in
+                        let interrupted = self?.routeTask
+                        try await self?.pauseForExclusiveHandoff()
+                        // 在途设备准备也要完成取消与释放，不能让晚到的租约与 MusicKit 抢系统输出。
+                        await interrupted?.value
+                        await self?.deviceCommandTail?.value
+                        try await ExclusivePlaybackCoordinator.shared.releasePendingOutputs(ownerID: ownerID)
+                    },
+                    isCurrent: { [weak self] in self?.routeGeneration == generation }
+                )
+                guard generation == self.routeGeneration else { return }
+                if ExtensionHost.shared.isAudioDeviceServiceAvailable {
+                    if let deviceID = self.selectedOutputDeviceID,
+                       self.isLeaseReusable(deviceID: deviceID), self.engineStorage != nil {
+                        self.schedule(from: self.currentTime, play: true, keepsLeaseOnFailure: true)
+                    } else {
+                        await self.preparePreferredRouteAndPlay(generation: generation)
+                    }
+                } else {
+                    self.startPlaybackNow()
+                }
+            } catch is CancellationError {
+                // 后来的播放或暂停已取代此请求。
+            } catch {
+                self.deviceFailureMessage = error.localizedDescription
             }
-            routeGeneration &+= 1
-            let generation = routeGeneration
-            Task { await preparePreferredRouteAndPlay(generation: generation) }
-            return
         }
-        startPlaybackNow()
     }
 
     private func startPlaybackNow() {
@@ -266,6 +282,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     }
 
     func pause() {
+        AudioPlaybackCoordinator.shared.cancel(ownerID: deviceServiceClientID)
         playbackIntentHandler?(false)
         routeGeneration &+= 1
         stopOutput()
@@ -322,6 +339,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     }
 
     func closeOutput() {
+        AudioPlaybackCoordinator.shared.cancel(ownerID: deviceServiceClientID)
         refreshCurrentTime()
         scheduleGeneration &+= 1
         queuedSuccessor = nil
@@ -348,6 +366,12 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         let retained = ExclusivePlaybackCoordinator.shared.retainPendingRelease(
             deviceID: deviceID, ownerID: ownerID, pending: pending
         )
+        let interrupted = routeTask
+        AudioPlaybackCoordinator.shared.retainPendingRelease(ownerID: ownerID, pending: PendingOutputRelease {
+            await interrupted?.value
+            try await retained.release()
+            try await ExclusivePlaybackCoordinator.shared.releasePendingOutputs(ownerID: ownerID)
+        })
         enqueuePCMRelease(clientID: clientID) { _ in
             do {
                 try await retained.release()
@@ -363,7 +387,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         hasLoadedOutputPreference = true
         routeGeneration &+= 1
         let generation = routeGeneration
-        Task { await applySystemDefaultRoute(generation: generation) }
+        routeTask = Task { await applySystemDefaultRoute(generation: generation) }
     }
 
     func selectExclusiveOutput(deviceID: String) {
@@ -371,7 +395,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         let generation = routeGeneration
         selectedOutputDeviceID = deviceID
         hasLoadedOutputPreference = true
-        Task { await applyExclusiveRoute(deviceID: deviceID, generation: generation, resumesPlayback: isPlaying) }
+        routeTask = Task { await applyExclusiveRoute(deviceID: deviceID, generation: generation, resumesPlayback: isPlaying) }
     }
 
     func togglePlayPause() {
@@ -1554,6 +1578,13 @@ final class ExclusivePlaybackCoordinator {
     func releasePending(ownerID: UUID, pending: PendingOutputRelease) {
         for id in owners.keys.filter({ owners[$0]?.id == ownerID && owners[$0]?.pending === pending }) {
             owners.removeValue(forKey: id)
+        }
+    }
+
+    /// 系统输出也必须等先前关闭/暂停遗留的独占资源释放，不能仅凭播放器已暂停就起播。
+    func releasePendingOutputs(ownerID: UUID) async throws {
+        for id in owners.keys.filter({ owners[$0]?.id == ownerID && owners[$0]?.pending != nil }) {
+            try await releasePreviousOwnerIfNeeded(deviceID: id, ownerID: UUID())
         }
     }
 
