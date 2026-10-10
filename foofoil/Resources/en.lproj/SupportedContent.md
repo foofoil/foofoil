@@ -54,7 +54,7 @@ Apple Music uses the same audio playback bar and side navigation list. The list 
 
 All audio and video foils share one playback slot. Starting another foil pauses the previous output and waits for any exclusive device lease to be released.
 
-MusicKit audio quality labels are shown when available. Playing quality takes priority; available formats are labeled separately. Numeric source sample rate, bit depth, and bitrate are not exposed and are not inferred from quality labels.
+Only the current playback quality reported by MusicKit is shown. The quality badge is hidden when that information is unavailable; supported formats are not displayed. Numeric source sample rate, bit depth, and bitrate are not exposed and are not inferred from quality labels.
 
 Quick Open shows all sources without category tabs. Each group initially shows 12 results; More adds 18 at a time, up to 60 results across the view. The overview search retains its category filters and initial limits.
 

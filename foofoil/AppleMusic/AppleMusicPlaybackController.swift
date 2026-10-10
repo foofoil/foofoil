@@ -31,8 +31,6 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
     private var playbackGeneration: UInt64 = 0
     private var loadedSelection: (item: AppleMusicLibraryItem, track: Track?, mode: MediaPlaybackMode)?
     private var artworkTask: Task<Void, Never>?
-    private var qualityTask: Task<Void, Never>?
-    private var availableAudioVariants: [AudioVariant]?
     private var displayedEntryID: String?
     private var isQueueReady = false
 
@@ -61,8 +59,6 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
         skipTask?.cancel()
         player.pause()
         artworkTask?.cancel()
-        qualityTask?.cancel()
-        availableAudioVariants = nil
         displayedEntryID = nil
         info = AudioTrackInfo.fallback(fileName: item.title)
         info.artist = item.subtitle
@@ -132,10 +128,9 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
             if updated != navigator { navigator = updated }
         }
         let entryChanged = displayedEntryID != entry?.id
-        if entryChanged { availableAudioVariants = nil }
-        let quality = AppleMusicAudioQuality.summary(current: player.state.audioVariant, available: availableAudioVariants)
+        let quality = AppleMusicAudioQuality.summary(current: player.state.audioVariant)
         if info.qualitySummary != quality { info.qualitySummary = quality }
-        let isLossless = AppleMusicAudioQuality.isLossless(current: player.state.audioVariant, available: availableAudioVariants)
+        let isLossless = AppleMusicAudioQuality.isLossless(current: player.state.audioVariant)
         if info.qualityIsLossless != isLossless { info.qualityIsLossless = isLossless }
         guard entryChanged else { return }
         displayedEntryID = entry?.id
@@ -144,7 +139,6 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
         info.artist = entry?.subtitle
         info.qualitySummary = quality
         info.qualityIsLossless = isLossless
-        fetchAvailableAudioVariants(for: entry)
         if case .song(let song) = entry?.item { info.album = song.albumTitle }
         MediaRemoteCommandCoordinator.shared.update(self, title: info.title)
         guard let url = entry?.artwork?.url(width: 800, height: 800) else { return }
@@ -154,31 +148,6 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
                 guard !Task.isCancelled, let self else { return }
                 self.info.artwork = NSImage(data: data)
             } catch { /* 封面失败不影响播放，继续显示音乐占位图。 */ }
-        }
-    }
-
-    /// 每次换曲只补查一次扩展元数据；失败不影响播放，迟到响应不能覆盖新曲目。
-    private func fetchAvailableAudioVariants(for entry: MusicKit.MusicPlayer.Queue.Entry?) {
-        qualityTask?.cancel()
-        guard let entry, case .song(let song) = entry.item else { return }
-        if let variants = song.audioVariants { availableAudioVariants = variants }
-        qualityTask = Task { [weak self] in
-            do {
-                let detailed = try await song.with([.audioVariants])
-                guard !Task.isCancelled, let self, self.displayedEntryID == entry.id, self.isQueueReady else { return }
-                self.availableAudioVariants = detailed.audioVariants
-                #if DEBUG
-                NSLog("Apple Music audio metadata: playing=%@; available=%@", self.player.state.audioVariant?.description ?? "unavailable", detailed.audioVariants?.map(\.description).joined(separator: ", ") ?? "unavailable")
-                #endif
-                self.refresh()
-            } catch {
-                #if DEBUG
-                if !Task.isCancelled {
-                    NSLog("Apple Music audio metadata: extended attributes unavailable; playing=%@", self?.player.state.audioVariant?.description ?? "unavailable")
-                }
-                #endif
-                // 曲目未提供音质元数据时保留播放器标签，不推测音源规格。
-            }
         }
     }
 
@@ -242,7 +211,6 @@ final class AppleMusicPlaybackController: ObservableObject, MediaTransportContro
         timer = nil
         loadingTask?.cancel()
         artworkTask?.cancel()
-        qualityTask?.cancel()
         isLoading = false
         player.stop()
         refresh()
