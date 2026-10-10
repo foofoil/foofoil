@@ -6,6 +6,17 @@
 
 import SwiftUI
 
+private extension View {
+    /// 与圆角输入框相近的外观，使录制提示和键位文字与输入框位置、高度一致。
+    func searchSlotStyle() -> some View {
+        self
+            .padding(.horizontal, 6)
+            .frame(maxWidth: .infinity, minHeight: 22, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 5).fill(Color(nsColor: .textBackgroundColor)))
+            .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color(nsColor: .separatorColor)))
+    }
+}
+
 /// 快捷键配置面板：按分组列出可配置命令，点击右侧控件即可重新录制。
 /// 以后新增快捷键只需向 `KeyboardShortcutCatalog` 追加分组，界面自动扩展。
 struct KeyboardShortcutsSettingsView: View {
@@ -13,6 +24,8 @@ struct KeyboardShortcutsSettingsView: View {
     @State private var nameQuery = ""
     /// 按快捷键搜索的键位；nil 表示不按快捷键过滤。
     @State private var shortcutQuery: KeyboardShortcut?
+    /// 按键搜索正在录制：左侧输入框让位给录制提示。
+    @State private var isRecordingShortcut = false
 
     private var isFiltering: Bool {
         !nameQuery.trimmingCharacters(in: .whitespaces).isEmpty || shortcutQuery != nil
@@ -22,34 +35,45 @@ struct KeyboardShortcutsSettingsView: View {
         KeyboardShortcutCatalog.searchResults(nameQuery: nameQuery, shortcutQuery: shortcutQuery)
     }
 
+    /// 搜索栏左侧：录制时为呼吸的录制提示，已选键位时显示键位，否则为名称输入框。
+    @ViewBuilder
+    private var searchSlot: some View {
+        if isRecordingShortcut {
+            HStack(spacing: 6) {
+                Image(systemName: "record.circle")
+                    .foregroundStyle(.red)
+                    .symbolEffect(.breathe, options: .repeating)
+                Text(NSLocalizedString("Press Shortcut to Search", comment: ""))
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
+            .searchSlotStyle()
+        } else if let shortcutQuery {
+            Text(shortcutQuery.displayString)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .searchSlotStyle()
+        } else {
+            TextField(NSLocalizedString("Search Keyboard Shortcuts", comment: ""), text: $nameQuery)
+                .textFieldStyle(.roundedBorder)
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                TextField(NSLocalizedString("Search Keyboard Shortcuts", comment: ""), text: $nameQuery)
-                    .textFieldStyle(.roundedBorder)
-                // 按键搜索：录制一个键位，筛出当前使用该快捷键的命令；Delete 清除。
+            HStack(spacing: 4) {
+                searchSlot
+                // 按键搜索：键盘图标开始录制；录制中或已有键位时变为取消/清除。靠右对齐。
                 ShortcutRecorderView(
                     shortcut: shortcutQuery,
                     promptTitle: NSLocalizedString("Search by Keys", comment: ""),
                     helpText: NSLocalizedString("Search Shortcut Recorder Help", comment: ""),
-                    cancelClearsShortcut: true
+                    cancelClearsShortcut: true,
+                    idleSymbolName: "keyboard",
+                    onRecordingChange: { isRecordingShortcut = $0 }
                 ) { newValue in
                     shortcutQuery = newValue
                 }
-                .frame(width: 128)
-                // 已录键位时提供显式的取消入口；叉号固定占位，避免布局跳动。
-                Button {
-                    shortcutQuery = nil
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
-                .help(NSLocalizedString("Clear Shortcut Search", comment: ""))
-                .accessibilityLabel(NSLocalizedString("Clear Shortcut Search", comment: ""))
-                .frame(width: 20)
-                .opacity(shortcutQuery != nil ? 1 : 0)
-                .disabled(shortcutQuery == nil)
+                .fixedSize()
             }
             .padding(.horizontal, 20)
             .padding(.vertical, 10)

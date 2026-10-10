@@ -8547,6 +8547,20 @@
         "zh-Hans": { "stringUnit": { "state": "translated", "value": "搜索快捷键" } }
       }
     },
+    "Press Shortcut to Search": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Press a shortcut…" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请按下快捷键…" } }
+      }
+    },
+    "Cancel Shortcut Recording": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Cancel Shortcut Recording" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "取消录制快捷键" } }
+      }
+    },
     "Search by Keys": {
       "extractionState": "manual",
       "localizations": {
