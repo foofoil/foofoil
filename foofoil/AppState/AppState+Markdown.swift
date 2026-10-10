@@ -98,18 +98,32 @@ extension AppState {
                 let inlineCodeColor = isDark ? "#E6EDF3" : "#1F2328"
                 let inlineCodeBackground = isDark ? "#2A3038" : "#EFF1F3"
                 let quoteBackground = isDark ? "#1C232C" : "#F6F8FA"
+                let quoteBarColor = isDark ? "#2F5A8C" : "#8DB8EE"
                 let tableHeaderBackground = isDark ? "#212830" : "#F0F3F6"
                 let tableStripeBackground = isDark ? "#1B2129" : "#FAFBFC"
                 // AppKit 会把 blockquote 的 CSS 背景错误转换为逐行文字底色；单列表格能稳定生成有边界的原生富文本块。
                 var styledHTMLBody = Self.markCodeRanges(in: htmlBody)
+                // 引用标记必须落在首尾段落内部；放在 td 与 p 之间会变成独立空段，即上下多出的空行。
                 styledHTMLBody = styledHTMLBody
                     .replacingOccurrences(
-                        of: "<blockquote>",
-                        with: "<table class=\"markdown-quote\"><tr><td>\(MarkdownRenderMarker.quoteStart)"
+                        of: #"<blockquote>\s*<p>"#,
+                        with: "<table class=\"markdown-quote\"><tr><td><p>\(MarkdownRenderMarker.quoteStart)",
+                        options: .regularExpression
                     )
                     .replacingOccurrences(
-                        of: "</blockquote>",
-                        with: "\(MarkdownRenderMarker.quoteEnd)</td></tr></table>"
+                        of: #"</p>\s*</blockquote>"#,
+                        with: "\(MarkdownRenderMarker.quoteEnd)</p></td></tr></table>",
+                        options: .regularExpression
+                    )
+                    .replacingOccurrences(
+                        of: #"<blockquote>\s*"#,
+                        with: "<table class=\"markdown-quote\"><tr><td>\(MarkdownRenderMarker.quoteStart)",
+                        options: .regularExpression
+                    )
+                    .replacingOccurrences(
+                        of: #"\s*</blockquote>"#,
+                        with: "\(MarkdownRenderMarker.quoteEnd)</td></tr></table>",
+                        options: .regularExpression
                     )
                     .replacingOccurrences(of: "<p>", with: "<p>\(MarkdownRenderMarker.paragraphStart)")
                     .replacingOccurrences(of: "</p>", with: "\(MarkdownRenderMarker.paragraphEnd)</p>")
@@ -243,7 +257,7 @@ extension AppState {
                 }
                 table.markdown-quote {
                     width: 100%;
-                    margin: 0.85em 0 1em 0;
+                    margin: 0;
                     border-collapse: collapse;
                     font-size: 1em;
                     line-height: 1.55;
@@ -253,7 +267,7 @@ extension AppState {
                     color: \(secondaryTextColor);
                     background-color: \(quoteBackground);
                     border: 0;
-                    border-left: 3px solid \(accentColor);
+                    border-left: 4px solid \(quoteBarColor);
                 }
                 table.markdown-quote p:last-child {
                     margin-bottom: 0;
@@ -517,7 +531,9 @@ extension AppState {
                 style.maximumLineHeight = 0
                 style.lineSpacing = 0
                 style.lineHeightMultiple = 1.55
-                style.paragraphSpacing = max(style.paragraphSpacing, fontSize * 0.65)
+                // 引用块上下留白由单元格内边距决定，段距不能撑出边框之外。
+                style.paragraphSpacing = 0
+                style.paragraphSpacingBefore = 0
             }
         }
 
