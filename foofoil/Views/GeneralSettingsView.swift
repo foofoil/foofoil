@@ -15,6 +15,7 @@ struct GeneralSettingsView: View {
     @State private var navigatorPanelSide = SettingsStore.shared.navigatorPanelSide
     @State private var navigatorPanelVisibilityMode = SettingsStore.shared.navigatorPanelVisibilityMode
     @State private var isFileSearchAuthorized = SpotlightSearchAccess.shared.isAuthorized
+    @State private var appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
     @State private var appleMusicSearchEnabled = SettingsStore.shared.appleMusicSearchEnabled
     @ObservedObject private var musicLibrary = AppleMusicLibrary.shared
 
@@ -53,7 +54,7 @@ struct GeneralSettingsView: View {
                 HStack(alignment: .center, spacing: 12) {
                     SettingsRowLabel(
                         title: NSLocalizedString("Share Menu Entry", comment: ""),
-                        note: NSLocalizedString("Share Menu Entry Note", comment: "")
+                        note: NSLocalizedString(appleMusicLibraryEnabled ? "Share Menu Entry Music Note" : "Share Menu Entry Note", comment: "")
                     )
                     Spacer(minLength: 16)
                     Button("Open Sharing Settings") {
@@ -122,16 +123,18 @@ struct GeneralSettingsView: View {
                         note: NSLocalizedString("Enable Local Search Index Note", comment: "")
                     )
                 }
-                Toggle(isOn: $appleMusicSearchEnabled) {
-                    SettingsRowLabel(
-                        title: NSLocalizedString("Music Enable Search", comment: ""),
-                        note: NSLocalizedString("Music Search Settings Note", comment: "")
-                    )
-                }
-                if appleMusicSearchEnabled && !musicLibrary.isAuthorized {
-                    Button("Music Authorize") { Task { await musicLibrary.authorize() } }
-                    if musicLibrary.authorization == .denied || musicLibrary.authorization == .restricted {
-                        Text("Music Authorization Denied").font(.caption).foregroundStyle(.secondary)
+                if appleMusicLibraryEnabled {
+                    Toggle(isOn: $appleMusicSearchEnabled) {
+                        SettingsRowLabel(
+                            title: NSLocalizedString("Music Enable Search", comment: ""),
+                            note: NSLocalizedString("Music Search Settings Note", comment: "")
+                        )
+                    }
+                    if appleMusicSearchEnabled && !musicLibrary.isAuthorized {
+                        Button("Music Authorize") { Task { await musicLibrary.authorize() } }
+                        if musicLibrary.authorization == .denied || musicLibrary.authorization == .restricted {
+                            Text("Music Authorization Denied").font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
             } header: {
@@ -146,8 +149,9 @@ struct GeneralSettingsView: View {
             navigatorPanelSide = SettingsStore.shared.navigatorPanelSide
             navigatorPanelVisibilityMode = SettingsStore.shared.navigatorPanelVisibilityMode
             isFileSearchAuthorized = SpotlightSearchAccess.shared.isAuthorized
+            appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
             appleMusicSearchEnabled = SettingsStore.shared.appleMusicSearchEnabled
-            musicLibrary.refreshAuthorization()
+            if appleMusicLibraryEnabled { musicLibrary.refreshAuthorization() }
         }
         .onChange(of: startupBehavior) { _, value in
             SettingsStore.shared.startupBehavior = value
@@ -159,9 +163,11 @@ struct GeneralSettingsView: View {
             SettingsStore.shared.navigatorPanelVisibilityMode = value
         }
         .onChange(of: appleMusicSearchEnabled) { _, value in
+            guard appleMusicLibraryEnabled else { return }
             SettingsStore.shared.appleMusicSearchEnabled = value
         }
         .onReceive(NotificationCenter.default.publisher(for: .appleMusicSearchDidChange)) { _ in
+            appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
             appleMusicSearchEnabled = SettingsStore.shared.appleMusicSearchEnabled
         }
         .onReceive(NotificationCenter.default.publisher(for: .spotlightSearchAuthorizationDidChange)) { _ in

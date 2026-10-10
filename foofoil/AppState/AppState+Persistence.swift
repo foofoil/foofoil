@@ -17,7 +17,11 @@ import FoofoilExtensionKit
 
 extension AppState {
         public func saveState() {
-            guard !isBatchUpdating, !isAdjustingDocumentStyling else { return }
+            guard !isFileOpenFeedback, !isBatchUpdating, !isAdjustingDocumentStyling else { return }
+            if hasOpenedContent || appleMusicReference != nil {
+                if !fileOpenFeedback.isEmpty { fileOpenFeedback = [] }
+                closesEmptyWindowAfterFileOpenFailure = false
+            }
             let config = toConfig()
             let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
             if appleMusicReference != nil || isCamera || imageURL != nil || webURL != nil || textURL != nil || extensionSession != nil || !trimmedText.isEmpty {

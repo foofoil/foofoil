@@ -190,7 +190,8 @@ final class FoilExposeModel: ObservableObject {
     /// 有关键字时只保留标题匹配项。
     private var matchedFoilItems: [FoilExposeItem] {
         let openIDs = Set(items.map(\.id))
-        let combined = items + historyItems.filter { !openIDs.contains($0.id) }
+        let combined = (items + historyItems.filter { !openIDs.contains($0.id) })
+            .filter { SettingsStore.shared.appleMusicLibraryEnabled || $0.symbolName != AppleMusicReference.symbolName }
         guard !searchQuery.isEmpty else { return combined }
         guard resultFilter == .all else { return [] }
         let command = CameraCaptureController.matches(searchQuery, available: cameraAvailable()) ? [FoilExposeItem(id: FoilExposeItem.cameraCommandID, controller: nil, isHistoryEntry: false, title: NSLocalizedString("Open Camera", comment: ""), symbolName: "camera", contentKind: .camera, thumbnailPath: nil)] : []

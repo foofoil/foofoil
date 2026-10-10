@@ -89,7 +89,7 @@ struct TextEditorModeView: View {
                         VStack(alignment: .leading, spacing: 0) {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(alignment: .top, spacing: 12) {
-                                    let configs = Array(historyManager.historyConfigs.prefix(30))
+                                    let configs = Array(historyManager.historyConfigs.filter({ SettingsStore.shared.appleMusicLibraryEnabled || $0.appleMusicReference == nil }).prefix(30))
                                     ForEach(Array(configs.enumerated()), id: \.element.id) { index, config in
                                         VStack(spacing: 4) {
                                             HistoryCardView(
@@ -174,7 +174,7 @@ struct TextEditorModeView: View {
                             }
 
                             Group {
-                                if let config = historyManager.historyConfigs.prefix(30).first(where: { $0.id == hoveredHistoryID }) {
+                                if let config = historyManager.historyConfigs.filter({ SettingsStore.shared.appleMusicLibraryEnabled || $0.appleMusicReference == nil }).prefix(30).first(where: { $0.id == hoveredHistoryID }) {
                                     let title = config.historyMenuDisplayName
                                     let url = config.historyWebURLDisplayString
                                     HStack(spacing: 4) {

@@ -29,6 +29,12 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     /// hide: 漏掉的箔窗，在 didHide 里补 orderOut，unhide 时再还原。
     private var windowsLeftVisibleAfterHide: [NSWindow] = []
 
+    public override init() {
+        super.init()
+        NotificationCenter.default.addObserver(self, selector: #selector(updateAppleMusicAvailability), name: .appleMusicSearchDidChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleFileOpenFeedback(_:)), name: .fileOpenFeedback, object: nil)
+    }
+
     // 获取当前活跃（Key）窗口对应的 AppState
     var activeWindowController: FloatingWindowController? {
         guard let keyWindow = NSApplication.shared.keyWindow else { return nil }
@@ -48,7 +54,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func isBlank(_ appState: AppState) -> Bool {
-        appState.appleMusicReference == nil && !appState.isCamera && appState.imageURL == nil
+        !appState.isFileOpenFeedback && appState.appleMusicReference == nil && !appState.isCamera && appState.imageURL == nil
             && appState.webURL == nil
             && appState.textURL == nil
             && appState.extensionSession == nil
@@ -91,14 +97,17 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     /// 其余分组各自另开箔片，避免直接传 nil 目标时多出一扇空箔。
     func openFilesInNewFoil(_ urls: [URL]) {
         let state = AppState()
+        let remaining = state.filterFileOpenFailures(urls)
+        guard !remaining.isEmpty else { return }
+        state.closesEmptyWindowAfterFileOpenFailure = true
         let controller = showNewWindow(with: state)
-        openDroppedFiles(urls, into: state)
+        openDroppedFiles(remaining, into: state, feedbackBatchID: state.fileOpenFeedbackBatchID)
         // 没有可打开的文件时收回空白箔；目录扫描与音视频可播性判定是异步的，
         // 完成前状态为空但不能关，等在途打开结束后再判定，避免关掉在途内容或留下空箔。
         closeFoilIfStillBlank(controller, for: state)
     }
 
-    private func closeFoilIfStillBlank(_ controller: FloatingWindowController, for state: AppState) {
+    func closeFoilIfStillBlank(_ controller: FloatingWindowController, for state: AppState) {
         guard state.pendingContentOpenCount == 0 else {
             var token: NSObjectProtocol?
             token = NotificationCenter.default.addObserver(
@@ -173,7 +182,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
                 addWindowController(controller)
                 controller.showWindow(nil)
             case .restoreWindows:
-                let savedConfigs = SettingsStore.shared.lastOpenWindowConfigs
+                let savedConfigs = SettingsStore.shared.lastOpenWindowConfigs.filter { SettingsStore.shared.appleMusicLibraryEnabled || $0.appleMusicReference == nil }
                 if !savedConfigs.isEmpty {
                     for config in savedConfigs {
                         let state = AppState(config: config)
@@ -211,7 +220,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
         guard !isTerminating else { return .terminateLater }
         isTerminating = true
         // 保存当前活跃窗口配置，用于下次启动恢复
-        let activeConfigs = windowControllers.map { $0.appState.toConfig() }
+        let activeConfigs = windowControllers.filter { !$0.appState.isFileOpenFeedback }.map { $0.appState.toConfig() }
         SettingsStore.shared.lastOpenWindowConfigs = activeConfigs
 
         HistoryManager.shared.flushPendingListSaves()

@@ -72,6 +72,7 @@ final class HistorySearchViewModel: ObservableObject {
     private var userMovedSelection = false
     private var isResetting = false
     var openCamera: (() -> Void)?
+    private let musicLibraryEnabled: @MainActor () -> Bool
     private let cameraAvailable: () -> Bool
     var showsOpenCamera: Bool { mode == .history && resultFilter == .all && CameraCaptureController.matches(query, available: cameraAvailable()) }
     var openResult: ((UUID) -> Void)?
@@ -87,7 +88,9 @@ final class HistorySearchViewModel: ObservableObject {
          musicSearch: (@MainActor (String) async throws -> [AppleMusicLibraryItem])? = nil,
          resolveMusicLink: @escaping @MainActor (AppleMusicLink) async throws -> AppleMusicLibraryItem = { try await AppleMusicLibrary.shared.resolve($0) },
          musicAuthorized: @escaping @MainActor () -> Bool = { AppleMusicLibrary.shared.isAuthorized },
-         musicEnabled: @escaping @MainActor () -> Bool = { SettingsStore.shared.appleMusicSearchEnabled }) {
+         musicEnabled: @escaping @MainActor () -> Bool = { SettingsStore.shared.appleMusicSearchEnabled },
+         musicLibraryEnabled: @escaping @MainActor () -> Bool = { SettingsStore.shared.appleMusicLibraryEnabled }) {
+        self.musicLibraryEnabled = musicLibraryEnabled
         self.resolveMusicLink = resolveMusicLink
         self.musicSearch = { term, filter in
             if let musicSearch { return .init(items: try await musicSearch(term)) }
@@ -272,7 +275,7 @@ final class HistorySearchViewModel: ObservableObject {
         fileStatus = nil; openError = nil
         userMovedSelection = false
         openURL = trimmed.isEmpty || resultFilter != .all ? nil : Self.url(from: trimmed)
-        if let url = Self.url(from: trimmed), let link = AppleMusicLink(url: url) {
+        if musicLibraryEnabled(), let url = Self.url(from: trimmed), let link = AppleMusicLink(url: url) {
             musicLink = link
             openURL = nil
             selectedID = itemIDs.first
@@ -348,7 +351,8 @@ final class HistorySearchViewModel: ObservableObject {
             let values = self.resultFilter == .all ? await self.historySearch(trimmed) : []
             guard !Task.isCancelled, currentGeneration == self.generation else { return }
             let previousIndex = self.selectedIndex
-            self.results = Array((self.mode == .url ? values.filter { $0.contentKind == .web } : values).prefix(SearchResultLimits.probe))
+            let visible = values.filter { self.musicLibraryEnabled() || !$0.isAppleMusic }
+            self.results = Array((self.mode == .url ? visible.filter { $0.contentKind == .web } : visible).prefix(SearchResultLimits.probe))
             self.isHistorySearching = false
             self.mergeFiles()
             self.reconcileSelection(previousIndex: previousIndex)

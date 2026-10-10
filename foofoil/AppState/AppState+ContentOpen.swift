@@ -5,6 +5,7 @@
 //
 
 
+import QuickLookThumbnailing
 import Foundation
 import Combine
 import AppKit
@@ -38,6 +39,9 @@ extension AppState {
                 self.id = UUID()
             }
             if clearsFileList {
+                extensionSession = nil
+                extensionFallbackProviderID = nil
+                extensionStateReference = nil
                 resetFileList()
                 clearCustomCover()
             }
@@ -96,6 +100,9 @@ extension AppState {
                 self.id = UUID()
             }
             if clearsFileList {
+                extensionSession = nil
+                extensionFallbackProviderID = nil
+                extensionStateReference = nil
                 resetFileList()
                 clearCustomCover()
             }
@@ -491,7 +498,7 @@ extension AppState {
                     return
                 }
                 guard isPlayable else {
-                    self.openQuickLook(url: url)
+                    self.reportFileOpenFeedback([.init(url: url, reason: .failed)])
                     if holdsSecurityAccess { url.stopAccessingSecurityScopedResource() }
                     return
                 }
@@ -502,14 +509,15 @@ extension AppState {
         }
 
         public func openWeb(url: URL, originalName: String? = nil) {
-            appleMusicItem = nil
-            resetFileList()
             let targetID = (imageURL != nil || webURL != nil || textURL != nil || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 ? UUID()
                 : id
             let cachedURL: URL
             if url.isFileURL {
-                guard let copiedURL = cacheImportedFile(from: url, kind: "web", for: targetID) else { return }
+                guard let copiedURL = cacheImportedFile(from: url, kind: "web", for: targetID) else {
+                    reportFileOpenFeedback([.init(url: url, reason: .unreadable)])
+                    return
+                }
                 cachedURL = copiedURL
             } else {
                 // 远程网页以 URL 为内容来源，不属于本地文件缓存。
@@ -522,6 +530,11 @@ extension AppState {
                 isBatchUpdating = false
                 saveState()
             }
+            appleMusicItem = nil
+            extensionSession = nil
+            extensionFallbackProviderID = nil
+            extensionStateReference = nil
+            resetFileList()
             self.id = targetID
             self.sourceFingerprint = Self.localSourceFingerprint(for: url)
             self.originalImageName = originalName ?? url.lastPathComponent
@@ -572,12 +585,13 @@ extension AppState {
         }
 
         public func openTextFile(url: URL) {
-            appleMusicItem = nil
-            resetFileList()
             let targetID = (imageURL != nil || webURL != nil || textURL != nil || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 ? UUID()
                 : id
-            guard let cachedURL = cacheImportedFile(from: url, kind: "text", for: targetID) else { return }
+            guard let cachedURL = cacheImportedFile(from: url, kind: "text", for: targetID) else {
+                reportFileOpenFeedback([.init(url: url, reason: .unreadable)])
+                return
+            }
 
             isBatchUpdating = true
             defer {
@@ -588,6 +602,11 @@ extension AppState {
 
             do {
                 let content = try Self.readTextContent(from: cachedURL)
+                appleMusicItem = nil
+                extensionSession = nil
+                extensionFallbackProviderID = nil
+                extensionStateReference = nil
+                resetFileList()
                 self.id = targetID
                 self.sourceFingerprint = Self.localSourceFingerprint(for: url)
                 self.text = content
@@ -607,6 +626,7 @@ extension AppState {
                 }
                 self.createdAt = Date()
             } catch {
+                reportFileOpenFeedback([.init(url: url, reason: .failed)])
                 print("Failed to read text file: \(error)")
             }
         }
@@ -644,30 +664,55 @@ extension AppState {
         }
 
         func openQuickLook(url: URL) {
-            // 复用原始文件的书签及窗口持有授权，避免复制大型文档或拆散文件包。
-            applyExternalMedia(url: url, holdsSecurityAccess: false, rotatesIdentity: true, clearsFileList: true, usesQuickLook: true)
+            if canUseKnownQuickLookPreview(url) {
+                applyExternalMedia(url: url, holdsSecurityAccess: false, rotatesIdentity: true, clearsFileList: true, usesQuickLook: true)
+                return
+            }
+            let generation = currentMediaRouteGeneration
+            let batchID = fileOpenFeedbackBatchID
+            let accessed = url.startAccessingSecurityScopedResource()
+            beginPendingContentOpen()
+            Task { @MainActor [weak self] in
+                defer {
+                    if accessed { url.stopAccessingSecurityScopedResource() }
+                    self?.endPendingContentOpen()
+                }
+                let request = QLThumbnailGenerator.Request(fileAt: url, size: CGSize(width: 128, height: 128), scale: 1, representationTypes: .thumbnail)
+                let representation = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request)
+                guard let self, self.currentMediaRouteGeneration == generation,
+                      self.fileOpenFeedbackBatchID == batchID else { return }
+                // 不把文件类型图标误当作成功预览；判定失败前不改动原内容或历史。
+                if representation?.type == .thumbnail {
+                    self.applyExternalMedia(url: url, holdsSecurityAccess: false, rotatesIdentity: true, clearsFileList: true, usesQuickLook: true)
+                } else {
+                    self.reportFileOpenFeedback([.init(url: url, reason: .unsupported)])
+                }
+            }
         }
 
         public func openFile(url: URL) {
-            appleMusicItem = nil
-            guard canOpenFile(url: url) else { return }
+            if let failure = initialFileOpenFailure(url) {
+                reportFileOpenFeedback([failure])
+                return
+            }
+            guard canOpenFile(url: url) else {
+                reportFileOpenFeedback([.init(url: url, reason: .unreadable)])
+                return
+            }
             currentMediaRouteGeneration &+= 1
 
             if FileListGrouper.isCueFile(url) {
+                appleMusicItem = nil
                 installCueSheets(urls: [url], preservesIdentity: false)
                 return
             }
 
-            resetFileList()
-
             if ExtensionHost.shared.canOpen(url: url) {
+                appleMusicItem = nil
+                resetFileList()
                 openUsingExtension(url: url)
                 return
             }
-
-            extensionSession = nil
-            extensionFallbackProviderID = nil
-            extensionStateReference = nil
 
             let ext = url.pathExtension.lowercased()
             if ["html", "htm", "webarchive", "xhtml"].contains(ext) {
@@ -783,6 +828,9 @@ extension AppState {
                     }
                 } catch {
                     self.isBatchUpdating = false
+                    if self.currentMediaRouteGeneration == routeGeneration {
+                        self.reportFileOpenFeedback(urls.map { .init(url: $0, reason: .failed) })
+                    }
                     NSLog("Extension session failed: \(error.localizedDescription)")
                 }
             }

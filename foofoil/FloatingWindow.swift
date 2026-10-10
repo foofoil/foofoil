@@ -593,7 +593,7 @@ public class FloatingWindow: NSWindow {
         if let controller = windowController as? FloatingWindowController,
            controller.appState.isBlank,
            let index = Self.matchedRecentHistoryIndex(event),
-           let config = HistoryManager.shared.historyConfigs.dropFirst(index - 1).first {
+           let config = HistoryManager.shared.historyConfigs.filter({ SettingsStore.shared.appleMusicLibraryEnabled || $0.appleMusicReference == nil }).dropFirst(index - 1).first {
             withAnimation(.easeInOut(duration: 0.35)) {
                 controller.appState.loadConfig(config)
             }

@@ -384,6 +384,7 @@ final class AppleMusicLibraryWindowController: NSWindowController {
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     func show() {
+        guard SettingsStore.shared.appleMusicLibraryEnabled else { return }
         AppleMusicLibrary.shared.refreshAuthorization()
         NSApp.activate(ignoringOtherApps: true)
         showWindow(nil)
@@ -501,11 +502,30 @@ struct AppleMusicModeView: View {
 }
 
 extension AppDelegate {
-    @objc func openAppleMusicLibraryAction() { AppleMusicLibraryWindowController.shared.show() }
+    @objc func openAppleMusicLibraryAction() {
+        guard SettingsStore.shared.appleMusicLibraryEnabled else { return }
+        AppleMusicLibraryWindowController.shared.show()
+    }
+
+    @objc func updateAppleMusicAvailability() {
+        let enabled = SettingsStore.shared.appleMusicLibraryEnabled
+        for menu in NSApp.mainMenu?.items.compactMap(\.submenu) ?? [] {
+            menu.items.first { $0.action == #selector(openAppleMusicLibraryAction) }?.isHidden = !enabled
+        }
+        if !enabled {
+            appleMusicLinkTask?.cancel()
+            appleMusicLinkTask = nil
+            for window in NSApp.windows where window is AppleMusicLibraryWindow { window.orderOut(nil) }
+            AppleMusicPlaybackController.stopIfActive()
+            for controller in windowControllers.filter({ $0.appState.appleMusicReference != nil }) { controller.close() }
+        }
+        HistoryManager.shared.refresh()
+        updateHistoryMenu()
+    }
 
     /// 快捷键直接打开时按需授权；连续粘贴只允许最后一个请求生效。
     func openAppleMusicLink(_ url: URL) {
-        guard let link = AppleMusicLink(url: url) else { return }
+        guard SettingsStore.shared.appleMusicLibraryEnabled, let link = AppleMusicLink(url: url) else { return }
         appleMusicLinkTask?.cancel()
         appleMusicLinkTask = Task { @MainActor [weak self] in
             do {
@@ -526,6 +546,7 @@ extension AppDelegate {
     }
 
     func openAppleMusic(_ item: AppleMusicLibraryItem, startingAt track: Track? = nil) {
+        guard SettingsStore.shared.appleMusicLibraryEnabled else { return }
         appleMusicLinkTask?.cancel()
         appleMusicLinkTask = nil
         HistorySearchWindowController.shared.dismiss()

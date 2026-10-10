@@ -65,3 +65,7 @@ Share menus in compatible macOS apps can open URLs, text, images, documents, aud
 You can open the system sharing settings directly from Settings > General > Share Menu and enable foofoil.
 
 The Share menu filters attachments with a known content type. Apps that supply only a generic file URL may still show foofoil. A mixed selection containing a known unsupported type hides the entry; ISO disc images remain available for SACD content.
+
+Files that cannot be opened from drag and drop, the clipboard, or sharing appear in a separate bordered feedback foil with their system icons, filenames, and reason. Existing foils are preserved, even if blank. Feedback foils are excluded from history and restart restoration; failures from the same batch are collected together. Known Quick Look documents retain their preview; unknown formats are previewed only when the system can generate a content thumbnail.
+
+Apple Music Library is disabled by default. Enable it in Settings → Types → Audio and Video to reveal its library entry, search options, and sharing guidance. Turning it off hides music history and search results without deleting saved history; Apple Music links open as ordinary web pages.

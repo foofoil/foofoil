@@ -560,9 +560,10 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
 public class SettingsStore {
     public static let shared = SettingsStore()
 
-    private let userDefaults = UserDefaults.standard
+    private let userDefaults: UserDefaults
 
-    private init() {
+    init(userDefaults: UserDefaults = .standard) {
+        self.userDefaults = userDefaults
         userDefaults.register(defaults: [
             Keys.opacity: 1.0,
             Keys.isPinned: false,
@@ -578,12 +579,14 @@ public class SettingsStore {
             Keys.mediaSeekStepInterval: MediaSeekStep.defaultInterval,
             Keys.showsMediaBottomProgressBar: true,
             Keys.confirmClosingPlayingAudio: true,
+            Keys.appleMusicLibraryEnabled: false,
             Keys.appleMusicSearchEnabled: true,
             Keys.startupBehavior: StartupBehavior.newWindow.rawValue
         ])
     }
 
     private enum Keys {
+        static let appleMusicLibraryEnabled = "appleMusicLibraryEnabled"
         static let appleMusicSearchEnabled = "appleMusicSearchEnabled"
         static let isPinned = "isPinned"
         static let opacity = "opacity"
@@ -610,12 +613,26 @@ public class SettingsStore {
         static let lastOpenWindowConfigs = "lastOpenWindowConfigs"
     }
 
-    var appleMusicSearchEnabled: Bool {
-        get { userDefaults.bool(forKey: Keys.appleMusicSearchEnabled) }
+    /// 总开关默认关闭；关闭不撤销系统授权，也不清除音乐历史或搜索偏好。
+    var appleMusicLibraryEnabled: Bool {
+        get { userDefaults.bool(forKey: Keys.appleMusicLibraryEnabled) }
         set {
-            guard newValue != appleMusicSearchEnabled else { return }
+            guard newValue != appleMusicLibraryEnabled else { return }
+            userDefaults.set(newValue, forKey: Keys.appleMusicLibraryEnabled)
+            if userDefaults === UserDefaults.standard {
+                NotificationCenter.default.post(name: .appleMusicSearchDidChange, object: nil)
+            }
+        }
+    }
+
+    var appleMusicSearchEnabled: Bool {
+        get { appleMusicLibraryEnabled && userDefaults.bool(forKey: Keys.appleMusicSearchEnabled) }
+        set {
+            guard newValue != userDefaults.bool(forKey: Keys.appleMusicSearchEnabled) else { return }
             userDefaults.set(newValue, forKey: Keys.appleMusicSearchEnabled)
-            NotificationCenter.default.post(name: .appleMusicSearchDidChange, object: nil)
+            if userDefaults === UserDefaults.standard {
+                NotificationCenter.default.post(name: .appleMusicSearchDidChange, object: nil)
+            }
         }
     }
 

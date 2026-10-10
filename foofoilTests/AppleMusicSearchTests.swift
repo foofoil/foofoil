@@ -373,4 +373,36 @@ struct AppleMusicSearchTests {
         quick.stop()
         expose.stopFileSearch()
     }
+    @Test func libraryDisabledByDefaultAndRetainsSearchPreference() throws {
+        let suite = "AppleMusicOptIn-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = SettingsStore(userDefaults: defaults)
+        #expect(!settings.appleMusicLibraryEnabled)
+        #expect(!settings.appleMusicSearchEnabled)
+        settings.appleMusicLibraryEnabled = true
+        #expect(settings.appleMusicSearchEnabled)
+        settings.appleMusicLibraryEnabled = false
+        #expect(!settings.appleMusicSearchEnabled)
+        settings.appleMusicLibraryEnabled = true
+        #expect(settings.appleMusicSearchEnabled)
+        settings.appleMusicSearchEnabled = false
+        settings.appleMusicLibraryEnabled = false
+        settings.appleMusicLibraryEnabled = true
+        #expect(!settings.appleMusicSearchEnabled)
+    }
+
+    @Test func disabledLibraryHidesMusicHistorySearchResults() async throws {
+        var music = history("Music history")
+        music.isAppleMusic = true
+        let note = history("User note")
+        let model = HistorySearchViewModel(historySearch: { _ in [music, note] },
+            fileSearch: { _, done in done(.results([])) }, cameraAvailable: { false },
+            musicAuthorized: { true }, musicEnabled: { false }, musicLibraryEnabled: { false })
+        model.query = "history"
+        try await waitUntil { !model.isSearching }
+        #expect(model.results.map(\.id) == [note.id])
+        model.stop()
+    }
+
 }

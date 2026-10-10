@@ -424,13 +424,16 @@ extension AppDelegate {
         let windowID = notification.userInfo?["windowID"] as? UUID
         let append = notification.userInfo?["append"] as? Bool ?? false
         let target = windowControllers.first(where: { $0.appState.id == windowID })?.appState
-        openGroupedFiles(urls, into: target, append: append)
+        openGroupedFiles(urls, into: target, append: append,
+                         feedbackBatchID: notification.userInfo?["feedbackBatchID"] as? UUID ?? UUID())
     }
 
     /// 按同类型分组打开：第一组进入目标箔片（或新窗口），其余组另开箔片。
     @discardableResult
-    func openGroupedFiles(_ urls: [URL], into target: AppState?, append: Bool) -> Bool {
+    func openGroupedFiles(_ urls: [URL], into target: AppState?, append: Bool, feedbackBatchID: UUID = UUID()) -> Bool {
         let probe = target ?? AppState()
+        probe.fileOpenFeedbackBatchID = feedbackBatchID
+        let urls = probe.filterFileOpenFailures(urls)
         let openable = urls.filter { probe.canOpenFile(url: $0) }
         var groups = FileListGrouper.groups(from: openable)
         guard !groups.isEmpty else { return false }
@@ -461,7 +464,7 @@ extension AppDelegate {
                 }
             }
             for group in groups {
-                openGroupInNewWindow(group)
+                openGroupInNewWindow(group, feedbackBatchID: probe.fileOpenFeedbackBatchID)
             }
             return true
         }
@@ -473,25 +476,29 @@ extension AppDelegate {
                 activateWindow(controller)
             }
         } else {
-            openGroupInNewWindow(first)
+            openGroupInNewWindow(first, feedbackBatchID: probe.fileOpenFeedbackBatchID)
         }
         for group in groups {
-            openGroupInNewWindow(group)
+            openGroupInNewWindow(group, feedbackBatchID: probe.fileOpenFeedbackBatchID)
         }
         return true
     }
 
     /// Finder 拖到 Dock 图标时与箔片内拖放保持一致：非空箔片只接收当前类型。
-    func openDroppedFiles(_ urls: [URL], into target: AppState?) {
+    func openDroppedFiles(_ urls: [URL], into target: AppState?, feedbackBatchID: UUID = UUID()) {
+        let probe = target ?? AppState()
+        probe.fileOpenFeedbackBatchID = feedbackBatchID
+        let urls = probe.filterFileOpenFailures(urls)
+        guard !urls.isEmpty else { return }
         guard let target else {
             let state = AppState()
-            guard state.handleDroppedFileURLs(urls) else { return }
+            guard state.handleDroppedFileURLs(urls, feedbackBatchID: feedbackBatchID) else { return }
             showNewWindow(with: state)
             return
         }
 
         if isBlank(target) {
-            guard target.handleDroppedFileURLs(urls) else { return }
+            guard target.handleDroppedFileURLs(urls, feedbackBatchID: feedbackBatchID) else { return }
             if let controller = windowControllers.first(where: { $0.appState === target }) {
                 activateWindow(controller)
             }
@@ -510,11 +517,16 @@ extension AppDelegate {
                 }
                 return
             }
-            guard target.appendMatchingDroppedFiles(urls: remaining) || consumedCover else { return }
+            let matching = target.matchingDroppedFiles(urls: remaining)
+            let paths = Set(matching.map(\.path))
+            target.reportFileOpenFeedback(remaining.filter { !paths.contains($0.path) }.map { .init(url: $0, reason: .differentType) })
+            guard target.appendMatchingDroppedFiles(urls: matching) || consumedCover else { return }
         } else {
             let matching = target.matchingDroppedFiles(urls: urls)
+            let paths = Set(matching.map(\.path))
+            target.reportFileOpenFeedback(urls.filter { !paths.contains($0.path) }.map { .init(url: $0, reason: .differentType) })
             guard !matching.isEmpty else { return }
-            openGroupedFiles(matching, into: target, append: false)
+            openGroupedFiles(matching, into: target, append: false, feedbackBatchID: probe.fileOpenFeedbackBatchID)
         }
 
         if let controller = windowControllers.first(where: { $0.appState === target }) {
@@ -522,8 +534,10 @@ extension AppDelegate {
         }
     }
 
-    func openGroupInNewWindow(_ group: FileListGroup) {
+    func openGroupInNewWindow(_ group: FileListGroup, feedbackBatchID: UUID = UUID()) {
         let state = AppState()
+        state.fileOpenFeedbackBatchID = feedbackBatchID
+        state.closesEmptyWindowAfterFileOpenFailure = true
         state.openFileGroup(group, preservesIdentity: true)
         showNewWindow(with: state)
     }
@@ -577,19 +591,23 @@ extension AppDelegate {
     }
 
     /// 剪贴板文件与拖入箔片走同一条管线；没有空白箔片时新建一扇再接管。
-    private func openClipboardFileURLs(_ urls: [URL]) -> Bool {
+    func openClipboardFileURLs(_ urls: [URL]) -> Bool {
+        let probe = AppState()
+        let urls = probe.filterFileOpenFailures(urls)
+        guard !urls.isEmpty else { return true }
         if let controller = availableBlankWindowController {
-            guard controller.appState.handleDroppedFileURLs(urls) else { return false }
+            guard controller.appState.handleDroppedFileURLs(urls, feedbackBatchID: probe.fileOpenFeedbackBatchID) else { return false }
             activateWindow(controller)
             return true
         }
 
         // 多个文件分组会通过通知回到源窗口，先把控制器登记进窗口表再交给拖放管线。
         let state = AppState()
+        state.closesEmptyWindowAfterFileOpenFailure = true
         let controller = FloatingWindowController(appState: state)
         prepareNewWindowFrame(for: controller)
         addWindowController(controller)
-        guard state.handleDroppedFileURLs(urls) else {
+        guard state.handleDroppedFileURLs(urls, feedbackBatchID: probe.fileOpenFeedbackBatchID) else {
             removeWindowController(controller)
             controller.close()
             return false
@@ -616,7 +634,7 @@ extension AppDelegate {
             }
             // 剪贴板内容整体是一个网址时直接作为网站打开，不落为纯文本笔记。
             if let url = AppState.websiteURL(fromClipboardText: text) {
-                if AppleMusicLink(url: url) != nil {
+                if SettingsStore.shared.appleMusicLibraryEnabled && AppleMusicLink(url: url) != nil {
                     openAppleMusicLink(url)
                     return true
                 }
@@ -731,7 +749,8 @@ extension AppDelegate {
         return ClipboardOpenableContent.forText(
             declaredMarkdown: declaredMarkdown,
             plainText: pasteboard.string(forType: .string),
-            html: clipboardHTML(from: pasteboard)
+            html: clipboardHTML(from: pasteboard),
+            appleMusicEnabled: SettingsStore.shared.appleMusicLibraryEnabled
         )
     }
 
@@ -898,7 +917,7 @@ extension AppDelegate {
     }
 
     private func openSharedWebsite(_ url: URL) {
-        if AppleMusicLink(url: url) != nil { openAppleMusicLink(url) }
+        if SettingsStore.shared.appleMusicLibraryEnabled && AppleMusicLink(url: url) != nil { openAppleMusicLink(url) }
         else { openWebURLInPreferredWindow(url) }
     }
 
@@ -1292,7 +1311,8 @@ struct ClipboardOpenableContent: Equatable {
     nonisolated static func forText(
         declaredMarkdown: String?,
         plainText: String?,
-        html: String?
+        html: String?,
+        appleMusicEnabled: Bool = true
     ) -> ClipboardOpenableContent? {
         let isDeclaredMarkdown = !(declaredMarkdown?
             .trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
@@ -1300,7 +1320,7 @@ struct ClipboardOpenableContent: Equatable {
         if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             if isDeclaredMarkdown || AppState.looksLikeMarkdown(text) { return ClipboardOpenableContent(.markdown) }
             if let url = AppState.websiteURL(fromClipboardText: text) {
-                return ClipboardOpenableContent(AppleMusicLink(url: url) == nil ? .website : .appleMusic)
+                return ClipboardOpenableContent(!appleMusicEnabled || AppleMusicLink(url: url) == nil ? .website : .appleMusic)
             }
             if html != nil || AppState.looksLikeHTML(text) { return ClipboardOpenableContent(.htmlFragment) }
             return ClipboardOpenableContent(.text)

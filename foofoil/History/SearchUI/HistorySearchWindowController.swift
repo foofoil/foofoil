@@ -53,7 +53,7 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
         model.openMusicLink = { url in (NSApp.delegate as? AppDelegate)?.openAppleMusicLink(url) }
         model.openMusic = { item in (NSApp.delegate as? AppDelegate)?.openAppleMusic(item) }
         model.enableMusicSearch = { [weak self] in
-            guard let self else { return }
+            guard let self, SettingsStore.shared.appleMusicLibraryEnabled else { return }
             self.isOpeningFile = true
             self.model.stop()
             Task { [weak self] in
@@ -102,7 +102,7 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
                 ?? delegate?.windowControllers.first(where: { $0.window?.isVisible == true })?.window
         }()
 
-        AppleMusicLibrary.shared.refreshAuthorization()
+        if SettingsStore.shared.appleMusicLibraryEnabled { AppleMusicLibrary.shared.refreshAuthorization() }
         model.reset(mode: mode, initialQuery: initialQuery)
         NSApp.activate(ignoringOtherApps: true)
 

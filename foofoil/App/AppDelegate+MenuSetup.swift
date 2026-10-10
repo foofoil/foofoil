@@ -117,6 +117,7 @@ extension AppDelegate {
                                    action: #selector(openAppleMusicLibraryAction), keyEquivalent: "")
         musicItem.withSymbol("music.note.list")
         musicItem.target = self
+        musicItem.isHidden = !SettingsStore.shared.appleMusicLibraryEnabled
         fileMenu.addItem(musicItem)
 
         let openClipboardContentItem = NSMenuItem(title: NSLocalizedString("Open Clipboard Content", comment: ""), action: #selector(openClipboardContentAction), keyEquivalent: "v")

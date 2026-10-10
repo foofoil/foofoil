@@ -119,3 +119,5 @@ Editing shortcuts apply to text fields or selectable content, depending on focus
 Paste an Apple Music song, album, or public playlist sharing link into Quick Open to preview it and press Return to open a music foil. Open Clipboard Content also opens these links directly as music. Explicit links work when Apple Music library search is disabled; music access authorization and content availability in your region still apply. Shared content does not need to be added to your library and can be restored from history.
 
 Quick Open shows all sources without category tabs, initially 12 results per group; More adds 18 at a time within the shared 60-result limit.
+
+Apple Music shortcuts and link handling require Enable Apple Music Library in Settings → Types → Audio and Video, which is off by default. When disabled, Quick Open and Open Clipboard Content treat Apple Music sharing links as ordinary websites.

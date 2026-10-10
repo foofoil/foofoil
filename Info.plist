@@ -32,6 +32,14 @@
 	<true/>
 	<key>CFBundleDocumentTypes</key>
 	<array>
+        <!-- 分享来源可交付任意文件，由主应用判定预览或展示反馈；不接管默认打开方式。 -->
+        <dict>
+            <key>CFBundleTypeName</key><string>File</string>
+            <key>CFBundleTypeRole</key><string>Viewer</string>
+            <key>LSHandlerRank</key><string>Alternate</string>
+            <key>LSItemContentTypes</key>
+            <array><string>public.data</string><string>com.apple.package</string></array>
+        </dict>
 		<dict>
 			<key>CFBundleTypeName</key>
 			<string>Folder</string>

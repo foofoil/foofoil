@@ -33,6 +33,7 @@ extension Notification.Name {
     public static let shouldSeekMediaPlayback = Notification.Name("shouldSeekMediaPlayback")
     public static let mediaPlaybackDidFinish = Notification.Name("mediaPlaybackDidFinish")
     public static let mediaPresentationSizeDidChange = Notification.Name("mediaPresentationSizeDidChange")
+    static let fileOpenFeedback = Notification.Name("fileOpenFeedback")
     public static let openGroupedFiles = Notification.Name("openGroupedFiles")
     /// 异步内容打开（音视频可播性判定、扩展会话等）全部结束；object 为对应 AppState。
     public static let contentOpenDidSettle = Notification.Name("contentOpenDidSettle")

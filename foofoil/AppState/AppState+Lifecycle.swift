@@ -17,6 +17,8 @@ import FoofoilExtensionKit
 
 extension AppState {
         public func resetContent() {
+            fileOpenFeedback = []
+            closesEmptyWindowAfterFileOpenFailure = false
             appleMusicItem = nil
             // 重置后的箔片是全新文档：先收起属于本箔的取色面板与样式面板，避免残留面板继续写回。
             (NSApplication.shared.delegate as? AppDelegate)?.dismissColorPanel(ownedBy: self)

@@ -62,7 +62,15 @@ public struct ContentView: View {
 
             // 内容区域
             Group {
-                if appState.isLoading {
+                if appState.isFileOpenFeedback {
+                    FileOpenFeedbackView(failures: appState.fileOpenFeedback) {
+                        NotificationCenter.default.post(
+                            name: .shouldCloseWindow,
+                            object: nil,
+                            userInfo: ["id": appState.id]
+                        )
+                    }
+                } else if appState.isLoading {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .scaleEffect(1.2)

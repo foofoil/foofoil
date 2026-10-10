@@ -4,7 +4,7 @@ import Testing
 
 @MainActor
 struct QuickLookTests {
-    @Test(arguments: ["docx", "xlsx", "pptx", "rtf", "unknown", ""])
+    @Test(arguments: ["docx", "xlsx", "pptx", "rtf"])
     func opensAndRestoresFallbackDocument(_ ext: String) throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -13,6 +13,7 @@ struct QuickLookTests {
         try Data("Preview fixture".utf8).write(to: url)
         let state = AppState()
         state.openFile(url: url)
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
         #expect(state.isQuickLookDocument)
         #expect(state.imageURL == url)
         #expect(state.cachedContentPaths.isEmpty)
@@ -44,6 +45,7 @@ struct QuickLookTests {
         #expect(state.canOpenFile(url: package))
         #expect(!state.canOpenFile(url: directory))
         #expect(state.handleDroppedFileURLs([package]))
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
         #expect(state.isQuickLookDocument)
         #expect(state.imageURL == package)
     }
@@ -54,22 +56,32 @@ struct QuickLookTests {
         defer { try? FileManager.default.removeItem(at: url) }
         let state = AppState()
         state.openFile(url: url)
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
         #expect(!state.isQuickLookDocument)
         #expect(state.text == "Native text")
         #expect(!state.canOpenFile(url: URL(string: "https://example.com/file.docx")!))
     }
 
-    @Test func unplayableMediaFallsBack() async throws {
+    @Test func unplayableMediaGetsFeedbackWithoutHistory() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).mp4")
         try Data("Not playable by AVFoundation".utf8).write(to: url)
         defer { try? FileManager.default.removeItem(at: url) }
+        let delegate = AppDelegate()
+        defer {
+            NotificationCenter.default.removeObserver(delegate)
+            for controller in delegate.windowControllers { controller.close() }
+        }
         let state = AppState()
         state.openFile(url: url)
-        for _ in 0..<100 where !state.isQuickLookDocument {
+        let deadline = Date().addingTimeInterval(10)
+        while state.pendingContentOpenCount > 0 && Date() < deadline {
             try await Task.sleep(for: .milliseconds(20))
         }
-        #expect(state.isQuickLookDocument)
-        #expect(!state.isVideoDocument)
-        #expect(state.toConfig().contentKind == .quickLook)
+        #expect(state.pendingContentOpenCount == 0)
+        #expect(!state.hasOpenedContent)
+        #expect(!state.isQuickLookDocument)
+        #expect(!HistoryManager.shared.historyConfigs.contains { $0.id == state.id })
+        let feedback = try #require(delegate.windowControllers.first { $0.appState.isFileOpenFeedback })
+        #expect(feedback.appState.fileOpenFeedback.first?.reason == .failed)
     }
 }

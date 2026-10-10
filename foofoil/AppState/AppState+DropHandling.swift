@@ -29,9 +29,11 @@ extension AppState {
 
         /// 窗口从 Finder 粘贴板一次性取得完整文件批次后直接处理，避免 NSItemProvider 丢失多选项。
         @discardableResult
-        func handleDroppedFileURLs(_ urls: [URL]) -> Bool {
-            let fileURLs = urls.filter(\.isFileURL)
-            guard !fileURLs.isEmpty else { return false }
+        func handleDroppedFileURLs(_ urls: [URL], feedbackBatchID: UUID = UUID()) -> Bool {
+            fileOpenFeedbackBatchID = feedbackBatchID
+            let originals = urls.filter(\.isFileURL)
+            let fileURLs = filterFileOpenFailures(originals)
+            guard !fileURLs.isEmpty else { return !originals.isEmpty }
             activeDirectoryDropScan?.cancel()
             activeDirectoryDropScan = nil
             currentDropGeneration &+= 1
@@ -45,7 +47,11 @@ extension AppState {
                     : nil
                 scanDroppedDirectories(urls: fileURLs) { [weak self] result in
                     guard let self, self.isCurrentDrop(generation), !result.wasCancelled else { return }
-                    _ = self.processDroppedFileURLs(result.urls, fileListTitle: fileListTitle, directorySourced: true)
+                    if result.urls.isEmpty || result.urls.allSatisfy({ self.initialFileOpenFailure($0) != nil }) {
+                        self.reportFileOpenFeedback(fileURLs.map { .init(url: $0, reason: .emptyDirectory) })
+                    } else {
+                        _ = self.processDroppedFileURLs(result.urls, fileListTitle: fileListTitle, directorySourced: true)
+                    }
                     if result.didReachLimit {
                         self.showDirectoryScanLimitAlert()
                     }
@@ -64,18 +70,22 @@ extension AppState {
         ) -> Bool {
             guard !fileURLs.isEmpty else { return false }
 
-            let remaining = consumeDroppedImagesAsAudioCover(from: fileURLs, directorySourced: directorySourced)
-            let consumedCover = remaining.count < fileURLs.count
+            let eligible = filterFileOpenFailures(fileURLs)
+            guard !eligible.isEmpty else { return true }
+            let remaining = consumeDroppedImagesAsAudioCover(from: eligible, directorySourced: directorySourced)
+            let consumedCover = remaining.count < eligible.count
             if remaining.isEmpty {
                 return consumedCover
             }
 
+            let openable = matchingDroppedFiles(urls: remaining)
+            let matching = Set(openable.map(\.path))
+            reportFileOpenFeedback(remaining.filter { !matching.contains($0.path) }.map { .init(url: $0, reason: .differentType) })
             if listableKind != nil {
-                return appendMatchingDroppedFiles(urls: remaining) || consumedCover
+                return appendMatchingDroppedFiles(urls: openable) || consumedCover || openable.count < remaining.count
             }
 
-            let openable = matchingDroppedFiles(urls: remaining)
-            guard !openable.isEmpty else { return false }
+            guard !openable.isEmpty else { return !remaining.isEmpty }
 
             if currentDroppedFileKind != nil {
                 if openable.count == 1, let url = openable.first {
@@ -98,6 +108,7 @@ extension AppState {
         }
 
         func handleDrop(providers: [NSItemProvider], appendToFileList: Bool, completion: @escaping (Bool) -> Void) {
+            fileOpenFeedbackBatchID = UUID()
             NSLog("handleDrop started for \(providers.count) providers append=\(appendToFileList)")
             for (index, p) in providers.enumerated() {
                 NSLog("Provider [\(index)] types: \(p.registeredTypeIdentifiers), suggestedName: \(p.suggestedName ?? "nil")")
@@ -116,17 +127,21 @@ extension AppState {
                         completion(false)
                         return
                     }
-                    let remaining = self.consumeDroppedImagesAsAudioCover(from: urls, directorySourced: directorySourced)
-                    let consumedCover = remaining.count < urls.count
+                    let eligible = self.filterFileOpenFailures(urls)
+                    guard !eligible.isEmpty else { completion(directorySourced || !urls.isEmpty); return }
+                    let remaining = self.consumeDroppedImagesAsAudioCover(from: eligible, directorySourced: directorySourced)
+                    let consumedCover = remaining.count < eligible.count
                     if remaining.isEmpty {
                         completion(consumedCover)
                         return
                     }
+                    let openable = self.matchingDroppedFiles(urls: remaining)
+                    let matching = Set(openable.map(\.path))
+                    self.reportFileOpenFeedback(remaining.filter { !matching.contains($0.path) }.map { .init(url: $0, reason: .differentType) })
                     if self.listableKind != nil {
-                        completion(self.appendMatchingDroppedFiles(urls: remaining) || consumedCover)
+                        completion(self.appendMatchingDroppedFiles(urls: openable) || consumedCover || openable.count < remaining.count)
                         return
                     }
-                    let openable = self.matchingDroppedFiles(urls: remaining)
                     if appendToFileList, !openable.isEmpty {
                         self.postGroupedFileOpen(urls: openable, append: true)
                         completion(true)
@@ -171,7 +186,8 @@ extension AppState {
                 userInfo: [
                     "urls": urls,
                     "windowID": id,
-                    "append": append
+                    "append": append,
+                    "feedbackBatchID": fileOpenFeedbackBatchID
                 ]
             )
         }
@@ -210,7 +226,12 @@ extension AppState {
                         completion([], false)
                         return
                     }
-                    completion(result.urls, true)
+                    if result.urls.isEmpty || result.urls.allSatisfy({ self.initialFileOpenFailure($0) != nil }) {
+                        self.reportFileOpenFeedback(urls.map { .init(url: $0, reason: .emptyDirectory) })
+                        completion([], true)
+                    } else {
+                        completion(result.urls, true)
+                    }
                     if result.didReachLimit {
                         self.showDirectoryScanLimitAlert()
                     }
@@ -752,6 +773,11 @@ extension AppState {
                 return
             }
             if url.isFileURL {
+                if let failure = initialFileOpenFailure(url) {
+                    reportFileOpenFeedback([failure])
+                    completion(true)
+                    return
+                }
                 // 拖拽文件可能为安全范围 URL，需临时获取访问授权；临时拷贝路径则无需授权亦可读取
                 let canOpen: Bool = {
                     let accessed = url.startAccessingSecurityScopedResource()

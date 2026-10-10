@@ -57,7 +57,7 @@ struct AppleMusicLinkTests {
             musicSearch: { _ in unrelatedSearches += 1; return [] }, resolveMusicLink: { link in
                 #expect(link.kind == .song && link.id == "456")
                 return song
-            }, musicAuthorized: { true }, musicEnabled: { false })
+            }, musicAuthorized: { true }, musicEnabled: { false }, musicLibraryEnabled: { true })
         model.query = "https://music.apple.com/cn/album/title/123?i=456"
         try await waitUntil { !model.isSearching }
         #expect(unrelatedSearches == 0 && model.openURL == nil && model.resultCount == 1)
@@ -73,7 +73,7 @@ struct AppleMusicLinkTests {
         let url = URL(string: "https://music.apple.com/us/song/name/456")!
         let model = HistorySearchViewModel(historySearch: { _ in [] }, fileSearch: { _, done in done(.results([])) },
             cameraAvailable: { false }, resolveMusicLink: { _ in throw CatalogLinkError.unavailable },
-            musicAuthorized: { false }, musicEnabled: { false })
+            musicAuthorized: { false }, musicEnabled: { false }, musicLibraryEnabled: { true })
         model.query = url.absoluteString
         #expect(model.resultCount == 1 && !model.showsOverallEmptyState && model.openURL == nil)
         var opened: URL?
@@ -83,7 +83,7 @@ struct AppleMusicLinkTests {
         model.stop()
         let authorized = HistorySearchViewModel(historySearch: { _ in [] }, fileSearch: { _, done in done(.results([])) },
             cameraAvailable: { false }, resolveMusicLink: { _ in throw CatalogLinkError.unavailable },
-            musicAuthorized: { true }, musicEnabled: { false })
+            musicAuthorized: { true }, musicEnabled: { false }, musicLibraryEnabled: { true })
         authorized.query = url.absoluteString
         try await waitUntil { !authorized.isSearching }
         #expect(authorized.musicLinkError != nil && authorized.openURL == nil)
@@ -96,7 +96,7 @@ struct AppleMusicLinkTests {
         let model = HistorySearchViewModel(historySearch: { _ in [] }, fileSearch: { _, done in done(.results([])) },
             cameraAvailable: { false }, resolveMusicLink: { _ in
                 await withCheckedContinuation { continuation = $0 }
-            }, musicAuthorized: { true }, musicEnabled: { false })
+            }, musicAuthorized: { true }, musicEnabled: { false }, musicLibraryEnabled: { true })
         model.query = "https://music.apple.com/us/song/name/456"
         try await waitUntil { continuation != nil }
         model.query = "https://example.com"
@@ -120,4 +120,23 @@ struct AppleMusicLinkTests {
         #expect(state.appleMusicItem?.reference == song.reference)
         #expect(state.sourceFingerprint == "apple-music:catalog:song:456")
     }
+    @Test func disabledLibraryTreatsMusicLinkAsOrdinaryWebsite() async throws {
+        let url = URL(string: "https://music.apple.com/us/song/name/456")!
+        var resolutions = 0
+        let model = HistorySearchViewModel(historySearch: { _ in [] }, fileSearch: { _, done in done(.results([])) },
+            cameraAvailable: { false }, resolveMusicLink: { _ in
+                resolutions += 1
+                throw CatalogLinkError.unavailable
+            }, musicAuthorized: { true }, musicEnabled: { false }, musicLibraryEnabled: { false })
+        model.query = url.absoluteString
+        try await waitUntil { !model.isSearching }
+        #expect(model.musicLink == nil)
+        #expect(model.linkedMusicItem == nil)
+        #expect(model.openURL == url)
+        #expect(resolutions == 0)
+        model.stop()
+        #expect(ClipboardOpenableContent.forText(declaredMarkdown: nil, plainText: url.absoluteString, html: nil,
+                                               appleMusicEnabled: false)?.kind == .website)
+    }
+
 }

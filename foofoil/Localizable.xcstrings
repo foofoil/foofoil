@@ -1,6 +1,176 @@
 {
   "sourceLanguage": "en",
   "strings": {
+  "Music Enable Library Note": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Browse and play albums, songs, and playlists from your library, search music in Quick Open and the overview, and open Apple Music sharing links. Authorization is required on first access."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "浏览并播放资料库中的专辑、歌曲和歌单，在快速打开和总览中搜索音乐，也可直接打开 Apple Music 分享链接。首次访问需要授权。"
+        }
+      }
+    }
+  },
+  "File Feedback Unsupported": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Opening this file is not supported yet."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "暂不支持打开此文件。"
+        }
+      }
+    }
+  },
+  "File Feedback Missing": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "This file no longer exists."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "此文件已不存在。"
+        }
+      }
+    }
+  },
+  "File Feedback Unreadable": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Unable to read this file. Check its access permissions."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法读取此文件，请检查访问权限。"
+        }
+      }
+    }
+  },
+  "File Feedback Empty Directory": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "There is no content to open in this folder."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "此文件夹中没有可打开的内容。"
+        }
+      }
+    }
+  },
+  "File Feedback Failed": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Unable to read or preview this file."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法读取或预览此文件。"
+        }
+      }
+    }
+  },
+  "File Feedback Different Type": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "This file cannot be added to the current foil’s content type."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "此文件无法加入当前类型的箔片。"
+        }
+      }
+    }
+  },
+  "File Feedback Title": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Unable to Open Files"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法打开文件"
+        }
+      }
+    }
+  },
+  "Share Menu Entry Music Note": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Enable foofoil under Sharing in System Settings to open content from Finder, Preview, Apple Music, and other apps."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "在系统设置的共享列表中启用「浮箔」，即可从 Finder、预览、Apple Music 等应用打开内容。"
+        }
+      }
+    }
+  },
+  "Music Enable Library": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Enable Apple Music Library"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "启用 Apple Music 资料库"
+        }
+      }
+    }
+  },
   "Share Menu Entry": {
     "extractionState": "manual",
     "localizations": {
@@ -24,13 +194,13 @@
       "en": {
         "stringUnit": {
           "state": "translated",
-          "value": "Enable foofoil under Sharing in System Settings to open content from Finder, Preview, Apple Music, and other apps."
+          "value": "Enable foofoil under Sharing in System Settings to open content from Finder, Preview, and other apps."
         }
       },
       "zh-Hans": {
         "stringUnit": {
           "state": "translated",
-          "value": "在系统设置的共享列表中启用「浮箔」，即可从 Finder、预览、Apple Music 等应用打开内容。"
+          "value": "在系统设置的共享列表中启用「浮箔」，即可从 Finder、预览等应用打开内容。"
         }
       }
     }

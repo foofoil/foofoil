@@ -16,7 +16,7 @@ extension AppDelegate {
     public func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let dockMenu = NSMenu()
 
-        let configs = HistoryRepository.shared.recent(limit: 10)
+        let configs = HistoryRepository.shared.recent(limit: 30).filter { SettingsStore.shared.appleMusicLibraryEnabled || $0.appleMusicReference == nil }
 
         if configs.isEmpty {
             let noHistoryItem = NSMenuItem(title: NSLocalizedString("No History", comment: ""), action: nil, keyEquivalent: "")
@@ -64,7 +64,7 @@ extension AppDelegate {
         historyMenu.addItem(searchItem)
         historyMenu.addItem(NSMenuItem.separator())
 
-        let configs = preloadedConfigs.map { Array($0.prefix(10)) } ?? HistoryRepository.shared.recent(limit: 10)
+        let configs = (preloadedConfigs ?? HistoryRepository.shared.recent(limit: 30)).filter { SettingsStore.shared.appleMusicLibraryEnabled || $0.appleMusicReference == nil }
 
         if configs.isEmpty {
             let noHistoryItem = NSMenuItem(title: NSLocalizedString("No History", comment: ""), action: nil, keyEquivalent: "")
@@ -106,7 +106,8 @@ extension AppDelegate {
 
     /// 搜索结果优先复用已打开的空白窗口，否则新建窗口。
     public func openSearchResultInNewWindow(id: UUID) {
-        guard let config = HistoryRepository.shared.config(id: id) else { return }
+        guard let config = HistoryRepository.shared.config(id: id),
+              SettingsStore.shared.appleMusicLibraryEnabled || config.appleMusicReference == nil else { return }
         let requiredPaths = [config.imagePath, config.textPath].compactMap { $0 }
         if requiredPaths.contains(where: { !FileManager.default.fileExists(atPath: $0) }) {
             // 音视频经安全范围书签仍可访问时放行（沙盒重启后路径直接不可达但授权可恢复）。
@@ -151,7 +152,8 @@ extension AppDelegate {
     }
 
     @objc func openHistoryItemAction(_ sender: NSMenuItem) {
-        guard let config = sender.representedObject as? WindowConfig else { return }
+        guard let config = sender.representedObject as? WindowConfig,
+              SettingsStore.shared.appleMusicLibraryEnabled || config.appleMusicReference == nil else { return }
 
         NSApp.activate(ignoringOtherApps: true)
         if config.appleMusicReference != nil {

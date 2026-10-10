@@ -14,6 +14,7 @@ struct ContentTypesSettingsView: View {
     @State private var mediaControlsAutoHideInterval = SettingsStore.shared.mediaPlaybackControlsAutoHideInterval
     @State private var mediaSeekStep = SettingsStore.shared.mediaSeekStepInterval
     @State private var showsBottomProgress = SettingsStore.shared.showsMediaBottomProgressBar
+    @State private var appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
     @State private var confirmClosingPlayingAudio = SettingsStore.shared.confirmClosingPlayingAudio
 
     var body: some View {
@@ -49,6 +50,12 @@ struct ContentTypesSettingsView: View {
                     value: $mediaSeekStep,
                     range: MediaSeekStep.minInterval...MediaSeekStep.maxInterval
                 )
+                Toggle(isOn: $appleMusicLibraryEnabled) {
+                    SettingsRowLabel(
+                        title: NSLocalizedString("Music Enable Library", comment: ""),
+                        note: NSLocalizedString("Music Enable Library Note", comment: "")
+                    )
+                }
             } header: {
                 Text(NSLocalizedString("Audio and Video", comment: ""))
             }
@@ -71,7 +78,15 @@ struct ContentTypesSettingsView: View {
             mediaControlsAutoHideInterval = SettingsStore.shared.mediaPlaybackControlsAutoHideInterval
             mediaSeekStep = SettingsStore.shared.mediaSeekStepInterval
             showsBottomProgress = SettingsStore.shared.showsMediaBottomProgressBar
+            appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
             confirmClosingPlayingAudio = SettingsStore.shared.confirmClosingPlayingAudio
+        }
+        .onChange(of: appleMusicLibraryEnabled) { _, value in
+            SettingsStore.shared.appleMusicLibraryEnabled = value
+            if value { AppleMusicLibrary.shared.refreshAuthorization() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .appleMusicSearchDidChange)) { _ in
+            appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
         }
         .onChange(of: slideshowInterval) { _, value in
             SettingsStore.shared.imageListSlideshowInterval = value

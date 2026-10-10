@@ -40,6 +40,10 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     /// 目录扫描令牌；新的拖放会主动终止仍在枚举的旧目录。
     var activeDirectoryDropScan: DroppedFileScanCancellation?
 
+    @Published var fileOpenFeedback: [FileOpenFeedback] = []
+    var fileOpenFeedbackBatchID = UUID()
+    var closesEmptyWindowAfterFileOpenFailure = false
+
     @Published public var isCommandKeyPressed: Bool = false
     /// 由窗口内容区的 AppKit tracking area 驱动，供需要整窗 hover 的内容控件使用。
     @Published var isPointerInsideWindow: Bool = false
