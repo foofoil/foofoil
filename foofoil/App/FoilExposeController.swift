@@ -25,6 +25,41 @@ enum FoilExposeMoveDirection: Equatable {
     case up, down, left, right
 }
 
+/// 总览历史的内容分类；摄像头和未归类内容只出现在“全部”。
+enum FoilExposeHistoryCategory: String, CaseIterable, Identifiable {
+    case all, images, media, web, documents, notes
+
+    var id: Self { self }
+    var localizationKey: String { "Expose History Category " + rawValue }
+    var symbolName: String {
+        switch self {
+        case .all: "square.grid.2x2"
+        case .images: "photo"
+        case .media: "play.rectangle"
+        case .web: "globe"
+        case .documents: "doc.text"
+        case .notes: "note.text"
+        }
+    }
+
+    var clearHistoryTitle: String {
+        let key = self == .all ? "Expose Clear All History" : "Expose Clear Category History Format"
+        return self == .all ? NSLocalizedString(key, comment: "")
+            : String(format: NSLocalizedString(key, comment: ""), NSLocalizedString(localizationKey, comment: ""))
+    }
+
+    func includes(_ kind: HistoryContentKind) -> Bool {
+        switch self {
+        case .all: true
+        case .images: kind == .image
+        case .media: kind == .audio || kind == .video
+        case .web: kind == .web
+        case .documents: [.text, .markdown, .csv, .pdf, .quickLook, .ebook].contains(kind)
+        case .notes: kind == .note
+        }
+    }
+}
+
 /// 覆盖层中一个箔片的快照：打开的箔片收集自 AppDelegate.windowControllers，展示信息取自历史配置。
 /// controller 为 nil 表示占位卡（新建空白箔）或历史记录条目（isHistoryEntry）。
 struct FoilExposeItem: Identifiable {
@@ -44,6 +79,8 @@ struct FoilExposeItem: Identifiable {
     /// 文档型箔片（笔记/文本/Markdown/CSV）的截断正文，供缩略图位置直接展示内容；其余类型为 nil。
     var bodyPreview: String? = nil
     var musicItem: AppleMusicLibraryItem? = nil
+
+    var requiresHistoryClearConfirmation: Bool { isHistoryEntry && contentKind == .note }
 
     var window: NSWindow? { controller?.window }
     var isNewFoil: Bool { controller == nil && !isHistoryEntry && musicItem == nil && id != Self.cameraCommandID }
@@ -76,7 +113,16 @@ final class FoilExposeModel: ObservableObject {
     /// 打开的箔片条目。
     let items: [FoilExposeItem]
     /// 历史记录条目。
-    let historyItems: [FoilExposeItem]
+    @Published private(set) var historyItems: [FoilExposeItem]
+    @Published var historyCategory: FoilExposeHistoryCategory = .all {
+        didSet {
+            guard oldValue != historyCategory else { return }
+            // 分类切换后的可见集由视图重新回传，避免编号直选命中旧卡片。
+            visibleIDs = []
+            selectedIndex = currentItems.firstIndex(where: \.isHistoryEntry) ?? 0
+        }
+    }
+
     /// 展示时剪贴板里可打开的内容类型（与实际打开结果一致）；nil 表示没有可打开内容，不显示提示。
     let clipboardContent: ClipboardOpenableContent?
     /// 当前键盘高亮的条目下标（对应 currentItems）；默认高亮第一项。
@@ -153,6 +199,7 @@ final class FoilExposeModel: ObservableObject {
                     }
                 }
             }
+            normalizeHistoryCategory()
             scheduleFileSearch()
             scheduleMusicSearch()
         }
@@ -191,6 +238,8 @@ final class FoilExposeModel: ObservableObject {
     var columnCount: Int = 4
     var onSelect: (FoilExposeItem) -> Void = { _ in }
     var onDismiss: () -> Void = {}
+    var onClearHistory: (FoilExposeHistoryCategory) -> Void = { _ in }
+    var onClearHistoryItem: (FoilExposeItem) -> Void = { _ in }
     /// 打开文件结果：由控制器检查可用性并在浮箔中打开。
     var onOpenFile: (URL) -> Void = { _ in }
     /// 请求开启文件搜索：由控制器弹出系统面板确认用户主目录。
@@ -266,7 +315,7 @@ final class FoilExposeModel: ObservableObject {
 
     /// 打开的箔片在前、历史记录在后的完整列表；已在打开的箔片中出现的条目不再重复显示；
     /// 有关键字时只保留标题匹配项。
-    private var matchedFoilItems: [FoilExposeItem] {
+    private var unfilteredMatchedFoilItems: [FoilExposeItem] {
         if isPickingScope { return [] }
         let openIDs = Set(items.map(\.id))
         let combined = (items + historyItems.filter { !openIDs.contains($0.id) })
@@ -275,8 +324,42 @@ final class FoilExposeModel: ObservableObject {
         guard resultFilter == .all || resultFilter == .history else { return [] }
         let command = (resultFilter == .all && CameraCaptureController.matches(searchQuery, available: cameraAvailable())) ? [FoilExposeItem(id: FoilExposeItem.cameraCommandID, controller: nil, isHistoryEntry: false, title: NSLocalizedString("Open Camera", comment: ""), symbolName: "camera", contentKind: .camera, thumbnailPath: nil)] : []
         let query = searchQuery
-        return command + combined.lazy.filter { $0.matches(query: query) }.prefix(SearchResultLimits.probe)
+        return command + combined.filter { $0.matches(query: query) }
     }
+    /// 分类数量在展示截断之前统计，并与历史分区的去重、设置和关键词规则保持一致。
+    func historyCount(in category: FoilExposeHistoryCategory) -> Int {
+        unfilteredMatchedFoilItems.filter { $0.isHistoryEntry && category.includes($0.contentKind) }.count
+    }
+
+    var visibleHistoryCategories: [FoilExposeHistoryCategory] {
+        FoilExposeHistoryCategory.allCases.filter { historyCount(in: $0) > 0 }
+    }
+
+    private func normalizeHistoryCategory() {
+        if historyCount(in: historyCategory) == 0 { historyCategory = .all }
+    }
+
+    func replaceHistoryItems(_ items: [FoilExposeItem]) {
+        historyItems = items
+        normalizeHistoryCategory()
+        visibleIDs = []
+        selectedIndex = currentItems.firstIndex(where: \.isHistoryEntry) ?? 0
+    }
+
+    /// 清除按完整分类处理，不受搜索词、设置隐藏或总览加载上限影响；活跃箔片保留。
+    static func historyToClear(_ configs: [WindowConfig], category: FoilExposeHistoryCategory,
+                               openIDs: Set<UUID>) -> [WindowConfig] {
+        configs.filter { !openIDs.contains($0.id) && category.includes($0.contentKind ?? HistoryContentKind.infer(from: $0)) }
+    }
+
+    var showsHistorySection: Bool {
+        !isPickingScope && (searchQuery.isEmpty || resultFilter == .all || resultFilter == .history)
+    }
+
+    private var matchedFoilItems: [FoilExposeItem] {
+        unfilteredMatchedFoilItems.filter { !$0.isHistoryEntry || historyCategory.includes($0.contentKind) }
+    }
+
     /// 总览搜索中文件与各音乐分组各自独立展示，没有跨来源的总数上限；只有已打开与历史条目列表封顶 maximum。
     var currentItems: [FoilExposeItem] {
         guard !searchQuery.isEmpty else { return matchedFoilItems }
@@ -471,7 +554,7 @@ final class FoilExposeModel: ObservableObject {
 
     /// 文件结果按相关度排序，并排除已在箔片/历史条目中展示的同一源文件。
     private func mergeFiles() {
-        let excluded = Set(currentItems.compactMap(\.sourcePath).map { URL(fileURLWithPath: $0).standardizedFileURL.path })
+        let excluded = Set(unfilteredMatchedFoilItems.compactMap(\.sourcePath).map { URL(fileURLWithPath: $0).standardizedFileURL.path })
         files = SpotlightFileResult.ranked(rawFiles, query: searchQuery, excluding: excluded, limit: SearchResultLimits.probe)
     }
 
@@ -689,6 +772,8 @@ final class FoilExposeController {
         model.onOpenFile = { [weak self] url in self?.openFile(url) }
         model.onRequestFileSearchAuthorization = { [weak self] in self?.requestFileSearchAuthorization() }
         model.onOpenClipboard = { [weak self] in self?.openClipboard() }
+        model.onClearHistory = { [weak self] category in self?.confirmClearHistory(category) }
+        model.onClearHistoryItem = { [weak self] item in self?.clearHistoryItem(item) }
         self.model = model
 
         // 先激活本 App，再在当前活跃显示器上铺一块非激活面板并指定它为 key window。
@@ -897,6 +982,88 @@ final class FoilExposeController {
         dismiss()
         NSApp.activate(ignoringOtherApps: true)
         (NSApplication.shared.delegate as? AppDelegate)?.openClipboardContentInNewWindow()
+    }
+
+    /// 便签的正文由应用保存，单条清除也需确认；其它类型直接清除历史，保留原始文件。
+    private func clearHistoryItem(_ item: FoilExposeItem) {
+        guard item.isHistoryEntry, !isPresentingSystemUI,
+              let model, let panel = panels.first else { return }
+        isPresentingSystemUI = true
+        if item.requiresHistoryClearConfirmation { panel.orderOut(nil) }
+        let historyID = item.id
+        Task { [weak self] in
+            guard let self else { return }
+            defer {
+                self.isPresentingSystemUI = false
+                if self.model === model, self.panels.first === panel {
+                    panel.makeKeyAndOrderFront(nil)
+                    if model.isSearching { model.requestSearchFieldFocus() }
+                }
+            }
+            guard let config = await Task.detached(priority: .userInitiated, operation: {
+                HistoryRepository.shared.config(id: historyID)
+            }).value, self.model === model else { return }
+            // 历史卡片菜单打开期间该条目可能已恢复成活跃箔片，避免清除其恢复数据。
+            guard (NSApp.delegate as? AppDelegate)?.windowControllers.contains(where: { $0.appState.id == item.id }) != true else { return }
+            if item.requiresHistoryClearConfirmation {
+                let alert = NSAlert()
+                alert.messageText = NSLocalizedString("Expose Clear Note Confirmation", comment: "")
+                alert.informativeText = String(format: NSLocalizedString("Expose Clear Note Confirmation Format", comment: ""), item.title)
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
+                let clearButton = alert.addButton(withTitle: NSLocalizedString("Delete History Record", comment: ""))
+                clearButton.hasDestructiveAction = true
+                guard alert.runModal() == .alertSecondButtonReturn else { return }
+            }
+            if await HistoryManager.shared.removeFromHistory([config]) {
+                model.replaceHistoryItems(Self.collectHistoryItems())
+            } else {
+                panel.orderOut(nil)
+                let error = NSAlert()
+                error.messageText = NSLocalizedString("Expose Clear History Failed", comment: "")
+                error.runModal()
+            }
+        }
+    }
+
+    /// 总览位于 screenSaver 层级，确认期间先让出面板与键盘，完成后恢复同一模型。
+    private func confirmClearHistory(_ category: FoilExposeHistoryCategory) {
+        guard !isPresentingSystemUI, let model, let panel = panels.first else { return }
+        isPresentingSystemUI = true
+        panel.orderOut(nil)
+        Task { [weak self] in
+            guard let self else { return }
+            defer {
+                self.isPresentingSystemUI = false
+                if self.model === model, self.panels.first === panel {
+                    NSApp.activate(ignoringOtherApps: true)
+                    panel.makeKeyAndOrderFront(nil)
+                    if model.isSearching { model.requestSearchFieldFocus() }
+                }
+            }
+            let configs = await Task.detached(priority: .userInitiated) {
+                HistoryRepository.shared.recent(limit: Int.max)
+            }.value
+            let openIDs = Set((NSApp.delegate as? AppDelegate)?.windowControllers.map { $0.appState.id } ?? [])
+            let targets = FoilExposeModel.historyToClear(configs, category: category, openIDs: openIDs)
+            guard self.model === model else { return }
+            let title = category.clearHistoryTitle
+            let alert = NSAlert()
+            alert.messageText = title
+            alert.informativeText = String(format: NSLocalizedString("Expose Clear History Confirmation Format", comment: ""), targets.count)
+            alert.alertStyle = .warning
+            alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
+            let clearButton = alert.addButton(withTitle: NSLocalizedString("Clear", comment: ""))
+            clearButton.hasDestructiveAction = true
+            guard alert.runModal() == .alertSecondButtonReturn else { return }
+            if await HistoryManager.shared.removeFromHistory(targets) {
+                model.replaceHistoryItems(Self.collectHistoryItems())
+            } else {
+                let error = NSAlert()
+                error.messageText = NSLocalizedString("Expose Clear History Failed", comment: "")
+                error.runModal()
+            }
+        }
     }
 
     /// 开启文件搜索：系统面板会盖住覆盖层，先让出面板，选择结束后恢复并重新查询。

@@ -63,6 +63,13 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
         if let bookmark = item.bookmark, AppState.resolveVideoBookmark(bookmark) != nil { return true }
         return FileManager.default.fileExists(atPath: item.path)
     }
+    @discardableResult
+    func remove(ids: Set<UUID>) -> Bool {
+        guard let database else { return false }
+        do { try database.remove(ids: ids); return true }
+        catch { NSLog("批量删除历史失败：%@", error.localizedDescription); return false }
+    }
+
     public func removeAll(excluding ids: Set<UUID>) { try? database?.removeAll(excluding: ids) }
     public func rename(id: UUID, title: String) { try? database?.rename(id: id, title: title) }
     public var searchDatabaseSize: Int64 { database?.searchDatabaseSize() ?? 0 }

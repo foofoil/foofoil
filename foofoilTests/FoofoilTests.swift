@@ -24,6 +24,20 @@ struct HistorySearchTests {
         return (HistoryRepository(databaseURL: directory.appendingPathComponent("history.sqlite3")), directory)
     }
 
+    @Test func bulkHistoryRemovalPreservesOtherRecordsAndRemovesSearchIndex() async throws {
+        let (repository, directory) = try repository()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let removed = WindowConfig(id: UUID(), text: "Delete matching archive")
+        let preserved = WindowConfig(id: UUID(), text: "Keep matching archive")
+        #expect(repository.upsert(removed))
+        #expect(repository.upsert(preserved))
+        #expect(repository.remove(ids: [removed.id]))
+        #expect(repository.config(id: removed.id) == nil)
+        #expect(repository.config(id: preserved.id) != nil)
+        let results = await repository.search("matching")
+        #expect(results.map(\.id) == [preserved.id])
+    }
+
     @Test func createsSQLiteDatabaseAndDoesNotImportLegacyHistory() throws {
         let legacy = try JSONEncoder().encode([WindowConfig(id: UUID(), text: "不应导入")])
         UserDefaults.standard.set(legacy, forKey: "historyConfigs")

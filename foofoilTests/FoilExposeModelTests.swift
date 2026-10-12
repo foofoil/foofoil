@@ -42,6 +42,99 @@ struct FoilExposeModelTests {
         FoilExposeModel(items: items, historyItems: historyItems, fileSearch: { _, _ in }, cancelFiles: {}, musicEnabled: { false })
     }
 
+    @Test func onlyHistoryNotesRequireSingleItemClearConfirmation() {
+        for kind in [HistoryContentKind.note, .text, .markdown, .csv, .image, .web, .pdf,
+                     .video, .audio, .extensionContent, .ebook, .quickLook, .camera] {
+            let history = FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true,
+                                        title: "History", symbolName: kind.symbolName, contentKind: kind, thumbnailPath: nil)
+            #expect(history.requiresHistoryClearConfirmation == (kind == .note))
+        }
+        #expect(!makeItem().requiresHistoryClearConfirmation)
+    }
+
+    @Test func emptyHistoryCategoriesAreHiddenAndSelectionFallsBack() {
+        let model = makeModel(items: [], historyItems: [makeItem(title: "Document", isHistoryEntry: true)])
+        #expect(model.visibleHistoryCategories == [.all, .documents])
+        model.historyCategory = .documents
+        model.searchText = "Missing"
+        #expect(model.visibleHistoryCategories.isEmpty)
+        #expect(model.historyCategory == .all)
+        model.searchText = ""
+        model.historyCategory = .documents
+        model.replaceHistoryItems([])
+        #expect(model.visibleHistoryCategories.isEmpty)
+        #expect(model.historyCategory == .all)
+        #expect(model.currentItems.isEmpty)
+    }
+
+    @Test func clearingCategoryUsesAllClosedRecordsAndInfersKinds() {
+        let open = WindowConfig(id: UUID(), text: "Open", contentKind: .note)
+        let note = WindowConfig(id: UUID(), text: "Closed", contentKind: .note)
+        let inferred = WindowConfig(id: UUID(), originalImageName: "book.epub")
+        let document = WindowConfig(id: UUID(), text: "Document", contentKind: .text)
+        let camera = WindowConfig(id: UUID(), isCamera: true, contentKind: .camera)
+        let configs = [open, note, inferred, document, camera]
+        #expect(FoilExposeModel.historyToClear(configs, category: .documents, openIDs: [open.id]).map(\.id) == [inferred.id, document.id])
+        #expect(FoilExposeModel.historyToClear(configs, category: .notes, openIDs: [open.id]).map(\.id) == [note.id])
+        #expect(FoilExposeModel.historyToClear(configs, category: .all, openIDs: [open.id]).count == 4)
+    }
+
+    @Test func historyCategoriesCoverSupportedKinds() {
+        #expect(FoilExposeHistoryCategory.allCases.count == 6)
+        for kind in [HistoryContentKind.audio, .video] {
+            #expect(FoilExposeHistoryCategory.media.includes(kind))
+        }
+        for kind in [HistoryContentKind.text, .markdown, .csv, .pdf, .quickLook, .ebook] {
+            #expect(FoilExposeHistoryCategory.documents.includes(kind))
+        }
+        #expect(FoilExposeHistoryCategory.images.includes(.image))
+        #expect(FoilExposeHistoryCategory.web.includes(.web))
+        #expect(FoilExposeHistoryCategory.notes.includes(.note))
+        for kind in [HistoryContentKind.camera, .extensionContent] {
+            #expect(FoilExposeHistoryCategory.all.includes(kind))
+            #expect(FoilExposeHistoryCategory.allCases.dropFirst().allSatisfy { !$0.includes(kind) })
+        }
+    }
+
+    @Test func historyCategoryFiltersOnlyHistoryAndKeepsCountsStable() {
+        let open = makeItem(title: "Open document")
+        let duplicate = makeItem(id: open.id, title: "Open document", isHistoryEntry: true)
+        let document = makeItem(title: "Archive", isHistoryEntry: true)
+        let image = FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true,
+                                  title: "Archive image", symbolName: "photo", contentKind: .image, thumbnailPath: nil)
+        let model = makeModel(items: [open], historyItems: [duplicate, document, image])
+        #expect(model.historyCategory == .all)
+        #expect(model.historyCount(in: .all) == 2)
+        model.historyCategory = .images
+        #expect(model.currentItems.map(\.id) == [open.id, image.id])
+        #expect(model.selectedIndex == 1)
+        #expect(model.historyCount(in: .documents) == 1)
+        model.searchText = "Archive"
+        #expect(model.historyCount(in: .all) == 2)
+        #expect(model.currentItems.map(\.id) == [image.id])
+        model.historyCategory = .notes
+        #expect(model.currentItems.isEmpty)
+        #expect(model.showsHistorySection)
+        #expect(model.historyCount(in: .images) == 1)
+        model.resultFilter = .files
+        #expect(!model.showsHistorySection)
+    }
+
+    @Test func historyCountsPrecedeSearchLimitAndCategoryFiltering() {
+        let documents = (0..<70).map { _ in makeItem(title: "Match", isHistoryEntry: true) }
+        let image = FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true,
+                                  title: "Match image", symbolName: "photo", contentKind: .image, thumbnailPath: nil)
+        let model = makeModel(items: [], historyItems: documents + [image])
+        model.searchText = "Match"
+        #expect(model.historyCount(in: .all) == 71)
+        #expect(model.currentItems.count == 60)
+        #expect(model.showsResultLimitNotice)
+        model.historyCategory = .images
+        #expect(model.currentItems.map(\.id) == [image.id])
+        #expect(model.historyCount(in: .documents) == 70)
+        #expect(!model.showsResultLimitNotice)
+    }
+
     @Test func currentItemsCombineOpenFoilsBeforeHistory() {
         let model = makeModel()
         #expect(model.currentItems.count == 8)

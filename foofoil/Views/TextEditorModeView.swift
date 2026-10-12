@@ -116,12 +116,14 @@ struct TextEditorModeView: View {
                                                     showRenameAlert = true
                                                 }) {
                                                     Label(NSLocalizedString("Change Title", comment: ""), systemImage: "pencil")
+                                                        .labelStyle(.titleAndIcon)
                                                 }
 
                                                 Button(action: {
                                                     historyManager.removeFromHistory(config)
                                                 }) {
-                                                    Label(NSLocalizedString("Delete", comment: ""), systemImage: "trash")
+                                                    Label(NSLocalizedString("Delete History Record", comment: ""), systemImage: "trash")
+                                                        .labelStyle(.titleAndIcon)
                                                 }
                                             }
 

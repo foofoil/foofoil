@@ -100,6 +100,12 @@ private struct ItemFrameReporter: View {
     }
 }
 
+/// 分类切换和键盘选择一起观察，避免分类重排被误当成键盘导航而滚动。
+private struct FoilExposeSelectionSnapshot: Equatable {
+    let index: Int
+    let historyCategory: FoilExposeHistoryCategory
+}
+
 /// 覆盖层主体：深色半透明背景 + 标题/搜索控件 + 自适应网格缩略图；点击背景关闭。
 /// 只在当前活跃显示器上展示，包含全部打开的箔片；历史记录与文件搜索各自独立分区。
 /// 编号随滚动实时重排，保证可见项都有编号。
@@ -145,8 +151,8 @@ struct FoilExposeView: View {
                             .padding(.bottom, 32)
                             .frame(maxWidth: 1240)
                             .frame(maxWidth: .infinity)
-                            // 条目少时网格在剩余空间纵向居中；条目多时自然恢复滚动。
-                            .frame(minHeight: scrollAreaHeight)
+                            // 内容不足一屏时保持顶部对齐，分类切换不因内容高度变化而整体移位。
+                            .frame(minHeight: scrollAreaHeight, alignment: .top)
                     }
                     .scrollPosition($scrollPosition)
                     .onScrollGeometryChange(for: CGFloat.self, of: { $0.contentOffset.y }) { _, newValue in
@@ -159,7 +165,9 @@ struct FoilExposeView: View {
                     .onPreferenceChange(ItemFramesPreference.self) { frames in
                         updateVisibleEntries(entries: entries, frames: frames, viewport: geo.frame(in: .global))
                     }
-                    .onChange(of: model.selectedIndex) { _, newIndex in
+                    .onChange(of: FoilExposeSelectionSnapshot(index: model.selectedIndex, historyCategory: model.historyCategory)) { old, new in
+                        guard old.historyCategory == new.historyCategory else { return }
+                        let newIndex = new.index
                         // 高亮已在屏内（如翻页重定位）就不滚动，避免打断浏览位置。
                         guard model.currentItems.indices.contains(newIndex),
                               !visibleIndices.contains(newIndex) else { return }
@@ -177,6 +185,10 @@ struct FoilExposeView: View {
                             try? await Task.sleep(nanoseconds: 120_000_000)
                             repositionToFirstVisible()
                         }
+                    }
+                    .onChange(of: model.historyCategory) { _, _ in
+                        repositionAfterPageScroll = false
+                        // 保留浏览位置；内容缩短时由 ScrollView 自然限制到有效范围。
                     }
                     .onChange(of: model.searchText) { _, _ in
                         // 关键字变化后结果集重排，回到顶部；可见编号由外框回调自然重算。
@@ -276,7 +288,7 @@ struct FoilExposeView: View {
         shortcutByID: [UUID: String]
     ) -> some View {
         // 有关键字时不再给整页空态：文件结果区会说明“主目录中没有匹配的文件”。
-        if entries.isEmpty && model.searchQuery.isEmpty {
+        if entries.isEmpty && model.searchQuery.isEmpty && !model.showsHistorySection {
             Text(NSLocalizedString("No Foils on This Screen", comment: ""))
                 .font(.system(size: 15))
                 .foregroundStyle(.white.opacity(0.6))
@@ -286,7 +298,7 @@ struct FoilExposeView: View {
             let historyEntries = entries.filter { $0.item.isHistoryEntry }
             let musicEntries = entries.filter { $0.item.musicItem != nil }
             VStack(spacing: 32) {
-                if entries.isEmpty && model.resultFilter == .all {
+                if entries.isEmpty && model.resultFilter == .all && !model.showsHistorySection {
                     // 关键字有输入但没有匹配的箔片/历史：提示居中占住网格区域的一行位置，
                     // 文件结果仍紧接在其下方，不被推到屏幕底部。
                     Text(String(format: NSLocalizedString("No Matching Foils Format", comment: ""), model.searchQuery))
@@ -294,19 +306,26 @@ struct FoilExposeView: View {
                         .foregroundStyle(.white.opacity(0.6))
                         .multilineTextAlignment(.center)
                         .frame(maxWidth: .infinity, minHeight: 96, alignment: .center)
-                } else {
-                    if !openEntries.isEmpty {
-                        VStack(alignment: .leading, spacing: 16) {
-                            sectionHeader("Expose Open Section", symbol: "macwindow", count: openEntries.filter { !$0.item.isNewFoil }.count, tint: .mint)
-                            grid(for: openEntries, shortcutByID: shortcutByID)
-                        }
+                }
+                if !openEntries.isEmpty {
+                    VStack(alignment: .leading, spacing: 16) {
+                        sectionHeader("Expose Open Section", symbol: "macwindow", count: openEntries.filter { !$0.item.isNewFoil }.count, tint: .mint)
+                        grid(for: openEntries, shortcutByID: shortcutByID)
                     }
-                    if !historyEntries.isEmpty {
-                        VStack(alignment: .leading, spacing: 16) {
-                            sectionHeader("Expose History Section", symbol: "clock.arrow.circlepath", count: historyEntries.count, tint: .white.opacity(0.7))
+                }
+                if model.showsHistorySection {
+                    VStack(alignment: .leading, spacing: 16) {
+                        historySectionHeader
+                        if historyEntries.isEmpty {
+                            Text("Expose History Category Empty")
+                                .font(.system(size: 13))
+                                .foregroundStyle(.white.opacity(0.6))
+                                .frame(maxWidth: .infinity, minHeight: 96)
+                        } else {
                             grid(for: historyEntries, shortcutByID: shortcutByID)
                         }
                     }
+                    .id("expose-history")
                 }
                 fileResultsSection
                 if model.showsMusicResults {
@@ -465,13 +484,75 @@ struct FoilExposeView: View {
                     model.onSelect(entry.item)
                 }
                 .background(ItemFrameReporter(id: entry.item.id))
+                .contextMenu {
+                    if entry.item.isHistoryEntry {
+                        Button(role: .destructive) {
+                            model.onClearHistoryItem(entry.item)
+                        } label: {
+                            Label("Delete History Record", systemImage: "trash")
+                                .labelStyle(.titleAndIcon)
+                        }
+                    }
+                }
 
             }
         }
     }
 
+    private var historySectionHeader: some View {
+        HStack(spacing: 16) {
+            sectionHeader("Expose History Section", symbol: "clock.arrow.circlepath",
+                          count: model.historyCount(in: model.historyCategory), tint: .white.opacity(0.7), showsDivider: false)
+                .fixedSize(horizontal: true, vertical: false)
+            Spacer(minLength: 0)
+            // 宽屏时标签贴右；空间不足时只让标签横向滚动，标题保持单行。
+            ViewThatFits(in: .horizontal) {
+                historyCategoryLabels.fixedSize()
+                ScrollView(.horizontal) { historyCategoryLabels }
+                    .scrollIndicators(.hidden)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .layoutPriority(1)
+        }
+    }
+
+    private var historyCategoryLabels: some View {
+        HStack(spacing: 6) {
+            ForEach(model.visibleHistoryCategories) { category in
+                let selected = model.historyCategory == category
+                let title = NSLocalizedString(category.localizationKey, comment: "")
+                let count = model.historyCount(in: category)
+                Button {
+                    model.historyCategory = category
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: category.symbolName)
+                        Text(title)
+                        Text(count, format: .number).monospacedDigit()
+                    }
+                    .font(.system(size: 12, weight: selected ? .semibold : .medium))
+                    .foregroundStyle(.white.opacity(selected ? 0.95 : 0.65))
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 7)
+                    .background(.white.opacity(selected ? 0.18 : 0.06), in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(Text(verbatim: "\(title) \(count.formatted())"))
+                .accessibilityAddTraits(selected ? .isSelected : [])
+                .contextMenu {
+                    Button(role: .destructive) {
+                        model.onClearHistory(category)
+                    } label: {
+                        Label(category.clearHistoryTitle, systemImage: "trash")
+                            .labelStyle(.titleAndIcon)
+                    }
+                }
+            }
+        }
+    }
+
     /// 来源标题不依赖卡片透明度，选中和搜索时仍保持清晰的分区。
-    private func sectionHeader(_ key: String, symbol: String, count: Int?, tint: Color) -> some View {
+    private func sectionHeader(_ key: String, symbol: String, count: Int?, tint: Color, showsDivider: Bool = true) -> some View {
         HStack(spacing: 10) {
             Image(systemName: symbol)
                 .font(.system(size: 13, weight: .semibold))
@@ -490,7 +571,9 @@ struct FoilExposeView: View {
                 .padding(.vertical, 3)
                 .background(.white.opacity(0.08), in: Capsule())
             }
-            Rectangle().fill(.white.opacity(0.12)).frame(height: 1)
+            if showsDivider {
+                Rectangle().fill(.white.opacity(0.12)).frame(height: 1)
+            }
         }
         .accessibilityElement(children: .combine)
     }

@@ -52,6 +52,36 @@ public final class HistoryManager: ObservableObject {
         refreshUI()
     }
 
+    /// 批量清除前取消待写入与索引任务；数据库及缓存清理放在已有串行队列，防止删除后复活。
+    @MainActor
+    func removeFromHistory(_ configs: [WindowConfig]) async -> Bool {
+        historyMutationGeneration &+= 1
+        let ids = Set(configs.map(\.id))
+        for id in ids {
+            pendingListConfigs.removeValue(forKey: id)
+            ContentIndexCoordinator.shared.cancel(historyID: id)
+        }
+        let activePaths = activeCachePaths()
+        let candidatePaths = Set(configs.flatMap(cachePaths(for:)))
+        let success = await withCheckedContinuation { continuation in
+            listSaveQueue.async {
+                guard self.repository.remove(ids: ids) else {
+                    continuation.resume(returning: false)
+                    return
+                }
+                let referencedPaths = Set(self.repository.recent(limit: Int.max).flatMap(self.cachePaths(for:)))
+                let preservedPaths = activePaths.union(referencedPaths)
+                for path in candidatePaths where !preservedPaths.contains(path) {
+                    let url = URL(fileURLWithPath: path)
+                    if AppState.isManagedCacheURL(url) { try? FileManager.default.removeItem(at: url) }
+                }
+                continuation.resume(returning: true)
+            }
+        }
+        refreshUI()
+        return success
+    }
+
     public func clearHistory(preserving activeConfigs: [WindowConfig]? = nil) {
         historyMutationGeneration &+= 1
         listSaveWorkItem?.cancel()

@@ -257,6 +257,14 @@ nonisolated final class HistoryDatabase {
         try queue.sync { try transaction { try deleteItem(id: id) } }
     }
 
+    func remove(ids: Set<UUID>) throws {
+        try queue.sync {
+            try transaction {
+                for id in ids { try deleteItem(id: id) }
+            }
+        }
+    }
+
     func removeAll(excluding ids: Set<UUID>) throws {
         try queue.sync {
             try transaction {

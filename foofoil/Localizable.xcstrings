@@ -1,6 +1,244 @@
 {
   "sourceLanguage": "en",
   "strings": {
+  "Delete History Record": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Delete Record"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "删除记录"
+        }
+      }
+    }
+  },
+  "Expose Clear Note Confirmation": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Delete this note record?"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "删除这条便签记录？"
+        }
+      }
+    }
+  },
+  "Expose Clear Note Confirmation Format": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Delete the history record for “%@” and its saved content? This cannot be undone."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "确定删除“%@”的历史记录及保存的内容吗？此操作无法撤销。"
+        }
+      }
+    }
+  },
+  "Expose Clear All History": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Clear All History"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "清除所有历史记录"
+        }
+      }
+    }
+  },
+  "Expose Clear Category History Format": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Clear All %@ History"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "清除所有%@历史记录"
+        }
+      }
+    }
+  },
+  "Expose Clear History Confirmation Format": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Clear %ld history records and their cached content? This includes all closed items in this category, beyond the current search results. Open foils and original files will be preserved."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "确定清除 %ld 条历史记录及其缓存内容吗？将清除该分类中所有未打开的记录，不限于当前搜索结果。保留已打开的箔片和原始文件。"
+        }
+      }
+    }
+  },
+  "Expose Clear History Failed": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "History could not be cleared. Please try again."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未能清除历史记录，请重试。"
+        }
+      }
+    }
+  },
+  "Expose History Category all": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "All"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "全部"
+        }
+      }
+    }
+  },
+  "Expose History Category images": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Images"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "图片"
+        }
+      }
+    }
+  },
+  "Expose History Category media": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Audio & Video"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "影音"
+        }
+      }
+    }
+  },
+  "Expose History Category web": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Web"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "网页"
+        }
+      }
+    }
+  },
+  "Expose History Category documents": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Documents"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "文档"
+        }
+      }
+    }
+  },
+  "Expose History Category notes": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Notes"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "便签"
+        }
+      }
+    }
+  },
+  "Expose History Category Empty": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "No matching history in this category."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "此分类暂无匹配的历史记录。"
+        }
+      }
+    }
+  },
   "Music Enable Library Note": {
     "extractionState": "manual",
     "localizations": {
