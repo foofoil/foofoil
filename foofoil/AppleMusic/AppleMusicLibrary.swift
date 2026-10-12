@@ -17,15 +17,23 @@ nonisolated public struct AppleMusicReference: Codable, Sendable, Equatable {
     }
 }
 
-/// 搜索按专辑、歌曲、歌单分组；两种搜索入口共用显示顺序和折叠数量。
+/// 搜索按专辑、歌单、歌曲分组；两种搜索入口共用显示顺序和折叠数量。
 enum AppleMusicSearchCategory: CaseIterable, Identifiable, Hashable {
-    case albums, songs, playlists
+    case albums, playlists, songs
     var id: Self { self }
     var localizationKey: String {
         switch self {
         case .albums: "Music Albums"
         case .songs: "Music Songs"
         case .playlists: "Music Playlists"
+        }
+    }
+    /// 综合搜索中的一级分组标题，与资料库窗口的分类名称区分。
+    var sectionLocalizationKey: String {
+        switch self {
+        case .albums: "Music Section Albums"
+        case .songs: "Music Section Songs"
+        case .playlists: "Music Section Playlists"
         }
     }
     var symbolName: String {

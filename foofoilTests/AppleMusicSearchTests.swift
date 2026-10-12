@@ -233,32 +233,27 @@ struct AppleMusicSearchTests {
         try await waitUntil { !quick.isSearching && !expose.isMusicSearching }
         #expect(quick.itemIDs.first == "file:\(file.id)")
         #expect(quick.visibleMusicResults.map(\.id) == albums.prefix(12).map(\.id) + songs.prefix(12).map(\.id))
-        #expect(expose.currentItems.compactMap { $0.musicItem?.id } == albums.prefix(6).map(\.id) + songs.prefix(6).map(\.id))
+        // 总览搜索每组首次展示 18 个，13 个结果全部可见。
+        #expect(expose.currentItems.compactMap { $0.musicItem?.id } == albums.map(\.id) + songs.map(\.id))
         #expect(!quick.itemIDs.contains("music:\(songs[12].id)"))
         // 高亮第一首歌曲后展开专辑，仍选中同一首歌曲，而非变成新加入的第七张专辑。
         quick.moveSelection(by: 13)
-        expose.selectedIndex = 6
-        let selected = expose.highlightedItem?.id
         quick.expandMusicResults(in: .albums)
-        expose.expandMusicResults(in: .albums)
         #expect(quick.visibleMusicResults(in: .albums).count == 13)
         #expect(quick.visibleMusicResults(in: .songs).count == 12)
         #expect(quick.selectedID == "music:\(songs[0].id)")
-        #expect(expose.highlightedItem?.id == selected)
-        #expect(expose.highlightedItem?.musicItem?.id == songs[0].id)
         var opened: String?
         quick.openMusic = { opened = $0.id }
         quick.openSelected()
         #expect(opened == songs[0].id)
         quick.expandMusicResults(in: .songs)
-        expose.expandMusicResults(in: .songs)
         #expect(quick.visibleMusicResults.count == 26 && expose.currentItems.count == 26)
         #expect(quick.itemIDs.contains("music:\(songs[12].id)"))
         quick.query = "new"
         expose.searchText = "new"
         try await waitUntil { !quick.isSearching && !expose.isMusicSearching }
         #expect(quick.expandedMusicCategories.isEmpty && expose.expandedMusicCategories.isEmpty)
-        #expect(quick.visibleMusicResults.count == 24 && expose.currentItems.count == 12)
+        #expect(quick.visibleMusicResults.count == 24 && expose.currentItems.count == 26)
         quick.stop()
         expose.stopFileSearch()
     }
@@ -305,7 +300,7 @@ struct AppleMusicSearchTests {
         quick.query = "music"
         expose.searchText = "music"
         try await waitUntil { !quick.isSearching && !expose.isMusicSearching }
-        #expect(quick.resultCount == 48 && expose.displayedResultCount == 60)
+        #expect(quick.resultCount == 48 && expose.displayedResultCount == 60 + 18 + 18 + 18)
         #expect(!quick.showsResultLimitNotice && expose.showsResultLimitNotice)
         #expect(quick.visibleResults.count == 12 && quick.visibleFiles.count == 12)
         quick.expandFileResults()
@@ -317,13 +312,16 @@ struct AppleMusicSearchTests {
         quick.resultFilter = .albums
         expose.resultFilter = .albums
         try await waitUntil { !quick.isSearching && !expose.isMusicSearching }
-        #expect(quick.resultCount == 6 && expose.displayedResultCount == 6)
+        #expect(quick.resultCount == 6 && expose.displayedResultCount == 18)
         #expect(quick.visibleResults.isEmpty && quick.visibleFiles.isEmpty)
         #expect(quick.visibleMusicResults.allSatisfy { $0.searchCategory == .albums })
         for expected in [24, 42, 60] {
             quick.expandMusicResults(in: .albums)
+            #expect(quick.resultCount == expected)
+        }
+        for expected in [36, 54, 60] {
             expose.expandMusicResults(in: .albums)
-            #expect(quick.resultCount == expected && expose.displayedResultCount == expected)
+            #expect(expose.displayedResultCount == expected)
         }
         #expect(quick.showsResultLimitNotice && expose.showsResultLimitNotice)
         #expect(!quick.canExpandMusicResults(in: .albums) && !expose.canExpandMusicResults(in: .albums))
@@ -339,9 +337,40 @@ struct AppleMusicSearchTests {
         expose.resultFilter = .files
         try await waitUntil { !quick.isSearching && !expose.isFileSearching }
         #expect(musicRequests == requestsBeforeFiles)
-        #expect(quick.resultCount == 60 && expose.displayedResultCount == 60)
+        #expect(quick.resultCount == 60 && expose.displayedResultCount == 18)
         #expect(quick.musicResults.isEmpty && expose.musicItems.isEmpty)
         quick.stop()
+        expose.stopFileSearch()
+    }
+
+    @Test func overviewFilesAndMusicGroupsShowEighteenAndExpandByEighteen() async throws {
+        let albums = try (0..<70).map { try album("overview-album-\($0)") }
+        let songs = try (0..<70).map { try song("overview-song-\($0)", title: "Overview Song \($0)") }
+        let files = (0..<70).map { SpotlightFileResult(url: URL(fileURLWithPath: "/tmp/overview-\($0).txt"), modifiedAt: Date()) }
+        let expose = FoilExposeModel(items: [], historyItems: [], fileSearch: { _, done in done(.results(files)) },
+                                     cameraAvailable: { false }, musicSearch: { _ in albums + songs },
+                                     musicAuthorized: { true }, musicEnabled: { true })
+        expose.searchText = "overview"
+        try await waitUntil { !expose.isFileSearching && !expose.isMusicSearching }
+        #expect(expose.visibleFiles.count == 18)
+        #expect(expose.visibleMusicItems.filter { $0.musicItem?.searchCategory == .albums }.count == 18)
+        #expect(expose.visibleMusicItems.filter { $0.musicItem?.searchCategory == .songs }.count == 18)
+        #expect(!expose.showsResultLimitNotice)
+        expose.expandFileResults()
+        #expect(expose.visibleFiles.count == 36)
+        expose.expandMusicResults(in: .albums)
+        expose.expandMusicResults(in: .songs)
+        #expect(expose.visibleMusicItems.filter { $0.musicItem?.searchCategory == .albums }.count == 36)
+        #expect(expose.visibleMusicItems.filter { $0.musicItem?.searchCategory == .songs }.count == 36)
+        while expose.canExpandFileResults { expose.expandFileResults() }
+        for category in [AppleMusicSearchCategory.albums, .songs] {
+            while expose.canExpandMusicResults(in: category) { expose.expandMusicResults(in: category) }
+        }
+        #expect(expose.visibleFiles.count == 60)
+        #expect(expose.visibleMusicItems.filter { $0.musicItem?.searchCategory == .albums }.count == 60)
+        #expect(expose.visibleMusicItems.filter { $0.musicItem?.searchCategory == .songs }.count == 60)
+        #expect(expose.displayedResultCount == 180)
+        #expect(expose.showsResultLimitNotice)
         expose.stopFileSearch()
     }
 
@@ -359,7 +388,7 @@ struct AppleMusicSearchTests {
         quick.resultFilter = .files
         expose.resultFilter = .files
         try await waitUntil { !quick.isSearching && !expose.isFileSearching }
-        #expect(quick.resultCount == 60 && expose.displayedResultCount == 60)
+        #expect(quick.resultCount == 60 && expose.displayedResultCount == 18)
         #expect(!quick.showsResultLimitNotice && !expose.showsResultLimitNotice)
         quick.resultFilter = .albums
         expose.resultFilter = .albums

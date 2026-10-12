@@ -6,6 +6,8 @@ nonisolated enum SearchResultLimits {
     static let probe = maximum + 1
     static let initial = 6
     static let increment = 18
+    /// 总览搜索的文件与每个音乐分组首次展示数量；每个分组单独封顶 maximum。
+    static let overviewGroupInitial = 18
 }
 
 enum SearchResultFilter: CaseIterable, Identifiable {

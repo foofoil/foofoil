@@ -98,6 +98,7 @@ final class FoilExposeModel: ObservableObject {
     @Published var pageScrollRequest: FoilExposePageScrollRequest?
     /// Spotlight 文件结果：只在关键字非空时查询与呈现。
     @Published private(set) var files: [SpotlightFileResult] = []
+    @Published private(set) var fileDisplayCount = SearchResultLimits.overviewGroupInitial
     @Published private(set) var isFileSearching = false
     @Published private(set) var fileStatus: FileSearchStatus?
     /// 打开文件失败等一次性说明；下一次搜索或重新开启文件搜索时清除。
@@ -198,21 +199,19 @@ final class FoilExposeModel: ObservableObject {
         let query = searchQuery
         return command + combined.lazy.filter { $0.matches(query: query) }.prefix(SearchResultLimits.probe)
     }
-    var budget: SearchResultBudget {
-        SearchResultBudget(baseCount: matchedFoilItems.count, fileCount: files.count,
-                           musicCounts: Dictionary(uniqueKeysWithValues: AppleMusicSearchCategory.allCases.map { ($0, musicItems(in: $0).count) }),
-                           desiredMusicCounts: musicDisplayCounts, filter: resultFilter)
-    }
+    /// 总览搜索中文件与各音乐分组各自独立展示，没有跨来源的总数上限；只有已打开与历史条目列表封顶 maximum。
     var currentItems: [FoilExposeItem] {
         guard !searchQuery.isEmpty else { return matchedFoilItems }
-        return Array(matchedFoilItems.prefix(budget.base)) + visibleMusicItems
+        return Array(matchedFoilItems.prefix(SearchResultLimits.maximum)) + visibleMusicItems
     }
-    var visibleFiles: [SpotlightFileResult] { Array(files.prefix(budget.files)) }
+    var visibleFiles: [SpotlightFileResult] { Array(files.prefix(fileDisplayCount)) }
     var displayedResultCount: Int { currentItems.count + visibleFiles.count }
     var showsResultLimitNotice: Bool {
-        let hasExtra = budget.base < matchedFoilItems.count || visibleFiles.count < files.count
-            || AppleMusicSearchCategory.allCases.contains { resultFilter.includes($0) && (budget.music[$0, default: 0] < musicItems(in: $0).count || musicHasMoreCategories.contains($0)) }
-        return hasExtra && (displayedResultCount == SearchResultLimits.maximum || !AppleMusicSearchCategory.allCases.contains { canExpandMusicResults(in: $0) })
+        let foilsTruncated = matchedFoilItems.count > SearchResultLimits.maximum
+        let hasExtra = visibleFiles.count < files.count
+            || AppleMusicSearchCategory.allCases.contains { resultFilter.includes($0) && (musicDisplayCount(in: $0) < musicItems(in: $0).count || musicHasMoreCategories.contains($0)) }
+        let canExpandAny = canExpandFileResults || AppleMusicSearchCategory.allCases.contains { canExpandMusicResults(in: $0) }
+        return foilsTruncated || (hasExtra && !canExpandAny)
     }
 
     /// 高亮条目：越界时回退到第一项。
@@ -251,19 +250,21 @@ final class FoilExposeModel: ObservableObject {
     }
     var visibleMusicItems: [FoilExposeItem] {
         AppleMusicSearchCategory.allCases.flatMap { category in
-            let values = musicItems(in: category)
-            return Array(values.prefix(budget.music[category, default: 0]))
+            Array(musicItems(in: category).prefix(musicDisplayCount(in: category)))
         }
     }
+    func musicDisplayCount(in category: AppleMusicSearchCategory) -> Int {
+        musicDisplayCounts[category, default: SearchResultLimits.overviewGroupInitial]
+    }
     func canExpandMusicResults(in category: AppleMusicSearchCategory) -> Bool {
-        displayedResultCount < SearchResultLimits.maximum && budget.music[category, default: 0] < musicItems(in: category).count
+        musicDisplayCount(in: category) < SearchResultLimits.maximum && musicDisplayCount(in: category) < musicItems(in: category).count
     }
     func expandMusicResults(in category: AppleMusicSearchCategory) {
         guard canExpandMusicResults(in: category) else { return }
         // 专辑组展开会把后面的歌曲向下推；按身份保留键盘高亮，避免误打开其它曲目。
         let selectedID = highlightedItem?.id
         expandedMusicCategories.insert(category)
-        musicDisplayCounts[category] = min(SearchResultLimits.maximum, musicDisplayCounts[category, default: SearchResultLimits.initial] + SearchResultLimits.increment)
+        musicDisplayCounts[category] = min(SearchResultLimits.maximum, musicDisplayCount(in: category) + SearchResultLimits.increment)
         if let selectedID, let index = currentItems.firstIndex(where: { $0.id == selectedID }) {
             selectedIndex = index
         }
@@ -324,6 +325,7 @@ final class FoilExposeModel: ObservableObject {
         fileGeneration += 1
         let generation = fileGeneration
         fileSearchNotice = nil
+        fileDisplayCount = SearchResultLimits.overviewGroupInitial
         let query = searchQuery
         guard !query.isEmpty && resultFilter.includesFiles else {
             cancelFiles()
@@ -357,6 +359,12 @@ final class FoilExposeModel: ObservableObject {
                 self.mergeFiles()
             }
         }
+    }
+
+    var canExpandFileResults: Bool { fileDisplayCount < SearchResultLimits.maximum && fileDisplayCount < files.count }
+    func expandFileResults() {
+        guard canExpandFileResults else { return }
+        fileDisplayCount = min(SearchResultLimits.maximum, fileDisplayCount + SearchResultLimits.increment)
     }
 
     /// 重试或重新授权后按当前关键字重新查询。

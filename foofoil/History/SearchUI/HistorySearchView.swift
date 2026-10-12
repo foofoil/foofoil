@@ -74,8 +74,8 @@ struct HistorySearchView: View {
                                             .font(.caption).padding(10)
                                     }
                                     if model.isFileSearching {
-                                        Text(NSLocalizedString("Searching Local Files", comment: ""))
-                                            .foregroundStyle(.secondary).padding(10)
+                                        SearchLoadingStatusView(text: NSLocalizedString("Searching Local Files", comment: ""))
+                                            .padding(10)
                                     } else if let status = model.fileStatus {
                                         HStack {
                                             Text(NSLocalizedString(status.localizationKey, comment: "")).foregroundStyle(.secondary)
@@ -89,10 +89,9 @@ struct HistorySearchView: View {
                                     }
                                 }
                                 if model.mode == .history, model.resultFilter != .files, model.isMusicSearchEnabled, model.isMusicAuthorized {
-                                    sectionLabel("Music Library")
                                     ForEach(AppleMusicSearchCategory.allCases) { category in
                                         if !model.musicResults(in: category).isEmpty {
-                                            sectionLabel(category.localizationKey)
+                                            sectionLabel(category.sectionLocalizationKey)
                                             ForEach(model.visibleMusicResults(in: category)) { item in
                                                 AppleMusicSearchResultRow(item: item, isSelected: model.selectedID == "music:\(item.id)")
                                                     .id("music:\(item.id)")
@@ -105,7 +104,10 @@ struct HistorySearchView: View {
                                             }
                                         }
                                     }
-                                    if model.isMusicSearching { ProgressView().controlSize(.small).padding(10) }
+                                    if model.isMusicSearching {
+                                        SearchLoadingStatusView(text: NSLocalizedString("Searching Music Library", comment: ""))
+                                            .padding(10)
+                                    }
                                     if let error = model.musicError {
                                         Text(error).foregroundStyle(.secondary).padding(10)
                                     }

@@ -125,7 +125,7 @@ struct AppleMusicLibraryView: View {
             }
         )) {
             Section("Music Library") {
-                ForEach(AppleMusicSearchCategory.allCases) { entry in
+                ForEach([AppleMusicSearchCategory.albums, .songs, .playlists]) { entry in
                     Label(LocalizedStringKey(entry.localizationKey), systemImage: entry.symbolName)
                         .tag(entry.localizationKey)
                 }

@@ -714,23 +714,6 @@
       }
     }
   },
-  "Search Result Type": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Result Type"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "结果类型"
-        }
-      }
-    }
-  },
   "Search Result Limit Notice Format": {
     "extractionState": "manual",
     "localizations": {
@@ -897,6 +880,57 @@
         "stringUnit": {
           "state": "translated",
           "value": "Apple Music 资料库"
+        }
+      }
+    }
+  },
+  "Music Section Albums": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Apple Music Albums"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Apple Music 专辑"
+        }
+      }
+    }
+  },
+  "Music Section Playlists": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Apple Music Playlists"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Apple Music 歌单"
+        }
+      }
+    }
+  },
+  "Music Section Songs": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Apple Music Songs"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Apple Music 音乐"
         }
       }
     }
@@ -2446,7 +2480,24 @@
         }
       }
     },
-    "Searching Local Files": {
+    "Searching Music Library": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Searching Apple Music Library…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正在搜索 Apple Music 资料库…"
+        }
+      }
+    }
+  },
+  "Searching Local Files": {
       "extractionState": "manual",
       "localizations": {
         "en": {

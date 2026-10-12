@@ -310,34 +310,32 @@ struct FoilExposeView: View {
                 }
                 fileResultsSection
                 if model.showsMusicResults {
-                    VStack(alignment: .leading, spacing: 10) {
-                        sectionHeader("Music Library", symbol: AppleMusicReference.symbolName, count: nil, tint: .pink)
-                        ForEach(AppleMusicSearchCategory.allCases) { category in
-                            if !model.musicItems(in: category).isEmpty {
-                                VStack(alignment: .leading, spacing: 10) {
-                                    sectionHeader(category.localizationKey, symbol: category.symbolName,
-                                                  count: nil, tint: .pink)
-                                    musicResultsGrid(
-                                        for: musicEntries.filter { $0.item.musicItem?.searchCategory == category },
-                                        shortcutByID: shortcutByID
-                                    )
-                                    if model.canExpandMusicResults(in: category) {
-                                        fileActionButton(category.moreLocalizationKey) {
-                                            model.expandMusicResults(in: category)
-                                        }
+                    ForEach(AppleMusicSearchCategory.allCases) { category in
+                        if !model.musicItems(in: category).isEmpty {
+                            VStack(alignment: .leading, spacing: 16) {
+                                sectionHeader(category.sectionLocalizationKey, symbol: category.symbolName,
+                                              count: nil, tint: .pink)
+                                musicResultsGrid(
+                                    for: musicEntries.filter { $0.item.musicItem?.searchCategory == category },
+                                    shortcutByID: shortcutByID
+                                )
+                                if model.canExpandMusicResults(in: category) {
+                                    fileActionButton(category.moreLocalizationKey) {
+                                        model.expandMusicResults(in: category)
                                     }
                                 }
                             }
                         }
-                        if model.isMusicSearching {
-                            ProgressView().controlSize(.small).tint(.white)
-                        } else if !model.isMusicAuthorized {
-                            Text("Music Search Authorization Note").foregroundStyle(.white.opacity(0.6))
-                        } else if let error = model.musicError {
-                            Text(error).foregroundStyle(.white.opacity(0.6))
-                        } else if musicEntries.isEmpty {
-                            Text("Music No Search Results").foregroundStyle(.white.opacity(0.6))
-                        }
+                    }
+                    if model.isMusicSearching {
+                        SearchLoadingStatusView(text: NSLocalizedString("Searching Music Library", comment: ""), foreground: .white.opacity(0.62))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else if !model.isMusicAuthorized {
+                        Text("Music Search Authorization Note").foregroundStyle(.white.opacity(0.6))
+                    } else if let error = model.musicError {
+                        Text(error).foregroundStyle(.white.opacity(0.6))
+                    } else if musicEntries.isEmpty {
+                        Text("Music No Search Results").foregroundStyle(.white.opacity(0.6))
                     }
                 }
                 if model.showsResultLimitNotice {
@@ -388,6 +386,9 @@ struct FoilExposeView: View {
                         }
                     }
                     .animation(.smooth(duration: 0.25), value: model.files)
+                    if model.canExpandFileResults {
+                        fileActionButton("Search More Files") { model.expandFileResults() }
+                    }
                     fileStatusLine
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -405,12 +406,7 @@ struct FoilExposeView: View {
     private var fileStatusLine: some View {
         VStack(alignment: .leading, spacing: 6) {
             if model.isFileSearching {
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Text(NSLocalizedString("Searching Local Files", comment: ""))
-                }
-                .font(.system(size: 12))
-                .foregroundStyle(.white.opacity(0.62))
+                SearchLoadingStatusView(text: NSLocalizedString("Searching Local Files", comment: ""), foreground: .white.opacity(0.62))
             } else if let status = model.fileStatus {
                 HStack(spacing: 10) {
                     Text(NSLocalizedString(status.localizationKey, comment: ""))
@@ -504,13 +500,6 @@ struct FoilExposeView: View {
                 searchControl
             }
             .frame(height: 32)
-            if !model.searchQuery.isEmpty {
-                Picker(NSLocalizedString("Search Result Type", comment: ""), selection: $model.resultFilter) {
-                    ForEach(model.isMusicSearchEnabled ? SearchResultFilter.allCases : [.all, .files]) { filter in
-                        Text(NSLocalizedString(filter.localizationKey, comment: "")).tag(filter)
-                    }
-                }.pickerStyle(.segmented).labelsHidden().frame(maxWidth: 440).environment(\.colorScheme, .dark)
-            }
             HStack(spacing: 16) {
                 Text(model.isSearching
                      ? NSLocalizedString("Search Foils Hint", comment: "")
