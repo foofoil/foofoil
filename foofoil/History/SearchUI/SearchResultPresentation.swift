@@ -33,7 +33,41 @@ enum SearchResultFilter: CaseIterable, Identifiable, Equatable, Sendable {
         }
     }
     var includesFiles: Bool { self == .all || self == .files || self == .folders }
-    var target: SpotlightSearchTarget { self == .folders ? .folders : .files }
+    var target: SpotlightSearchTarget {
+        switch self {
+        case .folders: .folders
+        case .files: .files
+        default: .all
+        }
+    }
+    var fileSectionLocalizationKey: String {
+        switch self {
+        case .folders: "Local Folders Section"
+        case .files: "Local Files Section"
+        default: "Local Files and Folders Section"
+        }
+    }
+    var searchingFilesLocalizationKey: String {
+        switch self {
+        case .folders: "Searching Local Folders"
+        case .files: "Searching Local Files"
+        default: "Searching Local Files and Folders"
+        }
+    }
+    var noFilesLocalizationKey: String {
+        switch self {
+        case .folders: "No Local Folder Results"
+        case .files: "No Local File Results"
+        default: "No Local Files and Folders Results"
+        }
+    }
+    var moreFilesLocalizationKey: String {
+        switch self {
+        case .folders: "Search More Folders"
+        case .files: "Search More Files"
+        default: "Search More Files and Folders"
+        }
+    }
     func includes(_ category: AppleMusicSearchCategory) -> Bool { self == .all || musicCategory == category }
 }
 

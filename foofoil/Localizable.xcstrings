@@ -2616,6 +2616,74 @@
         }
       }
     },
+    "Local Files and Folders Section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Files and Folders in Your Home Folder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户的文件和目录"
+          }
+        }
+      }
+    },
+    "Searching Local Files and Folders": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searching files and folders…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在搜索文件和目录…"
+          }
+        }
+      }
+    },
+    "No Local Files and Folders Results": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matching files or folders in your home folder."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户目录中没有匹配的文件和目录。"
+          }
+        }
+      }
+    },
+    "Search More Files and Folders": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More Files and Folders"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多文件和目录"
+          }
+        }
+      }
+    },
     "Search In Scope Placeholder": {
       "extractionState": "manual",
       "localizations": {

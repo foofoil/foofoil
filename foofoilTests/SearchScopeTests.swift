@@ -202,6 +202,33 @@ struct SearchScopeTests {
         #expect(fileResult.symbolName == "doc")
     }
 
+    @Test func spotlightAllTargetSearchesFilesAndFolders() {
+        let allPredicate = SpotlightFileSearch.predicate(for: "project swift", target: .all)
+        #expect(!allPredicate.predicateFormat.contains("kMDItemContentType"))
+
+        let home = SpotlightSearchAccess.userHome.path
+        #expect(allPredicate.evaluate(with: [
+            "kMDItemFSName": "project swift folder",
+            "kMDItemContentType": "public.folder",
+            "kMDItemPath": "\(home)/Documents/project swift folder"
+        ]))
+        #expect(allPredicate.evaluate(with: [
+            "kMDItemFSName": "project swift file.swift",
+            "kMDItemContentType": "public.plain-text",
+            "kMDItemPath": "\(home)/Documents/project swift file.swift"
+        ]))
+
+        #expect(SearchResultFilter.all.target == .all)
+        #expect(SearchResultFilter.files.target == .files)
+        #expect(SearchResultFilter.folders.target == .folders)
+        #expect(SearchResultFilter.all.fileSectionLocalizationKey == "Local Files and Folders Section")
+        #expect(SearchResultFilter.files.fileSectionLocalizationKey == "Local Files Section")
+        #expect(SearchResultFilter.folders.fileSectionLocalizationKey == "Local Folders Section")
+        #expect(SearchResultFilter.all.moreFilesLocalizationKey == "Search More Files and Folders")
+        #expect(SearchResultFilter.all.searchingFilesLocalizationKey == "Searching Local Files and Folders")
+        #expect(SearchResultFilter.all.noFilesLocalizationKey == "No Local Files and Folders Results")
+    }
+
     @Test func tabKeySelectsHighlightedScopeInHistorySearchPanel() {
         let model = HistorySearchViewModel(
             historySearch: { _ in [] },

@@ -371,7 +371,7 @@ struct FoilExposeView: View {
             if model.showsFileResults {
                 let isFolders = model.resultFilter == .folders
                 VStack(alignment: .leading, spacing: 10) {
-                    sectionHeader(isFolders ? "Local Folders Section" : "Local Files Section",
+                    sectionHeader(model.resultFilter.fileSectionLocalizationKey,
                                   symbol: isFolders ? "folder" : "magnifyingglass",
                                   count: model.visibleFiles.count,
                                   tint: .cyan)
@@ -391,7 +391,7 @@ struct FoilExposeView: View {
                     }
                     .animation(.smooth(duration: 0.25), value: model.files)
                     if model.canExpandFileResults {
-                        fileActionButton(isFolders ? "Search More Folders" : "Search More Files") { model.expandFileResults() }
+                        fileActionButton(model.resultFilter.moreFilesLocalizationKey) { model.expandFileResults() }
                     }
                     fileStatusLine
                 }
@@ -408,10 +408,9 @@ struct FoilExposeView: View {
     /// 文件来源的状态行：加载、需要授权、失败与空结果各自给出下一步动作；打开失败另起一行说明。
     @ViewBuilder
     private var fileStatusLine: some View {
-        let isFolders = model.resultFilter == .folders
         VStack(alignment: .leading, spacing: 6) {
             if model.isFileSearching {
-                SearchLoadingStatusView(text: NSLocalizedString(isFolders ? "Searching Local Folders" : "Searching Local Files", comment: ""), foreground: .white.opacity(0.62))
+                SearchLoadingStatusView(text: NSLocalizedString(model.resultFilter.searchingFilesLocalizationKey, comment: ""), foreground: .white.opacity(0.62))
             } else if let status = model.fileStatus {
                 HStack(spacing: 10) {
                     Text(NSLocalizedString(status.localizationKey, comment: ""))
@@ -425,7 +424,7 @@ struct FoilExposeView: View {
                     }
                 }
             } else if model.files.isEmpty {
-                Text(NSLocalizedString(isFolders ? "No Local Folder Results" : "No Local File Results", comment: ""))
+                Text(NSLocalizedString(model.resultFilter.noFilesLocalizationKey, comment: ""))
                     .font(.system(size: 12))
                     .foregroundStyle(.white.opacity(0.62))
             }

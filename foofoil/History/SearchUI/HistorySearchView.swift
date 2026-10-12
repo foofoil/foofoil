@@ -121,18 +121,18 @@ struct HistorySearchView: View {
                                         .font(.caption).padding(10)
                                 }
                                 if model.mode == .history && model.resultFilter.includesFiles {
-                                    sectionLabel(model.resultFilter == .folders ? "Local Folders Section" : "Local Files Section")
+                                    sectionLabel(model.resultFilter.fileSectionLocalizationKey)
                                     ForEach(Array(model.visibleFiles.enumerated()), id: \.element.id) { index, file in
                                         SpotlightFileResultRow(file: file, isSelected: model.selectedID == "file:\(file.id)")
                                             .id("file:\(file.id)")
                                             .onTapGesture { model.openFile?(file.url) }
                                     }
                                     if model.canExpandFileResults {
-                                        Button(NSLocalizedString(model.resultFilter == .folders ? "Search More Folders" : "Search More Files", comment: "")) { model.expandFileResults() }
+                                        Button(NSLocalizedString(model.resultFilter.moreFilesLocalizationKey, comment: "")) { model.expandFileResults() }
                                             .font(.caption).padding(10)
                                     }
                                     if model.isFileSearching {
-                                        SearchLoadingStatusView(text: NSLocalizedString(model.resultFilter == .folders ? "Searching Local Folders" : "Searching Local Files", comment: ""))
+                                        SearchLoadingStatusView(text: NSLocalizedString(model.resultFilter.searchingFilesLocalizationKey, comment: ""))
                                             .padding(10)
                                     } else if let status = model.fileStatus {
                                         HStack {
@@ -142,7 +142,7 @@ struct HistorySearchView: View {
                                             }
                                         }.padding(10)
                                     } else if model.files.isEmpty {
-                                        Text(NSLocalizedString(model.resultFilter == .folders ? "No Local Folder Results" : "No Local File Results", comment: ""))
+                                        Text(NSLocalizedString(model.resultFilter.noFilesLocalizationKey, comment: ""))
                                             .foregroundStyle(.secondary).padding(10)
                                     }
                                 }
