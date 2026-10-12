@@ -555,7 +555,7 @@ final class FoilExposeController {
     static let shared = FoilExposeController()
 
     private var panels: [FoilExposePanel] = []
-    private var model: FoilExposeModel?
+    var model: FoilExposeModel?
     private var keyMonitor: Any?
     private var showAllHotKeyRef: EventHotKeyRef?
     private var clipboardHotKeyRef: EventHotKeyRef?
@@ -929,11 +929,16 @@ final class FoilExposeController {
 
     private func installKeyMonitor() {
         keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self, let model = self.model else { return event }
-            // 系统面板（文件选择、授权）接管期间把按键交回系统，避免误触覆盖层。
-            if self.isPresentingSystemUI { return event }
-            let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            let key = event.charactersIgnoringModifiers?.lowercased()
+            self?.handleKeyEvent(event)
+        }
+    }
+
+    func handleKeyEvent(_ event: NSEvent) -> NSEvent? {
+        guard let model else { return event }
+        // 系统面板（文件选择、授权）接管期间把按键交回系统，避免误触覆盖层。
+        if isPresentingSystemUI { return event }
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let key = event.charactersIgnoringModifiers?.lowercased()
             let onlyCommand = modifiers.contains(.command)
                 && !modifiers.contains(.control) && !modifiers.contains(.option) && !modifiers.contains(.shift)
             let hasCommand = modifiers.contains(.command)
@@ -984,6 +989,16 @@ final class FoilExposeController {
             // 非搜索状态沿用行首/行尾与方向移动。
             if hasControl {
                 if model.isSearching {
+                    if model.isPickingScope {
+                        if key == "n" || event.keyCode == 45 {
+                            model.moveScopeSelection(by: 1)
+                            return nil
+                        }
+                        if key == "p" || event.keyCode == 35 {
+                            model.moveScopeSelection(by: -1)
+                            return nil
+                        }
+                    }
                     if let key = event.charactersIgnoringModifiers,
                        let item = model.item(forKey: key) {
                         self.select(item)
@@ -1055,7 +1070,6 @@ final class FoilExposeController {
             }
             return nil
         }
-    }
 
     func dismiss() {
         guard model != nil || !panels.isEmpty else { return }

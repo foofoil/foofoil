@@ -265,4 +265,104 @@ struct SearchScopeTests {
         #expect(model.activeScope == firstScope)
         #expect(model.query == "")
     }
+
+    @Test func ctrlNAndCtrlPSelectScopeInHistorySearchPanel() {
+        let model = HistorySearchViewModel(
+            historySearch: { _ in [] },
+            cameraAvailable: { false }
+        )
+        let panel = HistorySearchPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 400, height: 100),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        panel.searchModel = model
+
+        model.query = "/"
+        #expect(model.isPickingScope)
+        #expect(model.highlightedScopeIndex == 0)
+
+        // Ctrl+N 移动到下一项
+        let ctrlNEvent = NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [.control],
+            timestamp: 0,
+            windowNumber: panel.windowNumber,
+            context: nil,
+            characters: "\u{0e}",
+            charactersIgnoringModifiers: "n",
+            isARepeat: false,
+            keyCode: 45
+        )!
+        panel.sendEvent(ctrlNEvent)
+        #expect(model.highlightedScopeIndex == 1)
+
+        // Ctrl+P 移动回上一项
+        let ctrlPEvent = NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [.control],
+            timestamp: 0,
+            windowNumber: panel.windowNumber,
+            context: nil,
+            characters: "\u{10}",
+            charactersIgnoringModifiers: "p",
+            isARepeat: false,
+            keyCode: 35
+        )!
+        panel.sendEvent(ctrlPEvent)
+        #expect(model.highlightedScopeIndex == 0)
+    }
+
+    @Test func ctrlNAndCtrlPSelectScopeInFoilExposeController() {
+        let controller = FoilExposeController.shared
+        let originalModel = controller.model
+        defer { controller.model = originalModel }
+
+        let model = FoilExposeModel(
+            items: [],
+            historyItems: [],
+            cameraAvailable: { false }
+        )
+        controller.model = model
+
+        model.beginSearch()
+        model.searchText = "/"
+        #expect(model.isPickingScope)
+        #expect(model.highlightedScopeIndex == 0)
+
+        // Ctrl+N 移动到下一项
+        let ctrlNEvent = NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [.control],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: "\u{0e}",
+            charactersIgnoringModifiers: "n",
+            isARepeat: false,
+            keyCode: 45
+        )!
+        _ = controller.handleKeyEvent(ctrlNEvent)
+        #expect(model.highlightedScopeIndex == 1)
+
+        // Ctrl+P 移动回上一项
+        let ctrlPEvent = NSEvent.keyEvent(
+            with: .keyDown,
+            location: .zero,
+            modifierFlags: [.control],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            characters: "\u{10}",
+            charactersIgnoringModifiers: "p",
+            isARepeat: false,
+            keyCode: 35
+        )!
+        _ = controller.handleKeyEvent(ctrlPEvent)
+        #expect(model.highlightedScopeIndex == 0)
+    }
 }

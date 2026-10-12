@@ -13,16 +13,21 @@ final class HistorySearchPanel: NSPanel {
         if hasMarkedText { super.sendEvent(event); return }
         if event.keyCode == 53 { dismissSearch?(); return }
         if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "w" { dismissSearch?(); return }
+        let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        let isControlOnly = modifiers.contains(.control) && !modifiers.contains(.command) && !modifiers.contains(.option)
+        let keyChar = event.charactersIgnoringModifiers?.lowercased()
+        let isDown = event.keyCode == 125 || (isControlOnly && (keyChar == "n" || event.keyCode == 45))
+        let isUp = event.keyCode == 126 || (isControlOnly && (keyChar == "p" || event.keyCode == 35))
         if model.isPickingScope {
             if event.keyCode == 36 || event.keyCode == 76 || event.keyCode == 48 {
                 model.selectHighlightedScope()
                 return
             }
-            if event.keyCode == 125 || (event.modifierFlags.contains(.control) && event.charactersIgnoringModifiers == "n") {
+            if isDown {
                 model.moveScopeSelection(by: 1)
                 return
             }
-            if event.keyCode == 126 || (event.modifierFlags.contains(.control) && event.charactersIgnoringModifiers == "p") {
+            if isUp {
                 model.moveScopeSelection(by: -1)
                 return
             }
@@ -31,8 +36,8 @@ final class HistorySearchPanel: NSPanel {
             model.clearActiveScope()
             return
         }
-        if event.keyCode == 125 || (event.modifierFlags.contains(.control) && event.charactersIgnoringModifiers == "n") { model.moveSelection(by: 1); return }
-        if event.keyCode == 126 || (event.modifierFlags.contains(.control) && event.charactersIgnoringModifiers == "p") { model.moveSelection(by: -1); return }
+        if isDown { model.moveSelection(by: 1); return }
+        if isUp { model.moveSelection(by: -1); return }
         if (event.keyCode == 36 || event.keyCode == 76) && !hasMarkedText { model.openSelected(); return }
         super.sendEvent(event)
     }
