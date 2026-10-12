@@ -328,6 +328,16 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &contentModeCancellables)
 
+        // 只读正文与可编辑文本的切换决定上下键归属（滚动或切项），需同步“前往”菜单键位。
+        Publishers.Merge(controller.appState.$textURL.map { _ in () }, controller.appState.$isMarkdownPreview.map { _ in () })
+            .sink { [weak self, weak controller] _ in
+                DispatchQueue.main.async {
+                    guard let self, let controller, self.activeWindowController === controller else { return }
+                    self.updateGoMenuVisibility()
+                }
+            }
+            .store(in: &contentModeCancellables)
+
         // MusicKit 队列异步投影完成后刷新通用导航快捷键；@Published 发出时状态尚未提交。
         controller.appState.$builtInNavigatorContributions
             .sink { [weak self, weak controller] _ in

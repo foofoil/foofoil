@@ -8,6 +8,7 @@
 import Cocoa
 import PDFKit
 import SwiftUI
+import WebKit
 
 public class FloatingWindow: NSWindow {
     struct ResizeEdges: OptionSet {
@@ -187,6 +188,17 @@ public class FloatingWindow: NSWindow {
             return
         }
 
+        // 不可编辑正文的上下键滚动内容，先于列表切项处理；搜索输入中仍交给导航搜索。
+        if event.type == .keyDown,
+           let controller = self.windowController as? FloatingWindowController,
+           controller.appState.verticalArrowsScrollContent,
+           !controller.appState.isNavigatorSearchActive,
+           KeyboardShortcut.effectiveModifiers(for: event).isEmpty,
+           event.keyCode == 125 || event.keyCode == 126 {
+            scrollReadOnlyContent(by: event.keyCode == 125 ? 1 : -1, isExtensionDocument: controller.appState.isExtensionDocument)
+            return
+        }
+
         if event.type == .keyDown,
            let controller = self.windowController as? FloatingWindowController,
            controller.appState.handleFileListKeyDown(event) {
@@ -344,6 +356,38 @@ public class FloatingWindow: NSWindow {
         }
 
         super.sendEvent(event)
+    }
+
+    /// 上下键每次滚动约一行正文。EPUB 页面脚本被禁用，但宿主求值仍可用于滚动。
+    private func scrollReadOnlyContent(by direction: Int, isExtensionDocument: Bool) {
+        let step: CGFloat = 40
+        if isExtensionDocument {
+            guard let webView = Self.descendant(of: contentView, as: WKWebView.self) else { return }
+            webView.evaluateJavaScript("window.scrollBy(0, \(CGFloat(direction) * step));")
+            return
+        }
+        // 只滚动只读文本视图；可编辑编辑器保留原生光标与上下移动。
+        guard let scrollView = Self.descendant(of: contentView, as: NSScrollView.self, where: {
+            ($0.documentView as? NSTextView)?.isEditable == false
+        }) else { return }
+        let clipView = scrollView.contentView
+        var origin = clipView.bounds.origin
+        origin.y += CGFloat(direction) * step
+        clipView.scroll(to: clipView.constrainBoundsRect(NSRect(origin: origin, size: clipView.bounds.size)).origin)
+        scrollView.reflectScrolledClipView(clipView)
+    }
+
+    private static func descendant<T: NSView>(
+        of view: NSView?,
+        as type: T.Type,
+        where predicate: (T) -> Bool = { _ in true }
+    ) -> T? {
+        guard let view else { return nil }
+        if let match = view as? T, predicate(match) { return match }
+        for subview in view.subviews {
+            if let match = descendant(of: subview, as: type, where: predicate) { return match }
+        }
+        return nil
     }
 
     /// 播放控制在内容视图前匹配，设置变更后旧键位不再触发。

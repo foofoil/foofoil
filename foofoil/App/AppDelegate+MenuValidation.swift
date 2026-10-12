@@ -84,12 +84,19 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         Self.syncGoMenuKeyEquivalents(
             in: menu,
             isPDFDocument: activeAppState?.isPDFDocument == true,
-            hasFileList: activeAppState?.supportsItemNavigation == true
+            hasFileList: activeAppState?.supportsItemNavigation == true,
+            verticalArrowsScrollContent: activeAppState?.verticalArrowsScrollContent == true
         )
     }
 
     /// 独立成静态方法便于直接验证键位策略：主键位（菜单里展示的那个）与隐藏备用键位一起刷新。
-    static func syncGoMenuKeyEquivalents(in menu: NSMenu, isPDFDocument: Bool, hasFileList: Bool) {
+    /// 只读正文用上下方向键滚动，此时主键位若是上下方向键则不绑定菜单键位。
+    static func syncGoMenuKeyEquivalents(
+        in menu: NSMenu,
+        isPDFDocument: Bool,
+        hasFileList: Bool,
+        verticalArrowsScrollContent: Bool = false
+    ) {
         for item in menu.items {
             let identifier: String
             let isActive: Bool
@@ -116,7 +123,10 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
                 identifier = "go.goToPage"
                 isActive = isPDFDocument
             }
-            let shortcut = isActive ? KeyboardShortcutStore.shared.shortcut(forID: identifier) : nil
+            var shortcut = isActive ? KeyboardShortcutStore.shared.shortcut(forID: identifier) : nil
+            if verticalArrowsScrollContent, ["\u{F700}", "\u{F701}"].contains(shortcut?.keyEquivalent ?? "") {
+                shortcut = nil
+            }
             item.keyEquivalent = shortcut?.keyEquivalent ?? ""
             item.keyEquivalentModifierMask = shortcut?.modifiers ?? []
         }

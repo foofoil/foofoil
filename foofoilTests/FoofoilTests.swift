@@ -2912,6 +2912,27 @@ struct FoofoilTests {
                 && ((item.representedObject as? String) == up || (item.representedObject as? String) == down)
         }
         #expect(arrowExtras.isEmpty)
+
+        // 只读正文占用上下键滚动：列表切项不再抢占菜单上下键，左右键与 ⌃P/⌃N 备用键位保持不变。
+        AppDelegate.syncGoMenuKeyEquivalents(
+            in: goMenu,
+            isPDFDocument: false,
+            hasFileList: true,
+            verticalArrowsScrollContent: true
+        )
+        #expect(listPrevious?.keyEquivalent == "")
+        #expect(listNext?.keyEquivalent == "")
+    }
+
+    @Test func verticalArrowsScrollReadOnlyContentOnly() {
+        let appState = AppState()
+        appState.textURL = URL(fileURLWithPath: "/tmp/foofoil-readonly-\(UUID().uuidString).txt")
+        appState.text = "body"
+        #expect(appState.verticalArrowsScrollContent)
+
+        appState.textURL = nil
+        appState.text = ""
+        #expect(!appState.verticalArrowsScrollContent)
     }
 
     @Test func windowConfigAndHistoryRoundTripFileList() throws {

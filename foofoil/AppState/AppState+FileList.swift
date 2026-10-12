@@ -531,6 +531,13 @@ extension AppState {
         hasAppleMusicItemNavigation || fileList?.isPresentable == true || (isPPTXDocument && !pptxNavigationController.slides.isEmpty)
     }
 
+    /// 不可编辑的正文（只读文本、Markdown 预览、扩展文档）上下键滚动内容；与 `ContentView` 的内容选择保持一致。
+    var verticalArrowsScrollContent: Bool {
+        if isExtensionDocument { return true }
+        if isMarkdownPreview && isMarkdownDocument && !text.isEmpty { return true }
+        return textURL != nil && !isMarkdownDocument
+    }
+
     func activateAdjacentFileListItem(delta: Int, wraps: Bool = false) {
         if appleMusicItem != nil {
             activateAdjacentAppleMusicItem(delta: delta, wraps: wraps)
