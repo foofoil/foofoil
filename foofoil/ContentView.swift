@@ -333,6 +333,16 @@ public struct ContentView: View {
                 }
             }
 
+            if appState.isAudioDocument {
+                Button(action: {
+                    appState.copyAudioCoverToPasteboard()
+                }) {
+                    Label(NSLocalizedString("Copy Cover", comment: ""), systemImage: "photo.on.rectangle")
+                }
+                .disabled(appState.audioCoverImage == nil)
+                .keyboardShortcut("c", modifiers: [.command])
+            }
+
             if appState.isCamera {
                 if let camera = appState.cameraController { CameraDeviceContextMenu(controller: camera) }
             } else {

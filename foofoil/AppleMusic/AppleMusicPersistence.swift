@@ -1,6 +1,14 @@
+import AppKit
 import Foundation
 
 extension AppState {
+    /// 与音乐箔当前展示的封面保持一致；未加载完成或资料库条目未恢复时不提供。
+    @MainActor
+    var appleMusicCoverImage: NSImage? {
+        guard appleMusicItem != nil else { return nil }
+        return AppleMusicPlaybackController.shared.info.artwork
+    }
+
     /// 切换资料库来源前先保存旧箔，新内容获得独立的历史身份和音频默认外观。
     func prepareAppleMusic(_ item: AppleMusicLibraryItem) {
         let isNewSource = appleMusicReference?.sourceFingerprint != item.reference.sourceFingerprint

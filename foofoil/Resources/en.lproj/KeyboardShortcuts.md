@@ -37,7 +37,7 @@ Quick Open and the overview’s `/` search also search songs, albums, and playli
 | --- | --- | --- | --- |
 {{go}}
 
-Apple Music queues also use the common list navigation shortcuts and list search. Apple Music foils support the common border toggle shortcut.
+Apple Music queues also use the common list navigation shortcuts and list search. Apple Music foils support the common border toggle shortcut. In an audio foil, ⌘C (Edit → Copy Cover, or the context menu) copies the current cover image; it is disabled when the foil has no cover. Video foils keep their existing behavior.
 
 
 Navigation lists also support ⌃P / ⌃B for the previous item and ⌃N / ⌃F for the next. In read-only text, Markdown preview, and EPUB documents, ↑ / ↓ scroll the content instead; use ← / →, ⌃P / ⌃N, or a custom item shortcut to move between list items.

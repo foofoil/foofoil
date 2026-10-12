@@ -663,6 +663,15 @@ extension AppDelegate {
                 )
                 copyImageItem.withSymbol("photo.on.rectangle")
                 menu.addItem(copyImageItem)
+            } else if activeAppState?.isAudioDocument == true {
+                // 音频箔的 ⌘C 复制封面图；无封面时由 validateMenuItem 禁用。
+                let copyCoverItem = NSMenuItem(
+                    title: NSLocalizedString("Copy Cover", comment: ""),
+                    action: #selector(EditMenuCommands.copy(_:)),
+                    keyEquivalent: "c"
+                )
+                copyCoverItem.withSymbol("photo.on.rectangle")
+                menu.addItem(copyCoverItem)
             }
             appendExtractTextMenu(to: menu)
             appendExtractImageSubjectMenu(to: menu)
@@ -685,7 +694,9 @@ extension AppDelegate {
         cutItem.withSymbol("scissors")
         menu.addItem(cutItem)
 
-        let copyItem = NSMenuItem(title: NSLocalizedString("Copy", comment: ""), action: #selector(EditMenuCommands.copy(_:)), keyEquivalent: "c")
+        // 音频箔没有可复制的文本或图片内容，⌘C 改为复制当前封面；仍经由 responder chain 交给当前窗口。
+        let copyTitle = activeAppState?.isAudioDocument == true ? "Copy Cover" : "Copy"
+        let copyItem = NSMenuItem(title: NSLocalizedString(copyTitle, comment: ""), action: #selector(EditMenuCommands.copy(_:)), keyEquivalent: "c")
         copyItem.withSymbol("doc.on.doc")
         menu.addItem(copyItem)
 

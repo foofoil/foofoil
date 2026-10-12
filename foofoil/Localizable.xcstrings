@@ -3496,6 +3496,23 @@
         }
       }
     },
+    "Copy Cover": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy Cover"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复制封面图"
+          }
+        }
+      }
+    },
     "Copy Image": {
       "extractionState": "manual",
       "localizations": {

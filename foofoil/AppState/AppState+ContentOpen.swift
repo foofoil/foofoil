@@ -1363,6 +1363,23 @@ extension AppState {
             return pasteboard.writeObjects([image])
         }
 
+        /// 音频箔展示的封面：音乐箔取播放器封面，本地与扩展音频取视图已读出的封面；视频不提供。
+        @MainActor
+        public var audioCoverImage: NSImage? {
+            guard isAudioDocument else { return nil }
+            if appleMusicReference != nil { return appleMusicCoverImage }
+            return displayedArtwork
+        }
+
+        @MainActor
+        @discardableResult
+        public func copyAudioCoverToPasteboard() -> Bool {
+            guard let image = audioCoverImage else { return false }
+            let pasteboard = NSPasteboard.general
+            pasteboard.clearContents()
+            return pasteboard.writeObjects([image])
+        }
+
         public func saveWebScreenshot(_ image: NSImage, triggerSavePanel: Bool = false) {
             guard webURL != nil || isCamera else { return }
             let sourceID = id

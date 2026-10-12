@@ -607,6 +607,8 @@ public class FloatingWindow: NSWindow {
                 pasteboard.clearContents()
                 pasteboard.writeObjects([image])
             }
+        } else if controller.appState.isAudioDocument {
+            controller.appState.copyAudioCoverToPasteboard()
         } else if !controller.appState.isExternalMediaDocument {
             controller.appState.copyCurrentImageToPasteboard()
         }
@@ -615,6 +617,9 @@ public class FloatingWindow: NSWindow {
     public override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(FloatingWindow.copy(_:)) {
             guard let controller = windowController as? FloatingWindowController else { return false }
+            if controller.appState.isAudioDocument {
+                return controller.appState.audioCoverImage != nil
+            }
             return controller.appState.isCamera
                 ? controller.appState.cameraController?.hasFrame == true
                 : controller.appState.imageURL != nil && controller.appState.webURL == nil && !controller.appState.isExternalMediaDocument
