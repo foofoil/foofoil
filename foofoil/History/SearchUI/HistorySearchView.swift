@@ -8,6 +8,25 @@ struct HistorySearchView: View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
                 Image(systemName: model.mode == .url ? "globe" : "magnifyingglass").font(.title2).foregroundStyle(.secondary)
+                if let scope = model.activeScope {
+                    HStack(spacing: 5) {
+                        Image(systemName: scope.symbolName)
+                            .font(.system(size: 11))
+                        Text(scope.displayName)
+                            .font(.system(size: 13, weight: .medium))
+                        Button {
+                            model.clearActiveScope()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.accentColor.opacity(0.18)))
+                    .foregroundStyle(Color.accentColor)
+                }
                 TextField(placeholder, text: $model.query)
                     .textFieldStyle(.plain).font(.title3).focused($focused)
                     .accessibilityLabel(NSLocalizedString("Search History", comment: ""))
@@ -15,7 +34,46 @@ struct HistorySearchView: View {
             }
             .padding(18)
 
-            if !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if model.isPickingScope {
+                Divider()
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(model.filteredScopes.enumerated()), id: \.element.id) { index, scope in
+                        Button {
+                            model.selectScope(scope)
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: scope.symbolName)
+                                    .font(.body)
+                                    .frame(width: 20)
+                                    .foregroundStyle(index == model.highlightedScopeIndex ? Color.accentColor : .secondary)
+                                Text(scope.displayName)
+                                    .font(.body)
+                                    .foregroundStyle(index == model.highlightedScopeIndex ? Color.accentColor : .primary)
+                                Spacer()
+                                Text(scope.englishName)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                .fill(index == model.highlightedScopeIndex ? Color.accentColor.opacity(0.15) : Color.clear)
+                        )
+                    }
+                    if model.filteredScopes.isEmpty {
+                        Text(NSLocalizedString("No Matching Scopes", comment: ""))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                    }
+                }
+                .padding(8)
+            } else if !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Divider()
                 if let link = model.musicLink {
                     VStack(alignment: .leading, spacing: 8) {
@@ -63,18 +121,18 @@ struct HistorySearchView: View {
                                         .font(.caption).padding(10)
                                 }
                                 if model.mode == .history && model.resultFilter.includesFiles {
-                                    sectionLabel("Local Files Section")
+                                    sectionLabel(model.resultFilter == .folders ? "Local Folders Section" : "Local Files Section")
                                     ForEach(Array(model.visibleFiles.enumerated()), id: \.element.id) { index, file in
                                         SpotlightFileResultRow(file: file, isSelected: model.selectedID == "file:\(file.id)")
                                             .id("file:\(file.id)")
                                             .onTapGesture { model.openFile?(file.url) }
                                     }
                                     if model.canExpandFileResults {
-                                        Button(NSLocalizedString("Search More Files", comment: "")) { model.expandFileResults() }
+                                        Button(NSLocalizedString(model.resultFilter == .folders ? "Search More Folders" : "Search More Files", comment: "")) { model.expandFileResults() }
                                             .font(.caption).padding(10)
                                     }
                                     if model.isFileSearching {
-                                        SearchLoadingStatusView(text: NSLocalizedString("Searching Local Files", comment: ""))
+                                        SearchLoadingStatusView(text: NSLocalizedString(model.resultFilter == .folders ? "Searching Local Folders" : "Searching Local Files", comment: ""))
                                             .padding(10)
                                     } else if let status = model.fileStatus {
                                         HStack {
@@ -84,12 +142,12 @@ struct HistorySearchView: View {
                                             }
                                         }.padding(10)
                                     } else if model.files.isEmpty {
-                                        Text(NSLocalizedString("No Local File Results", comment: ""))
+                                        Text(NSLocalizedString(model.resultFilter == .folders ? "No Local Folder Results" : "No Local File Results", comment: ""))
                                             .foregroundStyle(.secondary).padding(10)
                                     }
                                 }
-                                if model.mode == .history, model.resultFilter != .files, model.isMusicSearchEnabled, model.isMusicAuthorized {
-                                    ForEach(AppleMusicSearchCategory.allCases) { category in
+                                if model.mode == .history, (model.resultFilter == .all || model.resultFilter.musicCategory != nil), model.isMusicSearchEnabled, model.isMusicAuthorized {
+                                    ForEach(AppleMusicSearchCategory.allCases.filter { model.resultFilter.includes($0) }) { category in
                                         if !model.musicResults(in: category).isEmpty {
                                             sectionLabel(category.sectionLocalizationKey)
                                             ForEach(model.visibleMusicResults(in: category)) { item in
@@ -141,7 +199,7 @@ struct HistorySearchView: View {
                     Spacer()
                 }.font(.caption).padding(.horizontal, 18).padding(.bottom, 12)
             }
-            if (model.musicLink != nil || (model.mode == .history && model.resultFilter != .files && model.isMusicSearchEnabled)), !model.isMusicAuthorized {
+            if (model.musicLink != nil || (model.mode == .history && (model.resultFilter == .all || model.resultFilter.musicCategory != nil) && model.isMusicSearchEnabled)), !model.isMusicAuthorized {
                 HStack {
                     Button(NSLocalizedString(model.musicLink == nil ? "Music Enable Search" : "Music Authorize", comment: "")) { model.enableMusicSearch?() }
                     Spacer()
@@ -179,9 +237,14 @@ struct HistorySearchView: View {
     }
 
     private var placeholder: String {
+        if let scope = model.activeScope {
+            return String(format: NSLocalizedString("Search In Scope Placeholder", comment: ""), scope.displayName)
+        }
         switch model.mode {
-        case .history: NSLocalizedString(model.isMusicSearchEnabled && model.isMusicAuthorized ? "Music Quick Open Placeholder" : "Search History Placeholder", comment: "")
-        case .url: NSLocalizedString("Enter URL Placeholder", comment: "")
+        case .history:
+            return NSLocalizedString(model.isMusicSearchEnabled && model.isMusicAuthorized ? "Music Quick Open Placeholder" : "Search History Placeholder", comment: "")
+        case .url:
+            return NSLocalizedString("Enter URL Placeholder", comment: "")
         }
     }
 }

@@ -13,6 +13,24 @@ final class HistorySearchPanel: NSPanel {
         if hasMarkedText { super.sendEvent(event); return }
         if event.keyCode == 53 { dismissSearch?(); return }
         if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "w" { dismissSearch?(); return }
+        if model.isPickingScope {
+            if event.keyCode == 36 || event.keyCode == 76 || event.keyCode == 48 {
+                model.selectHighlightedScope()
+                return
+            }
+            if event.keyCode == 125 || (event.modifierFlags.contains(.control) && event.charactersIgnoringModifiers == "n") {
+                model.moveScopeSelection(by: 1)
+                return
+            }
+            if event.keyCode == 126 || (event.modifierFlags.contains(.control) && event.charactersIgnoringModifiers == "p") {
+                model.moveScopeSelection(by: -1)
+                return
+            }
+        }
+        if event.keyCode == 51 && model.query.isEmpty && model.activeScope != nil {
+            model.clearActiveScope()
+            return
+        }
         if event.keyCode == 125 || (event.modifierFlags.contains(.control) && event.charactersIgnoringModifiers == "n") { model.moveSelection(by: 1); return }
         if event.keyCode == 126 || (event.modifierFlags.contains(.control) && event.charactersIgnoringModifiers == "p") { model.moveSelection(by: -1); return }
         if (event.keyCode == 36 || event.keyCode == 76) && !hasMarkedText { model.openSelected(); return }

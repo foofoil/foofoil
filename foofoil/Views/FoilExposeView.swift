@@ -310,7 +310,7 @@ struct FoilExposeView: View {
                 }
                 fileResultsSection
                 if model.showsMusicResults {
-                    ForEach(AppleMusicSearchCategory.allCases) { category in
+                    ForEach(AppleMusicSearchCategory.allCases.filter { model.resultFilter.includes($0) }) { category in
                         if !model.musicItems(in: category).isEmpty {
                             VStack(alignment: .leading, spacing: 16) {
                                 sectionHeader(category.sectionLocalizationKey, symbol: category.symbolName,
@@ -369,8 +369,12 @@ struct FoilExposeView: View {
     private var fileResultsSection: some View {
         Group {
             if model.showsFileResults {
+                let isFolders = model.resultFilter == .folders
                 VStack(alignment: .leading, spacing: 10) {
-                    sectionHeader("Local Files Section", symbol: "magnifyingglass", count: model.visibleFiles.count, tint: .cyan)
+                    sectionHeader(isFolders ? "Local Folders Section" : "Local Files Section",
+                                  symbol: isFolders ? "folder" : "magnifyingglass",
+                                  count: model.visibleFiles.count,
+                                  tint: .cyan)
                     // 关键字变化会先清空再补结果；网格常驻才能让行的增删都走同一段过渡。
                     LazyVGrid(columns: Self.fileColumns, spacing: 10) {
                         ForEach(model.visibleFiles) { file in
@@ -387,7 +391,7 @@ struct FoilExposeView: View {
                     }
                     .animation(.smooth(duration: 0.25), value: model.files)
                     if model.canExpandFileResults {
-                        fileActionButton("Search More Files") { model.expandFileResults() }
+                        fileActionButton(isFolders ? "Search More Folders" : "Search More Files") { model.expandFileResults() }
                     }
                     fileStatusLine
                 }
@@ -404,9 +408,10 @@ struct FoilExposeView: View {
     /// 文件来源的状态行：加载、需要授权、失败与空结果各自给出下一步动作；打开失败另起一行说明。
     @ViewBuilder
     private var fileStatusLine: some View {
+        let isFolders = model.resultFilter == .folders
         VStack(alignment: .leading, spacing: 6) {
             if model.isFileSearching {
-                SearchLoadingStatusView(text: NSLocalizedString("Searching Local Files", comment: ""), foreground: .white.opacity(0.62))
+                SearchLoadingStatusView(text: NSLocalizedString(isFolders ? "Searching Local Folders" : "Searching Local Files", comment: ""), foreground: .white.opacity(0.62))
             } else if let status = model.fileStatus {
                 HStack(spacing: 10) {
                     Text(NSLocalizedString(status.localizationKey, comment: ""))
@@ -420,7 +425,7 @@ struct FoilExposeView: View {
                     }
                 }
             } else if model.files.isEmpty {
-                Text(NSLocalizedString("No Local File Results", comment: ""))
+                Text(NSLocalizedString(isFolders ? "No Local Folder Results" : "No Local File Results", comment: ""))
                     .font(.system(size: 12))
                     .foregroundStyle(.white.opacity(0.62))
             }
@@ -507,11 +512,14 @@ struct FoilExposeView: View {
             }
             .font(.system(size: 13))
             .foregroundStyle(.white.opacity(0.62))
+            .opacity(model.isPickingScope ? 0 : 1)
+            .animation(.easeInOut(duration: 0.15), value: model.isPickingScope)
         }
         .padding(.top, 30)
         .padding(.bottom, 20)
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
+        .zIndex(10)
     }
 
     /// 标题后的搜索入口：默认是“/ 搜索”键帽提示，按 / 或点击后变成输入框；
@@ -523,12 +531,31 @@ struct FoilExposeView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(.white.opacity(0.55))
-                TextField(NSLocalizedString("Search Foils Placeholder", comment: ""), text: $model.searchText)
+                if let scope = model.activeScope {
+                    HStack(spacing: 4) {
+                        Image(systemName: scope.symbolName)
+                            .font(.system(size: 11))
+                        Text(scope.displayName)
+                            .font(.system(size: 12, weight: .medium))
+                        Button {
+                            model.clearActiveScope()
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 11))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.white.opacity(0.22)))
+                    .foregroundStyle(.white)
+                }
+                TextField(exposeSearchPlaceholder, text: $model.searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 14))
                     .foregroundStyle(.white)
                     // 不设置 tint：白色 tint 会把选区高亮一并染白，导致选中文字不可见。
-                    .frame(width: 200)
+                    .frame(width: model.activeScope == nil ? 220 : 160)
                     .focused($isSearchFieldFocused)
                     .background(
                         SearchFieldFocusProbe(
@@ -542,8 +569,14 @@ struct FoilExposeView: View {
             .padding(.vertical, 6)
             .background(Capsule().fill(Color.white.opacity(0.14)))
             .overlay(Capsule().stroke(Color.white.opacity(0.32), lineWidth: 1))
+            .overlay(alignment: .top) {
+                if model.isPickingScope {
+                    scopeHintsMenu
+                        .offset(y: 40)
+                }
+            }
             .environment(\.colorScheme, .dark)
-        } else if model.searchQuery.isEmpty {
+        } else if model.searchQuery.isEmpty && model.activeScope == nil {
             Button {
                 model.beginSearch()
             } label: {
@@ -565,6 +598,18 @@ struct FoilExposeView: View {
             .accessibilityLabel(NSLocalizedString("Search Foils Placeholder", comment: ""))
         } else {
             HStack(spacing: 8) {
+                if let scope = model.activeScope {
+                    HStack(spacing: 4) {
+                        Image(systemName: scope.symbolName)
+                            .font(.system(size: 11))
+                        Text(scope.displayName)
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(Capsule().fill(Color.white.opacity(0.22)))
+                    .foregroundStyle(.white)
+                }
                 Text(String(format: NSLocalizedString("Search Foils Results Format", comment: ""), model.searchQuery))
                     .font(.system(size: 14))
                     .foregroundStyle(.white.opacity(0.85))
@@ -581,6 +626,71 @@ struct FoilExposeView: View {
                 .accessibilityLabel(NSLocalizedString("Clear", comment: ""))
             }
         }
+    }
+
+    private var exposeSearchPlaceholder: String {
+        if let scope = model.activeScope {
+            return String(format: NSLocalizedString("Search In Scope Placeholder", comment: ""), scope.displayName)
+        }
+        return NSLocalizedString("Search Foils Placeholder", comment: "")
+    }
+
+    @ViewBuilder
+    private var scopeHintsMenu: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            ForEach(Array(model.filteredScopes.enumerated()), id: \.element.id) { index, scope in
+                Button {
+                    model.selectScope(scope)
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: scope.symbolName)
+                            .font(.system(size: 13))
+                            .frame(width: 20)
+                            .foregroundStyle(index == model.highlightedScopeIndex ? .white : .white.opacity(0.6))
+                        Text(scope.displayName)
+                            .font(.system(size: 13, weight: index == model.highlightedScopeIndex ? .semibold : .regular))
+                            .foregroundStyle(index == model.highlightedScopeIndex ? .white : .white.opacity(0.85))
+                        Spacer()
+                        Text(scope.englishName)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.white.opacity(0.5))
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(index == model.highlightedScopeIndex ? Color.accentColor : Color.clear)
+                )
+            }
+            if model.filteredScopes.isEmpty {
+                Text(NSLocalizedString("No Matching Scopes", comment: ""))
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.5))
+                    .padding(10)
+                    .frame(maxWidth: .infinity, alignment: .center)
+            }
+            Divider().overlay(Color.white.opacity(0.12)).padding(.vertical, 2)
+            Text(NSLocalizedString("Scope Hints Tip", comment: ""))
+                .font(.system(size: 10))
+                .foregroundStyle(.white.opacity(0.42))
+                .padding(.horizontal, 6)
+                .padding(.bottom, 2)
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .padding(6)
+        .frame(width: 260)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color(nsColor: .windowBackgroundColor))
+                .shadow(color: .black.opacity(0.5), radius: 16, x: 0, y: 8)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.white.opacity(0.18), lineWidth: 1)
+        )
     }
 
     /// 覆盖层标题使用应用显示名（中文环境为“浮箔”），与 App 菜单名称保持一致。

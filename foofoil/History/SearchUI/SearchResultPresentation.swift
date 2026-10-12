@@ -10,25 +10,30 @@ nonisolated enum SearchResultLimits {
     static let overviewGroupInitial = 18
 }
 
-enum SearchResultFilter: CaseIterable, Identifiable {
-    case all, files, albums, songs
+enum SearchResultFilter: CaseIterable, Identifiable, Equatable, Sendable {
+    case all, history, files, folders, albums, playlists, songs
     var id: Self { self }
     var localizationKey: String {
         switch self {
         case .all: "Search Filter All"
+        case .history: "Search History Section"
         case .files: "Search Filter Files"
+        case .folders: "Search Filter Folders"
         case .albums: "Music Albums"
+        case .playlists: "Music Playlists"
         case .songs: "Music Songs"
         }
     }
     var musicCategory: AppleMusicSearchCategory? {
         switch self {
         case .albums: .albums
+        case .playlists: .playlists
         case .songs: .songs
         default: nil
         }
     }
-    var includesFiles: Bool { self == .all || self == .files }
+    var includesFiles: Bool { self == .all || self == .files || self == .folders }
+    var target: SpotlightSearchTarget { self == .folders ? .folders : .files }
     func includes(_ category: AppleMusicSearchCategory) -> Bool { self == .all || musicCategory == category }
 }
 
@@ -52,7 +57,7 @@ struct SearchResultBudget {
             files = min(fileCount, initialCount, remaining)
             remaining -= files
         }
-        if filter == .all {
+        if filter == .all || filter == .history {
             base = min(baseCount, desiredBaseCount ?? baseCount, remaining)
             remaining -= base
         }

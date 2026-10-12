@@ -839,13 +839,13 @@
       "en": {
         "stringUnit": {
           "state": "translated",
-          "value": "Search history, files, and Apple Music…"
+          "value": "Search history, music, type / for scopes…"
         }
       },
       "zh-Hans": {
         "stringUnit": {
           "state": "translated",
-          "value": "搜索历史记录、文件和 Apple Music…"
+          "value": "搜索历史、音乐，输入 / 限定范围…"
         }
       }
     }
@@ -2527,6 +2527,142 @@
           "stringUnit": {
             "state": "translated",
             "value": "用户目录中的文件"
+          }
+        }
+      }
+    },
+    "Local Folders Section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Folders in Your Home Folder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户目录中的文件夹"
+          }
+        }
+      }
+    },
+    "Search Filter Folders": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "User Folders"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户文件夹"
+          }
+        }
+      }
+    },
+    "Searching Local Folders": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searching folders…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在搜索文件夹…"
+          }
+        }
+      }
+    },
+    "No Local Folder Results": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matching folders in your home folder."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户目录中没有匹配的文件夹。"
+          }
+        }
+      }
+    },
+    "Search More Folders": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More Folders"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多文件夹"
+          }
+        }
+      }
+    },
+    "Search In Scope Placeholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search in %1$@…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在%1$@中搜索…"
+          }
+        }
+      }
+    },
+    "No Matching Scopes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matching scopes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无匹配的搜索范围"
+          }
+        }
+      }
+    },
+    "Scope Hints Tip": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↑↓ to navigate · Enter / Tab to select · Esc to cancel"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "↑↓ 切换 · 回车 / Tab 确认 · Esc 取消"
           }
         }
       }
@@ -6406,13 +6542,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Search foils"
+            "value": "Search foils, type / for scopes…"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "搜索箔片"
+            "value": "搜索箔片，输入 / 限定范围…"
           }
         }
       }
@@ -6780,13 +6916,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Search history, files, or enter a URL"
+            "value": "Search history, files, type / for scopes…"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "搜索历史、文件或输入网址"
+            "value": "搜索历史、文件，输入 / 限定范围…"
           }
         }
       }

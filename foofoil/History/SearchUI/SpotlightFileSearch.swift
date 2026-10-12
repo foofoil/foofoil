@@ -1,12 +1,14 @@
 import Foundation
 import UniformTypeIdentifiers
 
-nonisolated struct SpotlightFileResult: Identifiable, Sendable, Equatable {
-    let url: URL
-    let modifiedAt: Date
-    var id: String { url.standardizedFileURL.path }
-    var name: String { url.lastPathComponent }
-    var symbolName: String {
+nonisolated public struct SpotlightFileResult: Identifiable, Sendable, Equatable {
+    public let url: URL
+    public let modifiedAt: Date
+    public let isDirectory: Bool
+    public var id: String { url.standardizedFileURL.path }
+    public var name: String { url.lastPathComponent }
+    public var symbolName: String {
+        if isDirectory { return "folder" }
         guard let type = UTType(filenameExtension: url.pathExtension) else { return "doc" }
         if type.conforms(to: .image) { return "photo" }
         if type.conforms(to: .audio) { return "music.note" }
@@ -15,8 +17,14 @@ nonisolated struct SpotlightFileResult: Identifiable, Sendable, Equatable {
         return "doc"
     }
 
+    public init(url: URL, modifiedAt: Date, isDirectory: Bool = false) {
+        self.url = url
+        self.modifiedAt = modifiedAt
+        self.isDirectory = isDirectory
+    }
+
     /// 结果展示上限：覆盖层可滚动，40 条仍能保持收集与渲染都很快。
-    static let displayLimit = 40
+    public static let displayLimit = 40
 
     /// 多关键字查询：整串吻合最优先，其余按每个关键字在文件名中的匹配质量求和，
     /// 同级再按修改时间与路径稳定排序。
@@ -47,6 +55,11 @@ nonisolated struct SpotlightFileResult: Identifiable, Sendable, Equatable {
             return $0.id < $1.id
         }.prefix(limit).map { $0 }
     }
+}
+
+nonisolated public enum SpotlightSearchTarget: Sendable, Equatable {
+    case files
+    case folders
 }
 
 nonisolated enum SpotlightSearchOutcome: Sendable {
@@ -93,11 +106,13 @@ final class SpotlightFileSearch {
         text.split(whereSeparator: { $0.isWhitespace }).map(String.init)
     }
 
-    nonisolated static func predicate(for text: String) -> NSPredicate {
+    nonisolated static func predicate(for text: String, target: SpotlightSearchTarget = .files) -> NSPredicate {
         let keywords = keywords(for: text)
         guard !keywords.isEmpty else { return NSPredicate(value: false) }
         var subpredicates: [NSPredicate] = [
-            NSPredicate(format: "NOT (%K == %@)", "kMDItemContentType", "public.folder"),
+            target == .folders
+                ? NSPredicate(format: "%K == %@", "kMDItemContentType", "public.folder")
+                : NSPredicate(format: "NOT (%K == %@)", "kMDItemContentType", "public.folder"),
             // 主目录范围包含 ~/Library：在谓词里先排除，减少无关候选并加快收集。
             NSPredicate(format: "NOT (%K BEGINSWITH %@)", "kMDItemPath",
                         SpotlightSearchAccess.userHome.appendingPathComponent("Library", isDirectory: true).path + "/"),
@@ -117,7 +132,7 @@ final class SpotlightFileSearch {
         }
     }
 
-    func start(text: String, scopes: [URL], extensions: Set<String>, completion: @escaping (SpotlightSearchOutcome) -> Void) {
+    func start(text: String, scopes: [URL], extensions: Set<String>, target: SpotlightSearchTarget = .files, completion: @escaping (SpotlightSearchOutcome) -> Void) {
         cancel()
         guard !scopes.isEmpty else { completion(.needsAuthorization); return }
         // 调用方已启动安全范围访问，服务接管到查询完成或取消。
@@ -125,7 +140,7 @@ final class SpotlightFileSearch {
         let requestGeneration = generation
         let query = makeQuery()
         query.searchScopes = scopes.map(\.path)
-        query.predicate = Self.predicate(for: text)
+        query.predicate = Self.predicate(for: text, target: target)
         query.sortDescriptors = [NSSortDescriptor(key: "kMDItemFSContentChangeDate", ascending: false),
                                  NSSortDescriptor(key: "kMDItemPath", ascending: true)]
         query.notificationBatchingInterval = 0.1
@@ -136,7 +151,7 @@ final class SpotlightFileSearch {
             observers.append(NotificationCenter.default.addObserver(forName: name, object: query, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
                     guard let self, self.generation == requestGeneration else { return }
-                    self.receiveResults(keywords: keywords, extensions: extensions, isFinished: name == .NSMetadataQueryDidFinishGathering)
+                    self.receiveResults(keywords: keywords, extensions: extensions, target: target, isFinished: name == .NSMetadataQueryDidFinishGathering)
                 }
             })
         }
@@ -145,7 +160,7 @@ final class SpotlightFileSearch {
             do { try await Task.sleep(for: deadline) } catch { return }
             guard let self, self.generation == requestGeneration else { return }
             // 截止只限制等待时间，不能把系统已经收集到的可用文件丢弃。
-            let files = self.collectResults(keywords: keywords, extensions: extensions)
+            let files = self.collectResults(keywords: keywords, extensions: extensions, target: target)
             guard files.isEmpty else {
                 self.finish(.results(files))
                 return
@@ -154,13 +169,13 @@ final class SpotlightFileSearch {
             // 让“没有匹配”正常结束，而不是误报为超时。
             do { try await Task.sleep(for: emptyDeadline - deadline) } catch { return }
             guard self.generation == requestGeneration else { return }
-            let lateFiles = self.collectResults(keywords: keywords, extensions: extensions)
+            let lateFiles = self.collectResults(keywords: keywords, extensions: extensions, target: target)
             self.finish(lateFiles.isEmpty ? .timedOut : .results(lateFiles))
         }
     }
 
-    private func receiveResults(keywords: [String], extensions: Set<String>, isFinished: Bool) {
-        let files = collectResults(keywords: keywords, extensions: extensions)
+    private func receiveResults(keywords: [String], extensions: Set<String>, target: SpotlightSearchTarget, isFinished: Bool) {
+        let files = collectResults(keywords: keywords, extensions: extensions, target: target)
         // 系统查询可能命中数万项；候选窗口已满且存在可展示文件时停止，不等待全量排序和收集完成。
         if isFinished || ((query?.resultCount ?? 0) >= Self.candidateLimit && !files.isEmpty) {
             finish(.results(files))
@@ -169,7 +184,7 @@ final class SpotlightFileSearch {
         }
     }
 
-    private func collectResults(keywords: [String], extensions: Set<String>) -> [SpotlightFileResult] {
+    private func collectResults(keywords: [String], extensions: Set<String>, target: SpotlightSearchTarget) -> [SpotlightFileResult] {
         guard let query else { return [] }
         query.disableUpdates()
         defer { query.enableUpdates() }
@@ -186,10 +201,17 @@ final class SpotlightFileSearch {
                   (item.value(forAttribute: "kMDItemFSInvisible") as? NSNumber)?.boolValue != true,
                   !url.pathComponents.contains(where: { $0.hasPrefix(".") }),
                   !Self.isHomeLibrary(url),
-                  !AppState.isManagedCacheURL(url),
-                  let identifier = item.value(forAttribute: "kMDItemContentType") as? String,
-                  Self.supports(url: url, typeIdentifier: identifier, extensions: extensions) else { continue }
-            files.append(.init(url: url, modifiedAt: item.value(forAttribute: "kMDItemFSContentChangeDate") as? Date ?? .distantPast))
+                  !AppState.isManagedCacheURL(url) else { continue }
+
+            let identifier = (item.value(forAttribute: "kMDItemContentType") as? String) ?? ""
+            if target == .folders {
+                guard identifier == "public.folder" || UTType(identifier)?.conforms(to: .folder) == true else { continue }
+                guard UTType(identifier)?.conforms(to: .package) != true else { continue }
+                files.append(.init(url: url, modifiedAt: item.value(forAttribute: "kMDItemFSContentChangeDate") as? Date ?? .distantPast, isDirectory: true))
+            } else {
+                guard Self.supports(url: url, typeIdentifier: identifier, extensions: extensions) else { continue }
+                files.append(.init(url: url, modifiedAt: item.value(forAttribute: "kMDItemFSContentChangeDate") as? Date ?? .distantPast, isDirectory: false))
+            }
             if files.count >= SearchResultLimits.probe { break }
         }
         return files
@@ -239,15 +261,19 @@ final class SpotlightFileSearch {
 
 extension SpotlightFileSearch {
     /// 用宿主与可用扩展声明的候选类型，在已授权的主目录范围内查询；未授权时直接报告状态。
-    func start(text: String, completion: @escaping (SpotlightSearchOutcome) -> Void) {
+    func start(text: String, target: SpotlightSearchTarget = .files, completion: @escaping (SpotlightSearchOutcome) -> Void) {
         let extensions = Set(ExtensionHost.shared.resolver.allDescriptors()
             .filter { $0.isEnabled && $0.isRuntimeAvailable }
             .flatMap(\.filenameExtensions).map { $0.lowercased() })
         do {
             let scopes = try SpotlightSearchAccess.shared.beginAccess()
-            start(text: text, scopes: scopes, extensions: extensions, completion: completion)
+            start(text: text, scopes: scopes, extensions: extensions, target: target, completion: completion)
         } catch {
             completion(.authorizationUnavailable)
         }
+    }
+
+    func start(text: String, completion: @escaping (SpotlightSearchOutcome) -> Void) {
+        start(text: text, target: .files, completion: completion)
     }
 }

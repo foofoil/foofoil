@@ -9,8 +9,11 @@ enum SpotlightFileOpener {
     @concurrent
     static func fileAccess(_ url: URL) async -> FileAccess {
         do {
-            let values = try url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey])
+            let values = try url.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey, .isDirectoryKey])
             if values.ubiquitousItemDownloadingStatus == .notDownloaded { return .notDownloaded }
+            if values.isDirectory == true {
+                return FileManager.default.isReadableFile(atPath: url.path) ? .readable : .needsPermission
+            }
             let handle = try FileHandle(forReadingFrom: url)
             try handle.close()
             return .readable
@@ -58,6 +61,22 @@ enum SpotlightFileOpener {
         guard let delegate = NSApp.delegate as? AppDelegate else {
             releaseAccess(access)
             return false
+        }
+        let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+        if isDir {
+            let target = delegate.availableBlankWindowController?.appState
+            let knownWindows = Set(delegate.windowControllers.map(ObjectIdentifier.init))
+            if let target {
+                guard target.handleDroppedFileURLs([scopedURL]) else {
+                    releaseAccess(access)
+                    return false
+                }
+            } else {
+                delegate.openFilesInNewFoil([scopedURL])
+            }
+            let openedState = target ?? delegate.windowControllers.first { !knownWindows.contains(ObjectIdentifier($0)) }?.appState
+            holdAccessUntilSettled(access, target: openedState)
+            return true
         }
         let target = delegate.availableBlankWindowController?.appState
         let knownWindows = Set(delegate.windowControllers.map(ObjectIdentifier.init))

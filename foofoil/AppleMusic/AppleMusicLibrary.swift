@@ -180,11 +180,12 @@ final class AppleMusicLibrary: ObservableObject {
     }
 
     func searchPage(_ term: String, filter: SearchResultFilter) async throws -> AppleMusicSearchPage {
-        guard isAuthorized, filter != .files else { return .init(items: []) }
+        guard isAuthorized, filter != .files, filter != .folders, filter != .history else { return .init(items: []) }
         let types: [any MusicLibrarySearchable.Type]
         switch filter {
         case .albums: types = [Album.self]
         case .songs: types = [Song.self]
+        case .playlists: types = [Playlist.self]
         default: types = [Album.self, Song.self, Playlist.self]
         }
         var request = MusicLibrarySearchRequest(term: term, types: types)

@@ -81,11 +81,78 @@ final class FoilExposeModel: ObservableObject {
     let clipboardContent: ClipboardOpenableContent?
     /// 当前键盘高亮的条目下标（对应 currentItems）；默认高亮第一项。
     @Published var selectedIndex: Int = 0
+
+    @Published var activeScope: SearchScope? = nil {
+        didSet {
+            if oldValue != activeScope {
+                resultFilter = activeScope?.filter ?? .all
+            }
+        }
+    }
+
+    var isPickingScope: Bool {
+        isSearching && activeScope == nil && searchText.hasPrefix("/")
+    }
+
+    var scopeFilterText: String {
+        guard isPickingScope else { return "" }
+        return String(searchText.dropFirst())
+    }
+
+    var availableScopes: [SearchScope] {
+        SearchScope.availableScopes(musicLibraryEnabled: SettingsStore.shared.appleMusicLibraryEnabled)
+    }
+
+    var filteredScopes: [SearchScope] {
+        let filter = scopeFilterText
+        return availableScopes.filter { $0.matches(filter: filter) }
+    }
+
+    @Published var highlightedScopeIndex: Int = 0
+
+    func moveScopeSelection(by offset: Int) {
+        guard !filteredScopes.isEmpty else { return }
+        highlightedScopeIndex = min(max(highlightedScopeIndex + offset, 0), filteredScopes.count - 1)
+    }
+
+    func selectHighlightedScope() {
+        guard isPickingScope, !filteredScopes.isEmpty else { return }
+        let index = min(max(highlightedScopeIndex, 0), filteredScopes.count - 1)
+        selectScope(filteredScopes[index])
+    }
+
+    func selectScope(_ scope: SearchScope) {
+        activeScope = scope
+        searchText = ""
+        highlightedScopeIndex = 0
+        selectedIndex = 0
+        requestSearchFieldFocus()
+    }
+
+    func clearActiveScope() {
+        activeScope = nil
+        resultFilter = .all
+        highlightedScopeIndex = 0
+        selectedIndex = 0
+    }
+
     /// 搜索关键字；输入时即时过滤，退出输入后关键字与过滤结果仍保留。
     @Published var searchText: String = "" {
         didSet {
             // 过滤结果变化后回到第一项，避免高亮落在已被过滤掉的条目上。
             if selectedIndex != 0 { selectedIndex = 0 }
+            if isPickingScope {
+                highlightedScopeIndex = 0
+                if searchText.contains(" ") {
+                    let parts = searchText.dropFirst().split(separator: " ", maxSplits: 1, omittingEmptySubsequences: false)
+                    let token = String(parts[0])
+                    if let matched = availableScopes.first(where: { $0.matches(filter: token) }) {
+                        selectScope(matched)
+                        searchText = parts.count > 1 ? String(parts[1]) : ""
+                        return
+                    }
+                }
+            }
             scheduleFileSearch()
             scheduleMusicSearch()
         }
@@ -132,7 +199,7 @@ final class FoilExposeModel: ObservableObject {
     var onOpenClipboard: () -> Void = {}
     /// 面板视图当前可见条目的 id（按显示顺序），随滚动实时回填；编号直选只命中可见项。
     private var visibleIDs: [UUID] = []
-    private let fileSearch: (String, @escaping (SpotlightSearchOutcome) -> Void) -> Void
+    private let fileSearch: (String, SpotlightSearchTarget, @escaping (SpotlightSearchOutcome) -> Void) -> Void
     private let cameraAvailable: () -> Bool
     private let cancelFiles: () -> Void
     private var fileSearchTask: Task<Void, Never>?
@@ -151,6 +218,7 @@ final class FoilExposeModel: ObservableObject {
          historyItems: [FoilExposeItem],
          clipboardContent: ClipboardOpenableContent? = nil,
          fileSearch: ((String, @escaping (SpotlightSearchOutcome) -> Void) -> Void)? = nil,
+         targetFileSearch: ((String, SpotlightSearchTarget, @escaping (SpotlightSearchOutcome) -> Void) -> Void)? = nil,
          cancelFiles: (() -> Void)? = nil,
          cameraAvailable: @escaping () -> Bool = { CameraCaptureController.isAvailable },
          musicSearch: (@MainActor (String) async throws -> [AppleMusicLibraryItem])? = nil,
@@ -169,15 +237,24 @@ final class FoilExposeModel: ObservableObject {
         self.historyItems = historyItems
         self.clipboardContent = clipboardContent
         let service = SpotlightFileSearch()
-        self.fileSearch = fileSearch ?? { text, completion in
-            service.start(text: text, completion: completion)
+        if let targetFileSearch {
+            self.fileSearch = targetFileSearch
+        } else if let fileSearch {
+            self.fileSearch = { text, _, completion in fileSearch(text, completion) }
+        } else {
+            self.fileSearch = { text, target, completion in
+                service.start(text: text, target: target, completion: completion)
+            }
         }
         self.cancelFiles = cancelFiles ?? { service.cancel() }
         musicSettingsCancellable = NotificationCenter.default.publisher(for: .appleMusicSearchDidChange)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self, !self.isStopped else { return }
-                if !self.musicEnabled() && self.resultFilter.musicCategory != nil { self.resultFilter = .all }
+                if !self.musicEnabled() && self.resultFilter.musicCategory != nil {
+                    self.activeScope = nil
+                    self.resultFilter = .all
+                }
                 self.scheduleMusicSearch()
             }
     }
@@ -190,12 +267,13 @@ final class FoilExposeModel: ObservableObject {
     /// 打开的箔片在前、历史记录在后的完整列表；已在打开的箔片中出现的条目不再重复显示；
     /// 有关键字时只保留标题匹配项。
     private var matchedFoilItems: [FoilExposeItem] {
+        if isPickingScope { return [] }
         let openIDs = Set(items.map(\.id))
         let combined = (items + historyItems.filter { !openIDs.contains($0.id) })
             .filter { SettingsStore.shared.appleMusicLibraryEnabled || $0.symbolName != AppleMusicReference.symbolName }
         guard !searchQuery.isEmpty else { return combined }
-        guard resultFilter == .all else { return [] }
-        let command = CameraCaptureController.matches(searchQuery, available: cameraAvailable()) ? [FoilExposeItem(id: FoilExposeItem.cameraCommandID, controller: nil, isHistoryEntry: false, title: NSLocalizedString("Open Camera", comment: ""), symbolName: "camera", contentKind: .camera, thumbnailPath: nil)] : []
+        guard resultFilter == .all || resultFilter == .history else { return [] }
+        let command = (resultFilter == .all && CameraCaptureController.matches(searchQuery, available: cameraAvailable())) ? [FoilExposeItem(id: FoilExposeItem.cameraCommandID, controller: nil, isHistoryEntry: false, title: NSLocalizedString("Open Camera", comment: ""), symbolName: "camera", contentKind: .camera, thumbnailPath: nil)] : []
         let query = searchQuery
         return command + combined.lazy.filter { $0.matches(query: query) }.prefix(SearchResultLimits.probe)
     }
@@ -238,20 +316,24 @@ final class FoilExposeModel: ObservableObject {
     /// 清除关键字并退出搜索输入，恢复完整列表。
     func clearSearch() {
         searchText = ""
+        activeScope = nil
+        resultFilter = .all
         isSearching = false
         selectedIndex = 0
     }
 
     /// 关键字非空时才呈现 Spotlight 文件结果区；空关键字不展示、不查询。
-    var showsFileResults: Bool { !searchQuery.isEmpty && resultFilter.includesFiles }
-    var showsMusicResults: Bool { !searchQuery.isEmpty && isMusicSearchEnabled && resultFilter != .files }
+    var showsFileResults: Bool { !isPickingScope && !searchQuery.isEmpty && resultFilter.includesFiles }
+    var showsMusicResults: Bool { !isPickingScope && !searchQuery.isEmpty && isMusicSearchEnabled && (resultFilter == .all || resultFilter.musicCategory != nil) }
     func musicItems(in category: AppleMusicSearchCategory) -> [FoilExposeItem] {
         musicItems.filter { $0.musicItem?.searchCategory == category }
     }
     var visibleMusicItems: [FoilExposeItem] {
-        AppleMusicSearchCategory.allCases.flatMap { category in
-            Array(musicItems(in: category).prefix(musicDisplayCount(in: category)))
-        }
+        AppleMusicSearchCategory.allCases
+            .filter { resultFilter.includes($0) }
+            .flatMap { category in
+                Array(musicItems(in: category).prefix(musicDisplayCount(in: category)))
+            }
     }
     func musicDisplayCount(in category: AppleMusicSearchCategory) -> Int {
         musicDisplayCounts[category, default: SearchResultLimits.overviewGroupInitial]
@@ -288,7 +370,7 @@ final class FoilExposeModel: ObservableObject {
             selectedIndex = min(selectedIndex, max(0, currentItems.count - 1))
         }
         let query = searchQuery
-        guard !isStopped, resultFilter != .files, !query.isEmpty, isMusicSearchEnabled, isMusicAuthorized else { return }
+        guard !isStopped, !isPickingScope, (resultFilter == .all || resultFilter.musicCategory != nil), !query.isEmpty, isMusicSearchEnabled, isMusicAuthorized else { return }
         isMusicSearching = true
         musicTask = Task { [weak self] in
             do {
@@ -327,7 +409,7 @@ final class FoilExposeModel: ObservableObject {
         fileSearchNotice = nil
         fileDisplayCount = SearchResultLimits.overviewGroupInitial
         let query = searchQuery
-        guard !query.isEmpty && resultFilter.includesFiles else {
+        guard !isPickingScope, !query.isEmpty && resultFilter.includesFiles else {
             cancelFiles()
             rawFiles = []
             files = []
@@ -339,10 +421,11 @@ final class FoilExposeModel: ObservableObject {
         files = []
         fileStatus = nil
         isFileSearching = true
+        let target = resultFilter.target
         fileSearchTask = Task { [weak self] in
             do { try await Task.sleep(for: .milliseconds(150)) } catch { return }
             guard let self, !Task.isCancelled, generation == self.fileGeneration else { return }
-            self.fileSearch(query) { [weak self] outcome in
+            self.fileSearch(query, target) { [weak self] outcome in
                 guard let self, generation == self.fileGeneration else { return }
                 switch outcome {
                 case .progress(let files):
@@ -883,10 +966,18 @@ final class FoilExposeController {
             if event.keyCode == 53 { // Esc：搜索状态下只退出搜索输入，否则关闭覆盖层
                 if model.isSearching {
                     if isComposing { return event }
+                    if model.isPickingScope {
+                        model.searchText = ""
+                        return nil
+                    }
                     model.endSearch()
                     return nil
                 }
                 self.dismiss()
+                return nil
+            }
+            if event.keyCode == 51 && model.isSearching && model.searchText.isEmpty && model.activeScope != nil {
+                model.clearActiveScope()
                 return nil
             }
             // 搜索输入时 ⌃ 组合优先用于数字/字母直选；未命中条目的 ⌃ 组合交给输入框做文本编辑（如 ⌃A/E），
@@ -918,19 +1009,37 @@ final class FoilExposeController {
                 return nil
             }
             switch event.keyCode {
-            case 48: // Tab：标签页已取消，吞掉以免焦点移出覆盖层；输入法组合时放行
+            case 48: // Tab：输入法组合时放行；选分类时选中当前高亮项；其余情况吞掉以免焦点移出覆盖层
                 if model.isSearching, isComposing { return event }
+                if model.isPickingScope {
+                    model.selectHighlightedScope()
+                    return nil
+                }
                 return nil
             case 116, 121: // PageUp / PageDown：整页滚动
                 model.requestPageScroll(direction: event.keyCode == 116 ? .up : .down)
-            case 36, 76: // 回车打开高亮箔片
+            case 36, 76: // 回车打开高亮箔片或选择限定范围
                 if model.isSearching, isComposing { return event }
+                if model.isPickingScope {
+                    model.selectHighlightedScope()
+                    return nil
+                }
                 guard let highlighted = model.highlightedItem else { return nil }
                 self.select(highlighted)
             case 123: model.moveSelection(.left)   // ←
             case 124: model.moveSelection(.right)  // →
-            case 125: model.moveSelection(.down)   // ↓
-            case 126: model.moveSelection(.up)     // ↑
+            case 125:
+                if model.isPickingScope {
+                    model.moveScopeSelection(by: 1)
+                    return nil
+                }
+                model.moveSelection(.down)   // ↓
+            case 126:
+                if model.isPickingScope {
+                    model.moveScopeSelection(by: -1)
+                    return nil
+                }
+                model.moveSelection(.up)     // ↑
             default:
                 // 搜索输入状态：其余按键交给输入框，关键字实时过滤。
                 if model.isSearching { return event }
