@@ -106,6 +106,7 @@ Default window positioning keys (see the table for custom bindings): Control–O
 | Undo / Redo | ⌘Z / ⇧⌘Z |
 | Cut / Copy / Paste | ⌘X / ⌘C / ⌘V |
 | Select all | ⌘A |
+| Close Foil Information | Esc |
 
 Editing shortcuts apply to text fields or selectable content, depending on focus and content type. Hiding keeps foils open and audio playing.
 

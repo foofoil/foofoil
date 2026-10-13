@@ -54,6 +54,10 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
         return try? database.config(id: id)
     }
 
+    func visitDates(id: UUID) -> (first: Date, last: Date)? {
+        try? database?.visitDates(id: id)
+    }
+
     public func touch(id: UUID) { try? database?.touch(id: id) }
     public func remove(id: UUID) { try? database?.remove(id: id) }
     public func updateThumbnailPath(id: UUID, path: String) { try? database?.updateThumbnailPath(id: id, path: path) }

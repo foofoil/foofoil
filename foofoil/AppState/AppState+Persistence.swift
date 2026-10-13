@@ -22,6 +22,11 @@ extension AppState {
                 if !fileOpenFeedback.isEmpty { fileOpenFeedback = [] }
                 closesEmptyWindowAfterFileOpenFailure = false
             }
+            // 补齐仍能可靠识别的原文件来源；托管缓存永远不能充当原路径。
+            if sourceFingerprint == nil, fileList == nil, appleMusicReference == nil,
+               let source = FoilInformation.sourceURL(for: toConfig()) {
+                sourceFingerprint = Self.localSourceFingerprint(for: source)
+            }
             let config = toConfig()
             let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
             if appleMusicReference != nil || isCamera || imageURL != nil || webURL != nil || textURL != nil || extensionSession != nil || !trimmedText.isEmpty {

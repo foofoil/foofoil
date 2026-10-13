@@ -79,6 +79,7 @@ nonisolated final class HistoryDatabase {
                 if kind == .web, let inputURL = config.webURLString {
                     let actualURL = config.actualWebURLString ?? inputURL
                     if let duplicate = try findWebDuplicate(inputURL: inputURL, actualURL: actualURL, excluding: config.id) {
+                        duplicateCreatedAt = duplicate.createdAt
                         config.webURLString = duplicate.webURLString ?? inputURL
                         if config.actualWebURLString == nil { config.actualWebURLString = duplicate.actualWebURLString }
                         if config.imagePath == nil { config.imagePath = duplicate.imagePath }
@@ -212,6 +213,20 @@ nonisolated final class HistoryDatabase {
 
     func config(id: UUID) throws -> WindowConfig? {
         try queue.sync { try queryConfigs("SELECT * FROM history_items WHERE id = ? LIMIT 1", bindings: [id.uuidString]).first }
+    }
+
+    /// 读取浮箔访问记录，不使用源文件的创建或修改时间。
+    func visitDates(id: UUID) throws -> (first: Date, last: Date)? {
+        try queue.sync {
+            var dates: (first: Date, last: Date)?
+            try withStatement("SELECT created_at, last_opened_at FROM history_items WHERE id = ?", bindings: [id.uuidString]) { statement in
+                if sqlite3_step(statement) == SQLITE_ROW {
+                    dates = (Date(timeIntervalSince1970: sqlite3_column_double(statement, 0)),
+                             Date(timeIntervalSince1970: sqlite3_column_double(statement, 1)))
+                }
+            }
+            return dates
+        }
     }
 
     func touch(id: UUID) throws {

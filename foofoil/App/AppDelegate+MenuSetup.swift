@@ -181,6 +181,11 @@ extension AppDelegate {
 
         fileMenu.addItem(NSMenuItem.separator())
 
+        let informationItem = NSMenuItem(title: NSLocalizedString("Foil Information Menu", comment: ""), action: #selector(showFoilInformationAction), keyEquivalent: "")
+        informationItem.withSymbol("info.circle")
+        informationItem.target = self
+        fileMenu.addItem(informationItem)
+
         let resetContentItem = NSMenuItem(title: NSLocalizedString("Reset", comment: ""), action: #selector(resetContentAction), keyEquivalent: "k")
         resetContentItem.withSymbol("arrow.counterclockwise")
         resetContentItem.keyEquivalentModifierMask = [.command]

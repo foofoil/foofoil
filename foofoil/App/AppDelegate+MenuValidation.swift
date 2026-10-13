@@ -211,6 +211,10 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         }?.isHidden = isHidden
     }
     public func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(showFoilInformationAction) {
+            return activeWindowController?.window?.isVisible == true
+                && activeWindowController?.window?.attachedSheet == nil
+        }
         if menuItem.action == #selector(hideCurrentFoilAction) {
             return activeWindowController?.window?.isVisible == true
         }
