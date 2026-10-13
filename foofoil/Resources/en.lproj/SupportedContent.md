@@ -72,4 +72,10 @@ Files that cannot be opened from drag and drop, the clipboard, or sharing appear
 
 Apple Music Library is disabled by default. Enable it in Settings → Types → Audio and Video to reveal its library entry, search options, and sharing guidance. Turning it off hides music history and search results without deleting saved history; Apple Music links open as ordinary web pages.
 
-All video foils can load external SRT, ASS/SSA, and WebVTT subtitles using the subtitle menu, the style panel, or drag and drop. Matching same-folder filenames are discovered automatically after folder access is available. Loaded files and visibility are saved with video history. Fonts, colors, background, shadow, bottom position and delay are global settings. ASS uses the global text style; PGS supports position and delay but keeps its bitmap appearance.
+All video foils can load external SRT, ASS/SSA, and WebVTT subtitles using the subtitle menu, the context menu, the View menu, or drag and drop. Matching same-folder filenames are discovered automatically after folder access is available. Loaded files are saved with video history; subtitle visibility is temporary. Fonts, colors, background, shadow, bottom position and delay are global settings. ASS uses the global text style; PGS supports position and delay but keeps its bitmap appearance.
+
+Choose Load Subtitle File from the video foil’s context menu or the system View menu to open external subtitles.
+
+After subtitles load successfully, Show Subtitles is available in the video context menu and View menu. Subtitles are shown each time a video opens; visibility is not saved in history.
+
+Videos support Capture Image from the context menu or File menu (⌘S). This opens a Save As dialog to save the current picture as a PNG image, without playback controls; subtitles are included only when Show Subtitles is enabled at capture time. Videos do not offer saving a copy of the video, Extract Text, or Extract Image Subject.

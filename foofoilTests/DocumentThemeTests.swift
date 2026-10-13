@@ -305,6 +305,60 @@ struct DocumentThemeTests {
         #expect(state.documentThemeId == "minimal")
     }
 
+    @Test func customThemeCapturesTypographyAndOverwritesInPlace() throws {
+        let catalog = DocumentThemeCatalog.shared
+        let state = AppState()
+        state.text = "主题测试"
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.documentFontName = "Helvetica"
+        state.textFontSize = 24
+        state.documentZoom = 1.4
+        state.documentLineSpacing = 1.8
+        state.documentParagraphSpacing = 0.9
+        let saved = catalog.addCustomTheme(name: "排版主题", currentBackgroundHex: "#EEEEEE",
+            currentTextHex: "#222222", isCurrentlyDark: false, typography: state.currentThemeTypography)
+        defer { catalog.deleteCustomTheme(id: saved.id) }
+        let encoded = try JSONEncoder().encode(saved)
+        let decoded = try JSONDecoder().decode(DocumentTheme.self, from: encoded)
+        #expect(decoded.typography == state.currentThemeTypography)
+        state.textFontSize = 30
+        let count = catalog.customThemes.count
+        let updated = catalog.addCustomTheme(name: saved.name, currentBackgroundHex: "#DDDDDD",
+            currentTextHex: "#333333", isCurrentlyDark: false,
+            typography: state.currentThemeTypography, replacing: saved.id)
+        #expect(catalog.customThemes.count == count)
+        #expect(updated.id == saved.id)
+        #expect(SettingsStore.shared.customDocumentThemes.first { $0.id == saved.id } == updated)
+        state.documentFontName = nil
+        state.textFontSize = 16
+        state.documentLineSpacing = nil
+        state.applyDocumentTheme(updated, isDark: false)
+        #expect(state.documentFontName == "Helvetica")
+        #expect(state.textFontSize == 30)
+        #expect(state.documentLineSpacing == 1.8)
+        #expect(state.documentParagraphSpacing == 0.9)
+        #expect(state.documentZoom == 1.4)
+        state.textFontSize = 32
+        state.adaptDocumentColorsToAppearanceChange(toDarkAppearance: true)
+        #expect(state.textFontSize == 32)
+    }
+
+    @Test func savingDefaultColorsKeepsTransparentBackgroundAndSystemText() {
+        let catalog = DocumentThemeCatalog.shared
+        let saved = catalog.addCustomTheme(name: "透明主题", currentBackgroundHex: nil,
+            currentTextHex: nil, isCurrentlyDark: false)
+        defer { catalog.deleteCustomTheme(id: saved.id) }
+        let state = AppState()
+        state.text = "正文"
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.applyDocumentTheme(saved, isDark: false)
+        #expect(state.backgroundColorHex == nil)
+        #expect(state.textColorHex == nil)
+        state.adaptDocumentColorsToAppearanceChange(toDarkAppearance: true)
+        #expect(state.backgroundColorHex == nil)
+        #expect(state.textColorHex == nil)
+    }
+
     // MARK: - 对比度计算辅助
 
     private func contrastRatio(between c1: NSColor, and c2: NSColor) -> CGFloat {

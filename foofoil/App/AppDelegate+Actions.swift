@@ -96,9 +96,18 @@ extension AppDelegate {
         }
     }
 
+    @objc func captureVideoFrameAction() {
+        guard let state = activeAppState, state.isVideoDocument else { return }
+        NotificationCenter.default.post(name: VideoFrameCapture.notification(for: state.id), object: nil)
+    }
+
     @objc func saveAsAction() {
         guard let appState = activeAppState else { return }
 
+        if appState.isVideoDocument {
+            captureVideoFrameAction()
+            return
+        }
         if appState.isCamera {
             let id = appState.id
             appState.cameraController?.capture { [weak appState] image in
@@ -1061,6 +1070,16 @@ extension AppDelegate {
                 "originalName": String(format: NSLocalizedString("Image Subject: %@", comment: ""), originalName)
             ]
         )
+    }
+
+    @objc func toggleSubtitlesAction() {
+        guard let state = activeAppState, state.isVideoDocument, state.subtitles.hasLoadedSubtitle else { return }
+        state.subtitles.setVisible(state.subtitles.isHidden)
+    }
+
+    @objc func loadSubtitleFileAction() {
+        guard let appState = activeAppState, appState.isVideoDocument else { return }
+        appState.subtitles.pickFile()
     }
 
     @objc func documentStyleAction() {

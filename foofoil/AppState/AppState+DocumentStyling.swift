@@ -78,17 +78,29 @@ extension AppState {
         supportsDocumentTextStyling ? documentParagraphSpacing : nil
     }
 
-    /// 应用选中的文档主题（前景色与背景色随当前外观切换）；不改变字体与排版参数。
-    public func applyDocumentTheme(_ theme: DocumentTheme, isDark: Bool) {
+    /// 应用选中的文档主题（前景色与背景色随当前外观切换）；自建主题同时恢复字体与排版参数。
+    public func applyDocumentTheme(_ theme: DocumentTheme, isDark: Bool, applyTypography: Bool = true) {
         isApplyingThemeColors = true
-        backgroundColorHex = theme.id == "none" ? nil : theme.backgroundHex(isDark: isDark)
-        if theme.id == "none" {
+        backgroundColorHex = theme.id == "none" || theme.usesDefaultBackground == true ? nil : theme.backgroundHex(isDark: isDark)
+        if theme.id == "none" || theme.usesDefaultText == true {
             textColorHex = nil
         } else if supportsDocumentTextStyling {
             textColorHex = theme.textHex(isDark: isDark)
         }
+        if applyTypography, supportsDocumentTextStyling, let typography = theme.typography {
+            documentFontName = typography.fontName
+            textFontSize = typography.fontSize
+            documentZoom = typography.zoom
+            documentLineSpacing = typography.lineSpacing
+            documentParagraphSpacing = typography.paragraphSpacing
+        }
         documentThemeId = theme.id
         isApplyingThemeColors = false
+    }
+
+    var currentThemeTypography: DocumentThemeTypography {
+        .init(fontName: documentFontName, fontSize: textFontSize, zoom: documentZoom,
+              lineSpacing: documentLineSpacing, paragraphSpacing: documentParagraphSpacing)
     }
 
     /// 新打开的文档默认采用素笺；已有主题（含“无”）或手动色彩保持用户选择。
@@ -134,7 +146,7 @@ extension AppState {
     /// 让内容始终可读；中间色与已相符的颜色保持不变。
     func adaptDocumentColorsToAppearanceChange(toDarkAppearance isDark: Bool) {
         if let themeId = documentThemeId, let theme = DocumentThemeCatalog.shared.theme(for: themeId) {
-            applyDocumentTheme(theme, isDark: isDark)
+            applyDocumentTheme(theme, isDark: isDark, applyTypography: false)
             return
         }
 

@@ -1,6 +1,294 @@
 {
   "sourceLanguage": "en",
   "strings": {
+  "Video Frame: %@": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Screenshot: %@"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "截图：%@"
+      }
+    }
+  }
+},
+  "Video Frame Capture Failed": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Unable to Capture Image"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "无法截取图片"
+      }
+    }
+  }
+},
+  "Capture Video Frame": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Capture Image"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "截取图片"
+      }
+    }
+  }
+},
+  "Theme Management Help": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Right-click a custom theme to overwrite or delete it."
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "右键点击自定义主题，可用当前配置覆盖或删除。"
+      }
+    }
+  }
+},
+  "Save current style as a theme": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Save current style as a theme"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "把当前配置保存为主题"
+      }
+    }
+  }
+},
+  "Replace with Current Style": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Replace with Current Style"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "用当前样式覆盖"
+      }
+    }
+  }
+},
+  "Overwrite Theme": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Overwrite"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "覆盖"
+      }
+    }
+  }
+},
+  "New Theme": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "New theme"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "新主题"
+      }
+    }
+  }
+},
+  "Save Theme Destination": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Save to"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "保存到"
+      }
+    }
+  }
+},
+  "Subtitle Preview Text": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "A beautiful moment"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "此刻，光影正好"
+      }
+    }
+  }
+},
+  "Subtitle Cool Description": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Cool mint with a delicate blue tint"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "薄荷文字、淡青底、深蓝影，清爽柔和"
+      }
+    }
+  }
+},
+  "Subtitle Light Description": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Dark text on a soft ivory backdrop"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "深色文字、柔白底，无阴影，温润清楚"
+      }
+    }
+  }
+},
+  "Subtitle Balanced Description": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "A subtle dark backdrop for clarity"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "银白文字、半透明墨底，清晰稳重"
+      }
+    }
+  }
+},
+  "Subtitle Clear Description": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Large, bright text for busy scenes"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "大号白字、深色底，无阴影，醒目易读"
+      }
+    }
+  }
+},
+  "Subtitle Warm Description": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Warm gold for comfortable viewing"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "暖金文字、棕色阴影，柔和耐看"
+      }
+    }
+  }
+},
+  "Subtitle Elegant Description": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Elegant white with a soft shadow"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "经典白字、柔和暗影，轻盈优雅"
+      }
+    }
+  }
+},
+  "Subtitle Mist": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Sea Mist"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "青岚"
+      }
+    }
+  }
+},
+  "Subtitle Spotlight": {
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Spotlight"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "聚光"
+      }
+    }
+  }
+},
   "Subtitle Style": {
     "localizations": {
       "en": {
@@ -98,69 +386,69 @@
     }
   },
   "Subtitle White Shadow": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "White with dark shadow"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "白字黑影"
-        }
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Silver Screen"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "银幕"
       }
     }
-  },
+  }
+},
   "Subtitle Black Background": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "White on dark background"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "黑底白字"
-        }
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Obsidian"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "墨晶"
       }
     }
-  },
+  }
+},
   "Subtitle Warm Yellow": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Warm yellow"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "暖黄字幕"
-        }
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Golden Hour"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "流金"
       }
     }
-  },
+  }
+},
   "Subtitle Light Background": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Dark on light background"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "浅底深字"
-        }
+  "localizations": {
+    "en": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "Moonlight"
+      }
+    },
+    "zh-Hans": {
+      "stringUnit": {
+        "state": "translated",
+        "value": "月白"
       }
     }
-  },
+  }
+},
   "Subtitle Font Size": {
     "localizations": {
       "en": {

@@ -153,6 +153,7 @@ extension AppDelegate {
         saveAsItem.target = self
         fileMenu.addItem(saveAsItem)
 
+
         let shareItem = NSMenuItem(title: NSLocalizedString("Share...", comment: ""), action: #selector(shareAction), keyEquivalent: "")
         shareItem.withSymbol("square.and.arrow.up")
         shareItem.representedObject = "file.share"
@@ -469,6 +470,16 @@ extension AppDelegate {
         documentStyleItem.target = self
         viewMenu.addItem(documentStyleItem)
 
+        let loadSubtitleItem = NSMenuItem(title: NSLocalizedString("Load Subtitle File", comment: ""),
+                                          action: #selector(loadSubtitleFileAction), keyEquivalent: "")
+        loadSubtitleItem.withSymbol("captions.bubble")
+        loadSubtitleItem.target = self
+        viewMenu.addItem(loadSubtitleItem)
+        let showSubtitlesItem = NSMenuItem(title: NSLocalizedString("Show Subtitles", comment: ""),
+                                           action: #selector(toggleSubtitlesAction), keyEquivalent: "")
+        showSubtitlesItem.target = self
+        viewMenu.addItem(showSubtitlesItem)
+
         // Increase Opacity - 快捷键 Command + Shift + ↑
         let increaseOpacityItem = NSMenuItem(title: NSLocalizedString("Increase Opacity", comment: ""), action: #selector(increaseOpacityAction), keyEquivalent: "")
         increaseOpacityItem.withSymbol("sun.max")
@@ -773,6 +784,7 @@ extension AppDelegate {
               let item = menu.items.first(where: { $0.action == #selector(extractTextFromImageAction) }) else {
             return
         }
+        item.isHidden = activeAppState?.isVideoDocument == true
         let isAvailable = activeAppState?.canExtractImageText == true
         item.isEnabled = isAvailable
         let shortcut = isAvailable ? KeyboardShortcutStore.shared.shortcut(forID: "edit.extractText") : nil
@@ -787,6 +799,7 @@ extension AppDelegate {
               let item = menu.items.first(where: { $0.action == #selector(extractImageSubjectAction) }) else {
             return
         }
+        item.isHidden = activeAppState?.isVideoDocument == true
         let isAvailable = activeAppState?.canExtractImageSubject == true
         item.isEnabled = isAvailable
         let shortcut = isAvailable ? KeyboardShortcutStore.shared.shortcut(forID: "edit.extractImageSubject") : nil

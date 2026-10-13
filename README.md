@@ -167,3 +167,5 @@ The bundled cmark library is distributed under its own permissive licenses. See 
 Video capabilities live in the sibling `video` repository. `./run` and `./package-dmg` include it by default; pass `--without-video` to omit it or `--with-video` to include it explicitly. No user installation or enablement is required.
 
 Videos support external SRT, ASS/SSA and WebVTT subtitles through automatic filename matching, manual loading and drag and drop, with history restoration. The default ⌘I shortcut opens video subtitle styles; font, size, colors, background, shadow, bottom position and delay are saved globally.
+
+Video foils use Capture Image (⌘S) to save the current picture as a PNG image through the Save As dialog.

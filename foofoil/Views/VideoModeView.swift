@@ -33,6 +33,7 @@ struct VideoModeView: View {
     let url: URL
     let shouldHideBorder: Bool
     @ObservedObject private var subtitles: VideoSubtitleController
+    @State private var captureDisplaySize = CGSize(width: 960, height: 540)
     @State private var videoSize = CGSize(width: 16, height: 9)
     @StateObject private var controller: VideoPlayerController
 
@@ -103,7 +104,11 @@ struct VideoModeView: View {
         .animation(.easeInOut(duration: 0.25), value: appState.isMediaPlaybackControlsVisible)
         .animation(.easeInOut(duration: 0.25), value: appState.fullScreenNavigatorControlBarInset)
         // 与图片有边框模式保持一致的 8pt 内容边距
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { captureDisplaySize = $0 }
         .padding(shouldHideBorder ? 0 : 8)
+        .onReceive(NotificationCenter.default.publisher(for: VideoFrameCapture.notification(for: appState.id))) { _ in
+            VideoFrameCapture.capture(player: controller.player, state: appState, displaySize: captureDisplaySize, sourceSize: videoSize)
+        }
         .task(id: url) {
             subtitles.onChange = { [weak appState] in appState?.saveState() }
             await subtitles.prepare(video: url)

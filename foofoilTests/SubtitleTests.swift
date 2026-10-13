@@ -31,7 +31,7 @@ import Testing
         let repo = HistoryRepository(databaseURL: directory.appendingPathComponent("history.sqlite3"))
         var association = SubtitleAssociation()
         association.files = [.init(path: "/tmp/movie.srt", bookmark: Data([1,2,3]))]
-        association.selectedPath = "/tmp/movie.srt"; association.isHidden = true
+        association.selectedPath = "/tmp/movie.srt"
         let config = WindowConfig(id: UUID(), originalImageName: "movie.mp4", subtitleAssociations: ["/tmp/movie.mp4": association])
         #expect(repo.upsert(config))
         let saved = try #require(repo.recent(limit: 10).first)
@@ -44,9 +44,9 @@ import Testing
         let original = store.style
         defer { store.style = original }
         store.style.delay = 1.5; store.style.bottom = 12
-        store.applyTheme(SubtitleStyle.themes[2].1)
+        store.applyTheme(SubtitleStyle.themes.first { $0.0 == "Subtitle Warm Yellow" }!.1)
         #expect(store.style.delay == 1.5 && store.style.bottom == 12)
-        #expect(store.style.color == "#FFE082")
+        #expect(store.style.color == "#FFE6A3")
     }
 }
 
@@ -70,19 +70,29 @@ extension SubtitleTests {
         #expect(controller.association.files.count == 2)
         #expect(controller.association.selectedPath == exact.path)
         #expect(controller.document?.text(at: 2) == "中文")
+        let historyBeforeHide = controller.history
+        var saves = 0
+        controller.onChange = { saves += 1 }
+        #expect(controller.hasLoadedSubtitle)
+        controller.hide()
+        #expect(controller.isHidden)
+        #expect(controller.history == historyBeforeHide)
+        #expect(saves == 0)
+        controller.setVisible(true)
+        #expect(!controller.isHidden)
         controller.hide()
         let saved = controller.history
         let restored = VideoSubtitleController()
         restored.restore(saved)
         await restored.prepare(video: video)
-        #expect(restored.association.isHidden)
+        #expect(!restored.isHidden)
         #expect(restored.association.selectedPath == exact.path)
         restored.selectFile(try #require(restored.association.files.first(where: { $0.path == alternate.path })))
         for _ in 0..<100 {
             if restored.association.selectedPath == alternate.path { break }
             try await Task.sleep(for: .milliseconds(10))
         }
-        #expect(!restored.association.isHidden)
+        #expect(!restored.isHidden)
         #expect(restored.document?.text(at: 2) == "English")
     }
 }
@@ -119,5 +129,36 @@ extension SubtitleTests {
         SubtitleStyleStore.shared.style.delay = -1
         #expect(state.subtitles.text(at: 0.5) == "Dropped subtitle")
         state.imageURL = nil
+    }
+}
+
+@MainActor
+@Suite(.serialized)
+struct SubtitleThemeTests {
+    @Test func customThemesSaveOverwriteRestoreAndDelete() throws {
+        let name = "subtitle-themes-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let store = SubtitleStyleStore(defaults: defaults)
+        store.style = SubtitleStyle(font: "Helvetica", size: 60, color: "#ABCDEF", background: "#12345680",
+                                    shadow: "#654321", bottom: 12, delay: 1.5, theme: "Custom")
+        let saved = store.saveTheme(name: "  我的影院  ")
+        #expect(saved.name == "我的影院")
+        let restored = SubtitleStyleStore(defaults: defaults)
+        #expect(restored.customThemes == [saved])
+        restored.style.size = 72
+        let replaced = restored.saveTheme(name: "我的影院", replacing: saved.id)
+        #expect(replaced.id == saved.id)
+        #expect(restored.customThemes.count == 1)
+        #expect(replaced.style.size == 72)
+        restored.applyTheme(SubtitleStyle.themes[0].1)
+        restored.selectTheme(replaced)
+        #expect(restored.style.size == 72)
+        #expect(restored.style.bottom == 12)
+        #expect(restored.style.delay == 1.5)
+        restored.deleteTheme(id: saved.id)
+        #expect(restored.style.theme == "Custom")
+        #expect(restored.style.size == 72)
+        #expect(SubtitleStyleStore(defaults: defaults).customThemes.isEmpty)
     }
 }

@@ -279,6 +279,19 @@ public struct ContentView: View {
                 .configuredKeyboardShortcut("view.slideshow")
             }
 
+            if appState.isVideoDocument {
+                Button {
+                    NotificationCenter.default.post(name: VideoFrameCapture.notification(for: appState.id), object: nil)
+                } label: {
+                    Label("Capture Video Frame", systemImage: "camera.viewfinder")
+                }
+                .keyboardShortcut("s", modifiers: [.command])
+                SubtitleVisibilityToggle(controller: appState.subtitles)
+                Button { appState.subtitles.pickFile() } label: {
+                    Label("Load Subtitle File", systemImage: "captions.bubble")
+                }
+            }
+
             if appState.usesImagePresentation {
                 // 视频/音频没有“拷贝图片”能力
                 if !appState.isExternalMediaDocument {
@@ -345,7 +358,7 @@ public struct ContentView: View {
 
             if appState.isCamera {
                 if let camera = appState.cameraController { CameraDeviceContextMenu(controller: camera) }
-            } else {
+            } else if !appState.isVideoDocument {
                 // 提取文字：仅光栅图片箔可用；图中无字时也禁用，检测未完成前保持禁用。
                 Button(action: {
                     (NSApplication.shared.delegate as? AppDelegate)?.extractTextFromImage(from: appState)

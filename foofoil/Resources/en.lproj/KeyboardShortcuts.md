@@ -20,7 +20,7 @@ Customize bindings in Settings → Keyboard Shortcuts. Except for global shortcu
 | --- | --- | --- | --- |
 | New foil | ⌘N | ⌘N |  |
 | Open file | ⌘O | ⌘O |  |
-| Save as | ⌘S | ⌘S | Depends on content |
+| Save as / Capture image | ⌘S | ⌘S | Videos: Capture Image opens an image Save As dialog; other content: save as |
 {{file}}
 
 In the Apple Music library window, Esc closes the window, including while the search field is focused. Drag the blank area of the sidebar to move the window.
@@ -124,3 +124,5 @@ Quick Open shows all sources without category tabs, initially 12 results per gro
 Apple Music shortcuts and link handling require Enable Apple Music Library in Settings → Types → Audio and Video, which is off by default. When disabled, Quick Open and Open Clipboard Content treat Apple Music sharing links as ordinary websites.
 
 The configurable Document / Subtitle Style command opens subtitle settings for videos and document settings for documents. Subtitle styles and timing are global.
+
+Subtitle and document styles can be saved as custom themes. Choose an existing theme in Save as Theme to overwrite it, or right-click a custom theme to overwrite or delete it. Subtitle themes save all settings; document themes save colors, fonts, size, and spacing.

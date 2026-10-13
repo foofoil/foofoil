@@ -7,6 +7,11 @@ import UniformTypeIdentifiers
 @MainActor final class VideoSubtitleController: NSObject, ObservableObject, AVPlayerItemLegibleOutputPushDelegate {
     @Published private(set) var videoURL: URL?
     @Published private(set) var association = SubtitleAssociation()
+    @Published private(set) var isHidden = false
+    @Published var hasEmbeddedSubtitles = false
+    var hasLoadedSubtitle: Bool {
+        association.selectedPath != nil ? document != nil : !nativeOptions.isEmpty || hasEmbeddedSubtitles
+    }
     @Published private(set) var document: SubtitleDocument?
     @Published private(set) var failure: String?
     @Published private(set) var nativeOptions: [AVMediaSelectionOption] = []
@@ -40,11 +45,13 @@ import UniformTypeIdentifiers
         history.merge(values) { _, restored in restored }
     }
     func prepare(video: URL) async {
+        isHidden = false
         guard videoURL?.standardizedFileURL != video.standardizedFileURL else { return }
         generation += 1
         let token = generation
         accessedSubtitle?.stopAccessingSecurityScopedResource(); accessedSubtitle = nil
         accessedDirectory?.stopAccessingSecurityScopedResource(); accessedDirectory = nil
+        hasEmbeddedSubtitles = false
         videoURL = video; document = nil; failure = nil; embeddedCues = []; nativeOptions = []
         association = history[Self.key(video)] ?? Self.saved[Self.key(video)] ?? .init()
         if let selected = association.selectedPath, let file = association.files.first(where: { $0.path == selected }) {
@@ -121,7 +128,7 @@ import UniformTypeIdentifiers
             document = doc; failure = nil
             if selectOnSuccess {
                 if !association.files.contains(where: { $0.path == file.path }) { association.files.append(file) }
-                association.selectedPath = file.path; association.embeddedID = nil; association.isHidden = false
+                association.selectedPath = file.path; association.embeddedID = nil; isHidden = false
             }
             save()
         } catch {
@@ -133,9 +140,10 @@ import UniformTypeIdentifiers
     private func reference(_ url: URL) -> SubtitleFileReference {
         .init(path: url.path, bookmark: try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil))
     }
-    func hide() { association.isHidden = true; save() }
+    func hide() { isHidden = true }
+    func setVisible(_ visible: Bool) { isHidden = !visible }
     func useEmbedded(_ commandID: String? = nil) {
-        association.selectedPath = nil; association.embeddedID = commandID; association.isHidden = false; document = nil; failure = nil; save()
+        association.selectedPath = nil; association.embeddedID = commandID; isHidden = false; document = nil; failure = nil; save()
     }
     private func save() {
         guard let videoURL else { return }
@@ -145,7 +153,7 @@ import UniformTypeIdentifiers
         onChange?()
     }
     func text(at time: Double) -> String {
-        guard !association.isHidden else { return "" }
+        guard !isHidden else { return "" }
         let delayed = time - SubtitleStyleStore.shared.style.delay
         if association.selectedPath != nil { return document?.text(at: delayed) ?? "" }
         return embeddedCues.filter { $0.start <= delayed && delayed < $0.end }.map(\.text).joined(separator: "\n")
@@ -162,7 +170,7 @@ import UniformTypeIdentifiers
         guard token == generation, self.player === player, player.currentItem === item else { return }
         nativeOptions = nativeGroup?.options ?? []
         if let id = association.embeddedID, let index = Int(id), nativeOptions.indices.contains(index) { selectNative(index) }
-        else if association.selectedPath == nil, !association.isHidden,
+        else if association.selectedPath == nil, !isHidden,
                 let preferred = nativeGroup?.defaultOption ?? nativeOptions.first,
                 let index = nativeOptions.firstIndex(of: preferred) { selectNative(index) }
     }
@@ -189,7 +197,7 @@ import UniformTypeIdentifiers
     }
     func nativeText(at time: Double) -> String {
         let delayed = time - SubtitleStyleStore.shared.style.delay
-        guard !association.isHidden else { return "" }
+        guard !isHidden else { return "" }
         if association.selectedPath != nil { return document?.text(at: delayed) ?? "" }
         if !lastNativeText.isEmpty, delayed >= lastNativeStart { return lastNativeText }
         return text(at: time)

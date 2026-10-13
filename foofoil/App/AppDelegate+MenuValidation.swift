@@ -140,6 +140,8 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             setMenuItem(withAction: #selector(reloadPageAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(captureImageFoofoilAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(documentStyleAction), in: menu, isHidden: true)
+            setMenuItem(withAction: #selector(loadSubtitleFileAction), in: menu, isHidden: true)
+            setMenuItem(withAction: #selector(toggleSubtitlesAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(selectColorAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(fitWindowToImageAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(fitImageToWindowWidthAction), in: menu, isHidden: true)
@@ -179,6 +181,9 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         // 2. Select Color 菜单项 (仅在 SVG 且为图片模式下有用)
         let isSVG = isImageMode && appState.isSVG
         setMenuItem(withAction: #selector(selectColorAction), in: menu, isHidden: !isSVG)
+
+        setMenuItem(withAction: #selector(loadSubtitleFileAction), in: menu, isHidden: !appState.isVideoDocument)
+        setMenuItem(withAction: #selector(toggleSubtitlesAction), in: menu, isHidden: !appState.isVideoDocument || !appState.subtitles.hasLoadedSubtitle)
 
         // 2.5 Document Style 菜单项 - 有可调样式的文档箔可用：文字颜色/字体/间距只对无排版文档内容开放，
         // 面板内部按同一组判定逐段显隐。
@@ -237,8 +242,15 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             return activeAppState?.webURL != nil
         }
 
+        if menuItem.action == #selector(captureVideoFrameAction) {
+            return activeAppState?.isVideoDocument == true
+        }
         if menuItem.action == #selector(saveAsAction) {
             guard let appState = activeAppState else { return false }
+            if appState.isVideoDocument {
+                menuItem.title = NSLocalizedString("Capture Video Frame", comment: "")
+                return true
+            }
             if appState.isCamera {
                 menuItem.title = NSLocalizedString("Save Screenshot...", comment: "")
                 return appState.cameraController?.hasFrame == true
@@ -267,6 +279,15 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
 
         if menuItem.action == #selector(extractImageSubjectAction) {
             return activeAppState?.canExtractImageSubject == true
+        }
+
+        if menuItem.action == #selector(toggleSubtitlesAction) {
+            guard let state = activeAppState, state.isVideoDocument, state.subtitles.hasLoadedSubtitle else { return false }
+            menuItem.state = state.subtitles.isHidden ? .off : .on
+            return true
+        }
+        if menuItem.action == #selector(loadSubtitleFileAction) {
+            return activeAppState?.isVideoDocument == true
         }
 
         if menuItem.action == #selector(documentStyleAction) {

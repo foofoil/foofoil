@@ -9,12 +9,22 @@ import AppKit
 import Combine
 import SwiftUI
 
-/// 文档主题：同时定义亮色与暗色外观下的背景色和文字前景色。
-/// 专为长文阅读与日常查看设计，保障良好的对比度与阅读舒适感。
+/// 自建主题保存排版参数，包括仍沿用默认值的字体和间距。
+public struct DocumentThemeTypography: Codable, Equatable {
+    public var fontName: String?
+    public var fontSize: Double
+    public var zoom: Double
+    public var lineSpacing: Double?
+    public var paragraphSpacing: Double?
+}
+
 public struct DocumentTheme: Identifiable, Codable, Equatable {
     public let id: String
     public let name: String
     public let isCustom: Bool
+    public let typography: DocumentThemeTypography?
+    public let usesDefaultBackground: Bool?
+    public let usesDefaultText: Bool?
 
     public let lightBackgroundHex: String
     public let lightTextHex: String
@@ -29,8 +39,14 @@ public struct DocumentTheme: Identifiable, Codable, Equatable {
         lightBackgroundHex: String,
         lightTextHex: String,
         darkBackgroundHex: String,
-        darkTextHex: String
+        darkTextHex: String,
+        typography: DocumentThemeTypography? = nil,
+        usesDefaultBackground: Bool? = nil,
+        usesDefaultText: Bool? = nil
     ) {
+        self.usesDefaultBackground = usesDefaultBackground
+        self.usesDefaultText = usesDefaultText
+        self.typography = typography
         self.id = id
         self.name = name
         self.isCustom = isCustom
@@ -52,13 +68,13 @@ public struct DocumentTheme: Identifiable, Codable, Equatable {
 
     /// 根据外观返回 SwiftUI 背景色
     public func backgroundColor(isDark: Bool) -> Color {
-        if id == "none" { return .clear }
+        if id == "none" || usesDefaultBackground == true { return .clear }
         return Color(hex: backgroundHex(isDark: isDark)) ?? (isDark ? Color(nsColor: .windowBackgroundColor) : Color.white)
     }
 
     /// 根据外观返回 SwiftUI 文字前景色
     public func textColor(isDark: Bool) -> Color {
-        if id == "none" { return .primary }
+        if id == "none" || usesDefaultText == true { return .primary }
         return Color(hex: textHex(isDark: isDark)) ?? (isDark ? Color.white : Color.black)
     }
 
@@ -172,7 +188,9 @@ public final class DocumentThemeCatalog: ObservableObject {
         name: String,
         currentBackgroundHex: String?,
         currentTextHex: String?,
-        isCurrentlyDark: Bool
+        isCurrentlyDark: Bool,
+        typography: DocumentThemeTypography? = nil,
+        replacing id: String? = nil
     ) -> DocumentTheme {
         let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedName = trimmedName.isEmpty ? NSLocalizedString("Custom Theme", comment: "") : trimmedName
@@ -199,16 +217,23 @@ public final class DocumentThemeCatalog: ObservableObject {
         }
 
         let newTheme = DocumentTheme(
-            id: UUID().uuidString,
+            id: customThemes.first(where: { $0.id == id })?.id ?? UUID().uuidString,
             name: resolvedName,
             isCustom: true,
             lightBackgroundHex: lightBg,
             lightTextHex: lightFg,
             darkBackgroundHex: darkBg,
-            darkTextHex: darkFg
+            darkTextHex: darkFg,
+            typography: typography,
+            usesDefaultBackground: currentBackgroundHex == nil,
+            usesDefaultText: currentTextHex == nil
         )
 
-        customThemes.append(newTheme)
+        if let index = customThemes.firstIndex(where: { $0.id == newTheme.id }) {
+            customThemes[index] = newTheme
+        } else {
+            customThemes.append(newTheme)
+        }
         SettingsStore.shared.customDocumentThemes = customThemes
         return newTheme
     }

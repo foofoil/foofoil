@@ -10,6 +10,7 @@ struct ExtensionVideoModeView: View {
     let shouldHideBorder: Bool
     @ObservedObject private var subtitles: VideoSubtitleController
     @ObservedObject private var subtitleStyle = SubtitleStyleStore.shared
+    @State private var captureDisplaySize = CGSize(width: 960, height: 540)
     @State private var subtitleTime = 0.0
     @StateObject private var controller: ExtensionAudioPlaybackController
     @State private var frame: VideoPresentationSnapshot?
@@ -80,10 +81,19 @@ struct ExtensionVideoModeView: View {
         }
         .onReceive(controller.$isPlaying) { appState.isMediaPlaying = $0 }
         .onReceive(appState.$extensionSession.compactMap { $0 }) { session in controller.apply(session: session) }
+        .onReceive(NotificationCenter.default.publisher(for: VideoFrameCapture.notification(for: appState.id))) { _ in
+            if let image {
+                let snapshot = SubtitleCaptureSnapshot(controller: subtitles, time: subtitleTime, embedded: frame?.subtitle,
+                    displaySize: captureDisplaySize, sourceSize: CGSize(width: image.width, height: image.height),
+                    controlsVisible: appState.isMediaPlaybackControlsVisible)
+                VideoFrameCapture.finish(snapshot.composite(on: image), state: appState)
+            }
+        }
         .task(id: appState.extensionSession?.id) {
             guard let session = appState.extensionSession else { return }
             subtitles.onChange = { [weak appState] in appState?.saveState() }
             if let url = session.request.primaryFileURL { await subtitles.prepare(video: url) }
+            subtitles.hasEmbeddedSubtitles = session.commands.contains { $0.id.hasPrefix("video.subtitle.") && $0.id != "video.subtitle.-1" }
             if let selected = subtitles.association.embeddedID,
                session.commands.contains(where: { $0.id == selected }) { appState.performExtensionCommand(selected) }
             appState.performExtensionMediaAction(.setSubtitleDelay(subtitleStyle.style.delay))

@@ -18,6 +18,7 @@ struct DocumentStyleView: View {
 
     @State private var isShowingSaveThemePopover = false
     @State private var newThemeName = ""
+    @State private var replacementThemeID = ""
 
     @State private var catalog: DocumentFontCatalog.Catalog?
     @State private var chineseOnly = false
@@ -100,6 +101,7 @@ struct DocumentStyleView: View {
                 Spacer()
                 Button {
                     newThemeName = ""
+                    replacementThemeID = ""
                     isShowingSaveThemePopover = true
                 } label: {
                     HStack(spacing: 3) {
@@ -109,12 +111,9 @@ struct DocumentStyleView: View {
                     .font(.caption)
                 }
                 .buttonStyle(.plain)
-                .foregroundStyle(appState.documentThemeId == nil ? Color.accentColor : Color.secondary.opacity(0.4))
-                .disabled(appState.documentThemeId != nil)
-                .help(appState.documentThemeId == nil
-                    ? NSLocalizedString("Save current colors as a theme", comment: "")
-                    : NSLocalizedString("Theme is selected. Change color to customize or save a new theme.", comment: ""))
-                .popover(isPresented: $isShowingSaveThemePopover) {
+                .foregroundStyle(Color.accentColor)
+                .help(NSLocalizedString("Save current style as a theme", comment: ""))
+                .sheet(isPresented: $isShowingSaveThemePopover) {
                     saveThemePopover
                 }
             }
@@ -135,6 +134,7 @@ struct DocumentStyleView: View {
 
         return Button {
             appState.applyDocumentTheme(theme, isDark: isDark)
+            if let catalog { selectedFamily = resolvedFamily(in: catalog) }
         } label: {
             HStack(spacing: 6) {
                 ZStack {
@@ -175,6 +175,13 @@ struct DocumentStyleView: View {
         .buttonStyle(.plain)
         .contextMenu {
             if theme.isCustom {
+                Button("Replace with Current Style") {
+                    let updated = themeCatalog.addCustomTheme(name: theme.name,
+                        currentBackgroundHex: appState.backgroundColorHex,
+                        currentTextHex: appState.textColorHex, isCurrentlyDark: colorScheme == .dark,
+                        typography: appState.currentThemeTypography, replacing: theme.id)
+                    appState.applyDocumentTheme(updated, isDark: colorScheme == .dark)
+                }
                 Button(role: .destructive) {
                     if appState.documentThemeId == theme.id {
                         appState.documentThemeId = nil
@@ -192,6 +199,13 @@ struct DocumentStyleView: View {
             Text(NSLocalizedString("Save Custom Theme", comment: ""))
                 .font(.headline)
 
+            Picker("Save Theme Destination", selection: $replacementThemeID) {
+                Text("New Theme").tag("")
+                ForEach(themeCatalog.customThemes) { Text($0.displayName).tag($0.id) }
+            }
+            .onChange(of: replacementThemeID) { _, id in
+                newThemeName = themeCatalog.theme(for: id)?.name ?? ""
+            }
             TextField(NSLocalizedString("Theme Name", comment: ""), text: $newThemeName)
                 .textFieldStyle(.roundedBorder)
                 .frame(width: 220)
@@ -201,12 +215,14 @@ struct DocumentStyleView: View {
                 Button(NSLocalizedString("Cancel", comment: "")) {
                     isShowingSaveThemePopover = false
                 }
-                Button(NSLocalizedString("Save", comment: "")) {
+                Button(replacementThemeID.isEmpty ? NSLocalizedString("Save", comment: "") : NSLocalizedString("Overwrite Theme", comment: "")) {
                     let created = themeCatalog.addCustomTheme(
                         name: newThemeName,
                         currentBackgroundHex: appState.backgroundColorHex,
                         currentTextHex: appState.textColorHex,
-                        isCurrentlyDark: colorScheme == .dark
+                        isCurrentlyDark: colorScheme == .dark,
+                        typography: appState.currentThemeTypography,
+                        replacing: replacementThemeID.isEmpty ? nil : replacementThemeID
                     )
                     appState.applyDocumentTheme(created, isDark: colorScheme == .dark)
                     isShowingSaveThemePopover = false
