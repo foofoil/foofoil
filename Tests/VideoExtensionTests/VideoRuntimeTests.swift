@@ -58,3 +58,29 @@ import VideoExtensionRuntime
     #expect(throws: MediaTransportError.self) { try MediaPlaybackAction.setVolume(1.1).validate() }
     #expect(throws: MediaTransportError.self) { try MediaPlaybackAction.setVolume(.nan).validate() }
 }
+
+@Test func separatedSubtitleContractAndDelayValidation() throws {
+    let caption = VideoSubtitleSnapshot(start: 1, end: 3, text: "Caption")
+    let frame = VideoPresentationSnapshot(surfaceID: 42, width: 1920, height: 1080, revision: 1, subtitle: caption)
+    let decoded = try JSONDecoder().decode(VideoPresentationSnapshot.self, from: JSONEncoder().encode(frame))
+    #expect(decoded.subtitle?.text == "Caption")
+    #expect(throws: MediaTransportError.self) { try MediaPlaybackAction.setSubtitleDelay(.infinity).validate() }
+    #expect(throws: MediaTransportError.self) { try MediaPlaybackAction.setSubtitleDelay(121).validate() }
+}
+
+@Test func embeddedTextIsSeparateAndSeekableWithDelay() throws {
+    let runtime = VideoRuntime()
+    defer { runtime.shutdown() }
+    let file = try #require(Bundle.module.url(forResource: "subtitle", withExtension: "mkv", subdirectory: "Fixtures"))
+    var session = try runtime.create(.singleFile(.init(url: file)))
+    session = try runtime.perform(JSONEncoder().encode(MediaPlaybackRequest(action: .seek(0.8), session: session)))
+    guard case .video(let frame) = session.presentation else { Issue.record("Missing video frame"); return }
+    let caption = try #require(frame.subtitle)
+    #expect(caption.text == "Hello subtitle")
+    #expect(abs(caption.start - 0.5) < 0.1)
+    #expect(caption.surfaceID == nil)
+    session = try runtime.perform(JSONEncoder().encode(MediaPlaybackRequest(action: .setSubtitleDelay(1), session: session)))
+    #expect(session.mediaPlayback?.position == 0.8)
+    session = try runtime.perform(JSONEncoder().encode(MediaPlaybackRequest(action: .setSubtitleDelay(-1), session: session)))
+    #expect(session.mediaPlayback?.state != .failed)
+}

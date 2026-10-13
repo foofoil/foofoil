@@ -17,7 +17,7 @@ swift test
 
 - 本地 MKV、AVI；H.264、HEVC（优先 VideoToolbox）、MPEG-4 ASP/Xvid。
 - AAC、AC3、EAC3、DTS/DTS-HD MA、TrueHD、MP3；以 48 kHz 双声道 PCM 经系统默认设备输出，不保留 Atmos 对象或压缩音频直通。
-- 音轨、内嵌字幕切换；SRT、ASS 普通文字显示，PGS 图形显示。ASS 样式、动画、字体附件、外部字幕尚未实现。
+- 音轨、内嵌字幕切换；SRT、ASS 提供独立文字条目，宿主全局样式排版；PGS 提供独立透明图形缓冲。ASS 动画、字体附件尚未实现；外部字幕由宿主管理。
 - 有界音频预缓冲、三个 IOSurface 画面缓冲；不复制整片、不转码生成媒体缓存。
 - C ABI + JSON 会话协议；宿主只拿 IOSurface ID，播放控制、播放互斥和历史由宿主持有。
 - `video-inspect <文件...>` 验证首帧、60 秒定位、逐轨切换、静音播放时钟与暂停。

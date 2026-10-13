@@ -47,6 +47,7 @@ public final class VideoRuntime: @unchecked Sendable {
             case .pause: fv_pause(entry.decoder)
             case .seek(let seconds):
                 guard fv_seek(entry.decoder, seconds) != 0 else { throw ContentProviderError.sessionCreationFailed("Video seek failed") }
+            case .setSubtitleDelay(let delay): fv_subtitle_delay(entry.decoder, delay)
             case .setVolume(let volume): fv_volume(entry.decoder, Float(volume))
             case .refresh: break
             default: throw ContentProviderError.unsupportedRequest
@@ -89,10 +90,14 @@ public final class VideoRuntime: @unchecked Sendable {
         session.mediaPlayback = .init(state: ExtensionMediaPlaybackState(rawValue: state["state"] as? String ?? "failed") ?? .failed,
             position: min(duration, max(0, state["position"] as? Double ?? 0)), duration: duration,
             isSeekable: duration > 0, volume: state["volume"] as? Double, failureMessage: failure.isEmpty ? nil : failure,
-            availableActions: [.play, .pause, .seek, .refresh, .setVolume])
+            availableActions: [.play, .pause, .seek, .refresh, .setVolume, .setSubtitleDelay])
         session.presentation = .video(.init(surfaceID: (state["surfaceID"] as? NSNumber)?.uint32Value ?? 0,
             width: state["width"] as? Int ?? 0, height: state["height"] as? Int ?? 0,
-            revision: (state["revision"] as? NSNumber)?.uint64Value ?? 0))
+            revision: (state["revision"] as? NSNumber)?.uint64Value ?? 0,
+            subtitle: (state["subtitle"] as? [String: Any]).flatMap { value in
+                guard let data = try? JSONSerialization.data(withJSONObject: value) else { return nil }
+                return try? JSONDecoder().decode(VideoSubtitleSnapshot.self, from: data)
+            }))
         session.commands = [CommandDescriptor(id: "video.subtitle.-1", titleLocalizationKey: "Subtitles Off", symbolName: "captions.bubble", isChecked: state["selectedSubtitleID"] as? String == "-1")]
         for track in state["tracks"] as? [[String: Any]] ?? [] {
             guard let id = track["id"] as? String, let kind = track["kind"] as? String, let title = track["title"] as? String else { continue }

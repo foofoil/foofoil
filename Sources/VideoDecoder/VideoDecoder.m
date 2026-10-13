@@ -84,6 +84,8 @@ static BOOL streamSeek(FVStream *s, double seconds) {
     BOOL _playing, _closed, _hasVideo, _videoEOF, _audioEOF;
     double _duration, _position, _origin, _wallStart, _audioEnd, _videoPTS;
     int _subtitleIndex;
+    double _subtitleDelay;
+    IOSurfaceRef _subtitleSurface;
     AVFormatContext *_subFormat;
     AVCodecContext *_subCodec;
     AVPacket *_subPacket;
@@ -155,6 +157,7 @@ static BOOL streamSeek(FVStream *s, double seconds) {
         _failure = @"Audio resampler initialization failed";
 }
 - (void)closeSubtitle {
+    if (_subtitleSurface) { CFRelease(_subtitleSurface); _subtitleSurface = NULL; }
     if (_hasSubtitle) avsubtitle_free(&_subtitle);
     _hasSubtitle = NO; av_packet_free(&_subPacket); avcodec_free_context(&_subCodec); avformat_close_input(&_subFormat);
 }
@@ -168,11 +171,16 @@ static BOOL streamSeek(FVStream *s, double seconds) {
     _subCodec = avcodec_alloc_context3(codec); avcodec_parameters_to_context(_subCodec, p);
     if (avcodec_open2(_subCodec, codec, NULL) < 0) { [self closeSubtitle]; return; }
     _subPacket = av_packet_alloc();
-    av_seek_frame(_subFormat, -1, (int64_t)(_position * AV_TIME_BASE), AVSEEK_FLAG_BACKWARD);
+    double target=MAX(0,_position-_subtitleDelay);
+    int64_t ticks=(int64_t)(target/av_q2d(_subFormat->streams[index]->time_base));
+    if(av_seek_frame(_subFormat,index,ticks,AVSEEK_FLAG_BACKWARD)<0)
+        av_seek_frame(_subFormat,-1,(int64_t)(MAX(0,target-30)*AV_TIME_BASE),AVSEEK_FLAG_BACKWARD);
 }
 - (void)updateSubtitle {
     if (!_subCodec || !_subPacket) return;
-    if (_hasSubtitle && _subtitleEnd > _position) return;
+    double time = _position - _subtitleDelay;
+    if (_hasSubtitle && _subtitleEnd > time) return;
+    if (_subtitleSurface) { CFRelease(_subtitleSurface); _subtitleSurface = NULL; }
     if (_hasSubtitle) avsubtitle_free(&_subtitle); _hasSubtitle = NO;
     for (int count = 0; count < 10000; count++) {
         int r = av_read_frame(_subFormat, _subPacket); if (r < 0) return;
@@ -185,7 +193,7 @@ static BOOL streamSeek(FVStream *s, double seconds) {
         _subtitleStart = pts + _subtitle.start_display_time / 1000.0;
         _subtitleEnd = pts + (_subtitle.end_display_time ? _subtitle.end_display_time / 1000.0 : MAX(duration, 4));
         _hasSubtitle = YES;
-        if (_subtitleEnd > _position) return;
+        if (_subtitleEnd > time) return;
         avsubtitle_free(&_subtitle); _hasSubtitle = NO;
     }
 }
@@ -216,44 +224,53 @@ static BOOL streamSeek(FVStream *s, double seconds) {
     uint8_t *dst[] = {IOSurfaceGetBaseAddress(surface)}; int stride[] = {(int)IOSurfaceGetBytesPerRow(surface)};
     _scale = sws_getCachedContext(_scale, w, h, f->format, w, h, AV_PIX_FMT_BGRA, SWS_FAST_BILINEAR, NULL, NULL, NULL);
     if (_scale) sws_scale(_scale, (const uint8_t *const *)f->data, f->linesize, 0, h, dst, stride);
-    [self drawSubtitle:dst[0] width:w height:h stride:stride[0]];
+
     IOSurfaceUnlock(surface, 0, NULL); av_frame_free(&download); _revision++;
 }
-- (void)drawSubtitle:(uint8_t *)pixels width:(int)w height:(int)h stride:(int)stride {
-    if (!_hasSubtitle || _position < _subtitleStart || _position >= _subtitleEnd) return;
-    for (unsigned i = 0; i < _subtitle.num_rects; i++) {
-        AVSubtitleRect *r = _subtitle.rects[i];
-        if (r->type == SUBTITLE_BITMAP) {
-            uint32_t *palette = (uint32_t *)r->data[1];
-            for (int y = 0; y < r->h; y++) for (int x = 0; x < r->w; x++) {
-                int dx = r->x + x, dy = r->y + y;
-                if (dx < 0 || dx >= w || dy < 0 || dy >= h) continue;
-                uint32_t c = palette[r->data[0][y*r->linesize[0]+x]];
-                uint8_t alpha = c >> 24; uint8_t *d = pixels + dy*stride + dx*4;
-                for (int k = 0; k < 3; k++) d[k] = (((c >> (8*k)) & 255) * alpha + d[k]*(255-alpha))/255;
-            }
-        } else {
-            NSString *text = r->ass ? @(r->ass) : (r->text ? @(r->text) : @"");
-            if (r->ass) { NSArray *parts = [text componentsSeparatedByString:@","]; if (parts.count >= 9) text = [[parts subarrayWithRange:NSMakeRange(8, parts.count-8)] componentsJoinedByString:@","]; }
-            text = [text stringByReplacingOccurrencesOfString:@"\\N" withString:@"\n"];
-            NSRegularExpression *tags = [NSRegularExpression regularExpressionWithPattern:@"\\{[^}]*\\}" options:0 error:nil];
-            text = [tags stringByReplacingMatchesInString:text options:0 range:NSMakeRange(0,text.length) withTemplate:@""];
-            CGColorSpaceRef space = CGColorSpaceCreateDeviceRGB();
-            CGContextRef ctx = CGBitmapContextCreate(pixels, w, h, 8, stride, space, kCGBitmapByteOrder32Little | kCGImageAlphaPremultipliedFirst);
-            CGColorSpaceRelease(space); if (!ctx) continue;
-            NSGraphicsContext *old = NSGraphicsContext.currentContext;
-            NSGraphicsContext.currentContext = [NSGraphicsContext graphicsContextWithCGContext:ctx flipped:NO];
-            NSMutableParagraphStyle *paragraph = [[NSMutableParagraphStyle alloc] init]; paragraph.alignment = NSTextAlignmentCenter;
-            NSDictionary *attrs = @{NSFontAttributeName:[NSFont systemFontOfSize:MAX(18,w/42.0) weight:NSFontWeightSemibold], NSForegroundColorAttributeName:NSColor.whiteColor,
-                NSStrokeColorAttributeName:NSColor.blackColor, NSStrokeWidthAttributeName:@(-3), NSParagraphStyleAttributeName:paragraph};
-            NSRect box = NSMakeRect(w*0.05, h*0.06, w*0.9, h*0.25);
-            NSSize size = [text boundingRectWithSize:box.size options:NSStringDrawingUsesLineFragmentOrigin attributes:attrs].size;
-            box.size.height = size.height;
-            [text drawWithRect:box options:NSStringDrawingUsesLineFragmentOrigin attributes:attrs];
-            NSGraphicsContext.currentContext = old; CGContextRelease(ctx);
+// 缓存独立图形字幕；不再把字幕烧进视频，宿主可统一排版和控制位置。
+- (NSDictionary *)subtitleDescription {
+    if (!_hasSubtitle) return nil;
+    NSMutableArray *texts = [NSMutableArray array];
+    int left=INT_MAX, top=INT_MAX, right=0, bottom=0;
+    for (unsigned i=0;i<_subtitle.num_rects;i++) {
+        AVSubtitleRect *r=_subtitle.rects[i];
+        if(r->type==SUBTITLE_BITMAP) {left=MIN(left,r->x);top=MIN(top,r->y);right=MAX(right,r->x+r->w);bottom=MAX(bottom,r->y+r->h);}
+        else {
+            NSString *text=r->ass?@(r->ass):(r->text?@(r->text):@"");
+            if(r->ass){NSArray *parts=[text componentsSeparatedByString:@","];if(parts.count>=9)text=[[parts subarrayWithRange:NSMakeRange(8,parts.count-8)] componentsJoinedByString:@","];}
+            text=[text stringByReplacingOccurrencesOfString:@"\\N" withString:@"\n"];
+            NSRegularExpression *tags=[NSRegularExpression regularExpressionWithPattern:@"\\{[^}]*\\}" options:0 error:nil];
+            text=[tags stringByReplacingMatchesInString:text options:0 range:NSMakeRange(0,text.length) withTemplate:@""];
+            if(text.length)[texts addObject:text];
         }
     }
+    int w=right-left,h=bottom-top;
+    if(left!=INT_MAX && w>0 && h>0 && w<=16384 && h<=16384 && !_subtitleSurface){
+        _subtitleSurface=IOSurfaceCreate((__bridge CFDictionaryRef)@{(NSString *)kIOSurfaceWidth:@(w),(NSString *)kIOSurfaceHeight:@(h),
+            (NSString *)kIOSurfaceBytesPerElement:@4,(NSString *)kIOSurfaceBytesPerRow:@(w*4),(NSString *)kIOSurfacePixelFormat:@(kCVPixelFormatType_32BGRA)});
+        if(_subtitleSurface){
+            IOSurfaceLock(_subtitleSurface,0,NULL);
+            uint8_t *pixels=IOSurfaceGetBaseAddress(_subtitleSurface);size_t stride=IOSurfaceGetBytesPerRow(_subtitleSurface);
+            memset(pixels,0,IOSurfaceGetAllocSize(_subtitleSurface));
+            for(unsigned i=0;i<_subtitle.num_rects;i++){
+                AVSubtitleRect *r=_subtitle.rects[i];if(r->type!=SUBTITLE_BITMAP)continue;
+                uint32_t *palette=(uint32_t *)r->data[1];
+                for(int y=0;y<r->h;y++)for(int x=0;x<r->w;x++){
+                    uint32_t c=palette[r->data[0][y*r->linesize[0]+x]];uint8_t alpha=c>>24;
+                    uint8_t *d=pixels+(r->y-top+y)*stride+(r->x-left+x)*4;
+                    for(int k=0;k<3;k++)d[k]=((c>>(8*k))&255)*alpha/255;d[3]=alpha;
+                }
+            }
+            IOSurfaceUnlock(_subtitleSurface,0,NULL);
+        }
+    }
+    NSMutableDictionary *result=[@{@"start":@(_subtitleStart),@"end":@(_subtitleEnd),@"text":[texts componentsJoinedByString:@"\n"]} mutableCopy];
+    if(_subtitleSurface){result[@"surfaceID"]=@(IOSurfaceGetID(_subtitleSurface));result[@"width"]=@(w);result[@"height"]=@(h);}
+    return result;
 }
+- (void)subtitleDelay:(double)value { dispatch_sync(_queue, ^{
+    self->_subtitleDelay=value;[self openSubtitle:self->_subtitleIndex];[self updateSubtitle];
+}); }
 - (double)clock {
     if (!_playing) return _position;
     AVAudioTime *render = _node.lastRenderTime;
@@ -333,12 +350,14 @@ static BOOL streamSeek(FVStream *s, double seconds) {
 - (NSDictionary *)snapshot {
     __block NSDictionary *result;
     dispatch_sync(_queue, ^{
+        self->_position=MIN(self->_duration,MAX(0,[self clock]));
+        [self updateSubtitle];
         IOSurfaceRef surface=self->_surfaces[self->_surfaceIndex];
         if (self->_closed) { result=@{}; return; }
         result=@{@"volume":@(self->_node.volume), @"position":@(MIN(self->_duration,MAX(0,[self clock]))), @"duration":@(self->_duration), @"state":self->_failure?@"failed":(self->_playing?@"playing":(self->_position>=self->_duration-0.05?@"stopped":@"paused")),
             @"failureMessage":self->_failure?:@"", @"surfaceID":@(surface?IOSurfaceGetID(surface):0),
             @"width":@(self->_video.codec?self->_video.codec->width:0), @"height":@(self->_video.codec?self->_video.codec->height:0),
-            @"revision":@(self->_revision), @"tracks":self->_tracks?:@[], @"selectedAudioID":@(self->_audio.stream).stringValue,
+            @"subtitle":[self subtitleDescription]?:NSNull.null, @"revision":@(self->_revision), @"tracks":self->_tracks?:@[], @"selectedAudioID":@(self->_audio.stream).stringValue,
             @"selectedSubtitleID":@(self->_subtitleIndex).stringValue};
     });return result;
 }
@@ -362,6 +381,7 @@ void fv_close(void *p){if(p){FVPlayer *player=(__bridge_transfer FVPlayer *)p;[p
 void fv_play(void *p){[(__bridge FVPlayer *)p play];}
 void fv_pause(void *p){[(__bridge FVPlayer *)p pause];}
 int fv_seek(void *p,double s){return [(__bridge FVPlayer *)p seek:s];}
+void fv_subtitle_delay(void *p,double value){[(__bridge FVPlayer *)p subtitleDelay:value];}
 void fv_volume(void *p,float v){[(__bridge FVPlayer *)p volume:v];}
 int fv_select(void *p,int s){return [(__bridge FVPlayer *)p select:s];}
 char *fv_snapshot(void *p){@autoreleasepool{NSData *d=[NSJSONSerialization dataWithJSONObject:[(__bridge FVPlayer *)p snapshot] options:0 error:nil];return d?strndup(d.bytes,d.length):NULL;}}
