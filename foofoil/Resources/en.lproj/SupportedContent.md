@@ -35,7 +35,7 @@ You can also type directly into a blank foil to write a note.
 | Type | Common formats | Notes |
 | --- | --- | --- |
 | Audio | MP3, M4A, AAC, WAV, AIFF, FLAC, etc. | Play music and recordings |
-| Video | MP4, MOV, M4V, etc. | Watch videos; some files may not play because of how they were encoded |
+| Video | MP4, MOV, M4V; MKV and AVI in builds with additional video support | MKV/AVI support includes H.264, HEVC and Xvid video, common audio tracks including DTS and TrueHD, and audio/subtitle selection. SRT and ASS use plain text styling; PGS uses bitmap subtitles. |
 | Hi-Fi audio | DSF, DFF, APE | DSF and DFF require a DoP-capable audio device; DST-compressed DFF is not supported |
 | SACD images | .iso | Play uncompressed stereo tracks |
 | Track lists | .cue | Play an album by track; keep the accompanying audio files |

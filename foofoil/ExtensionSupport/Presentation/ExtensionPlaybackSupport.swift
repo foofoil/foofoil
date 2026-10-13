@@ -6,6 +6,7 @@ import FoofoilExtensionKit
 enum ExtensionPlaybackSupport {
     /// 有播放快照、内容家族为音频，且已协商 `media.transport` 时才复用宿主音频 UI。
     static func usesHostAudioChrome(_ session: ContentSession) -> Bool {
+        if case .video = session.presentation { return false }
         guard session.mediaPlayback != nil else { return false }
         guard MediaPlaybackRequest.isSupported(by: session) else { return false }
         if let family = resolvedContentFamily(for: session) {

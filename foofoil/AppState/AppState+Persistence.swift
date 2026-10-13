@@ -243,7 +243,7 @@ extension AppState {
                 documentParagraphSpacing: documentParagraphSpacing,
                 documentThemeId: documentThemeId,
                 textPath: textURL?.path,
-                contentKind: appleMusicReference != nil ? .audio : isQuickLookDocument ? .quickLook : HistoryContentKind.infer(from: WindowConfig(
+                contentKind: appleMusicReference != nil ? .audio : isVideoDocument ? .video : isQuickLookDocument ? .quickLook : HistoryContentKind.infer(from: WindowConfig(
                     id: id,
                     imagePath: imageURL?.path,
                     isCamera: isCamera,

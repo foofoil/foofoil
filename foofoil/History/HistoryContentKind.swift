@@ -49,7 +49,10 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
         let name = (config.originalImageName ?? config.textPath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "").lowercased()
         // EPUB 由扩展承载，但历史仍按电子书归类，便于展示书名与书本图标。
         if name.hasSuffix(".epub") { return .ebook }
-        if config.extensionID != nil { return .extensionContent }
+        if config.extensionID != nil {
+            if config.contentKind == .video || config.fileList?.kind == .video { return .video }
+            return .extensionContent
+        }
         if config.isCamera { return .camera }
         if config.webURLString != nil { return .web }
         if name.hasSuffix(".pdf") { return .pdf }

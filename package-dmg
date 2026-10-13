@@ -12,7 +12,7 @@
 #   - 签名分支会剔除测试用的 Contents/XPCServices（工程与单测保持不变）。
 #
 # 用法:
-#   ./package-dmg [--sign|--sign-only|--no-sign] [输出目录]
+#   ./package-dmg [--sign|--sign-only|--no-sign] [--with-video|--without-video] [输出目录]
 #
 #     （无参数）    询问是否签名并公证；非交互式终端默认不签名
 #     --sign        直接签名并公证，不询问
@@ -50,10 +50,11 @@ ENTITLEMENTS="$SCRIPT_DIR/foofoil/foofoil.entitlements"
 NOTARY_PROFILE="${NOTARY_PROFILE:-foofoil-notary}"
 
 usage() {
-    print -r -- "用法: ./package-dmg [--sign|--sign-only|--no-sign] [输出目录]"
+    print -r -- "用法: ./package-dmg [--sign|--sign-only|--no-sign] [--with-video|--without-video] [输出目录]"
     print -r -- ""
     print -r -- "  --sign       签名并公证（不询问）"
     print -r -- "  --sign-only  仅签名，不做公证"
+    print -r -- "  --with-video / --without-video  包含或排除视频能力（默认包含）"
     print -r -- "  --no-sign    不签名，直接打包"
     print -r -- "  -h, --help   显示帮助"
     print -r -- ""
@@ -69,10 +70,13 @@ resolve_sign_identity() {
         | awk -F'"' '/"Developer ID Application/ { print $2; exit }'
 }
 
+INCLUDE_VIDEO=1
 MODE="ask"
 OUTPUT_DIR=""
 while (( $# > 0 )); do
     case "$1" in
+        --with-video) INCLUDE_VIDEO=1 ;;
+        --without-video) INCLUDE_VIDEO=0 ;;
         --sign) MODE="sign" ;;
         --sign-only) MODE="sign-only" ;;
         --no-sign) MODE="no-sign" ;;
@@ -154,6 +158,12 @@ if [[ ! -d "$APP_PATH" ]]; then
     print -u2 "Missing built app: $APP_PATH"
     exit 1
 fi
+
+if (( INCLUDE_VIDEO )); then
+    EXTENSION_DEFS+=("../video:Video.foofoilextension:release")
+fi
+# 每次明确清理可选模块，避免排除视频的包残留上一次构建的副本。
+rm -rf "$APP_PATH/Contents/PlugIns/Video.foofoilextension"
 
 # 2. 剔除仅在开发/单测中使用的 XPC 服务，工程与测试目标保持不变。
 rm -rf "$APP_PATH/Contents/XPCServices"

@@ -107,6 +107,12 @@ final class ExtensionHost: ExtensionRuntimeHost {
         }
     }
 
+    func canOpenAsVideo(url: URL) -> Bool {
+        resolver.candidates(for: .singleFile(.init(url: url))).contains {
+            !$0.descriptor.isBuiltIn && $0.descriptor.contentFamily == .video
+        }
+    }
+
     func additionalContentTypes(for family: ExtensionContentFamily) -> [UTType] {
         let extensions = resolver.allDescriptors()
             .filter { !$0.isBuiltIn && $0.contentFamily == family }

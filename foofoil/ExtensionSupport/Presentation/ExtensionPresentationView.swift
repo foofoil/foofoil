@@ -13,7 +13,10 @@ struct ExtensionPresentationView: View {
     var body: some View {
         Group {
             if let session = appState.extensionSession {
-                if ExtensionPlaybackSupport.usesHostAudioChrome(session) {
+                if case .video = session.presentation {
+                    ExtensionVideoModeView(appState: appState, session: session, shouldHideBorder: shouldHideBorder)
+                        .id(session.id)
+                } else if ExtensionPlaybackSupport.usesHostAudioChrome(session) {
                     ExtensionAudioModeView(
                         appState: appState,
                         session: session,
@@ -100,7 +103,7 @@ struct ExtensionPresentationView: View {
                 systemImage: "doc.text",
                 description: Text(NSLocalizedString(messageKey, comment: ""))
             )
-        case .document:
+        case .document, .video:
             // 文档呈现在 body 中单独路由；这里保持 switch 穷尽。
             EmptyView()
         }

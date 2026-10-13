@@ -1,6 +1,70 @@
 {
   "sourceLanguage": "en",
   "strings": {
+  "Audio and Subtitles": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Audio and Subtitles"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "音轨和字幕"
+        }
+      }
+    }
+  },
+  "Subtitles Off": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Subtitles Off"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "关闭字幕"
+        }
+      }
+    }
+  },
+  "Audio Track": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Audio Track"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "音轨"
+        }
+      }
+    }
+  },
+  "Subtitle Track": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Subtitle Track"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "字幕"
+        }
+      }
+    }
+  },
   "Foil Information Menu": {
     "extractionState": "manual",
     "localizations": {

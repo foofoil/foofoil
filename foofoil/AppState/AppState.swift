@@ -377,7 +377,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     }
     @Published var cameraController: CameraCaptureController?
     /// 摄像头画面与图片共用窗口布局及缩放规则；截图缓存不决定实时内容类型。
-    var usesImagePresentation: Bool { isCamera || (imageURL != nil && webURL == nil) }
+    var usesImagePresentation: Bool { isCamera || isVideoDocument || (imageURL != nil && webURL == nil) }
 
     @Published public var webURL: URL? {
         didSet {

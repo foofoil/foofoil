@@ -35,7 +35,7 @@
 | 类型 | 常见格式 | 说明 |
 | --- | --- | --- |
 | 音频 | MP3、M4A、AAC、WAV、AIFF、FLAC 等 | 播放音乐和录音 |
-| 视频 | MP4、MOV、M4V 等 | 播放视频；部分文件可能因编码方式不同而无法播放 |
+| 视频 | MP4、MOV、M4V；含增强视频能力的版本另支持 MKV、AVI | MKV/AVI 支持 H.264、HEVC、Xvid 视频，以及 DTS、TrueHD 等常见音轨，可切换音轨和字幕。SRT、ASS 使用普通文字样式，PGS 显示图形字幕。 |
 | Hi-Fi 音频 | DSF、DFF、APE | DSF 和 DFF 播放需连接支持 DoP 的音频设备；不支持 DST 压缩的 DFF |
 | SACD 镜像 | .iso | 播放未压缩的立体声音轨 |
 | 音轨列表 | .cue | 按曲目播放整张专辑；请保留配套的音频文件 |

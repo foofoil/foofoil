@@ -620,6 +620,7 @@ public enum FileListGrouper {
         if isCueFile(url) { return .cueSheets }
         if ext == "pdf" { return .other }
         if ["html", "htm", "webarchive", "xhtml"].contains(ext) { return .other }
+        if ExtensionHost.shared.canOpenAsVideo(url: url) { return .listable(.video) }
         if AppState.isVideoFileName(name) { return .listable(.video) }
         if AppState.isAudioFileName(name) { return .listable(.audio) }
         if ExtensionHost.shared.canOpenAsAudio(url: url) { return .listable(.audio) }

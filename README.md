@@ -163,3 +163,5 @@ Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) before
 foofoil is licensed under the [MIT License](LICENSE), copyright © 2026 Beijing Memory Vision Technology Co., Ltd.
 
 The bundled cmark library is distributed under its own permissive licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the required notices.
+
+Video capabilities live in the sibling `video` repository. `./run` and `./package-dmg` include it by default; pass `--without-video` to omit it or `--with-video` to include it explicitly. No user installation or enablement is required.

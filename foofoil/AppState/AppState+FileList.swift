@@ -487,6 +487,8 @@ extension AppState {
                 return
             }
             openFileListAudioUsingExtension(url: url, itemID: item.id)
+        case .video where ExtensionHost.shared.canOpenAsVideo(url: url):
+            openFileListVideoUsingExtension(url: url, itemID: item.id)
         case .video, .audio:
             currentMediaRouteGeneration &+= 1
             let routeGeneration = currentMediaRouteGeneration

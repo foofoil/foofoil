@@ -10,6 +10,14 @@ SCHEME="foofoil"
 APP_NAME="foofoil"
 DESTINATION='platform=macOS'
 
+INCLUDE_VIDEO=1
+for arg in "$@"; do
+    case "$arg" in
+        --with-video) INCLUDE_VIDEO=1 ;;
+        --without-video) INCLUDE_VIDEO=0 ;;
+        *) print -u2 "Unknown option: $arg"; exit 2 ;;
+    esac
+done
 SCRIPT_DIR="${0:A:h}"
 cd "$SCRIPT_DIR"
 
@@ -22,6 +30,10 @@ APP_PATH="$SCRIPT_DIR/build/Build/Products/Debug/$APP_NAME.app"
 # Debug 运行时注入兄弟仓库的开发插件；Release 分发见 ./package-dmg（内嵌插件）。
 EXTENSION_ROOTS=("$SCRIPT_DIR/../hifi" "$SCRIPT_DIR/../ebook")
 EXTENSION_BUNDLES=("Hi-Fi.foofoilextension" "EBook.foofoilextension")
+if (( INCLUDE_VIDEO )); then
+    EXTENSION_ROOTS+=("$SCRIPT_DIR/../video")
+    EXTENSION_BUNDLES+=("Video.foofoilextension")
+fi
 DEVELOPMENT_EXTENSIONS="$SCRIPT_DIR/build/DevelopmentExtensions"
 
 SIGN_NAME=$(codesign -dvv "$APP_PATH" 2>&1 | awk -F= '
@@ -36,6 +48,10 @@ SIGN_IDENTITY=$(print -r -- "$SIGN_IDENTITIES" | awk -v name="$SIGN_NAME" '
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 
 SIGNING_CHANGED=0
+if (( ! INCLUDE_VIDEO )) && [[ -e "$APP_PATH/Contents/PlugIns/Video.foofoilextension" ]]; then
+    rm -rf "$APP_PATH/Contents/PlugIns/Video.foofoilextension"
+    SIGNING_CHANGED=1
+fi
 mkdir -p "$APP_PATH/Contents/PlugIns"
 for i in {1..$#EXTENSION_ROOTS}; do
     EXT_ROOT="${EXTENSION_ROOTS[$i]}"

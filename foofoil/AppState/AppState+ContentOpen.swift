@@ -823,7 +823,7 @@ extension AppState {
                     self.saveState()
                     self.applyExtensionThumbnail(outcome.session)
                     // 扩展音频（DSF/DFF 等）同样检测同目录音乐列表；容器 ISO 由检测入口自行排除。
-                    if urls.count == 1 {
+                    if urls.count == 1, ExtensionPlaybackSupport.usesHostAudioChrome(outcome.session) {
                         self.detectAudioListIfNeeded(for: url)
                     }
                 } catch {
@@ -979,6 +979,46 @@ extension AppState {
                         reference: stateReference
                     )
                     NSLog("Extension session restore failed: \(error.localizedDescription)")
+                }
+            }
+        }
+
+        /// 视频列表逐项建会话，宿主持有列表身份，扩展仅持有当前影片的解码资源。
+        func openFileListVideoUsingExtension(url: URL, itemID: String) {
+            currentMediaRouteGeneration &+= 1
+            let generation = currentMediaRouteGeneration
+            extensionSession = nil
+            extensionFallbackProviderID = nil
+            extensionStateReference = nil
+            stopVideoAccess()
+            imageURL = nil
+            originalImageName = url.lastPathComponent
+            isLoading = true
+            let closeTask = extensionSessionCloseTask
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                _ = await closeTask?.value
+                guard self.currentMediaRouteGeneration == generation, self.fileList?.currentID == itemID else { return }
+                do {
+                    let outcome = try await ExtensionHost.shared.open(url: url)
+                    guard self.currentMediaRouteGeneration == generation, self.fileList?.currentID == itemID else {
+                        ExtensionHost.shared.closeSession(outcome.session)
+                        return
+                    }
+                    self.extensionSession = outcome.session
+                    if let extensionID = outcome.session.extensionID {
+                        self.extensionStateReference = try ExtensionHost.shared.stateStore.save(
+                            extensionID: extensionID, schemaVersion: 1,
+                            payload: JSONEncoder().encode(outcome.session), reference: outcome.session.id.uuidString.lowercased())
+                    }
+                    self.isLoading = false
+                    self.syncFileListNavigator()
+                    self.saveState()
+                } catch {
+                    guard self.currentMediaRouteGeneration == generation else { return }
+                    self.isLoading = false
+                    self.extensionHandoffFailureMessage = error.localizedDescription
+                    NSLog("Video provider session failed: %@", error.localizedDescription)
                 }
             }
         }

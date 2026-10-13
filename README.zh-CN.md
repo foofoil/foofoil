@@ -165,3 +165,5 @@ xcodebuild test \
 浮箔使用 [MIT License](LICENSE)，版权所有 © 2026 北京记忆视界科技有限公司。
 
 应用内置的 cmark 库使用其自身的宽松开源许可证，所需声明请参阅 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
+
+视频能力独立位于兄弟 `video` 仓库。`./run` 与 `./package-dmg` 默认包含它；使用 `--without-video` 排除，或 `--with-video` 显式包含。用户无需安装或启用模块。

@@ -558,8 +558,13 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .sink { [weak self] notification in
                 guard let self = self,
                       let targetId = notification.userInfo?["id"] as? UUID,
-                      targetId == self.appState.id,
-                      self.appState.isAudioDocument,
+                      targetId == self.appState.id else { return }
+                if self.appState.isVideoDocument,
+                   let size = notification.userInfo?["size"] as? NSSize {
+                    self.applyMediaPresentationSize(size, animated: true)
+                    return
+                }
+                guard self.appState.isAudioDocument,
                       let url = self.appState.currentAudioPresentationURL else { return }
 
                 let preserveDisplayArea = notification.userInfo?["preserveDisplayArea"] as? Bool == true

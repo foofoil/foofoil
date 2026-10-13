@@ -13,4 +13,7 @@
    <FileRef
       location = "group:../ebook">
    </FileRef>
+   <FileRef
+      location = "group:../video">
+   </FileRef>
 </Workspace>

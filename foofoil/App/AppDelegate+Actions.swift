@@ -408,6 +408,9 @@ extension AppDelegate {
         if kind == .audio {
             contentTypes.append(contentsOf: ExtensionHost.shared.additionalContentTypes(for: .audio))
         }
+        if kind == .video {
+            contentTypes.append(contentsOf: ExtensionHost.shared.additionalContentTypes(for: .video))
+        }
         panel.allowedContentTypes = Array(Dictionary(grouping: contentTypes, by: \.identifier).compactMap(\.value.first))
 
         panel.begin { response in

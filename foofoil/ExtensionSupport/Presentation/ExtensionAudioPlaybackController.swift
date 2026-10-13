@@ -38,8 +38,14 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
 
     init(appState: AppState, session: ContentSession) {
         appStateID = appState.id
-        command = { appState.performExtensionMediaAction($0) }
-        seekAction = { appState.seekExtensionPlayback(to: $0) }
+        command = { action in
+            guard appState.extensionSession?.id == session.id else { return }
+            appState.performExtensionMediaAction(action)
+        }
+        seekAction = { position in
+            guard appState.extensionSession?.id == session.id else { return }
+            appState.seekExtensionPlayback(to: position)
+        }
         notePlaybackIntent = { playing in
             if playing {
                 appState.noteUserStartedMediaPlayback()
@@ -210,6 +216,12 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
 
     /// 扩展独占输出没有宿主 mixer：音量控件只在所选设备有硬件音量时出现，直接读写设备标量。
     private func syncHardwareVolume(with session: ContentSession) {
+        if case .video = session.presentation, let value = session.mediaPlayback?.volume {
+            supportsVolumeControl = true
+            volume = Float(value)
+            isMuted = value == 0
+            return
+        }
         let selectedUID = session.audioDeviceSelection?.selectedDeviceID
         guard selectedUID != hardwareDeviceUID else { return }
         hardwareDeviceUID = selectedUID
@@ -289,6 +301,11 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
 
     func togglePlayPause() { isPlaying ? pause() : play() }
     func toggleMute() {
+        if let session = currentSession, case .video = session.presentation {
+            if isMuted { setVolume(preMuteVolume ?? 1); preMuteVolume = nil }
+            else { preMuteVolume = volume; setVolume(0) }
+            return
+        }
         guard supportsVolumeControl, let deviceID = hardwareDeviceID else { return }
         if HostAudioVolume.supportsMute(deviceID: deviceID) {
             let target = !isMuted
@@ -316,6 +333,12 @@ final class ExtensionAudioPlaybackController: ObservableObject, MediaTransportCo
     }
 
     func setVolume(_ newValue: Float) {
+        if let session = currentSession, case .video = session.presentation {
+            let value = min(1, max(0, newValue))
+            command(.setVolume(Double(value)))
+            volume = value; isMuted = value == 0
+            return
+        }
         guard supportsVolumeControl, let deviceID = hardwareDeviceID else { return }
         let clamped = max(0, min(1, newValue))
         HostAudioVolume.setVolume(clamped, deviceID: deviceID)
