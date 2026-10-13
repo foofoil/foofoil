@@ -1,0 +1,30 @@
+#!/bin/zsh
+set -euo pipefail
+ROOT="${0:A:h:h}"
+PREFIX="$ROOT/.build/ffmpeg"
+CONFIG_SHA=$(shasum -a 256 "$0" | cut -d " " -f 1)
+[[ -f "$PREFIX/config-sha" && "$(cat "$PREFIX/config-sha")" == "$CONFIG_SHA" ]] && exit 0
+VERSION=8.0.1
+SHA=05ee0b03119b45c0bdb4df654b96802e909e0a752f72e4fe3794f487229e5a41
+ARCHIVE="$ROOT/.build/ffmpeg-$VERSION.tar.xz"
+mkdir -p "$ROOT/.build"
+[[ -f "$ARCHIVE" ]] || curl -fL "https://ffmpeg.org/releases/ffmpeg-$VERSION.tar.xz" -o "$ARCHIVE"
+print "$SHA  $ARCHIVE" | shasum -a 256 -c -
+tar -xf "$ARCHIVE" -C "$ROOT/.build"
+cd "$ROOT/.build/ffmpeg-$VERSION"
+[[ ! -f Makefile ]] || make clean
+./configure --prefix="$PREFIX" --cc=clang --arch=arm64 --target-os=darwin \
+ --disable-debug --disable-everything --disable-autodetect --disable-programs --disable-doc \
+ --disable-network --disable-avdevice --disable-avfilter \
+ --enable-static --disable-shared --enable-pic --enable-small \
+ --enable-avformat --enable-avcodec --enable-swscale --enable-swresample \
+ --enable-protocol=file --enable-demuxer=matroska,avi \
+ --enable-parser=h264,hevc,mpeg4video,aac,ac3,dca,mlp,mpegaudio \
+ --enable-decoder=h264,hevc,mpeg4,aac,ac3,eac3,dca,truehd,mp3,ass,ssa,subrip,pgssub \
+ --enable-videotoolbox --enable-hwaccel=h264_videotoolbox,hevc_videotoolbox \
+ --extra-cflags='-mmacosx-version-min=15.0'
+make -j "$(sysctl -n hw.logicalcpu)"
+make install
+print -r -- "$CONFIG_SHA" > "$PREFIX/config-sha"
+mkdir -p "$ROOT/ThirdParty/FFmpeg"
+cp COPYING.LGPLv2.1 "$ROOT/ThirdParty/FFmpeg/"
