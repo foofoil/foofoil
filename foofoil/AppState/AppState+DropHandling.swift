@@ -30,6 +30,11 @@ extension AppState {
         /// 窗口从 Finder 粘贴板一次性取得完整文件批次后直接处理，避免 NSItemProvider 丢失多选项。
         @discardableResult
         func handleDroppedFileURLs(_ urls: [URL], feedbackBatchID: UUID = UUID()) -> Bool {
+            if isVideoDocument, urls.count == 1, let url = urls.first,
+               SubtitleDocument.extensions.contains(url.pathExtension.lowercased()) {
+                subtitles.importFile(url)
+                return true
+            }
             fileOpenFeedbackBatchID = feedbackBatchID
             let originals = urls.filter(\.isFileURL)
             let fileURLs = filterFileOpenFailures(originals)
@@ -768,6 +773,12 @@ extension AppState {
         }
 
         func openDroppedURL(_ url: URL, generation: UInt64, completion: @escaping (Bool) -> Void) {
+            if isCurrentDrop(generation), isVideoDocument,
+               SubtitleDocument.extensions.contains(url.pathExtension.lowercased()) {
+                subtitles.importFile(url)
+                completion(true)
+                return
+            }
             guard isCurrentDrop(generation) else {
                 completion(false)
                 return

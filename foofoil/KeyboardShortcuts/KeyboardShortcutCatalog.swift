@@ -113,7 +113,7 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("view.zoomInContent", "Zoom In Content", "+", [.command]),
         definition("view.zoomOutContent", "Zoom Out Content", "-", [.command]),
         definition("view.actualSize", "Actual Size", "0", [.command]),
-        definition("view.documentStyle", "Document Style", "i", [.command], "Shortcut Scope Document Style")
+        definition("view.documentStyle", "Document or Subtitle Style", "i", [.command], "Shortcut Scope Document or Subtitle Style")
     ]
 
     static let image: [KeyboardShortcutDefinition] = [

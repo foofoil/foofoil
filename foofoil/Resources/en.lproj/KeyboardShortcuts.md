@@ -122,3 +122,5 @@ Paste an Apple Music song, album, or public playlist sharing link into Quick Ope
 Quick Open shows all sources without category tabs, initially 12 results per group; More adds 18 at a time within the shared 60-result limit.
 
 Apple Music shortcuts and link handling require Enable Apple Music Library in Settings → Types → Audio and Video, which is off by default. When disabled, Quick Open and Open Clipboard Content treat Apple Music sharing links as ordinary websites.
+
+The configurable Document / Subtitle Style command opens subtitle settings for videos and document settings for documents. Subtitle styles and timing are global.

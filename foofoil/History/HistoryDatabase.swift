@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 nonisolated final class HistoryDatabase {
-    static let schemaVersion = 18
+    static let schemaVersion = 19
 
     private let queue = DispatchQueue(label: "com.foofoil.history.database", qos: .utility)
     private var connection: OpaquePointer?
@@ -109,8 +109,8 @@ nonisolated final class HistoryDatabase {
                         extension_id, extension_state_reference, navigator_panel_side,
                         navigator_panel_visibility, navigator_panel_width, file_list,
                         document_zoom, document_scroll_file, document_scroll_fraction, text_fingerprint,
-                        image_ocr_text, image_has_subject, image_subject_path, apple_music_reference
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        image_ocr_text, image_has_subject, image_subject_path, apple_music_reference, subtitle_associations
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -146,6 +146,7 @@ nonisolated final class HistoryDatabase {
                         image_ocr_text=excluded.image_ocr_text,
                         image_has_subject=excluded.image_has_subject,
                         image_subject_path=excluded.image_subject_path,
+                        subtitle_associations=excluded.subtitle_associations,
                         apple_music_reference=excluded.apple_music_reference
                     """, bindings: [
                         config.id.uuidString, kind.rawValue, title, config.originalImageName,
@@ -170,7 +171,8 @@ nonisolated final class HistoryDatabase {
                         config.imageOCRText,
                         config.imageHasSubject,
                         config.imageSubjectPath,
-                        try config.appleMusicReference.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) }
+                        try config.appleMusicReference.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
+                        try config.subtitleAssociations.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) }
                     ])
 
                 let metadata = (
@@ -461,6 +463,7 @@ nonisolated final class HistoryDatabase {
         try addColumnIfMissing("image_has_subject", definition: "image_has_subject INTEGER")
         try addColumnIfMissing("image_subject_path", definition: "image_subject_path TEXT")
         // v18 资料库身份独立保存，不伪造文件路径，也不缓存 MusicKit 曲目队列。
+        try addColumnIfMissing("subtitle_associations", definition: "subtitle_associations TEXT")
         try addColumnIfMissing("apple_music_reference", definition: "apple_music_reference TEXT")
         if previousVersion >= 1 && previousVersion < 9 {
             // v9：旧列表 video_looping=1 是单曲循环开关；迁成顺序循环，使列表能自动续播。
@@ -701,6 +704,9 @@ nonisolated final class HistoryDatabase {
                     imageSubjectPath: columns["image_subject_path"].flatMap { optionalText(statement, $0) },
                     documentZoom: sqlite3_column_double(statement, columns["document_zoom"]!),
                     mediaPlaybackMode: MediaPlaybackMode(sqliteValue: Int(sqlite3_column_int(statement, columns["video_looping"]!))),
+                    subtitleAssociations: columns["subtitle_associations"].flatMap { optionalText(statement, $0) }.flatMap {
+                        try? JSONDecoder().decode([String: SubtitleAssociation].self, from: Data($0.utf8))
+                    },
                     videoBookmark: optionalText(statement, columns["video_bookmark"]!).flatMap { Data(base64Encoded: $0) },
                     mediaSidecarBookmark: optionalText(statement, columns["media_sidecar_bookmark"]!).flatMap { Data(base64Encoded: $0) },
                     customCoverPath: columns["custom_cover_path"].flatMap { optionalText(statement, $0) },

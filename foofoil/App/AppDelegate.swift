@@ -283,6 +283,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     /// 收起属于该箔的文档样式面板；面板不属于它时不动。
     func dismissDocumentStylePanel(ownedBy appState: AppState) {
         DocumentStylePanelController.shared.dismiss(ownedBy: appState)
+        SubtitleStylePanelController.shared.dismiss(ownedBy: appState)
     }
 
     /// 收起属于该箔的取色面板；面板不属于它时不动（可能正被另一扇箔使用）。

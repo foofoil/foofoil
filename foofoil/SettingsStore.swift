@@ -174,6 +174,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     /// 旧字段：仅表示是否单曲循环，随 `mediaPlaybackMode` 写入以兼容旧解码。
     public var isVideoLooping: Bool
     /// 视频/音频原始文件的安全范围书签；沙盒授权仅随进程有效，靠它在 app 重启后恢复访问权限。
+    public var subtitleAssociations: [String: SubtitleAssociation]?
     public var videoBookmark: Data?
     /// 音频同目录封面所在文件夹的安全范围书签；重启后恢复访问以保证封面可再次读取。
     public var mediaSidecarBookmark: Data?
@@ -231,6 +232,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         documentZoom: Double = 1.0,
         mediaPlaybackMode: MediaPlaybackMode = .sequentialLoop,
         isVideoLooping: Bool? = nil,
+        subtitleAssociations: [String: SubtitleAssociation]? = nil,
         videoBookmark: Data? = nil,
         mediaSidecarBookmark: Data? = nil,
         customCoverPath: String? = nil,
@@ -279,6 +281,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.documentZoom = documentZoom
         self.mediaPlaybackMode = mediaPlaybackMode
         self.isVideoLooping = isVideoLooping ?? (mediaPlaybackMode == .singleLoop)
+        self.subtitleAssociations = subtitleAssociations
         self.videoBookmark = videoBookmark
         self.mediaSidecarBookmark = mediaSidecarBookmark
         self.customCoverPath = customCoverPath
@@ -294,7 +297,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference
+        case isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference
     }
 
     public init(from decoder: Decoder) throws {
@@ -332,6 +335,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         imageSubjectPath = try container.decodeIfPresent(String.self, forKey: .imageSubjectPath)
         webZoom = try container.decodeIfPresent(Double.self, forKey: .webZoom) ?? 1.0
         documentZoom = try container.decodeIfPresent(Double.self, forKey: .documentZoom) ?? 1.0
+        subtitleAssociations = try container.decodeIfPresent([String: SubtitleAssociation].self, forKey: .subtitleAssociations)
         videoBookmark = try container.decodeIfPresent(Data.self, forKey: .videoBookmark)
         mediaSidecarBookmark = try container.decodeIfPresent(Data.self, forKey: .mediaSidecarBookmark)
         customCoverPath = try container.decodeIfPresent(String.self, forKey: .customCoverPath)

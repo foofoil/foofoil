@@ -1065,6 +1065,10 @@ extension AppDelegate {
 
     @objc func documentStyleAction() {
         guard let appState = activeAppState else { return }
+        if appState.isVideoDocument {
+            SubtitleStylePanelController.shared.show(for: appState)
+            return
+        }
         guard appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling else { return }
         DocumentStylePanelController.shared.show(for: appState)
     }

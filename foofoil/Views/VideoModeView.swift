@@ -32,10 +32,13 @@ struct VideoModeView: View {
     @ObservedObject private var navigatorHover: NavigatorHoverState
     let url: URL
     let shouldHideBorder: Bool
+    @ObservedObject private var subtitles: VideoSubtitleController
+    @State private var videoSize = CGSize(width: 16, height: 9)
     @StateObject private var controller: VideoPlayerController
 
     init(appState: AppState, url: URL, shouldHideBorder: Bool) {
         self.appState = appState
+        self.subtitles = appState.subtitles
         self.navigatorHover = appState.navigatorHover
         self.url = url
         self.shouldHideBorder = shouldHideBorder
@@ -60,6 +63,7 @@ struct VideoModeView: View {
             PlayerView(player: controller.player)
 
             // 视频画面不是交互控件，整块画面作为拖拽区域；底部控制条仍优先处理事件。
+            SubtitleOverlay(controller: subtitles, time: controller.currentTime, width: videoSize.width, height: videoSize.height, native: true, controlsVisible: appState.isMediaPlaybackControlsVisible)
             WindowDragArea()
 
             if appState.isMediaPlaybackControlsVisible {
@@ -74,6 +78,18 @@ struct VideoModeView: View {
                     .zIndex(1)
             }
 
+            if appState.isMediaPlaybackControlsVisible {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Menu { SubtitleMenuItems(controller: subtitles) } label: { Image(systemName: "captions.bubble") }
+                            .menuStyle(.borderlessButton).fixedSize().padding(10)
+                            .background(.black.opacity(0.5), in: Capsule())
+                            .accessibilityLabel(Text("Audio and Subtitles"))
+                    }
+                    Spacer()
+                }
+            }
             // 箔底常显的细进度线；与控制条显隐无关，设置中可关闭。
             VStack {
                 Spacer(minLength: 0)
@@ -88,6 +104,17 @@ struct VideoModeView: View {
         .animation(.easeInOut(duration: 0.25), value: appState.fullScreenNavigatorControlBarInset)
         // 与图片有边框模式保持一致的 8pt 内容边距
         .padding(shouldHideBorder ? 0 : 8)
+        .task(id: url) {
+            subtitles.onChange = { [weak appState] in appState?.saveState() }
+            await subtitles.prepare(video: url)
+            await subtitles.bindNative(controller.player)
+            let asset = AVURLAsset(url: url)
+            if let track = try? await asset.loadTracks(withMediaType: .video).first,
+               let size = try? await track.load(.naturalSize), let transform = try? await track.load(.preferredTransform) {
+                let transformed = size.applying(transform)
+                videoSize = CGSize(width: abs(transformed.width), height: abs(transformed.height))
+            }
+        }
         .onAppear {
             controller.isLooping = appState.shouldLoopCurrentItem
             controller.activateRemoteCommands()

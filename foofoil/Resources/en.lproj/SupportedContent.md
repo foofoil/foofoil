@@ -35,7 +35,7 @@ You can also type directly into a blank foil to write a note.
 | Type | Common formats | Notes |
 | --- | --- | --- |
 | Audio | MP3, M4A, AAC, WAV, AIFF, FLAC, etc. | Play music and recordings |
-| Video | MP4, MOV, M4V; MKV and AVI in builds with additional video support | MKV/AVI support includes H.264, HEVC and Xvid video, common audio tracks including DTS and TrueHD, and audio/subtitle selection. SRT and ASS use plain text styling; PGS uses bitmap subtitles. |
+| Video | MP4, MOV, M4V; MKV and AVI in builds with additional video support | MKV/AVI support includes H.264, HEVC and Xvid video, common audio tracks including DTS and TrueHD, and audio/subtitle selection. Text subtitles use globally configurable styles; PGS uses bitmap subtitles. |
 | Hi-Fi audio | DSF, DFF, APE | DSF and DFF require a DoP-capable audio device; DST-compressed DFF is not supported |
 | SACD images | .iso | Play uncompressed stereo tracks |
 | Track lists | .cue | Play an album by track; keep the accompanying audio files |
@@ -71,3 +71,5 @@ The Share menu filters attachments with a known content type. Apps that supply o
 Files that cannot be opened from drag and drop, the clipboard, or sharing appear in a separate bordered feedback foil with their system icons, filenames, and reason. Existing foils are preserved, even if blank. Feedback foils are excluded from history and restart restoration; failures from the same batch are collected together. Known Quick Look documents retain their preview; unknown formats are previewed only when the system can generate a content thumbnail.
 
 Apple Music Library is disabled by default. Enable it in Settings → Types → Audio and Video to reveal its library entry, search options, and sharing guidance. Turning it off hides music history and search results without deleting saved history; Apple Music links open as ordinary web pages.
+
+All video foils can load external SRT, ASS/SSA, and WebVTT subtitles using the subtitle menu, the style panel, or drag and drop. Matching same-folder filenames are discovered automatically after folder access is available. Loaded files and visibility are saved with video history. Fonts, colors, background, shadow, bottom position and delay are global settings. ASS uses the global text style; PGS supports position and delay but keeps its bitmap appearance.

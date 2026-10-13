@@ -85,6 +85,7 @@ extension AppState {
             self.isNavigatorPanelExplicitlyVisible = false
             self.activeNavigatorContributionID = nil
             self.expandedNavigatorItemIDs = []
+            subtitles.restore(config.subtitleAssociations)
             restoreFileList(from: config)
             restoreExtensionSession(from: config)
             restoreCustomCover(from: config)
@@ -262,6 +263,7 @@ extension AppState {
                 webZoom: webZoom,
                 documentZoom: documentZoom,
                 mediaPlaybackMode: mediaPlaybackMode,
+                subtitleAssociations: subtitles.history.isEmpty ? nil : subtitles.history,
                 videoBookmark: videoBookmarkData,
                 mediaSidecarBookmark: mediaSidecarBookmarkData,
                 customCoverPath: customCoverURL?.path,

@@ -8,12 +8,16 @@ import CoreImage
 struct ExtensionVideoModeView: View {
     @ObservedObject var appState: AppState
     let shouldHideBorder: Bool
+    @ObservedObject private var subtitles: VideoSubtitleController
+    @ObservedObject private var subtitleStyle = SubtitleStyleStore.shared
+    @State private var subtitleTime = 0.0
     @StateObject private var controller: ExtensionAudioPlaybackController
     @State private var frame: VideoPresentationSnapshot?
     @State private var image: CGImage?
     private let context = CIContext(options: [.cacheIntermediates: false])
 
     init(appState: AppState, session: ContentSession, shouldHideBorder: Bool) {
+        self.subtitles = appState.subtitles
         self.appState = appState; self.shouldHideBorder = shouldHideBorder
         _controller = StateObject(wrappedValue: ExtensionAudioPlaybackController(appState: appState, session: session))
     }
@@ -24,14 +28,18 @@ struct ExtensionVideoModeView: View {
                 Image(decorative: image, scale: 1).resizable().aspectRatio(contentMode: .fit)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
+            SubtitleOverlay(controller: subtitles, time: subtitleTime,
+                            width: Double(frame?.width ?? 16), height: Double(frame?.height ?? 9), embedded: frame?.subtitle, controlsVisible: appState.isMediaPlaybackControlsVisible)
             WindowDragArea()
             if appState.isMediaPlaybackControlsVisible {
                 VStack {
                     HStack {
                         Spacer()
                         Menu {
-                            ForEach(appState.extensionSession?.commands ?? []) { command in
+                            SubtitleMenuItems(controller: subtitles)
+                            ForEach((appState.extensionSession?.commands ?? []).filter { $0.id != "video.subtitle.-1" }) { command in
                                 Button {
+                                    if command.id.hasPrefix("video.subtitle.") { subtitles.useEmbedded(command.id) }
                                     appState.performExtensionCommand(command.id)
                                 } label: {
                                     Label(command.displayTitle ?? NSLocalizedString(command.titleLocalizationKey, comment: ""),
@@ -58,6 +66,9 @@ struct ExtensionVideoModeView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipped().padding(shouldHideBorder ? 0 : 8)
+        .onChange(of: subtitleStyle.style.delay) { _, delay in
+            appState.performExtensionMediaAction(.setSubtitleDelay(delay))
+        }
         .onAppear {
             controller.activateRemoteCommands()
             if appState.resumesMediaPlaybackOnActivation { controller.play() }
@@ -71,12 +82,18 @@ struct ExtensionVideoModeView: View {
         .onReceive(appState.$extensionSession.compactMap { $0 }) { session in controller.apply(session: session) }
         .task(id: appState.extensionSession?.id) {
             guard let session = appState.extensionSession else { return }
+            subtitles.onChange = { [weak appState] in appState?.saveState() }
+            if let url = session.request.primaryFileURL { await subtitles.prepare(video: url) }
+            if let selected = subtitles.association.embeddedID,
+               session.commands.contains(where: { $0.id == selected }) { appState.performExtensionCommand(selected) }
+            appState.performExtensionMediaAction(.setSubtitleDelay(subtitleStyle.style.delay))
             var lastStateRefresh = Date.distantPast
             while !Task.isCancelled {
                 do {
                     let current = try await ExtensionHost.shared.perform(mediaAction: .refresh, in: session)
                     guard !Task.isCancelled, appState.extensionSession?.id == session.id else { return }
                     controller.apply(session: current)
+                    subtitleTime = current.mediaPlayback?.position ?? 0
                     if case .video(let next) = current.presentation, next != frame {
                         if let surface = IOSurfaceLookup(next.surfaceID) {
                             IOSurfaceLock(surface, .readOnly, nil)

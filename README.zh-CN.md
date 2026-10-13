@@ -167,3 +167,5 @@ xcodebuild test \
 应用内置的 cmark 库使用其自身的宽松开源许可证，所需声明请参阅 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
 视频能力独立位于兄弟 `video` 仓库。`./run` 与 `./package-dmg` 默认包含它；使用 `--without-video` 排除，或 `--with-video` 显式包含。用户无需安装或启用模块。
+
+视频支持外部 SRT、ASS/SSA、WebVTT 字幕：同名自动查找、手动载入或拖入，关联随历史保存。默认 ⌘I 打开视频字幕样式，字体、字号、颜色、背景、阴影、底边位置和延迟全局保存。

@@ -1,6 +1,390 @@
 {
   "sourceLanguage": "en",
   "strings": {
+  "Subtitle Style": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Subtitle Style"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "字幕样式"
+        }
+      }
+    }
+  },
+  "Load Subtitle File": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Load Subtitle File…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "载入字幕文件…"
+        }
+      }
+    }
+  },
+  "Locate Subtitle File": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Locate Subtitle File…"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "重新选择字幕文件…"
+        }
+      }
+    }
+  },
+  "Subtitle Directory Access": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Allow access to this video folder to find matching subtitle files automatically."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "允许访问此视频所在文件夹，以自动查找同名字幕文件。"
+        }
+      }
+    }
+  },
+  "Subtitle Global Settings Notice": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "These settings apply to all video foils and are saved automatically."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "这些设置应用于所有视频箔，并自动保存。"
+        }
+      }
+    }
+  },
+  "Subtitle Theme": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Theme"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "主题"
+        }
+      }
+    }
+  },
+  "Subtitle White Shadow": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "White with dark shadow"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "白字黑影"
+        }
+      }
+    }
+  },
+  "Subtitle Black Background": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "White on dark background"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "黑底白字"
+        }
+      }
+    }
+  },
+  "Subtitle Warm Yellow": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Warm yellow"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "暖黄字幕"
+        }
+      }
+    }
+  },
+  "Subtitle Light Background": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Dark on light background"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "浅底深字"
+        }
+      }
+    }
+  },
+  "Subtitle Font Size": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Font size (at 1080p)"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "字号（以 1080p 为基准）"
+        }
+      }
+    }
+  },
+  "Subtitle Shadow Color": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Shadow color"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "阴影色"
+        }
+      }
+    }
+  },
+  "Subtitle Bottom Position": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Distance from bottom"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "距底边位置"
+        }
+      }
+    }
+  },
+  "Subtitle Delay": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Delay"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "延迟"
+        }
+      }
+    }
+  },
+  "Subtitle Positive Delay Notice": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Positive values show subtitles later; negative values show them earlier."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "正值使字幕晚出现，负值使字幕提前出现。"
+        }
+      }
+    }
+  },
+  "Subtitle Bitmap Styling Notice": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Font and colors apply to text subtitles. Bitmap subtitles support position, delay, and visibility."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "字体和颜色应用于文字字幕。图形字幕支持位置、延迟和显示开关。"
+        }
+      }
+    }
+  },
+  "Show Subtitles": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Show subtitles"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "显示字幕"
+        }
+      }
+    }
+  },
+  "Subtitle File Too Large": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Subtitle file exceeds 16 MB."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "字幕文件超过 16 MB。"
+        }
+      }
+    }
+  },
+  "Subtitle Encoding Unsupported": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Cannot read the subtitle text encoding."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法读取字幕的文字编码。"
+        }
+      }
+    }
+  },
+  "Subtitle File Has No Cues": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "No valid subtitle cues were found."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "未找到有效字幕条目。"
+        }
+      }
+    }
+  },
+  "Document or Subtitle Style": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Document / Subtitle Style"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "文档 / 字幕样式"
+        }
+      }
+    }
+  },
+  "Shortcut Scope Document or Subtitle Style": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Documents and videos"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "文档和视频"
+        }
+      }
+    }
+  },
+  "Seconds": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "seconds"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "秒"
+        }
+      }
+    }
+  },
+  "System Font": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "System font"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "系统字体"
+        }
+      }
+    }
+  },
   "Audio and Subtitles": {
     "localizations": {
       "en": {

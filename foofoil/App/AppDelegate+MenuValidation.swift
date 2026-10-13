@@ -185,7 +185,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         setMenuItem(
             withAction: #selector(documentStyleAction),
             in: menu,
-            isHidden: !(appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling)
+            isHidden: !(appState.isVideoDocument || appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling)
         )
 
         // 3. Fit Window to Image & Fit Image to Window Width 菜单项 - 仅图片且有边框时可见
@@ -271,7 +271,8 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
 
         if menuItem.action == #selector(documentStyleAction) {
             guard let appState = activeAppState else { return false }
-            return appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling
+            menuItem.title = NSLocalizedString(appState.isVideoDocument ? "Subtitle Style" : "Document Style", comment: "")
+            return appState.isVideoDocument || appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling
         }
 
         if menuItem.action == #selector(openClipboardContentAction) {

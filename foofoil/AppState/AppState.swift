@@ -25,6 +25,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     public static let minDocumentZoom: Double = 0.5
     public static let maxDocumentZoom: Double = 3.0
 
+    let subtitles = VideoSubtitleController()
     public var id: UUID
     var sourceFingerprint: String?
     public var isInteractiveZooming: Bool = false
