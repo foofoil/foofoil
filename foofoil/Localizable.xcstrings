@@ -33,6 +33,70 @@
         }
       }
     },
+    "Incognito Foil History Hint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incognito Foil · Not saved to history"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无痕箔 · 不进入历史记录"
+          }
+        }
+      }
+    },
+    "New Incognito Foil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Incognito Foil"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建无痕箔"
+          }
+        }
+      }
+    },
+    "Open Clipboard Incognito": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Clipboard Incognito"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无痕打开剪贴板内容"
+          }
+        }
+      }
+    },
+    "Incognito Foil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incognito Foil"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无痕箔"
+          }
+        }
+      }
+    },
   "Video Frame: %@": {
   "localizations": {
     "en": {
@@ -1830,13 +1894,13 @@
       "en": {
         "stringUnit": {
           "state": "translated",
-          "value": "Enable foofoil under Sharing in System Settings to open content from Finder, Preview, Apple Music, and other apps."
+          "value": "Enable both foofoil and Incognito Foil under Sharing in System Settings to open content from Finder, Preview, Apple Music, and other apps."
         }
       },
       "zh-Hans": {
         "stringUnit": {
           "state": "translated",
-          "value": "在系统设置的共享列表中启用「浮箔」，即可从 Finder、预览、Apple Music 等应用打开内容。"
+          "value": "在系统设置的共享列表中勾选「浮箔」和「无痕箔」，即可从 Finder、预览、Apple Music 等应用打开内容。"
         }
       }
     }
@@ -1881,13 +1945,13 @@
       "en": {
         "stringUnit": {
           "state": "translated",
-          "value": "Enable foofoil under Sharing in System Settings to open content from Finder, Preview, and other apps."
+          "value": "Enable both foofoil and Incognito Foil under Sharing in System Settings to open content from Finder, Preview, and other apps."
         }
       },
       "zh-Hans": {
         "stringUnit": {
           "state": "translated",
-          "value": "在系统设置的共享列表中启用「浮箔」，即可从 Finder、预览等应用打开内容。"
+          "value": "在系统设置的共享列表中勾选「浮箔」和「无痕箔」，即可从 Finder、预览等应用打开内容。"
         }
       }
     }

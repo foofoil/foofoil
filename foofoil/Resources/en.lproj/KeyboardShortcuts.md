@@ -5,6 +5,9 @@ Customize bindings in Settings → Keyboard Shortcuts. Except for global shortcu
 ⌘ Command · ⇧ Shift · ⌥ Option · ⌃ Control · Esc Escape · Space · Tab
 
 
+Incognito foils never enter history and are not restored after quitting. Use File → New Incognito Foil or Open Clipboard Incognito; the system Share menu also offers Incognito Foil. Content dropped into an incognito foil stays out of history, including any additional foils created for separate file groups.
+Ordinary opening actions only reuse ordinary blank foils. Incognito opening creates a new foil; an empty incognito foil shows a footprints-with-slash icon and offers no history cards or recent-history number shortcuts.
+
 ## Global Shortcuts
 
 | Action | Default shortcut | Current shortcut | Notes |

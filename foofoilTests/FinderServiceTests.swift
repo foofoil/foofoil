@@ -6,7 +6,7 @@ import Testing
 struct FinderServiceTests {
     private class RecordingDelegate: AppDelegate {
         var openedURLs: [URL] = []
-        override func openFilesInNewFoil(_ urls: [URL]) {
+        override func openFilesInNewFoil(_ urls: [URL], isIncognito: Bool = false) {
             openedURLs = urls
         }
     }

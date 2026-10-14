@@ -30,8 +30,8 @@ struct TextEditorModeView: View {
             if geometry.size.width < 100 || geometry.size.height < 100 {
                 Color.clear
             } else {
-                let isBlank = appState.imageURL == nil && appState.webURL == nil && appState.textURL == nil && appState.text.isEmpty
-                let showTipsAndHistory = geometry.size.height >= 140
+                let isBlank = appState.isBlank
+                let showTipsAndHistory = geometry.size.height >= 140 && appState.canOpenRecentHistory
 
                 VStack(alignment: .leading, spacing: 0) {
                     ZStack(alignment: .topLeading) {
@@ -206,6 +206,21 @@ struct TextEditorModeView: View {
                             .frame(height: 14)
                         }
                         .background(NonMovableBackground())
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .overlay {
+                    if isBlank && appState.isIncognito {
+                        Image(nsImage: IncognitoFoilIcon.image)
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: min(96, geometry.size.width * 0.28),
+                                   height: min(96, geometry.size.height * 0.28))
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel(Text("Incognito Foil History Hint"))
+                            // 大图标覆盖在窗口正中央，不阻挡文本输入、拖放或窗口拖动。
+                            .allowsHitTesting(false)
                     }
                 }
             }

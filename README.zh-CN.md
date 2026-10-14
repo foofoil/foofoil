@@ -56,6 +56,8 @@ Hi-Fi 当前支持 DSF、raw DFF、未压缩立体声 SACD ISO 和 APE/CUE。DSD
 | --- | --- |
 | 箔片总览（Exposé，全局） | <kbd>⌃ ⇧ Esc</kbd> |
 | 打开剪贴板内容 | <kbd>⇧ ⌘ V</kbd> |
+| 新建无痕箔 | <kbd>⇧ ⌘ N</kbd> |
+| 无痕打开剪贴板内容 | <kbd>⇧ ⌥ ⌘ V</kbd> |
 | 快速打开 | <kbd>⌘ P</kbd> |
 | 隐藏当前活跃箔片 | <kbd>⌘ H</kbd> |
 | 隐藏所有箔片，临时让出工作区 | <kbd>⇧ ⌘ H</kbd> |
@@ -70,6 +72,8 @@ Hi-Fi 当前支持 DSF、raw DFF、未压缩立体声 SACD ISO 和 APE/CUE。DSD
 | 增加 / 降低不透明度 | <kbd>⇧ ⌘ ↑</kbd> / <kbd>⇧ ⌘ ↓</kbd> |
 | 将箔片移到下一屏幕 | <kbd>⌃ ⌥ Tab</kbd> |
 | 将箔片移到屏幕九宫格位置 | <kbd>⌃ ⌥</kbd> + <kbd>Q W E / A S D / Z X C</kbd> |
+
+无痕箔不进入历史记录，退出后也不会恢复。系统共享菜单也提供无痕箔入口，Exposé 中的无痕箔在右上角显示脚印斜线标记。
 
 总览快捷键在其他应用处于前台时也可使用；打开总览后仍可按 ⇧⌘V 打开剪贴板内容。
 

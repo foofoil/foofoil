@@ -86,6 +86,12 @@ extension AppDelegate {
         newWindowItem.withSymbol("plus.rectangle.on.rectangle")
         newWindowItem.target = self
         fileMenu.addItem(newWindowItem)
+        let privateItem = NSMenuItem(title: NSLocalizedString("New Incognito Foil", comment: ""), action: #selector(newIncognitoWindowAction), keyEquivalent: "n")
+        privateItem.keyEquivalentModifierMask = [.command, .shift]
+        privateItem.representedObject = "file.newIncognito"
+        privateItem.withImage(IncognitoFoilIcon.menuImage)
+        privateItem.target = self
+        fileMenu.addItem(privateItem)
 
         fileMenu.addItem(NSMenuItem.separator())
 
@@ -126,6 +132,12 @@ extension AppDelegate {
         openClipboardContentItem.representedObject = KeyboardShortcutCatalog.openClipboardContent.id
         openClipboardContentItem.target = self
         fileMenu.addItem(openClipboardContentItem)
+        let privateClipboardItem = NSMenuItem(title: NSLocalizedString("Open Clipboard Incognito", comment: ""), action: #selector(openClipboardIncognitoAction), keyEquivalent: "v")
+        privateClipboardItem.keyEquivalentModifierMask = [.command, .shift, .option]
+        privateClipboardItem.representedObject = "file.openClipboardIncognito"
+        privateClipboardItem.withImage(IncognitoFoilIcon.menuImage)
+        privateClipboardItem.target = self
+        fileMenu.addItem(privateClipboardItem)
 
         fileMenu.addItem(NSMenuItem.separator())
 

@@ -17,7 +17,7 @@ import FoofoilExtensionKit
 
 extension AppState {
         public func saveState() {
-            guard !isFileOpenFeedback, !isBatchUpdating, !isAdjustingDocumentStyling else { return }
+            guard !isIncognito, !isFileOpenFeedback, !isBatchUpdating, !isAdjustingDocumentStyling else { return }
             if hasOpenedContent || appleMusicReference != nil {
                 if !fileOpenFeedback.isEmpty { fileOpenFeedback = [] }
                 closesEmptyWindowAfterFileOpenFailure = false

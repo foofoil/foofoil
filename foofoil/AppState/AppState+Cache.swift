@@ -241,7 +241,8 @@ extension AppState {
                             userInfo: [
                                 "id": newId,
                                 "imageURL": destURL,
-                                "originalName": formattedTitle
+                                "originalName": formattedTitle,
+                                "isIncognito": self.isIncognito
                             ]
                         )
                     }

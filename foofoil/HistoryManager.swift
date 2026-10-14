@@ -87,14 +87,15 @@ public final class HistoryManager: ObservableObject {
         listSaveWorkItem?.cancel()
         pendingListConfigs.removeAll()
         listSaveQueue.sync {}
-        let configs = activeConfigs ?? (NSApplication.shared.delegate as? AppDelegate)?.windowControllers.map { $0.appState.toConfig() } ?? []
-        let active = configs.filter(hasPersistableContent)
+        let configs = activeConfigs ?? (NSApplication.shared.delegate as? AppDelegate)?.windowControllers.filter { !$0.appState.isIncognito }.map { $0.appState.toConfig() } ?? []
+        let incognitoIDs = Set((NSApplication.shared.delegate as? AppDelegate)?.windowControllers.filter { $0.appState.isIncognito }.map { $0.appState.id } ?? [])
+        let active = configs.filter { !incognitoIDs.contains($0.id) && hasPersistableContent($0) }
         let activeIDs = Set(active.map(\.id))
         ContentIndexCoordinator.shared.cancelAll(excluding: activeIDs)
         repository.removeAll(excluding: activeIDs)
         active.forEach { _ = repository.upsert($0) }
 
-        let activePaths = Set(active.flatMap(cachePaths(for:)))
+        let activePaths = Set(active.flatMap(cachePaths(for:))).union(activeCachePaths())
         for directoryURL in AppState.cacheDirectoryURLs() {
             guard let enumerator = FileManager.default.enumerator(at: directoryURL, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else { continue }
             for case let fileURL as URL in enumerator where AppState.isManagedCacheURL(fileURL) && !activePaths.contains(fileURL.path) {
@@ -133,6 +134,7 @@ public final class HistoryManager: ObservableObject {
         historyMutationGeneration &+= 1
         // 同步活跃箔片，避免下一次自动保存覆盖刚改好的历史标题。
         state?.applyFoilTitle(newTitle)
+        guard state?.isIncognito != true else { return }
         repository.rename(id: configId, title: newTitle)
         refreshUI()
     }

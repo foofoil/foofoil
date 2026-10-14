@@ -26,6 +26,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     public static let maxDocumentZoom: Double = 3.0
 
     let subtitles = VideoSubtitleController()
+    /// 无痕属性属于窗口，内容替换或重置时仍保留；不写入持久配置。
+    public let isIncognito: Bool
     public var id: UUID
     var sourceFingerprint: String?
     public var isInteractiveZooming: Bool = false
@@ -483,6 +485,9 @@ public class AppState: NSObject, ObservableObject, Identifiable {
             && text.isEmpty
     }
 
+    /// 历史卡片和编号快捷键只属于普通空箔，避免将历史内容带入无痕窗口。
+    var canOpenRecentHistory: Bool { isBlank && !isIncognito }
+
     @Published public var isPinned: Bool {
         didSet {
             saveState()
@@ -624,7 +629,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         case url(URL)
     }
 
-    public init(config: WindowConfig) {
+    public init(config: WindowConfig, isIncognito: Bool = false) {
+        self.isIncognito = isIncognito
         self.id = config.id
         self.sourceFingerprint = config.sourceFingerprint
         self.isPinned = config.isPinned
@@ -762,7 +768,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         updateRenderedMarkdown()
     }
 
-    public init(id: UUID = UUID()) {
+    public init(id: UUID = UUID(), isIncognito: Bool = false) {
+        self.isIncognito = isIncognito
         self.id = id
         self.sourceFingerprint = nil
         self.isPinned = false

@@ -22,8 +22,17 @@ nonisolated enum SharedContentLink: Equatable {
         return components.url
     }
 
+    static func incognitoURL(_ url: URL) -> URL? {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              Self(url: url) != nil else { return nil }
+        components.host = "incognito-share"
+        return components.url
+    }
+
+    static func isIncognito(_ url: URL) -> Bool { url.scheme == "foofoil" && url.host == "incognito-share" }
+
     init?(url: URL) {
-        guard url.scheme == "foofoil", url.host == "share",
+        guard url.scheme == "foofoil", ["share", "incognito-share"].contains(url.host ?? ""),
               let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let items = components.queryItems, items.count == 1,
               let value = items.first?.value else { return nil }
@@ -46,16 +55,21 @@ nonisolated enum SharedContentLink: Equatable {
 /// 来源应用的临时导出必须在 item-provider 回调结束前复制；主应用再保存自己的持久副本。
 nonisolated enum ShareStaging {
     static let directoryName = "FoofoilShareInbox"
+    static let incognitoDirectoryName = "FoofoilIncognitoShareInbox"
+
+    static func isIncognito(_ url: URL) -> Bool {
+        isStaged(url) && url.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent == incognitoDirectoryName
+    }
 
     static func isStaged(_ url: URL) -> Bool {
         guard url.isFileURL else { return false }
         let parent = url.deletingLastPathComponent()
         return UUID(uuidString: parent.lastPathComponent) != nil
-            && parent.deletingLastPathComponent().lastPathComponent == directoryName
+            && [directoryName, incognitoDirectoryName].contains(parent.deletingLastPathComponent().lastPathComponent)
     }
 
-    static func copy(_ source: URL, named name: String? = nil) throws -> URL {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(directoryName)
+    static func copy(_ source: URL, named name: String? = nil, isIncognito: Bool = false) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(isIncognito ? incognitoDirectoryName : directoryName)
             .appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let proposed = name.map { URL(fileURLWithPath: $0).lastPathComponent } ?? source.lastPathComponent

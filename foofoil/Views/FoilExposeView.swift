@@ -935,8 +935,10 @@ struct FoilExposeItemView: View {
     }
 
     private var accessibilityLabel: String {
-        guard let shortcut else { return item.title }
-        return "\(showsSearchModifier ? "⌃" : "")\(shortcut) \(item.title)"
+        let title = item.controller?.appState.isIncognito == true
+            ? "\(NSLocalizedString("Incognito Foil", comment: "")) \(item.title)" : item.title
+        guard let shortcut else { return title }
+        return "\(showsSearchModifier ? "⌃" : "")\(shortcut) \(title)"
     }
 
     private var thumbnail: some View {
@@ -978,6 +980,24 @@ struct FoilExposeItemView: View {
                         }
                         mediaKindOverlay
                         shortcutBadge
+                        if item.controller?.appState.isIncognito == true {
+                            VStack {
+                                HStack {
+                                    Spacer()
+                                    Image(nsImage: IncognitoFoilIcon.image)
+                                        .renderingMode(.template)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: 16, height: 16)
+                                        .foregroundStyle(.white)
+                                        .frame(width: 26, height: 26)
+                                        .background(Circle().fill(Color.black.opacity(0.65)))
+                                        .help(Text("Incognito Foil History Hint"))
+                                }
+                                Spacer()
+                            }
+                            .padding(7)
+                        }
                     }
                     .frame(width: geometry.size.width, height: geometry.size.height)
                 }

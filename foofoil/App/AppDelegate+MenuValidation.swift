@@ -284,7 +284,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             return appState.isVideoDocument || appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling
         }
 
-        if menuItem.action == #selector(openClipboardContentAction) {
+        if menuItem.action == #selector(openClipboardContentAction) || menuItem.action == #selector(openClipboardIncognitoAction) {
             // 菜单跟踪期间 key window 可能不可用：没有活跃箔片时仍按剪贴板本身判断可用性。
             return hasOpenableClipboardContent(using: activeAppState)
         }

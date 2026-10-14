@@ -1,3 +1,4 @@
+import OSLog
 import AppKit
 import UniformTypeIdentifiers
 
@@ -48,11 +49,21 @@ final class ShareViewController: NSViewController {
         openingTask = Task { [weak self] in
             do {
                 guard !providers.isEmpty, providers.count <= 100 else { throw CocoaError(.fileReadUnsupportedScheme) }
+                ShareDiagnostics.logger.notice("Handoff started: \(providers.count, privacy: .public) attachments, incognito=\(Bundle.main.object(forInfoDictionaryKey: "FoofoilIncognito") as? Bool == true, privacy: .public)")
                 var urls: [URL] = []
                 // 保留来源顺序；任一附件失败时保留分享面板，不悄悄漏掉内容。
                 for provider in providers {
                     try Task.checkCancellation()
-                    urls.append(try await SharedItemLoader.load(provider))
+                    let loaded = try await SharedItemLoader.load(provider)
+                    if Bundle.main.object(forInfoDictionaryKey: "FoofoilIncognito") as? Bool == true {
+                        if loaded.isFileURL {
+                            let accessed = loaded.startAccessingSecurityScopedResource()
+                            defer { if accessed { loaded.stopAccessingSecurityScopedResource() } }
+                            urls.append(try ShareStaging.copy(loaded, isIncognito: true))
+                        } else if let privateURL = SharedContentLink.incognitoURL(loaded) {
+                            urls.append(privateURL)
+                        } else { throw CocoaError(.fileReadUnsupportedScheme) }
+                    } else { urls.append(loaded) }
                 }
                 try Task.checkCancellation()
                 guard let self else { return }
@@ -66,6 +77,7 @@ final class ShareViewController: NSViewController {
                         else { continuation.resume() }
                     }
                 }
+                ShareDiagnostics.logger.notice("Handoff delivered: \(urls.count, privacy: .public) items")
                 self.extensionContext?.completeRequest(returningItems: [], completionHandler: nil)
             } catch {
                 guard !Task.isCancelled, let self else { return }

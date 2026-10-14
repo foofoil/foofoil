@@ -79,6 +79,20 @@ if (( SIGNING_CHANGED )); then
         -f -R -trusted "$APP_PATH"
 fi
 
+# Xcode 测试构建也会登记同 bundle ID 的分享扩展；清理 DerivedData 的旧登记，
+# 防止 Finder 选中旧构建并向另一份应用交付文件。仅处理本应用的两个分享入口。
+for SHARE_NAME in foofoilShareExtension foofoilIncognitoShareExtension; do
+    SHARE_PATH="$APP_PATH/Contents/PlugIns/$SHARE_NAME.appex"
+    [[ -d "$SHARE_PATH" ]] || continue
+    SHARE_IDENTIFIER=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$SHARE_PATH/Contents/Info.plist")
+    while IFS= read -r REGISTERED_SHARE_PATH; do
+        if [[ "$REGISTERED_SHARE_PATH" == "$HOME/Library/Developer/Xcode/DerivedData/"*"/foofoil.app/Contents/PlugIns/$SHARE_NAME.appex" ]]; then
+            pluginkit -r "$REGISTERED_SHARE_PATH"
+        fi
+    done < <(pluginkit -m -A -D -v -i "$SHARE_IDENTIFIER" | awk -F '\t' 'NF >= 4 { print $NF }')
+    pluginkit -a "$SHARE_PATH"
+done
+
 # 终止所有正在运行的实例
 pkill -x "$APP_NAME" 2>/dev/null || true
 

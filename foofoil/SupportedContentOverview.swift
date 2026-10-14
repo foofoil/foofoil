@@ -25,7 +25,9 @@ enum SupportedContentOverview {
         for (placeholder, identifier) in [("openDirectoryShortcut", "file.openDirectory"),
                                           ("openURLShortcut", "file.openURL"),
                                           ("openCameraShortcut", "file.openCamera"),
-                                          ("openClipboardShortcut", "file.openClipboardContent")] {
+                                          ("openClipboardShortcut", "file.openClipboardContent"),
+                                          ("newIncognitoShortcut", "file.newIncognito"),
+                                          ("openClipboardIncognitoShortcut", "file.openClipboardIncognito")] {
             let shortcut = KeyboardShortcutCatalog.definition(withID: identifier).flatMap(shortcutProvider)
             let suffix = shortcut.map {
                 String(format: NSLocalizedString("Supported Content Shortcut Format", comment: ""),

@@ -4,6 +4,7 @@
 //  Created by tolg on 2026/7/6.
 //
 
+import OSLog
 import SwiftUI
 import UniformTypeIdentifiers
 import Combine
@@ -13,6 +14,14 @@ import FoofoilExtensionKit
 
 extension AppDelegate {
     // MARK: - Actions
+
+    @objc func newIncognitoWindowAction() {
+        showNewWindow(with: AppState(isIncognito: true))
+    }
+
+    @objc func openClipboardIncognitoAction() {
+        _ = openClipboardContentInNewWindow(isIncognito: true)
+    }
 
     @objc func newWindowAction() {
         showNewWindow(with: AppState())
@@ -215,7 +224,10 @@ extension AppDelegate {
 
     @objc func openFileAction() {
         // 无箔窗口时同样弹出选择面板；选中的文件在确认后由 openGroupedFiles 落入新开的箔片。
-        let appState = activeAppState
+        let appState = activeAppState.flatMap { state in
+            // 普通打开不能把无痕空箔当成可复用目标；直接拖入仍由目标箔处理。
+            state.isIncognito && isBlank(state) ? availableBlankWindowController?.appState : state
+        }
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
@@ -234,7 +246,10 @@ extension AppDelegate {
     }
 
     @objc func openDirectoryAction() {
-        let appState = activeAppState
+        let appState = activeAppState.flatMap { state in
+            // 普通打开不能把无痕空箔当成可复用目标；直接拖入仍由目标箔处理。
+            state.isIncognito && isBlank(state) ? availableBlankWindowController?.appState : state
+        }
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = true
@@ -320,7 +335,7 @@ extension AppDelegate {
                 }
             }
             for group in groups {
-                openGroupInNewWindow(group, feedbackBatchID: probe.fileOpenFeedbackBatchID)
+                openGroupInNewWindow(group, feedbackBatchID: probe.fileOpenFeedbackBatchID, isIncognito: probe.isIncognito)
             }
             return true
         }
@@ -332,10 +347,10 @@ extension AppDelegate {
                 activateWindow(controller)
             }
         } else {
-            openGroupInNewWindow(first, feedbackBatchID: probe.fileOpenFeedbackBatchID)
+            openGroupInNewWindow(first, feedbackBatchID: probe.fileOpenFeedbackBatchID, isIncognito: probe.isIncognito)
         }
         for group in groups {
-            openGroupInNewWindow(group, feedbackBatchID: probe.fileOpenFeedbackBatchID)
+            openGroupInNewWindow(group, feedbackBatchID: probe.fileOpenFeedbackBatchID, isIncognito: probe.isIncognito)
         }
         return true
     }
@@ -390,8 +405,8 @@ extension AppDelegate {
         }
     }
 
-    func openGroupInNewWindow(_ group: FileListGroup, feedbackBatchID: UUID = UUID()) {
-        let state = AppState()
+    func openGroupInNewWindow(_ group: FileListGroup, feedbackBatchID: UUID = UUID(), isIncognito: Bool = false) {
+        let state = AppState(isIncognito: isIncognito)
         state.fileOpenFeedbackBatchID = feedbackBatchID
         state.closesEmptyWindowAfterFileOpenFailure = true
         state.openFileGroup(group, preservesIdentity: true)
@@ -428,37 +443,37 @@ extension AppDelegate {
 
     /// 直接打开剪贴板内容：文件/文件夹/图片复用拖入箔片的处理管线，文本按 Markdown / 网址 / HTML / 笔记区分。
     @discardableResult
-    func openClipboardContentInNewWindow() -> Bool {
+    func openClipboardContentInNewWindow(isIncognito: Bool = false) -> Bool {
         appleMusicLinkTask?.cancel()
         appleMusicLinkTask = nil
         let fileURLs = clipboardFileURLs()
         if !fileURLs.isEmpty {
-            return openClipboardFileURLs(fileURLs)
+            return openClipboardFileURLs(fileURLs, isIncognito: isIncognito)
         }
 
         if let image = clipboardImage() {
-            let target = clipboardContentTarget()
+            let target = clipboardContentTarget(isIncognito: isIncognito)
             target.state.openImage(image: image, imageSource: .clipboard)
             presentClipboardTarget(target)
             return true
         }
 
-        return openClipboardText(from: NSPasteboard.general)
+        return openClipboardText(from: NSPasteboard.general, isIncognito: isIncognito)
     }
 
     /// 剪贴板文件与拖入箔片走同一条管线；没有空白箔片时新建一扇再接管。
-    func openClipboardFileURLs(_ urls: [URL]) -> Bool {
+    func openClipboardFileURLs(_ urls: [URL], isIncognito: Bool = false) -> Bool {
         let probe = AppState()
         let urls = probe.filterFileOpenFailures(urls)
         guard !urls.isEmpty else { return true }
-        if let controller = availableBlankWindowController {
+        if let controller = blankWindowController(isIncognito: isIncognito) {
             guard controller.appState.handleDroppedFileURLs(urls, feedbackBatchID: probe.fileOpenFeedbackBatchID) else { return false }
             activateWindow(controller)
             return true
         }
 
         // 多个文件分组会通过通知回到源窗口，先把控制器登记进窗口表再交给拖放管线。
-        let state = AppState()
+        let state = AppState(isIncognito: isIncognito)
         state.closesEmptyWindowAfterFileOpenFailure = true
         let controller = FloatingWindowController(appState: state)
         prepareNewWindowFrame(for: controller)
@@ -472,7 +487,7 @@ extension AppDelegate {
         return true
     }
 
-    private func openClipboardText(from pasteboard: NSPasteboard) -> Bool {
+    private func openClipboardText(from pasteboard: NSPasteboard, isIncognito: Bool) -> Bool {
         let declaredMarkdownRaw = Self.markdownPasteboardTypes
             .compactMap { pasteboard.availableType(from: [$0]) }
             .first
@@ -483,7 +498,7 @@ extension AppDelegate {
 
         if let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             if isDeclaredMarkdown || AppState.looksLikeMarkdown(text) {
-                let target = clipboardContentTarget()
+                let target = clipboardContentTarget(isIncognito: isIncognito)
                 target.state.openText(text, isMarkdown: true)
                 presentClipboardTarget(target)
                 return true
@@ -491,18 +506,18 @@ extension AppDelegate {
             // 剪贴板内容整体是一个网址时直接作为网站打开，不落为纯文本笔记。
             if let url = AppState.websiteURL(fromClipboardText: text) {
                 if SettingsStore.shared.appleMusicLibraryEnabled && AppleMusicLink(url: url) != nil {
-                    openAppleMusicLink(url)
+                    openAppleMusicLink(url, isIncognito: isIncognito)
                     return true
                 }
-                let target = clipboardContentTarget()
+                let target = clipboardContentTarget(isIncognito: isIncognito)
                 target.state.openWeb(url: url)
                 presentClipboardTarget(target)
                 return true
             }
             if let html = clipboardHTML(from: pasteboard) ?? (AppState.looksLikeHTML(text) ? text : nil) {
-                return openClipboardHTML(html, plainText: text)
+                return openClipboardHTML(html, plainText: text, isIncognito: isIncognito)
             }
-            let target = clipboardContentTarget()
+            let target = clipboardContentTarget(isIncognito: isIncognito)
             target.state.openText(text, isMarkdown: false)
             presentClipboardTarget(target)
             return true
@@ -510,11 +525,11 @@ extension AppDelegate {
 
         // 只有 HTML 表示、没有可读纯文本时仍按网页打开。
         guard let html = clipboardHTML(from: pasteboard) else { return false }
-        return openClipboardHTML(html, plainText: nil)
+        return openClipboardHTML(html, plainText: nil, isIncognito: isIncognito)
     }
 
-    private func openClipboardHTML(_ html: String, plainText: String?) -> Bool {
-        let target = clipboardContentTarget()
+    private func openClipboardHTML(_ html: String, plainText: String?, isIncognito: Bool) -> Bool {
+        let target = clipboardContentTarget(isIncognito: isIncognito)
         // HTML 片段没有可靠网页标题，历史标题取粘贴文本开头的摘要。
         let fallbackName = NSLocalizedString("Clipboard Web Page", comment: "")
         let title = AppState.clipboardHTMLTitle(html: html, plainText: plainText) ?? fallbackName
@@ -531,11 +546,11 @@ extension AppDelegate {
         let controller: FloatingWindowController?
     }
 
-    private func clipboardContentTarget() -> ClipboardContentTarget {
-        if let controller = availableBlankWindowController {
+    private func clipboardContentTarget(isIncognito: Bool = false) -> ClipboardContentTarget {
+        if let controller = blankWindowController(isIncognito: isIncognito) {
             return ClipboardContentTarget(state: controller.appState, controller: controller)
         }
-        return ClipboardContentTarget(state: AppState(), controller: nil)
+        return ClipboardContentTarget(state: AppState(isIncognito: isIncognito), controller: nil)
     }
 
     private func presentClipboardTarget(_ target: ClipboardContentTarget) {
@@ -746,17 +761,19 @@ extension AppDelegate {
     }
 
     public func application(_ application: NSApplication, open urls: [URL]) {
+        ShareDiagnostics.logger.notice("URL receive: \(urls.count, privacy: .public) items")
         var filePaths: [String] = []
         for url in urls {
             if let shared = SharedContentLink(url: url) {
+                let isIncognito = SharedContentLink.isIncognito(url)
                 didOpenFiles = true
                 NSApp.activate(ignoringOtherApps: true)
                 switch shared {
-                case .website(let website): openSharedWebsite(website)
+                case .website(let website): openSharedWebsite(website, isIncognito: isIncognito)
                 case .text(let text):
-                    if let website = AppState.websiteURL(fromClipboardText: text) { openSharedWebsite(website) }
+                    if let website = AppState.websiteURL(fromClipboardText: text) { openSharedWebsite(website, isIncognito: isIncognito) }
                     else {
-                        let state = AppState()
+                        let state = AppState(isIncognito: isIncognito)
                         if AppState.looksLikeHTML(text) { _ = state.openHTML(text, originalName: NSLocalizedString("Clipboard Web Page", comment: "")) }
                         else { state.openText(text, isMarkdown: AppState.looksLikeMarkdown(text)) }
                         showNewWindow(with: state)
@@ -776,9 +793,18 @@ extension AppDelegate {
         }
     }
 
-    private func openSharedWebsite(_ url: URL) {
-        if SettingsStore.shared.appleMusicLibraryEnabled && AppleMusicLink(url: url) != nil { openAppleMusicLink(url) }
-        else { openWebURLInPreferredWindow(url) }
+    private func openSharedWebsite(_ url: URL, isIncognito: Bool = false) {
+        if SettingsStore.shared.appleMusicLibraryEnabled && AppleMusicLink(url: url) != nil {
+            openAppleMusicLink(url, isIncognito: isIncognito)
+            return
+        }
+        if isIncognito {
+            let state = AppState(isIncognito: true)
+            state.openWeb(url: url)
+            showNewWindow(with: state)
+            return
+        }
+        openWebURLInPreferredWindow(url)
     }
 
     @objc func handleCreateNewFoofoilFromImage(_ notification: Notification) {
@@ -797,7 +823,7 @@ extension AppDelegate {
             createdAt: Date()
         )
 
-        let newState = AppState(config: config)
+        let newState = AppState(config: config, isIncognito: userInfo["isIncognito"] as? Bool ?? false)
 
         // 显示新窗口
         showNewWindow(with: newState)
@@ -822,9 +848,10 @@ extension AppDelegate {
               let imageURL = appState.imageURL,
               !appState.isExtractingText else { return }
         if let cached = appState.imageOCRText?.trimmingCharacters(in: .whitespacesAndNewlines), !cached.isEmpty {
-            presentExtractedText(cached)
+            presentExtractedText(cached, isIncognito: appState.isIncognito)
             return
         }
+        let isIncognito = appState.isIncognito
         appState.isExtractingText = true
         DispatchQueue.global(qos: .userInitiated).async { [weak self, weak appState] in
             let recognized = ((try? ImageOCRIndexer.recognize(url: imageURL)) ?? "")
@@ -837,14 +864,14 @@ extension AppDelegate {
                 appState?.hasExtractableImageText = true
                 appState?.imageTextDetectedURL = imageURL
                 appState?.saveState()
-                self.presentExtractedText(recognized)
+                self.presentExtractedText(recognized, isIncognito: isIncognito)
             }
         }
     }
 
     /// 把识别到的文字在新箔片中以纯文本打开，复用"新建空白箔"的窗口通道。
-    private func presentExtractedText(_ recognized: String) {
-        let state = AppState()
+    private func presentExtractedText(_ recognized: String, isIncognito: Bool) {
+        let state = AppState(isIncognito: isIncognito)
         state.openText(recognized, isMarkdown: false)
         showNewWindow(with: state)
     }
@@ -860,6 +887,7 @@ extension AppDelegate {
         guard appState.canExtractImageSubject,
               let sourceURL = appState.imageURL,
               !appState.isExtractingImageSubject else { return }
+        let isIncognito = appState.isIncognito
         let newID = UUID()
         guard let destURL = appState.getCachedImageURL(for: newID, extension: "png") else { return }
         let originalName = appState.originalImageName ?? sourceURL.lastPathComponent
@@ -872,7 +900,7 @@ extension AppDelegate {
                 DispatchQueue.main.async {
                     appState?.isExtractingImageSubject = false
                     guard let self, copied else { return }
-                    self.postExtractedSubjectFoofoil(id: newID, imageURL: destURL, originalName: originalName)
+                    self.postExtractedSubjectFoofoil(id: newID, imageURL: destURL, originalName: originalName, isIncognito: isIncognito)
                 }
             }
             return
@@ -884,7 +912,7 @@ extension AppDelegate {
             DispatchQueue.main.async {
                 appState?.isExtractingImageSubject = false
                 guard let self, extracted else { return }
-                self.postExtractedSubjectFoofoil(id: newID, imageURL: destURL, originalName: originalName)
+                self.postExtractedSubjectFoofoil(id: newID, imageURL: destURL, originalName: originalName, isIncognito: isIncognito)
             }
         }
     }
@@ -904,14 +932,15 @@ extension AppDelegate {
     }
 
     /// 主体抠图写入新箔片后，走既有的"从图片新建箔片"通道发布。
-    private func postExtractedSubjectFoofoil(id: UUID, imageURL: URL, originalName: String) {
+    private func postExtractedSubjectFoofoil(id: UUID, imageURL: URL, originalName: String, isIncognito: Bool) {
         NotificationCenter.default.post(
             name: .createNewFoofoilFromImage,
             object: nil,
             userInfo: [
                 "id": id,
                 "imageURL": imageURL,
-                "originalName": String(format: NSLocalizedString("Image Subject: %@", comment: ""), originalName)
+                "originalName": String(format: NSLocalizedString("Image Subject: %@", comment: ""), originalName),
+                "isIncognito": isIncognito
             ]
         )
     }

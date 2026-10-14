@@ -4,6 +4,7 @@
 //  Created by tolg on 2026/7/6.
 //
 
+import OSLog
 import SwiftUI
 import UniformTypeIdentifiers
 import Combine
@@ -45,12 +46,17 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
         return activeWindowController?.appState
     }
 
-    /// 优先返回当前活跃的空白窗口；若没有，则返回任意一个已打开的空白窗口。
+    /// 自动接管仅限普通空箔；无痕空箔不是普通打开操作的候选目标。
     var availableBlankWindowController: FloatingWindowController? {
-        if let activeWindowController, isBlank(activeWindowController.appState) {
-            return activeWindowController
-        }
-        return windowControllers.first { isBlank($0.appState) }
+        blankWindowController(isIncognito: false)
+    }
+
+    func blankWindowController(isIncognito: Bool) -> FloatingWindowController? {
+        // 明确的无痕打开始终创建新箔，不自动占用任何现有空箔。
+        guard !isIncognito else { return nil }
+        if let activeWindowController, isBlank(activeWindowController.appState),
+           !activeWindowController.appState.isIncognito { return activeWindowController }
+        return windowControllers.first { isBlank($0.appState) && !$0.appState.isIncognito }
     }
 
     func isBlank(_ appState: AppState) -> Bool {
@@ -78,12 +84,19 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     public func application(_ sender: NSApplication, openFiles filenames: [String]) {
         didOpenFiles = true
         let urls = filenames.map { URL(fileURLWithPath: $0) }
+        ShareDiagnostics.logger.notice("File receive: \(urls.count, privacy: .public) files, staged=\(urls.contains(where: ShareStaging.isStaged), privacy: .public)")
         if urls.contains(where: ShareStaging.isStaged) {
             Task { @MainActor [weak self] in
                 do {
-                    let imported = try await Task.detached { try SharedFileImport.persist(urls) }.value
-                    self?.openFilesInNewFoil(imported)
+                    for isIncognito in [false, true] {
+                        let batch = urls.filter { ShareStaging.isIncognito($0) == isIncognito }
+                        guard !batch.isEmpty else { continue }
+                        let imported = try await Task.detached { try SharedFileImport.persist(batch) }.value
+                        ShareDiagnostics.logger.notice("Import complete: \(imported.count, privacy: .public) files, incognito=\(isIncognito, privacy: .public)")
+                        self?.openFilesInNewFoil(imported, isIncognito: isIncognito)
+                    }
                 } catch {
+                    ShareDiagnostics.logger.error("Import failed: \((error as NSError).domain, privacy: .public) \((error as NSError).code, privacy: .public)")
                     let alert = NSAlert()
                     alert.messageText = NSLocalizedString("Share Import Failed", comment: "")
                     alert.informativeText = error.localizedDescription
@@ -95,9 +108,10 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 先建好新箔片作为目标，再走拖放管线：多文件分组时首个分组落入该箔片，
     /// 其余分组各自另开箔片，避免直接传 nil 目标时多出一扇空箔。
-    func openFilesInNewFoil(_ urls: [URL]) {
-        let state = AppState()
+    func openFilesInNewFoil(_ urls: [URL], isIncognito: Bool = false) {
+        let state = AppState(isIncognito: isIncognito)
         let remaining = state.filterFileOpenFailures(urls)
+        ShareDiagnostics.logger.notice("File open: \(remaining.count, privacy: .public) of \(urls.count, privacy: .public) accepted, incognito=\(isIncognito, privacy: .public)")
         guard !remaining.isEmpty else { return }
         state.closesEmptyWindowAfterFileOpenFailure = true
         let controller = showNewWindow(with: state)
@@ -209,11 +223,16 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// 无痕箔仅活在本次运行中，不参与退出时的窗口恢复快照。
+    var restorableWindowConfigs: [WindowConfig] {
+        windowControllers.filter { !$0.appState.isFileOpenFeedback && !$0.appState.isIncognito }.map { $0.appState.toConfig() }
+    }
+
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard !isTerminating else { return .terminateLater }
         isTerminating = true
         // 保存当前活跃窗口配置，用于下次启动恢复
-        let activeConfigs = windowControllers.filter { !$0.appState.isFileOpenFeedback }.map { $0.appState.toConfig() }
+        let activeConfigs = restorableWindowConfigs
         SettingsStore.shared.lastOpenWindowConfigs = activeConfigs
 
         HistoryManager.shared.flushPendingListSaves()

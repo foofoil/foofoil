@@ -54,6 +54,8 @@ These default shortcuts cover distinctive features and everyday actions. Except 
 | --- | --- |
 | Foil Overview (Exposé, global) | <kbd>⌃ ⇧ Esc</kbd> |
 | Open clipboard content | <kbd>⇧ ⌘ V</kbd> |
+| New incognito foil | <kbd>⇧ ⌘ N</kbd> |
+| Open clipboard incognito | <kbd>⇧ ⌥ ⌘ V</kbd> |
 | Quick Open | <kbd>⌘ P</kbd> |
 | Hide the active foil | <kbd>⌘ H</kbd> |
 | Hide all foils to clear your workspace temporarily | <kbd>⇧ ⌘ H</kbd> |
@@ -68,6 +70,8 @@ These default shortcuts cover distinctive features and everyday actions. Except 
 | Increase / decrease opacity | <kbd>⇧ ⌘ ↑</kbd> / <kbd>⇧ ⌘ ↓</kbd> |
 | Move foil to the next screen | <kbd>⌃ ⌥ Tab</kbd> |
 | Move foil to a position in a 3×3 screen grid | <kbd>⌃ ⌥</kbd> + <kbd>Q W E / A S D / Z X C</kbd> |
+
+Incognito foils stay out of history and are not restored after quitting. The system Share menu also offers Incognito Foil. An slashed-footprints badge marks incognito foils in Exposé.
 
 The overview shortcut also works while another app is active. Within the overview, ⇧⌘V still opens clipboard content.
 

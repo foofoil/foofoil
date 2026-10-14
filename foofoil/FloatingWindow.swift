@@ -640,7 +640,7 @@ public class FloatingWindow: NSWindow {
 
         // ⌘1-9 打开最近历史仅在空白箔有效：菜单不再绑定该键，改由空白箔窗口直属处理。
         if let controller = windowController as? FloatingWindowController,
-           controller.appState.isBlank,
+           controller.appState.canOpenRecentHistory,
            let index = Self.matchedRecentHistoryIndex(event),
            let config = HistoryManager.shared.historyConfigs.filter({ SettingsStore.shared.appleMusicLibraryEnabled || $0.appleMusicReference == nil }).dropFirst(index - 1).first {
             withAnimation(.easeInOut(duration: 0.35)) {
