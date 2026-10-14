@@ -42,6 +42,24 @@ struct FoilExposeModelTests {
         FoilExposeModel(items: items, historyItems: historyItems, fileSearch: { _, _ in }, cancelFiles: {}, musicEnabled: { false })
     }
 
+    @Test func renameRefreshKeepsSelectionAndUpdatesSearchMatches() {
+        let open = makeItem(title: "Old title")
+        let history = makeItem(title: "History title", isHistoryEntry: true)
+        let model = makeModel(items: [open], historyItems: [history])
+        model.selectedIndex = 1
+        let renamed = makeItem(id: history.id, title: "New history title", isHistoryEntry: true)
+        model.refreshItems(open: [open], history: [renamed])
+        #expect(model.currentItems[model.selectedIndex].id == history.id)
+        #expect(model.currentItems[model.selectedIndex].title == "New history title")
+        model.searchText = "Old"
+        let renamedOpen = makeItem(id: open.id, title: "New open title")
+        model.refreshItems(open: [renamedOpen], history: [renamed])
+        #expect(model.currentItems.isEmpty)
+        #expect(model.selectedIndex == 0)
+        model.searchText = "New"
+        #expect(model.currentItems.map(\.id) == [open.id, history.id])
+    }
+
     @Test func onlyHistoryNotesRequireSingleItemClearConfirmation() {
         for kind in [HistoryContentKind.note, .text, .markdown, .csv, .image, .web, .pdf,
                      .video, .audio, .extensionContent, .ebook, .quickLook, .camera] {

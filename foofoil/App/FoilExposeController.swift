@@ -79,6 +79,11 @@ struct FoilExposeItem: Identifiable {
     /// 文档型箔片（笔记/文本/Markdown/CSV）的截断正文，供缩略图位置直接展示内容；其余类型为 nil。
     var bodyPreview: String? = nil
     var musicItem: AppleMusicLibraryItem? = nil
+    var allowsTitleEditing: Bool = true
+
+    var canRenameTitle: Bool {
+        allowsTitleEditing && contentKind != .camera && !isNewFoil && musicItem == nil
+    }
 
     var requiresHistoryClearConfirmation: Bool { isHistoryEntry && contentKind == .note }
 
@@ -111,7 +116,7 @@ struct FoilExposePageScrollRequest: Equatable {
 @MainActor
 final class FoilExposeModel: ObservableObject {
     /// 打开的箔片条目。
-    let items: [FoilExposeItem]
+    @Published private(set) var items: [FoilExposeItem]
     /// 历史记录条目。
     @Published private(set) var historyItems: [FoilExposeItem]
     @Published var historyCategory: FoilExposeHistoryCategory = .all {
@@ -240,6 +245,7 @@ final class FoilExposeModel: ObservableObject {
     var onDismiss: () -> Void = {}
     var onClearHistory: (FoilExposeHistoryCategory) -> Void = { _ in }
     var onClearHistoryItem: (FoilExposeItem) -> Void = { _ in }
+    var onRenameItem: (FoilExposeItem) -> Void = { _ in }
     /// 打开文件结果：由控制器检查可用性并在浮箔中打开。
     var onOpenFile: (URL) -> Void = { _ in }
     /// 请求开启文件搜索：由控制器弹出系统面板确认用户主目录。
@@ -344,6 +350,17 @@ final class FoilExposeModel: ObservableObject {
         normalizeHistoryCategory()
         visibleIDs = []
         selectedIndex = currentItems.firstIndex(where: \.isHistoryEntry) ?? 0
+    }
+
+    /// 改名后重建搜索结果，优先保留当前选择；标题不再匹配搜索时限制到有效下标。
+    func refreshItems(open: [FoilExposeItem], history: [FoilExposeItem]) {
+        let selectedID = currentItems.indices.contains(selectedIndex) ? currentItems[selectedIndex].id : nil
+        items = open
+        historyItems = history
+        normalizeHistoryCategory()
+        visibleIDs = []
+        selectedIndex = selectedID.flatMap { id in currentItems.firstIndex { $0.id == id } }
+            ?? min(selectedIndex, max(0, currentItems.count - 1))
     }
 
     /// 清除按完整分类处理，不受搜索词、设置隐藏或总览加载上限影响；活跃箔片保留。
@@ -774,6 +791,7 @@ final class FoilExposeController {
         model.onOpenClipboard = { [weak self] in self?.openClipboard() }
         model.onClearHistory = { [weak self] category in self?.confirmClearHistory(category) }
         model.onClearHistoryItem = { [weak self] item in self?.clearHistoryItem(item) }
+        model.onRenameItem = { [weak self] item in self?.renameItem(item) }
         self.model = model
 
         // 先激活本 App，再在当前活跃显示器上铺一块非激活面板并指定它为 key window。
@@ -854,7 +872,8 @@ final class FoilExposeController {
                 contentKind: contentKind,
                 thumbnailPath: thumbnailPath,
                 sourcePath: Self.sourcePath(from: config),
-                bodyPreview: bodyPreview
+                bodyPreview: bodyPreview,
+                allowsTitleEditing: controller.appState.toConfig().canRenameTitle
             )
         }
     }
@@ -882,7 +901,8 @@ final class FoilExposeController {
                 contentKind: contentKind,
                 thumbnailPath: thumbnailPath,
                 sourcePath: Self.sourcePath(from: config),
-                bodyPreview: FoilExposeItem.makeBodyPreview(kind: contentKind, text: config.text)
+                bodyPreview: FoilExposeItem.makeBodyPreview(kind: contentKind, text: config.text),
+                allowsTitleEditing: config.canRenameTitle
             )
         }
     }
@@ -982,6 +1002,28 @@ final class FoilExposeController {
         dismiss()
         NSApp.activate(ignoringOtherApps: true)
         (NSApplication.shared.delegate as? AppDelegate)?.openClipboardContentInNewWindow()
+    }
+
+    private func renameItem(_ item: FoilExposeItem) {
+        guard item.canRenameTitle, !isPresentingSystemUI,
+              let model, let panel = panels.first else { return }
+        isPresentingSystemUI = true
+        panel.orderOut(nil)
+        defer {
+            isPresentingSystemUI = false
+            if self.model === model {
+                panel.makeKeyAndOrderFront(nil)
+                if model.isSearching { model.requestSearchFieldFocus() }
+            }
+        }
+        let config = item.controller?.appState.toConfig() ?? HistoryRepository.shared.config(id: item.id)
+        guard let config, config.canRenameTitle else { return }
+        let alert = FoilTitleEditing.makeAlert(title: FoilTitleEditing.editableTitle(for: config))
+        guard alert.runModal() == .alertFirstButtonReturn,
+              let field = alert.accessoryView as? NSTextField else { return }
+        HistoryManager.shared.updateHistoryTitle(configId: item.id, newTitle: field.stringValue)
+        let controllers = (NSApp.delegate as? AppDelegate)?.windowControllers ?? []
+        model.refreshItems(open: Self.collectItems(from: controllers), history: Self.collectHistoryItems())
     }
 
     /// 便签的正文由应用保存，单条清除也需确认；其它类型直接清除历史，保留原始文件。

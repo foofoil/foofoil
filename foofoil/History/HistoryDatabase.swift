@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 nonisolated final class HistoryDatabase {
-    static let schemaVersion = 19
+    static let schemaVersion = 20
 
     private let queue = DispatchQueue(label: "com.foofoil.history.database", qos: .utility)
     private var connection: OpaquePointer?
@@ -109,8 +109,8 @@ nonisolated final class HistoryDatabase {
                         extension_id, extension_state_reference, navigator_panel_side,
                         navigator_panel_visibility, navigator_panel_width, file_list,
                         document_zoom, document_scroll_file, document_scroll_fraction, text_fingerprint,
-                        image_ocr_text, image_has_subject, image_subject_path, apple_music_reference, subtitle_associations
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        image_ocr_text, image_has_subject, image_subject_path, apple_music_reference, subtitle_associations, custom_title
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -147,7 +147,7 @@ nonisolated final class HistoryDatabase {
                         image_has_subject=excluded.image_has_subject,
                         image_subject_path=excluded.image_subject_path,
                         subtitle_associations=excluded.subtitle_associations,
-                        apple_music_reference=excluded.apple_music_reference
+                        apple_music_reference=excluded.apple_music_reference, custom_title=excluded.custom_title
                     """, bindings: [
                         config.id.uuidString, kind.rawValue, title, config.originalImageName,
                         config.imagePath, config.textPath, config.webURLString, config.actualWebURLString,
@@ -172,7 +172,8 @@ nonisolated final class HistoryDatabase {
                         config.imageHasSubject,
                         config.imageSubjectPath,
                         try config.appleMusicReference.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
-                        try config.subtitleAssociations.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) }
+                        try config.subtitleAssociations.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
+                        config.customTitle
                     ])
 
                 let metadata = (
@@ -240,7 +241,7 @@ nonisolated final class HistoryDatabase {
     func rename(id: UUID, title: String) throws {
         try queue.sync {
             try transaction {
-                guard var config = try queryConfigs("SELECT * FROM history_items WHERE id = ?", bindings: [id.uuidString]).first else { return }
+                guard var config = try queryConfigs("SELECT * FROM history_items WHERE id = ?", bindings: [id.uuidString]).first, config.canRenameTitle else { return }
                 try deleteChunks(historyID: id, kinds: [0, 1])
                 if var fileList = config.fileList, fileList.isPresentable {
                     // 列表标题属于列表本身，不能覆盖会随当前项切换的原始文件名。
@@ -248,12 +249,13 @@ nonisolated final class HistoryDatabase {
                     fileList.isCustomTitle = fileList.title != nil
                     config.fileList = fileList
                 } else {
-                    config.originalImageName = FileListState.normalizedTitle(title)
+                    config.customTitle = FileListState.normalizedTitle(title)
                 }
+                config.storedDisplayTitle = nil
                 let displayTitle = displayTitle(for: config, kind: config.contentKind ?? HistoryContentKind.infer(from: config))
                 try executePrepared(
-                    "UPDATE history_items SET display_title = ?, original_filename = ?, file_list = ?, updated_at = ? WHERE id = ?",
-                    bindings: [displayTitle, config.originalImageName, encodeFileList(config.fileList), Date().timeIntervalSince1970, id.uuidString]
+                    "UPDATE history_items SET display_title = ?, custom_title = ?, file_list = ?, updated_at = ? WHERE id = ?",
+                    bindings: [displayTitle, config.customTitle, encodeFileList(config.fileList), Date().timeIntervalSince1970, id.uuidString]
                 )
                 let metadata = [config.webURLString, config.actualWebURLString].compactMap { $0 }.joined(separator: " ")
                 try insertChunk(historyID: id, title: displayTitle, kind: 0, ordinal: 0, pageNumber: nil, text: metadata)
@@ -437,6 +439,8 @@ nonisolated final class HistoryDatabase {
         }
         // 即使用户库的 user_version 落后于实际列，也按列是否存在补 file_list，避免 INSERT 引用缺失列。
         try addColumnIfMissing("file_list", definition: "file_list TEXT")
+        // v20 箔片改名不再覆盖原始文件名，保存与恢复使用独立标题。
+        try addColumnIfMissing("custom_title", definition: "custom_title TEXT")
         // v10 新增音频同目录封面文件夹的安全范围书签（Base64 文本）；重启后靠它恢复封面访问。
         try addColumnIfMissing("media_sidecar_bookmark", definition: "media_sidecar_bookmark TEXT")
         // v11 用户拖入替换的音频封面缓存路径；重开历史时优先使用这份封面。
@@ -538,6 +542,7 @@ nonisolated final class HistoryDatabase {
         if let fileList = config.fileList, fileList.isPresentable {
             return fileList.historyDisplayTitle
         }
+        if let title = FileListState.normalizedTitle(config.customTitle) { return title }
         // 普通笔记的原始文件名字段承载用户自定义标题；其他类型继续沿用既有展示规则。
         if kind == .note, let title = config.originalImageName?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
             return title
@@ -674,6 +679,7 @@ nonisolated final class HistoryDatabase {
                 result.append(WindowConfig(
                     id: id,
                     imagePath: optionalText(statement, columns["image_path"]!),
+                    isCamera: kind == .camera,
                     webURLString: optionalText(statement, columns["web_url"]!),
                     actualWebURLString: optionalText(statement, columns["actual_web_url"]!),
                     originalImageName: optionalText(statement, columns["original_filename"]!),
@@ -698,6 +704,7 @@ nonisolated final class HistoryDatabase {
                     contentKind: kind,
                     sourceFingerprint: optionalText(statement, columns["source_fingerprint"]!),
                     storedDisplayTitle: text(statement, columns["display_title"]!),
+                    customTitle: optionalText(statement, columns["custom_title"]!),
                     thumbnailPath: optionalText(statement, columns["thumbnail_path"]!),
                     imageOCRText: columns["image_ocr_text"].flatMap { optionalText(statement, $0) },
                     imageHasSubject: columns["image_has_subject"].flatMap { optionalBool(statement, $0) },

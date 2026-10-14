@@ -157,6 +157,8 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     public var sourceFingerprint: String?
     /// 仓库读取时携带的展示标题，不作为窗口内容来源。
     public var storedDisplayTitle: String?
+    /// 用户自定义的箔片标题，与原始文件名及内容类型独立。
+    public var customTitle: String?
     /// 预先生成并单独存储的 HEIC 缩略图路径，仅用作历史列表展示，不作为窗口内容来源。
     public var thumbnailPath: String?
     /// 图片箔的派生内容缓存，随历史持久化，重开历史时无需重跑 Vision：
@@ -224,6 +226,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         contentKind: HistoryContentKind? = nil,
         sourceFingerprint: String? = nil,
         storedDisplayTitle: String? = nil,
+        customTitle: String? = nil,
         thumbnailPath: String? = nil,
         imageOCRText: String? = nil,
         imageHasSubject: Bool? = nil,
@@ -273,6 +276,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.contentKind = contentKind
         self.sourceFingerprint = sourceFingerprint
         self.storedDisplayTitle = storedDisplayTitle
+        self.customTitle = FileListState.normalizedTitle(customTitle)
         self.thumbnailPath = thumbnailPath
         self.imageOCRText = imageOCRText
         self.imageHasSubject = imageHasSubject
@@ -297,7 +301,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference
+        case isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference
     }
 
     public init(from decoder: Decoder) throws {
@@ -329,6 +333,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         contentKind = try container.decodeIfPresent(HistoryContentKind.self, forKey: .contentKind)
         sourceFingerprint = try container.decodeIfPresent(String.self, forKey: .sourceFingerprint)
         storedDisplayTitle = try container.decodeIfPresent(String.self, forKey: .storedDisplayTitle)
+        customTitle = try container.decodeIfPresent(String.self, forKey: .customTitle)
         thumbnailPath = try container.decodeIfPresent(String.self, forKey: .thumbnailPath)
         imageOCRText = try container.decodeIfPresent(String.self, forKey: .imageOCRText)
         imageHasSubject = try container.decodeIfPresent(Bool.self, forKey: .imageHasSubject)
@@ -494,10 +499,19 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         return result.trimmingCharacters(in: .whitespaces)
     }
 
+    /// 摄像头与没有内容来源的空箔使用系统标题，不提供改名。
+    var canRenameTitle: Bool {
+        guard !isCamera, contentKind != .camera else { return false }
+        return imagePath != nil || webURLString != nil || textPath != nil
+            || extensionID != nil || appleMusicReference != nil || fileList?.isPresentable == true
+            || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     public var historyMenuDisplayName: String {
         if let fileList, fileList.isPresentable {
             return fileList.historyDisplayTitle
         }
+        if let customTitle = FileListState.normalizedTitle(customTitle) { return customTitle }
         if isMarkdownDocument {
             return markdownHistoryDisplayName
         }

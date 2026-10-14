@@ -54,6 +54,7 @@ extension AppState {
             self.originalImageName = config.sourceFingerprint == SupportedContentOverview.sourceFingerprint
                 ? NSLocalizedString("Supported Content Overview", comment: "") + ".md"
                 : config.originalImageName
+            self.customTitle = config.customTitle
             self.imageSource = config.imageSource
             self.showBorder = config.showBorder
             self.imageScale = Self.clampImageScale(config.imageScale)
@@ -257,6 +258,7 @@ extension AppState {
                     fileList: fileList?.isPresentable == true ? fileList : nil
                 )),
                 sourceFingerprint: sourceFingerprint,
+                customTitle: customTitle,
                 imageOCRText: imageOCRText,
                 imageHasSubject: imageSubjectDetectedURL != nil ? hasExtractableImageSubject : nil,
                 imageSubjectPath: imageSubjectCutoutURL?.path,

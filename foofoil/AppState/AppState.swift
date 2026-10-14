@@ -311,6 +311,10 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         }
     }
 
+    @Published var customTitle: String? {
+        didSet { saveState() }
+    }
+
     public var imageSource: ImageSource?
 
     /// 会话属于箔片状态；全屏重建 SwiftUI 视图时仍保留页码与临时预览。
@@ -652,6 +656,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.originalImageName = config.sourceFingerprint == SupportedContentOverview.sourceFingerprint
                 ? NSLocalizedString("Supported Content Overview", comment: "") + ".md"
                 : config.originalImageName
+        self.customTitle = config.customTitle
         self.imageSource = config.imageSource
         self.showBorder = config.showBorder
         self.imageScale = Self.clampImageScale(config.imageScale)
@@ -769,6 +774,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.actualWebURL = nil
         self.textURL = nil
         self.originalImageName = nil
+        self.customTitle = nil
         self.imageSource = nil
         self.showBorder = true
         self.imageScale = 1.0

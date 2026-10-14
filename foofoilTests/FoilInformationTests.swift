@@ -4,6 +4,82 @@ import Testing
 
 @MainActor
 struct FoilInformationTests {
+    @Test func cameraAndEmptyFoilsRejectTitleChanges() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = HistoryRepository(databaseURL: directory.appendingPathComponent("history.sqlite"))
+        let configs = [WindowConfig(id: UUID()),
+                       WindowConfig(id: UUID(), text: " \n ", contentKind: .note),
+                       WindowConfig(id: UUID(), isCamera: true, contentKind: .camera),
+                       WindowConfig(id: UUID(), imagePath: "/tmp/frame.png", contentKind: .camera)]
+        for config in configs {
+            #expect(!config.canRenameTitle)
+            #expect(repository.upsert(config))
+            repository.rename(id: config.id, title: "Rejected")
+            #expect(repository.config(id: config.id)?.customTitle == nil)
+            let state = AppState(config: config)
+            state.applyFoilTitle("Rejected")
+            #expect(state.customTitle == nil)
+        }
+        #expect(WindowConfig(id: UUID(), textPath: "/tmp/empty.txt").canRenameTitle)
+        #expect(WindowConfig(id: UUID(), text: "Content").canRenameTitle)
+    }
+
+    @Test func renamedHistoryPreservesSourcesAndSurvivesSaveAndReopen() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("history.sqlite")
+        let repository = HistoryRepository(databaseURL: url)
+        let configs = [
+            WindowConfig(id: UUID(), imagePath: "/tmp/source.png", originalImageName: "source.png", imageSource: .clipboard, contentKind: .image),
+            WindowConfig(id: UUID(), webURLString: "https://example.com", originalImageName: "Original page", contentKind: .web),
+            WindowConfig(id: UUID(), originalImageName: "source.csv", text: "a,b", textPath: "/tmp/source.csv", contentKind: .csv),
+            WindowConfig(id: UUID(), originalImageName: "source.md", text: "# Heading", contentKind: .markdown)
+        ]
+        for config in configs {
+            #expect(repository.upsert(config))
+            let originalTitle = try #require(repository.config(id: config.id)).historyMenuDisplayName
+            repository.rename(id: config.id, title: "  自定义标题  ")
+            let renamed = try #require(repository.config(id: config.id))
+            #expect(renamed.customTitle == "自定义标题")
+            #expect(renamed.historyMenuDisplayName == "自定义标题")
+            #expect(renamed.originalImageName == config.originalImageName)
+            #expect(renamed.contentKind == config.contentKind)
+            #expect(renamed.textPath == config.textPath)
+            #expect(renamed.webURLString == config.webURLString)
+            #expect(repository.upsert(renamed))
+            let reopened = HistoryRepository(databaseURL: url)
+            #expect(reopened.config(id: config.id)?.historyMenuDisplayName == "自定义标题")
+            repository.rename(id: config.id, title: "  ")
+            #expect(repository.config(id: config.id)?.customTitle == nil)
+            #expect(repository.config(id: config.id)?.historyMenuDisplayName == originalTitle)
+        }
+        #expect((await repository.search("自定义标题")).isEmpty)
+    }
+
+    @Test func activeTitleRoundTripsWithoutChangingFilenameAndResetClearsIt() throws {
+        let state = AppState()
+        state.isBatchUpdating = true
+        state.originalImageName = "source.csv"
+        state.text = "a,b"
+        state.applyFoilTitle(" 自定义标题 ")
+        let config = state.toConfig()
+        #expect(config.historyMenuDisplayName == "自定义标题")
+        #expect(config.originalImageName == "source.csv")
+        let decoded = try JSONDecoder().decode(WindowConfig.self, from: JSONEncoder().encode(config))
+        #expect(decoded.customTitle == "自定义标题")
+        let restored = AppState(config: decoded)
+        #expect(restored.toConfig().historyMenuDisplayName == "自定义标题")
+        #expect(restored.originalImageName == "source.csv")
+        state.applyFoilTitle("  ")
+        #expect(state.customTitle == nil)
+        state.applyFoilTitle("Reset me")
+        state.resetContent()
+        #expect(state.customTitle == nil)
+    }
+
     @Test func prefersOriginalSourceOverCacheAndRejectsCacheSource() throws {
         let cache = try #require(AppState.getFoofoilDirectoryURL()).appendingPathComponent("cached_image_test.pdf")
         let original = URL(fileURLWithPath: "/Users/example/Documents/original.pdf")

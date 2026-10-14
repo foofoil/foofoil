@@ -34,6 +34,7 @@ extension AppState {
             isCamera = false
             isBatchUpdating = true
             self.originalImageName = nil
+            self.customTitle = nil
             self.imageSource = nil
             self.imageURL = nil
             self.webURL = nil

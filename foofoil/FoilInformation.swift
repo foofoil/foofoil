@@ -134,11 +134,11 @@ extension AppDelegate {
             rows.append(.init(key: "Foil Info First Visit", value: (visits?.first ?? config.createdAt)?.formatted(date: .numeric, time: .standard) ?? unknown))
             rows.append(.init(key: "Foil Info Last Visit", value: (visits?.last ?? config.createdAt)?.formatted(date: .numeric, time: .standard) ?? unknown))
             rows.append(contentsOf: metadata.rows)
-            presentFoilInformation(rows: rows, source: source, available: metadata.available, window: window)
+            presentFoilInformation(rows: rows, source: source, available: metadata.available, window: window, state: state)
         }
     }
 
-    private func presentFoilInformation(rows: [FoilInformation.Row], source: URL?, available: Bool, window: NSWindow) {
+    private func presentFoilInformation(rows: [FoilInformation.Row], source: URL?, available: Bool, window: NSWindow, state: AppState) {
         let panel = FoilInformationPanel(
             contentRect: NSRect(x: 0, y: 0, width: 560, height: 360),
             styleMask: [.titled], backing: .buffered, defer: false
@@ -177,7 +177,18 @@ extension AppDelegate {
             let entry = NSStackView(views: [label, value])
             entry.alignment = .firstBaseline
             entry.spacing = 16
-            if row.key == "Foil Info File Path", let source {
+            if row.key == "Foil Info Title", state.toConfig().canRenameTitle {
+                let button = FoilTitleEditButton(title: "", target: self, action: #selector(editFoilTitle(_:)))
+                button.image = NSImage(systemSymbolName: "pencil", accessibilityDescription: NSLocalizedString("Change Title", comment: ""))
+                button.bezelStyle = .accessoryBarAction
+                button.toolTip = NSLocalizedString("Change Title", comment: "")
+                button.setAccessibilityLabel(NSLocalizedString("Change Title", comment: ""))
+                button.appState = state
+                button.titleLabel = value
+                button.widthAnchor.constraint(equalToConstant: 28).isActive = true
+                entry.addArrangedSubview(button)
+                value.widthAnchor.constraint(equalToConstant: 288).isActive = true
+            } else if row.key == "Foil Info File Path", let source {
                 let button = SourceRevealButton(title: "", target: self, action: #selector(revealFoilSource(_:)))
                 button.image = NSImage(systemSymbolName: "folder", accessibilityDescription: NSLocalizedString("Show in Finder", comment: ""))
                 button.bezelStyle = .accessoryBarAction
@@ -251,6 +262,18 @@ extension AppDelegate {
         window.beginSheet(panel)
     }
 
+    @objc private func editFoilTitle(_ sender: FoilTitleEditButton) {
+        guard let state = sender.appState, state.toConfig().canRenameTitle, let panel = sender.window, panel.attachedSheet == nil else { return }
+        let id = state.id
+        let alert = FoilTitleEditing.makeAlert(title: FoilTitleEditing.editableTitle(for: state.toConfig()))
+        alert.beginSheetModal(for: panel) { [weak sender, weak state] response in
+            guard response == .alertFirstButtonReturn, let state, state.id == id, state.toConfig().canRenameTitle,
+                  let field = alert.accessoryView as? NSTextField else { return }
+            HistoryManager.shared.updateHistoryTitle(configId: id, newTitle: field.stringValue)
+            sender?.titleLabel?.stringValue = state.toConfig().historyMenuDisplayName
+        }
+    }
+
     @objc private func dismissFoilInformation(_ sender: NSButton) {
         guard let sheet = sender.window else { return }
         sheet.sheetParent?.endSheet(sheet)
@@ -260,6 +283,11 @@ extension AppDelegate {
         guard let url = sender.sourceURL else { return }
         NSWorkspace.shared.activateFileViewerSelecting([url])
     }
+}
+
+private final class FoilTitleEditButton: NSButton {
+    weak var appState: AppState?
+    weak var titleLabel: NSTextField?
 }
 
 private final class SourceRevealButton: NSButton {

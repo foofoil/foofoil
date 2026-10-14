@@ -485,6 +485,13 @@ struct FoilExposeView: View {
                 }
                 .background(ItemFrameReporter(id: entry.item.id))
                 .contextMenu {
+                    if entry.item.canRenameTitle {
+                        Button {
+                            model.onRenameItem(entry.item)
+                        } label: {
+                            Label("Change Title", systemImage: "pencil")
+                        }
+                    }
                     if entry.item.isHistoryEntry {
                         Button(role: .destructive) {
                             model.onClearHistoryItem(entry.item)
@@ -933,46 +940,51 @@ struct FoilExposeItemView: View {
     }
 
     private var thumbnail: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.white.opacity(0.08))
-            if item.isNewFoil {
-                // 无箔窗口时的占位卡：大号加号提示可新建空白箔。
-                Image(systemName: "plus")
-                    .font(.system(size: 44, weight: .light))
-                    .foregroundStyle(.white.opacity(0.7))
-            } else if let image = thumbnailLoader.image {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                typeIconBadge
-            } else if let bodyPreview = item.bodyPreview {
-                // 文档型箔片：缩略图位置直接展示截断正文，一眼看出写了什么；行数固定避免盖到左下角类型角标。
-                Text(bodyPreview)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .lineSpacing(4)
-                    .multilineTextAlignment(.leading)
-                    .lineLimit(8)
-                    .truncationMode(.tail)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(12)
-                typeIconBadge
-            } else {
-                // 没有缩略图时用大号类型图标占位，仍能看出内容类型。
-                Image(systemName: item.symbolName)
-                    .font(.system(size: 34))
-                    .foregroundStyle(.white.opacity(0.55))
+        RoundedRectangle(cornerRadius: 10)
+            .fill(Color.white.opacity(0.08))
+            .aspectRatio(1, contentMode: .fit)
+            // 先由网格列宽确定正方形边界；内容只参与绘制，避免宽图片或正文撑开卡片。
+            .overlay {
+                GeometryReader { geometry in
+                    ZStack {
+                        if item.isNewFoil {
+                            // 无箔窗口时的占位卡：大号加号提示可新建空白箔。
+                            Image(systemName: "plus")
+                                .font(.system(size: 44, weight: .light))
+                                .foregroundStyle(.white.opacity(0.7))
+                        } else if let image = thumbnailLoader.image {
+                            Image(nsImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(width: geometry.size.width, height: geometry.size.height)
+                            typeIconBadge
+                        } else if let bodyPreview = item.bodyPreview {
+                            // 文档型箔片：缩略图位置直接展示截断正文，一眼看出写了什么；行数固定避免盖到左下角类型角标。
+                            Text(bodyPreview)
+                                .font(.system(size: 12))
+                                .foregroundStyle(.white.opacity(0.85))
+                                .lineSpacing(4)
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(8)
+                                .truncationMode(.tail)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                                .padding(12)
+                            typeIconBadge
+                        } else {
+                            // 没有缩略图时用大号类型图标占位，仍能看出内容类型。
+                            Image(systemName: item.symbolName)
+                                .font(.system(size: 34))
+                                .foregroundStyle(.white.opacity(0.55))
+                        }
+                        mediaKindOverlay
+                        shortcutBadge
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                }
             }
-            mediaKindOverlay
-            shortcutBadge
-        }
-        // 正方形卡片：高度随列宽而定，超出部分裁掉。
-        .frame(maxWidth: .infinity)
-        .aspectRatio(1, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .overlay(strokeOverlay)
-        .contentShape(RoundedRectangle(cornerRadius: 10))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(strokeOverlay)
+            .contentShape(RoundedRectangle(cornerRadius: 10))
     }
 
     /// 占位卡用虚线边框传达“新增”语义；键盘高亮描边更亮更粗，其余卡片沿用实线描边。
