@@ -25,3 +25,5 @@ swift test
 ## 第三方代码
 
 模块自有代码 MIT；静态链接的裁剪版 FFmpeg 为 LGPL-2.1-or-later，许可证随模块打包。未开启 GPL/nonfree 组件。见 `ThirdParty/NOTICE.md`。
+
+视频历史缩略图由独立解码器读取影片中间时间点，不改变播放位置；临时缩略图在会话关闭时删除。

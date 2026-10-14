@@ -13,3 +13,5 @@ Uses bounded buffering without a full-file conversion cache. C ABI and JSON cros
 `video-inspect <files...>` checks first-frame decoding, seeking, track selection, muted playback and pause timing.
 
 Module source is MIT; FFmpeg is LGPL-2.1-or-later. See ThirdParty/NOTICE.md and the bundled license.
+
+Video history thumbnails use the midpoint of the video through an independent decoder, without changing playback position. Temporary thumbnail images are removed when the session closes.

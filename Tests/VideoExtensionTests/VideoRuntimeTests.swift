@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import ImageIO
 import FoofoilExtensionKit
 import FoofoilExtensionABI
 import VideoExtensionRuntime
@@ -83,4 +84,18 @@ import VideoExtensionRuntime
     #expect(session.mediaPlayback?.position == 0.8)
     session = try runtime.perform(JSONEncoder().encode(MediaPlaybackRequest(action: .setSubtitleDelay(-1), session: session)))
     #expect(session.mediaPlayback?.state != .failed)
+}
+
+@Test func midpointThumbnailKeepsPlaybackAtTheBeginningAndCleansUp() throws {
+    let runtime = VideoRuntime()
+    defer { runtime.shutdown() }
+    let url = try #require(Bundle.module.url(forResource: "test", withExtension: "avi", subdirectory: "Fixtures"))
+    let session = try runtime.create(.singleFile(.init(url: url)))
+    #expect(session.mediaPlayback?.position == 0)
+    let thumbnail = try #require(session.thumbnailURL)
+    let source = try #require(CGImageSourceCreateWithURL(thumbnail as CFURL, nil))
+    let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
+    #expect(image.width > 0 && image.width <= 512 && image.height > 0 && image.height <= 512)
+    _ = try runtime.perform(JSONEncoder().encode(SessionLifecycleRequest(operation: .close, session: session)))
+    #expect(!FileManager.default.fileExists(atPath: thumbnail.path))
 }

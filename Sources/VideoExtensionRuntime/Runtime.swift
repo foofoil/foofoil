@@ -2,6 +2,10 @@ import Foundation
 import FoofoilExtensionKit
 import FoofoilExtensionABI
 import VideoDecoder
+import CoreImage
+import IOSurface
+import ImageIO
+import UniformTypeIdentifiers
 
 public final class VideoRuntime: @unchecked Sendable {
     private struct Entry {
@@ -28,6 +32,7 @@ public final class VideoRuntime: @unchecked Sendable {
         var session = ContentSession(extensionID: "app.foofoil.extension.video", providerID: "video.files", request: request,
             presentation: .video(.init(surfaceID: 0, width: 0, height: 0, revision: 0)), capabilities: capabilities)
         session = try snapshot(session, decoder: decoder)
+        session.thumbnailURL = midpointThumbnail(url: url, duration: session.mediaPlayback?.duration ?? 0)
         entries[session.id] = Entry(session: session, decoder: decoder, access: access)
         return session
     }
@@ -56,6 +61,7 @@ public final class VideoRuntime: @unchecked Sendable {
             let request = try JSONDecoder().decode(SessionLifecycleRequest.self, from: data)
             try request.validate()
             if request.operation == .close {
+                if let url = entry.session.thumbnailURL { try? FileManager.default.removeItem(at: url) }
                 fv_close(entry.decoder); entry.access.stop(); entries.removeValue(forKey: id)
                 entry.session.mediaPlayback?.state = .stopped
                 entry.session.presentation = .video(.init(surfaceID: 0, width: 0, height: 0, revision: 0))
@@ -76,8 +82,37 @@ public final class VideoRuntime: @unchecked Sendable {
     }
     public func shutdown() {
         lock.lock(); defer { lock.unlock() }
-        for entry in entries.values { fv_close(entry.decoder); entry.access.stop() }
+        for entry in entries.values {
+            if let url = entry.session.thumbnailURL { try? FileManager.default.removeItem(at: url) }
+            fv_close(entry.decoder); entry.access.stop()
+        }
         entries.removeAll()
+    }
+    /// 用独立解码器取中间画面，缩略图失败不影响播放或播放位置。
+    private func midpointThumbnail(url: URL, duration: Double) -> URL? {
+        guard duration.isFinite, duration > 0 else { return nil }
+        var error: UnsafeMutablePointer<CChar>?
+        guard let decoder = fv_open(url.path, &error) else { fv_free(error); return nil }
+        defer { fv_close(decoder) }
+        guard fv_seek(decoder, duration / 2) != 0,
+              let bytes = fv_snapshot(decoder) else { return nil }
+        defer { fv_free(bytes) }
+        guard let state = try? JSONSerialization.jsonObject(with: Data(String(cString: bytes).utf8)) as? [String: Any],
+              let id = (state["surfaceID"] as? NSNumber)?.uint32Value,
+              let surface = IOSurfaceLookup(id) else { return nil }
+        IOSurfaceLock(surface, .readOnly, nil)
+        defer { IOSurfaceUnlock(surface, .readOnly, nil) }
+        let source = CIImage(ioSurface: surface)
+        let scale = min(1, 512 / max(source.extent.width, source.extent.height))
+        let small = source.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        guard let image = CIContext(options: [.cacheIntermediates: false]).createCGImage(small, from: small.extent) else { return nil }
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("foofoil-video-thumbnails", isDirectory: true)
+        do { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true) } catch { return nil }
+        let destination = directory.appendingPathComponent(UUID().uuidString + ".png")
+        guard let output = CGImageDestinationCreateWithURL(destination as CFURL, UTType.png.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(output, image, nil)
+        guard CGImageDestinationFinalize(output) else { try? FileManager.default.removeItem(at: destination); return nil }
+        return destination
     }
     private func snapshot(_ original: ContentSession, decoder: UnsafeMutableRawPointer) throws -> ContentSession {
         guard let bytes = fv_snapshot(decoder) else { throw ContentProviderError.sessionCreationFailed("Cannot read video state") }
