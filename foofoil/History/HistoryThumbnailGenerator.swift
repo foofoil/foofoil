@@ -115,18 +115,7 @@ public enum HistoryThumbnailGenerator {
                 kCGImageSourceCreateThumbnailWithTransform: true
               ] as CFDictionary),
               let thumbnail = cropAndResize(image, to: 128) else { return false }
-        // 完整写入后再改名，列表读取时不会碰到尚未编码完成的文件。
-        let temporary = destinationURL.deletingLastPathComponent().appendingPathComponent("\(UUID().uuidString).heic")
-        defer { try? FileManager.default.removeItem(at: temporary) }
-        guard write(thumbnail, to: temporary) else { return false }
-        do {
-            if FileManager.default.fileExists(atPath: destinationURL.path) {
-                _ = try FileManager.default.replaceItemAt(destinationURL, withItemAt: temporary)
-            } else {
-                try FileManager.default.moveItem(at: temporary, to: destinationURL)
-            }
-            return true
-        } catch { return false }
+        return write(thumbnail, to: destinationURL)
     }
 
     /// 多分区音频列表的历史缩略图：按分区顺序把各分区封面铺进固定四宫格（最多四张）。
@@ -176,7 +165,8 @@ public enum HistoryThumbnailGenerator {
         let directory = destinationURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
 
-        guard let destination = CGImageDestinationCreateWithURL(destinationURL as CFURL, "public.heic" as CFString, 1, nil) else {
+        let data = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(data, "public.heic" as CFString, 1, nil) else {
             return false
         }
         CGImageDestinationAddImage(
@@ -184,7 +174,8 @@ public enum HistoryThumbnailGenerator {
             image,
             [kCGImageDestinationLossyCompressionQuality: 0.70] as CFDictionary
         )
-        return CGImageDestinationFinalize(destination)
+        guard CGImageDestinationFinalize(destination) else { return false }
+        return (try? ContentCache.shared.write(data as Data, to: destinationURL)) != nil
     }
 
     /// 将视图已展示的封面写入该窗口的历史缩略图并返回落盘路径。
@@ -200,18 +191,7 @@ public enum HistoryThumbnailGenerator {
             at: destinationURL.deletingLastPathComponent(),
             withIntermediateDirectories: true
         )
-        guard let destination = CGImageDestinationCreateWithURL(
-            destinationURL as CFURL,
-            "public.heic" as CFString,
-            1,
-            nil
-        ) else { return nil }
-        CGImageDestinationAddImage(
-            destination,
-            thumbnail,
-            [kCGImageDestinationLossyCompressionQuality: 0.70] as CFDictionary
-        )
-        guard CGImageDestinationFinalize(destination) else { return nil }
+        guard write(thumbnail, to: destinationURL) else { return nil }
         return destinationURL
     }
 

@@ -84,10 +84,8 @@ nonisolated enum ImageSubjectExtractor {
             return false
         }
         do {
-            if FileManager.default.fileExists(atPath: destURL.path) {
-                try FileManager.default.removeItem(at: destURL)
-            }
-            try FileManager.default.moveItem(at: tempURL, to: destURL)
+            try ContentCache.shared.copy(from: tempURL, to: destURL)
+            try? FileManager.default.removeItem(at: tempURL)
             return true
         } catch {
             try? FileManager.default.removeItem(at: tempURL)

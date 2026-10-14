@@ -16,6 +16,12 @@ struct GeneralSettingsView: View {
     @State private var isFileSearchAuthorized = SpotlightSearchAccess.shared.isAuthorized
     @State private var appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
     @State private var appleMusicSearchEnabled = SettingsStore.shared.appleMusicSearchEnabled
+    @State private var cacheLimitGB = Double(SettingsStore.shared.contentCacheLimitBytes) / 1_073_741_824
+    @State private var cacheUsage: Int64 = 0
+    @State private var pendingCacheLimit: Int64?
+    @State private var showsCacheConfirmation = false
+    @State private var cacheError = false
+    @State private var updatingCache = false
     @ObservedObject private var musicLibrary = AppleMusicLibrary.shared
 
     var body: some View {
@@ -47,6 +53,27 @@ struct GeneralSettingsView: View {
                 }
             } header: {
                 Text(NSLocalizedString("System Section", comment: ""))
+            }
+
+            Section {
+                HStack {
+                    SettingsRowLabel(
+                        title: NSLocalizedString("Cache Limit", comment: ""),
+                        note: String(format: NSLocalizedString("Cache Used: %@", comment: ""), ByteCountFormatter.string(fromByteCount: cacheUsage, countStyle: .binary))
+                    )
+                    Spacer()
+                    TextField("Cache Limit", value: $cacheLimitGB, format: .number)
+                        .labelsHidden()
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 70)
+                        .onSubmit { requestCacheLimit() }
+                    Text("GB")
+                    Button("Apply") { requestCacheLimit() }
+                        .disabled(updatingCache)
+                }
+                Text("Cache Limit Note").font(.caption).foregroundStyle(.secondary)
+            } header: {
+                Text("Cache Section")
             }
 
             Section {
@@ -131,6 +158,23 @@ struct GeneralSettingsView: View {
                 Text(NSLocalizedString("Search Section", comment: ""))
             }
         }
+        .alert("Reduce Cache Limit", isPresented: $showsCacheConfirmation) {
+            Button("Cancel", role: .cancel) { restoreCacheLimit() }
+            Button("Clear Oldest Cache", role: .destructive) {
+                if let limit = pendingCacheLimit { applyCacheLimit(limit, allowClearing: true) }
+            }
+        } message: {
+            Text(String(format: NSLocalizedString("Reduce Cache Limit Message", comment: ""),
+                        ByteCountFormatter.string(fromByteCount: cacheUsage, countStyle: .binary),
+                        ByteCountFormatter.string(fromByteCount: pendingCacheLimit ?? 0, countStyle: .binary)))
+        }
+        .alert("Cache Limit Failed", isPresented: $cacheError) {
+            Button("OK", role: .cancel) { }
+        } message: { Text("Cache Limit Failed Message") }
+        .task { await refreshCacheUsage() }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("ContentCacheDidChange"))) { _ in
+            Task { await refreshCacheUsage() }
+        }
         .formStyle(.grouped)
         .frame(width: SettingsWindowMetrics.width, alignment: .top)
         .onAppear {
@@ -158,6 +202,55 @@ struct GeneralSettingsView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .spotlightSearchAuthorizationDidChange)) { _ in
             isFileSearchAuthorized = SpotlightSearchAccess.shared.isAuthorized
+        }
+    }
+    private func restoreCacheLimit() {
+        cacheLimitGB = Double(SettingsStore.shared.contentCacheLimitBytes) / 1_073_741_824
+        pendingCacheLimit = nil
+    }
+
+    private func refreshCacheUsage() async {
+        cacheUsage = await Task.detached(priority: .utility) { ContentCache.shared.usage }.value
+    }
+
+    private func requestCacheLimit() {
+        guard cacheLimitGB.isFinite, cacheLimitGB >= 0.01, cacheLimitGB <= 1_000_000 else {
+            restoreCacheLimit()
+            cacheError = true
+            return
+        }
+        let limit = Int64(cacheLimitGB * 1_073_741_824)
+        updatingCache = true
+        Task {
+            await refreshCacheUsage()
+            updatingCache = false
+            if limit < cacheUsage {
+                pendingCacheLimit = limit
+                showsCacheConfirmation = true
+            } else { applyCacheLimit(limit) }
+        }
+    }
+
+    private func applyCacheLimit(_ limit: Int64, allowClearing: Bool = false) {
+        updatingCache = true
+        let controllers = (NSApplication.shared.delegate as? AppDelegate)?.windowControllers ?? []
+        ContentCache.shared.protect(Set(controllers.map { $0.appState.id }), paths: Set(controllers.flatMap { $0.appState.cachedContentPaths }))
+        HistoryManager.shared.flushPendingListSaves()
+        Task {
+            let outcome = await Task.detached(priority: .utility) {
+                do { try ContentCache.shared.setLimit(limit, allowClearing: allowClearing); return 0 }
+                catch ContentCache.LimitError.confirmationRequired { return 1 }
+                catch { return 2 }
+            }.value
+            updatingCache = false
+            await refreshCacheUsage()
+            if outcome == 1 {
+                pendingCacheLimit = limit
+                showsCacheConfirmation = true
+            } else {
+                restoreCacheLimit()
+                cacheError = outcome == 2
+            }
         }
     }
 }

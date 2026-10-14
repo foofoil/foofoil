@@ -395,14 +395,10 @@ extension AppState {
         private func installCustomCover(from sourceURL: URL) -> Bool {
             let accessed = sourceURL.startAccessingSecurityScopedResource()
             defer { if accessed { sourceURL.stopAccessingSecurityScopedResource() } }
-            removeCachedCoverFiles(for: id)
             let ext = sourceURL.pathExtension.isEmpty ? "png" : sourceURL.pathExtension
             guard let destination = getCachedContentURL(kind: "cover", extension: ext) else { return false }
             do {
-                if FileManager.default.fileExists(atPath: destination.path) {
-                    try FileManager.default.removeItem(at: destination)
-                }
-                try FileManager.default.copyItem(at: sourceURL, to: destination)
+                try ContentCache.shared.copy(from: sourceURL, to: destination)
             } catch {
                 return false
             }
@@ -1435,7 +1431,7 @@ extension AppState {
                 guard let destURL = self.getCachedImageURL(extension: "png") else { return }
 
                 do {
-                    try pngData.write(to: destURL)
+                    try ContentCache.shared.write(pngData, to: destURL)
                     DispatchQueue.main.async {
                         guard self.id == sourceID, self.webURL != nil || self.isCamera else { return }
                         self.imageURL = destURL
@@ -1472,7 +1468,7 @@ extension AppState {
                 }
 
                 do {
-                    try pngData.write(to: destURL)
+                    try ContentCache.shared.write(pngData, to: destURL)
                     DispatchQueue.main.async {
                         self.isBatchUpdating = true
                         self.sourceFingerprint = nil

@@ -286,6 +286,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     public func removeWindowController(_ controller: FloatingWindowController) {
         guard let index = windowControllers.firstIndex(where: { $0 === controller }) else { return }
         windowControllers.remove(at: index)
+        ContentCache.shared.protect(Set(windowControllers.map { $0.appState.id }), paths: Set(windowControllers.flatMap { $0.appState.cachedContentPaths }))
         syncFoilSpaceJoining()
     }
 
@@ -311,6 +312,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
 
     func addWindowController(_ controller: FloatingWindowController) {
         windowControllers.append(controller)
+        ContentCache.shared.protect(Set(windowControllers.map { $0.appState.id }), paths: Set(windowControllers.flatMap { $0.appState.cachedContentPaths }))
         syncFoilSpaceJoining()
 
         // 内容在当前窗口内切换时（例如通过“打开”或拖放）也立即更新 PDF 专用菜单。

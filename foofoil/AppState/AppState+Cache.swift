@@ -19,7 +19,7 @@ extension AppState {
 
         /// 将旧版本 Flofoil/Flamina 的数据目录迁移到 foofoil，仅在新目录不存在时执行。
         @discardableResult
-        static func migrateLegacySupportDirectoryIfNeeded() -> Bool {
+        nonisolated static func migrateLegacySupportDirectoryIfNeeded() -> Bool {
             guard let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else { return false }
             let targetURL = appSupportURL.appendingPathComponent("foofoil", isDirectory: true)
             guard !FileManager.default.fileExists(atPath: targetURL.path) else { return false }
@@ -37,7 +37,7 @@ extension AppState {
             return false
         }
 
-        static func getFoofoilDirectoryURL() -> URL? {
+        nonisolated static func getFoofoilDirectoryURL() -> URL? {
             guard let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
                 return nil
             }
@@ -46,7 +46,7 @@ extension AppState {
         }
 
         /// 返回应用自建缓存目录，兼容旧版 Flofoil/Flamina 目录以防迁移失败。
-        public static func cacheDirectoryURLs() -> [URL] {
+        public nonisolated static func cacheDirectoryURLs() -> [URL] {
             guard let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
                 return []
             }
@@ -64,7 +64,7 @@ extension AppState {
         }
 
         /// 仅识别由本应用写入的缓存文件，避免误删 Application Support 中的其他内容。
-        public static func isManagedCacheURL(_ url: URL) -> Bool {
+        public nonisolated static func isManagedCacheURL(_ url: URL) -> Bool {
             let name = url.lastPathComponent
             return name.hasPrefix("cached_image") ||
                 name.hasPrefix("cached_text_") ||
@@ -95,6 +95,12 @@ extension AppState {
         }
 
         func getCachedContentURL(kind: String, for windowId: UUID? = nil, extension ext: String? = nil, itemToken: String? = nil) -> URL? {
+            if Thread.isMainThread {
+                MainActor.assumeIsolated {
+                    let controllers = (NSApplication.shared.delegate as? AppDelegate)?.windowControllers ?? []
+                    ContentCache.shared.protect(Set(controllers.map { $0.appState.id }).union([windowId ?? id]), paths: Set(controllers.flatMap { $0.appState.cachedContentPaths }))
+                }
+            }
             guard let foofoilURL = AppState.getFoofoilDirectoryURL() else {
                 return nil
             }
@@ -121,10 +127,7 @@ extension AppState {
             guard let destinationURL = getCachedContentURL(kind: kind, for: windowId, extension: sourceURL.pathExtension) else { return nil }
 
             do {
-                if FileManager.default.fileExists(atPath: destinationURL.path) {
-                    try FileManager.default.removeItem(at: destinationURL)
-                }
-                try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+                try ContentCache.shared.copy(from: sourceURL, to: destinationURL)
                 return destinationURL
             } catch {
                 print("Failed to copy \(kind) file to cache: \(error)")
@@ -187,7 +190,8 @@ extension AppState {
                 return false
             }
 
-            guard let destination = CGImageDestinationCreateWithURL(destURL as CFURL, UTType.heic.identifier as CFString, 1, nil) else {
+            let data = NSMutableData()
+            guard let destination = CGImageDestinationCreateWithData(data, UTType.heic.identifier as CFString, 1, nil) else {
                 return false
             }
 
@@ -196,7 +200,8 @@ extension AppState {
             ]
 
             CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
-            return CGImageDestinationFinalize(destination)
+            guard CGImageDestinationFinalize(destination) else { return false }
+            return (try? ContentCache.shared.write(data as Data, to: destURL)) != nil
         }
 
         func convertNSImageToHEIC(image: NSImage, destURL: URL, quality: Float = 0.8, backingScaleFactor: CGFloat = 1.0) -> Bool {
@@ -204,7 +209,8 @@ extension AppState {
                 return false
             }
 
-            guard let destination = CGImageDestinationCreateWithURL(destURL as CFURL, UTType.heic.identifier as CFString, 1, nil) else {
+            let data = NSMutableData()
+            guard let destination = CGImageDestinationCreateWithData(data, UTType.heic.identifier as CFString, 1, nil) else {
                 return false
             }
 
@@ -223,7 +229,8 @@ extension AppState {
             ]
 
             CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
-            return CGImageDestinationFinalize(destination)
+            guard CGImageDestinationFinalize(destination) else { return false }
+            return (try? ContentCache.shared.write(data as Data, to: destURL)) != nil
         }
 
         public func createNewFoofoilFromScreenshot(image: NSImage, backingScaleFactor: CGFloat) {
@@ -295,7 +302,6 @@ extension AppState {
         }
 
         func cacheImage(from sourceURL: URL, itemToken: String? = nil) -> URL? {
-            clearCachedImages()
 
             let ext = sourceURL.pathExtension.lowercased()
             let shouldCompressToHEIC = ["png", "bmp", "tiff", "tif"].contains(ext)
@@ -310,16 +316,13 @@ extension AppState {
             guard let destURL = getCachedImageURL(extension: sourceURL.pathExtension, itemToken: itemToken) else { return nil }
 
             do {
-                if FileManager.default.fileExists(atPath: destURL.path) {
-                    try FileManager.default.removeItem(at: destURL)
-                }
-                try FileManager.default.copyItem(at: sourceURL, to: destURL)
+                try ContentCache.shared.copy(from: sourceURL, to: destURL)
                 return destURL
             } catch {
                 print("Failed to copy image to cache: \(error)")
                 if let data = try? Data(contentsOf: sourceURL) {
                     do {
-                        try data.write(to: destURL)
+                        try ContentCache.shared.write(data, to: destURL)
                         return destURL
                     } catch {
                         print("Failed to write image data to cache: \(error)")

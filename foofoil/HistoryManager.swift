@@ -141,6 +141,7 @@ public final class HistoryManager: ObservableObject {
 
     private func refreshUI() {
         refresh()
+        NotificationCenter.default.post(name: Notification.Name("ContentCacheDidChange"), object: nil)
         DispatchQueue.main.async {
             (NSApplication.shared.delegate as? AppDelegate)?.updateHistoryMenu()
         }

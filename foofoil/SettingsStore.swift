@@ -578,6 +578,10 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
 public class SettingsStore {
     public static let shared = SettingsStore()
 
+    var contentCacheLimitBytes: Int64 {
+        (userDefaults.object(forKey: ContentCache.limitKey) as? NSNumber)?.int64Value ?? ContentCache.defaultLimit
+    }
+
     private let userDefaults: UserDefaults
 
     init(userDefaults: UserDefaults = .standard) {

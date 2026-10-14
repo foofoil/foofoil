@@ -36,7 +36,7 @@ nonisolated enum FragmentedMP4PlaybackCopy {
     private static func makeCopy(of source: URL, to destination: URL, patchingTagAt offset: UInt64) -> Bool {
         let directory = destination.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let temporary = directory.appendingPathComponent("\(filePrefix)tmp_\(UUID().uuidString).tmp")
+        let temporary = directory.appendingPathComponent(".playable_tmp_\(UUID().uuidString).tmp")
         guard clonefile(source.path, temporary.path, 0) == 0 else {
             NSLog("无法克隆分片媒体副本：%d", errno)
             return false
@@ -50,7 +50,8 @@ nonisolated enum FragmentedMP4PlaybackCopy {
             try? FileManager.default.removeItem(at: temporary)
             return false
         }
-        guard rename(temporary.path, destination.path) == 0 else {
+        defer { try? FileManager.default.removeItem(at: temporary) }
+        guard (try? ContentCache.shared.copy(from: temporary, to: destination)) != nil else {
             try? FileManager.default.removeItem(at: temporary)
             return false
         }

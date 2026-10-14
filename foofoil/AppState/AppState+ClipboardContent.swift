@@ -163,7 +163,7 @@ extension AppState {
     public func openHTML(_ html: String, originalName: String? = nil) -> Bool {
         guard !html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               let destinationURL = getCachedContentURL(kind: "web", extension: "html"),
-              (try? html.write(to: destinationURL, atomically: true, encoding: .utf8)) != nil else {
+              (try? ContentCache.shared.write(Data(html.utf8), to: destinationURL)) != nil else {
             return false
         }
         openWeb(url: destinationURL, originalName: originalName)
