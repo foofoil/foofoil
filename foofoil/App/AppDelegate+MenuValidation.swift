@@ -11,6 +11,8 @@ import WebKit
 import FoofoilExtensionKit
 
 enum GoMenuItemTag {
+    static let chapterPrevious = 806
+    static let chapterNext = 807
     static let pdfPrevious = 801
     static let pdfNext = 802
     static let fileListPrevious = 803
@@ -53,7 +55,10 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         let isPDFDocument = activeAppState?.isPDFDocument == true
         let hasFileList = activeAppState?.supportsItemNavigation == true
         for item in menu.items {
-            if item.action == #selector(previousFileListItemAction)
+            if item.tag == GoMenuItemTag.chapterPrevious || item.tag == GoMenuItemTag.chapterNext {
+                item.isHidden = activeAppState?.chapterNavigatorContribution == nil
+                item.isEnabled = activeAppState?.adjacentChapterID(delta: item.tag == GoMenuItemTag.chapterPrevious ? -1 : 1) != nil
+            } else if item.action == #selector(previousFileListItemAction)
                 || item.action == #selector(nextFileListItemAction) {
                 let isPrimaryArrow = item.tag == GoMenuItemTag.fileListPrevious
                     || item.tag == GoMenuItemTag.fileListNext
@@ -74,6 +79,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         let appState = activeAppState
         goMenuItem?.isHidden = appState?.isPDFDocument != true
             && appState?.supportsItemNavigation != true
+            && appState?.chapterNavigatorContribution == nil
         syncGoMenuKeyEquivalents()
     }
 
@@ -85,7 +91,8 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             in: menu,
             isPDFDocument: activeAppState?.isPDFDocument == true,
             hasFileList: activeAppState?.supportsItemNavigation == true,
-            verticalArrowsScrollContent: activeAppState?.verticalArrowsScrollContent == true
+            verticalArrowsScrollContent: activeAppState?.verticalArrowsScrollContent == true,
+            hasChapters: activeAppState?.chapterNavigatorContribution != nil
         )
     }
 
@@ -95,12 +102,19 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         in menu: NSMenu,
         isPDFDocument: Bool,
         hasFileList: Bool,
-        verticalArrowsScrollContent: Bool = false
+        verticalArrowsScrollContent: Bool = false,
+        hasChapters: Bool = false
     ) {
         for item in menu.items {
             let identifier: String
             let isActive: Bool
             switch item.tag {
+            case GoMenuItemTag.chapterPrevious:
+                identifier = "go.previousChapter"
+                isActive = hasChapters
+            case GoMenuItemTag.chapterNext:
+                identifier = "go.nextChapter"
+                isActive = hasChapters
             case GoMenuItemTag.pdfPrevious:
                 identifier = "go.previousPage"
                 isActive = isPDFDocument
@@ -367,6 +381,10 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
 
         if menuItem.action == #selector(reloadPageAction) {
             return activeAppState?.webURL != nil
+        }
+
+        if menuItem.action == #selector(previousChapterAction) || menuItem.action == #selector(nextChapterAction) {
+            return activeAppState?.adjacentChapterID(delta: menuItem.action == #selector(previousChapterAction) ? -1 : 1) != nil
         }
 
         if menuItem.action == #selector(previousPDFPageAction) ||

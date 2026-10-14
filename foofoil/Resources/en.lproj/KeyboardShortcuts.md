@@ -41,6 +41,9 @@ Quick Open and the overview’s `/` search also search songs, albums, and playli
 | --- | --- | --- | --- |
 {{go}}
 
+EPUB chapter navigation follows reading order and skips subsections. Use Go → Previous Chapter / Next Chapter; customize these bindings in Settings → Keyboard Shortcuts → Navigation. Chapter navigation stops at the first and last chapters.
+
+
 Apple Music queues also use the common list navigation shortcuts and list search. Apple Music foils support the common border toggle shortcut. In an audio foil, ⌘C (Edit → Copy Cover, or the context menu) copies the current cover image; it is disabled when the foil has no cover. Video foils keep their existing behavior.
 
 

@@ -54,6 +54,7 @@ Hi-Fi 当前支持 DSF、raw DFF、未压缩立体声 SACD ISO 和 APE/CUE。DSD
 
 | 操作 | 默认快捷键 |
 | --- | --- |
+| EPUB 上一章 / 下一章 | <kbd>←</kbd> / <kbd>→</kbd> |
 | 箔片总览（Exposé，全局） | <kbd>⌃ ⇧ Esc</kbd> |
 | 打开剪贴板内容 | <kbd>⇧ ⌘ V</kbd> |
 | 新建无痕箔 | <kbd>⇧ ⌘ N</kbd> |

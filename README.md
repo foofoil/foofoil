@@ -52,6 +52,7 @@ These default shortcuts cover distinctive features and everyday actions. Except 
 
 | Action | Default shortcut |
 | --- | --- |
+| Previous / next EPUB chapter | <kbd>←</kbd> / <kbd>→</kbd> |
 | Foil Overview (Exposé, global) | <kbd>⌃ ⇧ Esc</kbd> |
 | Open clipboard content | <kbd>⇧ ⌘ V</kbd> |
 | New incognito foil | <kbd>⇧ ⌘ N</kbd> |

@@ -201,7 +201,7 @@ public class FloatingWindow: NSWindow {
 
         if event.type == .keyDown,
            let controller = self.windowController as? FloatingWindowController,
-           controller.appState.handleFileListKeyDown(event) {
+           (controller.appState.handleChapterKeyDown(event) || controller.appState.handleFileListKeyDown(event)) {
             return
         }
 
@@ -631,7 +631,7 @@ public class FloatingWindow: NSWindow {
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
         // 列表切项必须赶在主菜单匹配 PDF 翻页方向键之前处理。
         if let controller = windowController as? FloatingWindowController,
-           controller.appState.handleFileListKeyDown(event) {
+           (controller.appState.handleChapterKeyDown(event) || controller.appState.handleFileListKeyDown(event)) {
             return true
         }
 

@@ -528,6 +528,43 @@ extension AppState {
         scheduleImageListSlideshowAdvance()
     }
 
+    var chapterNavigatorContribution: NavigatorContribution? {
+        guard isExtensionDocument else { return nil }
+        return extensionSession?.navigatorContributions.first {
+            $0.readingOrderItemIDs?.isEmpty == false && $0.allowedActions.contains(.activate)
+        }
+    }
+
+    func adjacentChapterID(delta: Int) -> String? {
+        guard let contribution = chapterNavigatorContribution,
+              let order = contribution.readingOrderItemIDs,
+              let current = contribution.currentReadingOrderItemID,
+              let index = order.firstIndex(of: current),
+              order.indices.contains(index + delta),
+              contribution.items.contains(where: { $0.id == order[index + delta] && $0.isEnabled }) else { return nil }
+        return order[index + delta]
+    }
+
+    func activateAdjacentChapter(delta: Int) {
+        guard !isNavigatorActionInFlight,
+              let contribution = chapterNavigatorContribution,
+              let id = adjacentChapterID(delta: delta) else { return }
+        performNavigatorAction(NavigatorAction(contributionID: contribution.id, kind: .activate, itemIDs: [id]))
+    }
+
+    @discardableResult
+    func handleChapterKeyDown(_ event: NSEvent) -> Bool {
+        guard chapterNavigatorContribution != nil, !isNavigatorSearchActive,
+              !((NSApp.keyWindow?.firstResponder as? NSTextView)?.isEditable ?? false) else { return false }
+        for (identifier, delta) in [("go.previousChapter", -1), ("go.nextChapter", 1)] {
+            if KeyboardShortcutStore.shared.matches(event, identifier: identifier) {
+                activateAdjacentChapter(delta: delta)
+                return true
+            }
+        }
+        return false
+    }
+
     /// 图片列表与 PPT 共用“上一项/下一项”命令和快捷键，PPT 首尾不循环。
     var supportsItemNavigation: Bool {
         hasAppleMusicItemNavigation || fileList?.isPresentable == true || (isPPTXDocument && !pptxNavigationController.slides.isEmpty)

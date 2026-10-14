@@ -102,6 +102,8 @@ nonisolated enum KeyboardShortcutCatalog {
     ]
 
     static let go: [KeyboardShortcutDefinition] = [
+        definition("go.previousChapter", "Previous Chapter", "\u{F702}", [], "Shortcut Scope EPUB"),
+        definition("go.nextChapter", "Next Chapter", "\u{F703}", [], "Shortcut Scope EPUB"),
         definition("go.previousPage", "Previous Page", "\u{F702}", [], "Shortcut Scope PDF"),
         definition("go.nextPage", "Next Page", "\u{F703}", [], "Shortcut Scope PDF"),
         definition("go.goToPage", "Go to Page Menu Item", "g", [.command], "Shortcut Scope PDF"),

@@ -237,6 +237,17 @@ extension AppDelegate {
         goMenu.delegate = self
         self.goMenu = goMenu
 
+        for (title, action, identifier, tag) in [
+            ("Previous Chapter", #selector(previousChapterAction), "go.previousChapter", GoMenuItemTag.chapterPrevious),
+            ("Next Chapter", #selector(nextChapterAction), "go.nextChapter", GoMenuItemTag.chapterNext)
+        ] {
+            let item = NSMenuItem(title: NSLocalizedString(title, comment: ""), action: action, keyEquivalent: "")
+            item.target = self
+            item.tag = tag
+            item.representedObject = identifier
+            goMenu.addItem(item)
+        }
+
         let previousPageItem = NSMenuItem(
             title: NSLocalizedString("Previous Page", comment: ""),
             action: #selector(previousPDFPageAction),

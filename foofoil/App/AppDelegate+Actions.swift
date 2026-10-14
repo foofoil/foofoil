@@ -969,6 +969,14 @@ extension AppDelegate {
         DocumentStylePanelController.shared.show(for: appState)
     }
 
+    @objc func previousChapterAction() {
+        activeAppState?.activateAdjacentChapter(delta: -1)
+    }
+
+    @objc func nextChapterAction() {
+        activeAppState?.activateAdjacentChapter(delta: 1)
+    }
+
     @objc func previousPDFPageAction() {
         postPDFNavigationNotification(.shouldGoToPreviousPDFPage)
     }
