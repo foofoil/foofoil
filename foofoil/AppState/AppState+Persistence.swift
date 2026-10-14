@@ -220,9 +220,11 @@ extension AppState {
         }
 
         public func toConfig() -> WindowConfig {
+            // 视频扩展也记录原文件来源，供历史存活检查及重启后授权恢复使用。
+            let videoResource = isVideoDocument ? extensionSession.flatMap { ExtensionPlaybackSupport.authorizedResource(in: $0, fileList: fileList) } : nil
             return WindowConfig(
                 id: id,
-                imagePath: imageURL?.path,
+                imagePath: videoResource?.url.path ?? imageURL?.path,
                 isCamera: isCamera,
                 webURLString: webURL?.absoluteString,
                 actualWebURLString: actualWebURL?.absoluteString,
@@ -266,7 +268,7 @@ extension AppState {
                 documentZoom: documentZoom,
                 mediaPlaybackMode: mediaPlaybackMode,
                 subtitleAssociations: subtitles.history.isEmpty ? nil : subtitles.history,
-                videoBookmark: videoBookmarkData,
+                videoBookmark: videoResource?.securityScopedBookmark ?? videoBookmarkData,
                 mediaSidecarBookmark: mediaSidecarBookmarkData,
                 customCoverPath: customCoverURL?.path,
                 extensionID: extensionSession?.extensionID,

@@ -1613,6 +1613,11 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             maximumContentWidth = max(1, screenFrame.width * initialImageScreenLimit - inset)
             maximumContentHeight = max(1, screenFrame.height * initialImageScreenLimit - inset)
         }
+        if appState.isVideoDocument {
+            let content = Self.initialVideoContentSize(sourceSize: imageSize,
+                maximumSize: NSSize(width: min(720, maximumContentWidth), height: min(480, maximumContentHeight)))
+            return (NSSize(width: content.width + inset, height: content.height + inset), content.width / imageSize.width)
+        }
         if appState.isAudioDocument {
             let audioContentMax = max(1, AudioTrackInfo.initialWindowMaxLength - inset)
             maximumContentWidth = min(maximumContentWidth, audioContentMax)
@@ -1624,6 +1629,13 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             NSSize(width: imageSize.width * scale + inset, height: imageSize.height * scale + inset),
             scale
         )
+    }
+
+    /// 与视频分辨率及解码来源无关，初始画面按统一边界保持宽高比。
+    static func initialVideoContentSize(sourceSize: NSSize, maximumSize: NSSize = NSSize(width: 720, height: 480)) -> NSSize {
+        guard sourceSize.width > 0, sourceSize.height > 0 else { return maximumSize }
+        let scale = min(maximumSize.width / sourceSize.width, maximumSize.height / sourceSize.height)
+        return NSSize(width: sourceSize.width * scale, height: sourceSize.height * scale)
     }
 
     enum WindowSizeAlignment {
@@ -2108,7 +2120,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             restoreSavedMediaFrameIfNeeded(contentSize: size)
             return
         }
-        if hadPreviousMediaSize, appState.isAudioDocument {
+        if hadPreviousMediaSize, appState.isAudioDocument, !appState.isVideoDocument {
             applyImageListSuccessorLayout(imageSize: size, animated: animated)
             return
         }

@@ -20,7 +20,7 @@ public enum HistoryThumbnailGenerator {
     ///   - kind: 历史内容类型
     ///   - destinationURL: 缩略图保存的目标 HEIC 路径
     /// - Returns: 生成并保存成功返回 true，否则返回 false
-    public static func generateThumbnail(
+    nonisolated public static func generateThumbnail(
         for url: URL,
         kind: HistoryContentKind,
         destinationURL: URL,
@@ -59,15 +59,19 @@ public enum HistoryThumbnailGenerator {
             }
 
         case .video:
-            // 视频引用原始文件且不做 OCR；取首帧画面作为缩略图
-            let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+            // 取中间时间点，避开常见片头黑场；独立读取不影响播放器位置。
+            let asset = AVURLAsset(url: url)
+            let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
             generator.maximumSize = CGSize(width: 512, height: 512)
-            // 当前调用位于后台索引队列，可用信号量同步等待异步取帧结果
+            generator.requestedTimeToleranceBefore = .zero
+            generator.requestedTimeToleranceAfter = .zero
             let semaphore = DispatchSemaphore(value: 0)
             var generatedImage: CGImage?
-            generator.generateCGImageAsynchronously(for: .zero) { cgImage, _, _ in
-                generatedImage = cgImage
+            Task {
+                let duration = (try? await asset.load(.duration).seconds) ?? 0
+                let time = CMTime(seconds: Self.videoThumbnailTime(duration: duration), preferredTimescale: 600)
+                generatedImage = try? await generator.image(at: time).image
                 semaphore.signal()
             }
             semaphore.wait()
@@ -99,6 +103,10 @@ public enum HistoryThumbnailGenerator {
     }
 
     /// 远程音乐封面仅解码缩略尺寸，并沿用历史统一的正方形 HEIC 缓存。
+    nonisolated static func videoThumbnailTime(duration: Double) -> Double {
+        duration.isFinite && duration > 0 ? duration / 2 : 0
+    }
+
     nonisolated static func generateArtworkThumbnail(data: Data, destinationURL: URL) -> Bool {
         guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [

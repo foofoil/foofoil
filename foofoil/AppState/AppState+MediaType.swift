@@ -37,6 +37,7 @@ extension AppState {
         /// 当前内容是否为音频文档（复用图片内容通道，但不经缓存）。
         public var isAudioDocument: Bool {
             if appleMusicReference != nil { return true }
+            if isVideoDocument { return false }
             guard !isQuickLookDocument else { return false }
             if let session = extensionSession, ExtensionPlaybackSupport.usesHostAudioChrome(session) {
                 return true

@@ -79,3 +79,7 @@ Choose Load Subtitle File from the video foil’s context menu or the system Vie
 After subtitles load successfully, Show Subtitles is available in the video context menu and View menu. Subtitles are shown each time a video opens; visibility is not saved in history.
 
 Videos support Capture Image from the context menu or File menu (⌘S). This opens a Save As dialog to save the current picture as a PNG image, without playback controls; subtitles are included only when Show Subtitles is enabled at capture time. Videos do not offer saving a copy of the video, Extract Text, or Extract Image Subject.
+
+New videos share an initial display area of up to 720×480, preserving aspect ratio. Opening from history restores the saved window size.
+
+Video history thumbnails use the midpoint of the video to avoid opening black or white screens. Reopening a video refreshes older thumbnails without changing its starting or restored playback position.
