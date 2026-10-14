@@ -101,29 +101,44 @@ extension AppDelegate {
         NotificationCenter.default.post(name: VideoFrameCapture.notification(for: state.id), object: nil)
     }
 
-    @objc func saveAsAction() {
-        guard let appState = activeAppState else { return }
-
-        if appState.isVideoDocument {
+    @objc func saveContentImageAction() {
+        guard let state = activeAppState, state.canSaveContentImage else { return }
+        if state.isVideoDocument {
             captureVideoFrameAction()
-            return
-        }
-        if appState.isCamera {
-            let id = appState.id
-            appState.cameraController?.capture { [weak appState] image in
-                guard let appState, appState.id == id, appState.isCamera, let image else { return }
-                NotificationCenter.default.post(name: Notification.Name("flashWindow_\(id.uuidString)"), object: nil)
-                appState.saveWebScreenshot(image, triggerSavePanel: true)
+        } else if state.isCamera {
+            let name = state.contentImageName
+            let id = state.id
+            state.cameraController?.capture { [weak self] image in
+                guard let image else { return }
+                if state.id == id, state.isCamera {
+                    NotificationCenter.default.post(name: Notification.Name("flashWindow_\(id.uuidString)"), object: nil)
+                    state.saveWebScreenshot(image)
+                }
+                self?.presentContentImagePanel(image, name: name)
             }
-        } else if let webURL = appState.webURL, !webURL.isFileURL {
-            // 在线网页：先出发截图和闪白信号
+        } else if let image = state.audioCoverImage {
+            presentContentImagePanel(image, name: state.contentImageName)
+        } else if state.webURL != nil {
             NotificationCenter.default.post(
-                name: Notification.Name("triggerSaveSnapshot_\(appState.id.uuidString)"),
-                object: nil
-            )
+                name: Notification.Name("triggerSaveSnapshot_\(state.id.uuidString)"), object: nil)
+        } else if let root = activeWindowController?.window?.contentView {
+            let name = state.contentImageName
+            Task { @MainActor in
+                do {
+                    let image = try await FoilContentCapture.capture(in: root, state: state)
+                    presentContentImagePanel(image, name: name)
+                } catch { showSaveErrorAlert(error) }
+            }
+        }
+    }
+
+    @objc func saveAsAction() {
+        guard let state = activeAppState, let content = state.contentSavePayload else { return }
+        if case .webArchive = content {
+            NotificationCenter.default.post(
+                name: Notification.Name("saveWebArchive_\(state.id.uuidString)"), object: nil)
         } else {
-            // 文本、图片或本地 HTML 模式：直接弹出另存为面板
-            presentSavePanel(for: appState)
+            presentContentSavePanel(content, name: state.originalImageName)
         }
     }
 
@@ -196,177 +211,6 @@ extension AppDelegate {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(url.absoluteString, forType: .string)
-    }
-
-    @objc func handleWebSnapshotReadyForSave(_ notification: Notification) {
-        guard let userInfo = notification.userInfo,
-              let id = userInfo["id"] as? UUID,
-              let appState = activeAppState,
-              appState.id == id else {
-            return
-        }
-
-        // 截图和闪白已完成，现在弹出保存面板
-        presentSavePanel(for: appState)
-    }
-
-    func presentSavePanel(for appState: AppState) {
-        let savePanel = NSSavePanel()
-        savePanel.canCreateDirectories = true
-
-        var defaultName = "Untitled"
-        var allowedTypes: [UTType] = []
-
-        // 摄像头截图使用本地时间后缀；新打开的箔片名称及历史标题不随保存动作改变。
-        if appState.isCamera {
-            guard appState.imageURL != nil else { return }
-            let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "en_US_POSIX")
-            formatter.dateFormat = "yyyyMMdd_HHmmss"
-            defaultName = NSLocalizedString("Camera Foil", comment: "") + "_" + formatter.string(from: Date()) + ".png"
-            allowedTypes = [.png]
-        // 网页模式优先于其截图缓存。
-        } else if let webURL = appState.webURL {
-            if webURL.isFileURL {
-                if let name = appState.originalImageName, !name.isEmpty {
-                    defaultName = name
-                } else {
-                    defaultName = webURL.lastPathComponent
-                }
-                let ext = webURL.pathExtension
-                if let type = UTType(filenameExtension: ext) {
-                    allowedTypes = [type]
-                } else {
-                    allowedTypes = [.html, .data]
-                }
-            } else {
-                // 在线网页：直接保存为生成的截图图片 (PNG)
-                guard let _ = appState.imageURL else {
-                    let alert = NSAlert()
-                    alert.messageText = NSLocalizedString("Web Snapshot Loading Title", comment: "")
-                    alert.informativeText = NSLocalizedString("Web Snapshot Loading Message", comment: "")
-                    alert.runModal()
-                    return
-                }
-                if let name = appState.originalImageName, !name.isEmpty {
-                    defaultName = name
-                } else if let host = webURL.host {
-                    defaultName = host
-                } else {
-                    defaultName = "Snapshot"
-                }
-
-                // 去除所有已知网页相关的后缀
-                if defaultName.lowercased().hasSuffix(".webloc") {
-                    defaultName = String(defaultName.dropLast(7))
-                }
-                if defaultName.lowercased().hasSuffix(".webarchive") {
-                    defaultName = String(defaultName.dropLast(11))
-                }
-                if defaultName.lowercased().hasSuffix(".pdf") {
-                    defaultName = String(defaultName.dropLast(4))
-                }
-
-                if !defaultName.lowercased().hasSuffix(".png") {
-                    defaultName += ".png"
-                }
-                allowedTypes = [.png]
-            }
-        } else if let imageURL = appState.imageURL { // 2. 其次判定是否为独立的图片或 PDF
-            if let name = appState.originalImageName {
-                defaultName = name
-            } else {
-                defaultName = imageURL.lastPathComponent
-            }
-            let ext = imageURL.pathExtension
-            if let type = UTType(filenameExtension: ext) {
-                allowedTypes = [type]
-            } else {
-                allowedTypes = [.image, .data]
-            }
-        } else if !appState.text.isEmpty { // 3. 最后判定是否为文本
-            if let name = appState.originalImageName, !name.isEmpty {
-                defaultName = name
-            } else {
-                defaultName = appState.isMarkdownPreview ? "Untitled.md" : "Untitled.txt"
-            }
-
-            let ext = URL(fileURLWithPath: defaultName).pathExtension.lowercased()
-            if ext == "md" || ext == "markdown" {
-                if let mdType = UTType("net.daringfireball.markdown") {
-                    allowedTypes.append(mdType)
-                }
-                if let pubMdType = UTType("public.markdown") {
-                    allowedTypes.append(pubMdType)
-                }
-                allowedTypes.append(.plainText)
-            } else if ext == "csv" {
-                if let csvType = UTType(filenameExtension: "csv") {
-                    allowedTypes.append(csvType)
-                }
-                allowedTypes.append(.plainText)
-            } else {
-                allowedTypes = [.plainText]
-            }
-        } else {
-            let alert = NSAlert()
-            alert.messageText = NSLocalizedString("Save As Failed Title", comment: "")
-            alert.informativeText = NSLocalizedString("Save As Failed Message", comment: "")
-            alert.runModal()
-            return
-        }
-
-        savePanel.nameFieldStringValue = defaultName
-        if !allowedTypes.isEmpty {
-            savePanel.allowedContentTypes = allowedTypes
-        }
-
-        savePanel.begin { response in
-            if response == .OK, let targetURL = savePanel.url {
-                DispatchQueue.main.async {
-                    self.performSaveAs(appState: appState, to: targetURL)
-                }
-            }
-        }
-    }
-
-    func performSaveAs(appState: AppState, to targetURL: URL) {
-        let isAccessing = targetURL.startAccessingSecurityScopedResource()
-        defer {
-            if isAccessing {
-                targetURL.stopAccessingSecurityScopedResource()
-            }
-        }
-
-        do {
-            // 1. 优先处理网页模式
-            if let webURL = appState.webURL {
-                if webURL.isFileURL {
-                    if FileManager.default.fileExists(atPath: targetURL.path) {
-                        try FileManager.default.removeItem(at: targetURL)
-                    }
-                    try FileManager.default.copyItem(at: webURL, to: targetURL)
-                } else {
-                    // 在线网页另存为：拷贝截图文件
-                    guard let imageURL = appState.imageURL else {
-                        throw NSError(domain: "FoofoilError", code: 404, userInfo: [NSLocalizedDescriptionKey: "Snapshot image not found"])
-                    }
-                    if FileManager.default.fileExists(atPath: targetURL.path) {
-                        try FileManager.default.removeItem(at: targetURL)
-                    }
-                    try FileManager.default.copyItem(at: imageURL, to: targetURL)
-                }
-            } else if let imageURL = appState.imageURL { // 2. 其次处理图片模式
-                if FileManager.default.fileExists(atPath: targetURL.path) {
-                    try FileManager.default.removeItem(at: targetURL)
-                }
-                try FileManager.default.copyItem(at: imageURL, to: targetURL)
-            } else if !appState.text.isEmpty { // 3. 最后处理文本
-                try appState.text.write(to: targetURL, atomically: true, encoding: .utf8)
-            }
-        } catch {
-            self.showSaveErrorAlert(error)
-        }
     }
 
     @objc func openFileAction() {

@@ -151,6 +151,7 @@ struct PPTXModeView: View {
             WindowDragArea()
             if appState.isMediaPlaybackControlsVisible, !controller.slides.isEmpty {
                 pageControls
+                    .opacity(appState.isCapturingContentImage ? 0 : 1)
                     .padding(appState.navigatorPanelSide == .left ? .leading : .trailing,
                              appState.fullScreenNavigatorControlBarInset)
                     .transition(.move(edge: .bottom))

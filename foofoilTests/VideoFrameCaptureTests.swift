@@ -9,7 +9,7 @@ import Testing
         for name in ["Movie.mp4", "Movie.mkv", "Movie.avi", "Movie.mp4.mkv", "电影.mov"] {
             let title = VideoFrameCapture.imageTitle(sourceName: name)
             #expect(!AppState.isVideoFileName(title))
-            #expect((title as NSString).pathExtension == "png")
+            #expect((title as NSString).pathExtension == "heic")
         }
     }
     @Test func captureIncludesOnlyVisibleTimedSubtitlesAndFreezesStyle() throws {

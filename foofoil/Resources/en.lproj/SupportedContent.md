@@ -78,8 +78,14 @@ Choose Load Subtitle File from the video foil’s context menu or the system Vie
 
 After subtitles load successfully, Show Subtitles is available in the video context menu and View menu. Subtitles are shown each time a video opens; visibility is not saved in history.
 
-Videos support Capture Image from the context menu or File menu (⌘S). This opens a Save As dialog to save the current picture as a PNG image, without playback controls; subtitles are included only when Show Subtitles is enabled at capture time. Videos do not offer saving a copy of the video, Extract Text, or Extract Image Subject.
+Videos support Save Content Image from the context menu or File menu (⌘S). This opens the Save Content Image dialog to save the current picture as an image (HEIC by default, with PNG and JPG choices), without playback controls; subtitles are included only when Show Subtitles is enabled at capture time. Save As (⇧⌘S) saves a copy of the current video file. Videos do not offer Extract Text or Extract Image Subject.
 
 New videos share an initial display area of up to 720×480, preserving aspect ratio. Opening from history restores the saved window size.
 
 Video history thumbnails use the midpoint of the video to avoid opening black or white screens. Reopening a video refreshes older thumbnails without changing its starting or restored playback position.
+
+## Saving content
+
+⌘S opens “Save Content Image” to save an image of the current visible content (HEIC by default, with PNG and JPG choices). Documents (including text, Markdown, PDF, EPUB, and Quick Look previews) save the visible viewport, with its current scroll position, zoom, and background, excluding window borders and navigation controls. Videos, camera, and websites retain their existing capture behavior. Audio saves the displayed cover image; unavailable when there is no cover.
+
+⇧⌘S saves the source file, or the complete current text/Markdown source including edits. EPUB saves the original EPUB file; websites save a `.webarchive`. Camera, CUE tracks, SACD ISO, and Apple Music do not provide Save As. Both commands are disabled for blank foils.

@@ -20,7 +20,8 @@ Customize bindings in Settings → Keyboard Shortcuts. Except for global shortcu
 | --- | --- | --- | --- |
 | New foil | ⌘N | ⌘N |  |
 | Open file | ⌘O | ⌘O |  |
-| Save as / Capture image | ⌘S | ⌘S | Videos: Capture Image opens an image Save As dialog; other content: save as |
+| Save Content Image | ⌘S | ⌘S | Save the visible content as HEIC by default, with PNG and JPG choices; audio saves the cover image when available |
+| Save As | ⇧⌘S | ⇧⌘S | Save the source file or complete text; websites save a web archive. Unavailable for camera, CUE, SACD ISO, and Apple Music |
 {{file}}
 
 In the Apple Music library window, Esc closes the window, including while the search field is focused. Drag the blank area of the sidebar to move the window.

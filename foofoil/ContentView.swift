@@ -140,6 +140,7 @@ public struct ContentView: View {
                         )
                 }
             }
+            .background(FoilCaptureArea(id: appState.id))
             .padding(contentPadding)
             // 嵌平“始终显示”时侧边栏以分栏形式挤占内容空间而不是盖在内容上；
             // 悬停模式侧边栏覆盖内容，内容保持原位。拖拽调宽时跟随指针即时变化不动画。
@@ -162,6 +163,7 @@ public struct ContentView: View {
                 .allowsHitTesting(false)
 
             FullScreenNavigatorOverlay(appState: appState)
+                .opacity(appState.isCapturingContentImage ? 0 : 1)
         }
         .frame(minWidth: minimumWidth, minHeight: minimumLength)
         // Finder 文件由 FloatingWindow 直接读取粘贴板，确保多选批次不会被 SwiftUI 拆丢。
@@ -171,7 +173,7 @@ public struct ContentView: View {
                 .stroke(appState.isFileDropTargeted ? Color.blue.opacity(0.8) : (shouldHideBorder ? Color.clear : Color.white.opacity(0.15)), lineWidth: appState.isFileDropTargeted ? 3 : 1)
         )
         .overlay(alignment: .bottom) {
-            if let pdfPageIndicator {
+            if let pdfPageIndicator, !appState.isCapturingContentImage {
                 Text(pdfPageIndicator)
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .monospacedDigit()
@@ -279,13 +281,22 @@ public struct ContentView: View {
                 .configuredKeyboardShortcut("view.slideshow")
             }
 
+            Button {
+                (NSApp.delegate as? AppDelegate)?.saveContentImageAction()
+            } label: {
+                Label("Save Content Image", systemImage: "photo")
+            }
+            .keyboardShortcut("s", modifiers: [.command])
+            .disabled(!appState.canSaveContentImage)
+            Button {
+                (NSApp.delegate as? AppDelegate)?.saveAsAction()
+            } label: {
+                Label("Save As...", systemImage: "square.and.arrow.down")
+            }
+            .keyboardShortcut("s", modifiers: [.command, .shift])
+            .disabled(appState.contentSavePayload == nil)
+
             if appState.isVideoDocument {
-                Button {
-                    NotificationCenter.default.post(name: VideoFrameCapture.notification(for: appState.id), object: nil)
-                } label: {
-                    Label("Capture Video Frame", systemImage: "camera.viewfinder")
-                }
-                .keyboardShortcut("s", modifiers: [.command])
                 SubtitleVisibilityToggle(controller: appState.subtitles)
                 Button { appState.subtitles.pickFile() } label: {
                     Label("Load Subtitle File", systemImage: "captions.bubble")

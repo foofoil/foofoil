@@ -158,13 +158,6 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
 
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(handleWebSnapshotReadyForSave(_:)),
-            name: .webSnapshotReadyForSave,
-            object: nil
-        )
-
-        NotificationCenter.default.addObserver(
-            self,
             selector: #selector(handleKeyboardShortcutsDidChange),
             name: .keyboardShortcutsDidChange,
             object: nil

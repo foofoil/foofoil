@@ -1420,7 +1420,7 @@ extension AppState {
             return pasteboard.writeObjects([image])
         }
 
-        public func saveWebScreenshot(_ image: NSImage, triggerSavePanel: Bool = false) {
+        public func saveWebScreenshot(_ image: NSImage) {
             guard webURL != nil || isCamera else { return }
             let sourceID = id
 
@@ -1439,14 +1439,6 @@ extension AppState {
                     DispatchQueue.main.async {
                         guard self.id == sourceID, self.webURL != nil || self.isCamera else { return }
                         self.imageURL = destURL
-
-                        if triggerSavePanel {
-                            NotificationCenter.default.post(
-                                name: .webSnapshotReadyForSave,
-                                object: nil,
-                                userInfo: ["id": self.id]
-                            )
-                        }
                     }
                 } catch {
                     print("Failed to save web screenshot: \(error)")

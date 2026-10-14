@@ -695,6 +695,14 @@ public class FloatingWindow: NSWindow {
             return true
         }
 
+        // 两种保存命令优先于网页和文档内的按键处理；禁用时也不让网页执行自己的保存。
+        if event.charactersIgnoringModifiers?.lowercased() == "s",
+           modifiers == .command || modifiers == [.command, .shift] {
+            if modifiers == .command { delegate?.saveContentImageAction() }
+            else { delegate?.saveAsAction() }
+            return true
+        }
+
         // 可配置的菜单快捷键优先交由主菜单处理，避免被网页等内容视图吞掉。
         if delegate?.matchesConfigurableShortcut(event) == true {
             if let mainMenu = NSApplication.shared.mainMenu, mainMenu.performKeyEquivalent(with: event) {

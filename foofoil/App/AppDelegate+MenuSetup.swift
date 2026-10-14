@@ -147,9 +147,16 @@ extension AppDelegate {
         addToListItem.target = self
         fileMenu.addItem(addToListItem)
 
+        let saveImageItem = NSMenuItem(title: NSLocalizedString("Save Content Image", comment: ""),
+                                      action: #selector(saveContentImageAction), keyEquivalent: "s")
+        saveImageItem.withSymbol("photo")
+        saveImageItem.keyEquivalentModifierMask = [.command]
+        saveImageItem.target = self
+        fileMenu.addItem(saveImageItem)
+
         let saveAsItem = NSMenuItem(title: NSLocalizedString("Save As...", comment: ""), action: #selector(saveAsAction), keyEquivalent: "s")
         saveAsItem.withSymbol("square.and.arrow.down")
-        saveAsItem.keyEquivalentModifierMask = [.command]
+        saveAsItem.keyEquivalentModifierMask = [.command, .shift]
         saveAsItem.target = self
         fileMenu.addItem(saveAsItem)
 

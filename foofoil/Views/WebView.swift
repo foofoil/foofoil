@@ -110,6 +110,7 @@ struct WebView: NSViewRepresentable {
         private var reloadNotificationToken: Any?
         private var captureNotificationToken: Any?
         private var saveSnapshotNotificationToken: Any?
+        private var saveArchiveNotificationToken: Any?
 
         init(_ parent: WebView) {
             self.parent = parent
@@ -206,6 +207,21 @@ struct WebView: NSViewRepresentable {
                 }
             }
 
+            saveArchiveNotificationToken = NotificationCenter.default.addObserver(
+                forName: Notification.Name("saveWebArchive_\(parent.appState.id.uuidString)"),
+                object: nil, queue: .main
+            ) { [weak webView, weak self] _ in
+                guard let webView, let self else { return }
+                let name = self.parent.appState.originalImageName ?? webView.title
+                webView.createWebArchiveData { result in
+                    guard let delegate = NSApp.delegate as? AppDelegate else { return }
+                    switch result {
+                    case .success(let data): delegate.presentContentSavePanel(.archive(data), name: name)
+                    case .failure(let error): delegate.showSaveErrorAlert(error)
+                    }
+                }
+            }
+
             // 监听特定窗口的“另存为截图并闪白”通知
             let saveSnapshotNotificationName = Notification.Name("triggerSaveSnapshot_\(parent.appState.id.uuidString)")
             saveSnapshotNotificationToken = NotificationCenter.default.addObserver(
@@ -221,14 +237,17 @@ struct WebView: NSViewRepresentable {
                     object: nil
                 )
 
+                let name = self.parent.appState.contentImageName
+                let sourceID = self.parent.appState.id
                 let config = WKSnapshotConfiguration()
                 webView.takeSnapshot(with: config) { nsImage, error in
                     if let image = nsImage {
-                        DispatchQueue.main.async {
-                            self.parent.appState.saveWebScreenshot(image, triggerSavePanel: true)
+                        if self.parent.appState.id == sourceID {
+                            self.parent.appState.saveWebScreenshot(image)
                         }
-                    } else if let error = error {
-                        NSLog("Failed to take web snapshot for saving: \(error.localizedDescription)")
+                        (NSApp.delegate as? AppDelegate)?.presentContentImagePanel(image, name: name)
+                    } else if let error {
+                        (NSApp.delegate as? AppDelegate)?.showSaveErrorAlert(error)
                     }
                 }
             }
@@ -364,6 +383,9 @@ struct WebView: NSViewRepresentable {
                 NotificationCenter.default.removeObserver(token)
             }
             if let token = captureNotificationToken {
+                NotificationCenter.default.removeObserver(token)
+            }
+            if let token = saveArchiveNotificationToken {
                 NotificationCenter.default.removeObserver(token)
             }
             if let token = saveSnapshotNotificationToken {

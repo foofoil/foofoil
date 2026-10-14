@@ -245,23 +245,11 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         if menuItem.action == #selector(captureVideoFrameAction) {
             return activeAppState?.isVideoDocument == true
         }
+        if menuItem.action == #selector(saveContentImageAction) {
+            return activeAppState?.canSaveContentImage == true
+        }
         if menuItem.action == #selector(saveAsAction) {
-            guard let appState = activeAppState else { return false }
-            if appState.isVideoDocument {
-                menuItem.title = NSLocalizedString("Capture Video Frame", comment: "")
-                return true
-            }
-            if appState.isCamera {
-                menuItem.title = NSLocalizedString("Save Screenshot...", comment: "")
-                return appState.cameraController?.hasFrame == true
-            }
-            if let webURL = appState.webURL, !webURL.isFileURL {
-                menuItem.title = NSLocalizedString("Save Screenshot...", comment: "")
-                return appState.imageURL != nil
-            } else {
-                menuItem.title = NSLocalizedString("Save As...", comment: "")
-            }
-            return appState.imageURL != nil || !appState.text.isEmpty
+            return activeAppState?.contentSavePayload != nil
         }
 
         if menuItem.action == #selector(shareAction) {

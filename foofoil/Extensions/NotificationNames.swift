@@ -8,7 +8,6 @@
 import Foundation
 
 extension Notification.Name {
-    public static let webSnapshotReadyForSave = Notification.Name("webSnapshotReadyForSave")
     public static let createNewFoofoilFromImage = Notification.Name("createNewFoofoilFromImage")
     public static let shouldRestoreFrame = Notification.Name("shouldRestoreFrame")
     public static let shouldFitImageToWindowWidth = Notification.Name("shouldFitImageToWindowWidth")

@@ -38,37 +38,12 @@ import UniformTypeIdentifiers
     }
     static func finish(_ image: CGImage, state: AppState) {
         let sourceName = state.originalImageName ?? state.imageURL?.lastPathComponent ?? NSLocalizedString("Video", comment: "")
-        let panel = NSSavePanel()
-        panel.title = NSLocalizedString("Capture Video Frame", comment: "")
-        panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = imageTitle(sourceName: sourceName)
-        guard panel.runModal() == .OK, let destination = panel.url else { return }
-        let accessed = destination.startAccessingSecurityScopedResource()
-        // 只在用户选定位置后编码并写入，不创建图片箔或修改视频历史。
-        Task {
-            defer { if accessed { destination.stopAccessingSecurityScopedResource() } }
-            do {
-                try await Task.detached(priority: .userInitiated) {
-                    let data = NSMutableData()
-                    guard let output = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else {
-                        throw CocoaError(.fileWriteUnknown)
-                    }
-                    CGImageDestinationAddImage(output, image, nil)
-                    guard CGImageDestinationFinalize(output) else { throw CocoaError(.fileWriteUnknown) }
-                    try (data as Data).write(to: destination, options: .atomic)
-                }.value
-            } catch {
-                let alert = NSAlert()
-                alert.messageText = NSLocalizedString("Save As Failed Title", comment: "")
-                alert.informativeText = error.localizedDescription
-                alert.runModal()
-            }
-        }
+        (NSApp.delegate as? AppDelegate)?.presentContentImagePanel(image, name: imageTitle(sourceName: sourceName))
     }
     static func imageTitle(sourceName: String) -> String {
         // 使用图片扩展名作为默认保存名称。
         String(format: NSLocalizedString("Video Frame: %@", comment: ""),
-               (sourceName as NSString).deletingPathExtension) + ".png"
+               (sourceName as NSString).deletingPathExtension) + ".heic"
     }
 
 }

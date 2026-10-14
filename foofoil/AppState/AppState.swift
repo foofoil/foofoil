@@ -53,6 +53,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     @Published var isMediaPlaybackControlsVisible: Bool = false
     /// 由窗口级 Finder 文件拖放接收器驱动，用于保留整窗拖放高亮反馈。
     @Published var isFileDropTargeted: Bool = false
+    @Published var isCapturingContentImage = false
     @Published public var isLoading: Bool = false
     /// 原生全屏只是一种瞬时展示状态，不写入窗口历史；退出后恢复原有边框偏好。
     @Published public var isFullScreen: Bool = false
