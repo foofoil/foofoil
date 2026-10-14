@@ -385,7 +385,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
             return fileList.kind.historySymbolName
         }
         if let contentKind { return contentKind.symbolName }
-        if isCamera { return "camera" }
+        if isCamera { return "web.camera" }
         if self.webURLString != nil {
             return "globe"
         } else if self.imagePath != nil {

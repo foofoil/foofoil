@@ -973,9 +973,9 @@ struct FoilExposeItemView: View {
                                 .padding(12)
                             typeIconBadge
                         } else {
-                            // 没有缩略图时用大号类型图标占位，仍能看出内容类型。
+                            // 没有缩略图时用大号类型图标占位，仍能看出内容类型；摄像头箔不展示画面，图标更大。
                             Image(systemName: item.symbolName)
-                                .font(.system(size: 34))
+                                .font(.system(size: item.contentKind == .camera ? 56 : 34, weight: item.contentKind == .camera ? .light : .regular))
                                 .foregroundStyle(.white.opacity(0.55))
                         }
                         mediaKindOverlay

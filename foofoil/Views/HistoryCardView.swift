@@ -93,6 +93,7 @@ struct HistoryCardView: View {
 
     private var isAudioHistory: Bool { historyKind == .audio }
     private var isVideoHistory: Bool { historyKind == .video }
+    private var isCameraHistory: Bool { historyKind == .camera }
 
     @ViewBuilder
     private var shortcutOverlay: some View {
@@ -121,6 +122,10 @@ struct HistoryCardView: View {
 
     private var videoPlaceholder: some View {
         mediaPlaceholder(systemName: "play.fill")
+    }
+
+    private var cameraPlaceholder: some View {
+        mediaPlaceholder(systemName: historyKind.symbolName)
     }
 
     private func mediaPlaceholder(systemName: String) -> some View {
@@ -191,6 +196,8 @@ struct HistoryCardView: View {
     }
 
     private func loadImageAsync() {
+        // 摄像头箔不展示保存的截图，统一使用摄像机图标占位
+        guard !isCameraHistory else { return }
         // 优先使用已生成且单独存储的正方形 HEIC 缩略图，避免加载超大原图
         let path: String
         if let thumbnailPath = config.thumbnailPath, FileManager.default.fileExists(atPath: thumbnailPath) {
@@ -216,7 +223,9 @@ struct HistoryCardView: View {
     @ViewBuilder
     private func historyCardContent(for config: WindowConfig) -> some View {
         Group {
-            if Self.shouldShowMediaCard(config: config, hasLoadedImage: cardImage != nil) {
+            if isCameraHistory {
+                cameraPlaceholder
+            } else if Self.shouldShowMediaCard(config: config, hasLoadedImage: cardImage != nil) {
                 if let nsImage = cardImage {
                     ZStack {
                         renderCardImage(for: nsImage)

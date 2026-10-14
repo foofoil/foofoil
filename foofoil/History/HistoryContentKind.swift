@@ -18,7 +18,7 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
 
     public var symbolName: String {
         switch self {
-        case .camera: return "camera"
+        case .camera: return "web.camera"
         case .quickLook: return "doc"
         case .web: return "globe"
         case .image: return "photo"
