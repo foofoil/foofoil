@@ -623,6 +623,9 @@ public enum FileListGrouper {
         if ExtensionHost.shared.canOpenAsVideo(url: url) { return .listable(.video) }
         if AppState.isVideoFileName(name) { return .listable(.video) }
         if AppState.isAudioFileName(name) { return .listable(.audio) }
+        if let track = AppState.fragmentedMediaTrackKind(of: url) {
+            return .listable(track == .video ? .video : .audio)
+        }
         if ExtensionHost.shared.canOpenAsAudio(url: url) { return .listable(.audio) }
         if let type = UTType(filenameExtension: ext) {
             if type.conforms(to: .text) { return .other }

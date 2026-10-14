@@ -81,7 +81,7 @@ nonisolated enum MediaDurationLoader {
             return timing.duration
         }
 
-        let asset = AVURLAsset(url: url)
+        let asset = AVURLAsset.media(url: url)
         guard let duration = try? await asset.load(.duration) else { return nil }
         let seconds = duration.seconds
         return seconds.isFinite && seconds > 0 ? seconds : nil
@@ -98,7 +98,7 @@ nonisolated enum AudioMetadataLoader {
     static func load(from url: URL) async -> AudioTrackInfo {
         var info = AudioTrackInfo.fallback(fileName: url.lastPathComponent)
         info.formatName = formatName(for: url)
-        let asset = AVURLAsset(url: url)
+        let asset = AVURLAsset.media(url: url)
         let metadata = ((try? await asset.load(.commonMetadata)) ?? [])
             + ((try? await asset.load(.metadata)) ?? [])
         await applyMetadata(metadata, to: &info)

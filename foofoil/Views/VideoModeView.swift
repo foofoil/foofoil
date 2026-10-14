@@ -113,7 +113,7 @@ struct VideoModeView: View {
             subtitles.onChange = { [weak appState] in appState?.saveState() }
             await subtitles.prepare(video: url)
             await subtitles.bindNative(controller.player)
-            let asset = AVURLAsset(url: url)
+            let asset = AVURLAsset.media(url: url)
             if let track = try? await asset.loadTracks(withMediaType: .video).first,
                let size = try? await track.load(.naturalSize), let transform = try? await track.load(.preferredTransform) {
                 let transformed = size.applying(transform)

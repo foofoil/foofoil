@@ -179,6 +179,10 @@ public final class HistoryManager: ObservableObject {
     private func cachePaths(for config: WindowConfig) -> [String] {
         var paths = [config.imagePath, config.textPath, config.customCoverPath, config.imageSubjectPath].compactMap { $0 }
         if let value = config.webURLString, let url = URL(string: value), url.isFileURL { paths.append(url.path) }
+        if let imagePath = config.imagePath,
+           let copy = FragmentedMP4PlaybackCopy.copyURL(for: URL(fileURLWithPath: imagePath)) {
+            paths.append(copy.path)
+        }
         return paths
     }
 

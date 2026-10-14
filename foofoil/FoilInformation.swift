@@ -124,7 +124,7 @@ extension AppDelegate {
             }
             let metadata = await FoilInformation.fileRows(source: source, contentURL: contentURL, kind: kind)
             if (kind == .audio || kind == .video), let contentURL {
-                let asset = AVURLAsset(url: contentURL)
+                let asset = AVURLAsset.media(url: contentURL)
                 if let duration = try? await asset.load(.duration), duration.seconds.isFinite {
                     rows.append(.init(key: "Foil Info Duration", value: Duration.seconds(duration.seconds).formatted(.time(pattern: .hourMinuteSecond))))
                 }

@@ -84,7 +84,7 @@ final class VideoPlayerController: ObservableObject, MediaTransportControlling {
         self.previousItemAction = previousItemAction
         self.nextItemAction = nextItemAction
         self.playbackIntentHandler = playbackIntentHandler
-        self.player = AVPlayer(url: url)
+        self.player = AVPlayer(playerItem: AVPlayerItem(asset: AVURLAsset.media(url: url)))
         apply(range)
         loadFileDuration()
 
@@ -316,8 +316,8 @@ final class VideoPlayerController: ObservableObject, MediaTransportControlling {
     func load(url: URL, range: MediaPlaybackRange? = nil, autoplay: Bool = true) {
         mediaTitle = url.deletingPathExtension().lastPathComponent
         let currentURL = (player.currentItem?.asset as? AVURLAsset)?.url
-        if currentURL != url {
-            player.replaceCurrentItem(with: AVPlayerItem(url: url))
+        if currentURL != FragmentedMP4PlaybackCopy.playableURL(for: url) {
+            player.replaceCurrentItem(with: AVPlayerItem(asset: AVURLAsset.media(url: url)))
             fileDuration = .invalid
             duration = 0
             loadFileDuration()

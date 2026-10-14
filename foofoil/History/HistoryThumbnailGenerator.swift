@@ -60,7 +60,7 @@ public enum HistoryThumbnailGenerator {
 
         case .video:
             // 取中间时间点，避开常见片头黑场；独立读取不影响播放器位置。
-            let asset = AVURLAsset(url: url)
+            let asset = AVURLAsset.media(url: url)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
             generator.maximumSize = CGSize(width: 512, height: 512)

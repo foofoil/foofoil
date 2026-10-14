@@ -1528,7 +1528,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             return
         }
 
-        let asset = AVURLAsset(url: url)
+        let asset = AVURLAsset.media(url: url)
         Task {
             guard let track = try? await asset.loadTracks(withMediaType: .video).first,
                   let naturalSize = try? await track.load(.naturalSize) else {

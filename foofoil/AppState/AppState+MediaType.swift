@@ -134,7 +134,21 @@ extension AppState {
         }
 
         public static func isExternalMediaFile(url: URL) -> Bool {
-            isExternalMediaFileName(url.lastPathComponent)
+            isExternalMediaFileName(url.lastPathComponent) || fragmentedMediaTrackKind(of: url) != nil
+        }
+
+        /// `.m4s` 等分片容器没有可靠的扩展名类型，按内容探测轨道类型；其它扩展名不读取文件。
+        static func fragmentedMediaTrackKind(of url: URL) -> FragmentedMP4Probe.TrackKind? {
+            guard url.pathExtension.lowercased() == "m4s" else { return nil }
+            return FragmentedMP4Probe.trackKind(of: url)
+        }
+
+        /// 视频/音频箔使用的名称：分片文件按探测结果补上 `.mp4` 或 `.m4a`，
+        /// 让标题、历史恢复与保存对话框沿用既有的按扩展名判断。
+        static func externalMediaDisplayName(for url: URL) -> String {
+            guard let track = fragmentedMediaTrackKind(of: url) else { return url.lastPathComponent }
+            let stem = url.deletingPathExtension().lastPathComponent
+            return stem + (track == .video ? ".mp4" : ".m4a")
         }
 
         /// 为视频/音频原始文件创建安全范围书签，用于跨进程生命周期保留沙盒访问授权。
