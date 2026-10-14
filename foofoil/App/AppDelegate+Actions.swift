@@ -555,6 +555,10 @@ extension AppDelegate {
 
     private func presentClipboardTarget(_ target: ClipboardContentTarget) {
         if let controller = target.controller {
+            // 剪贴板 Markdown 预览复用空白箔时，也按只读文档应用初始阅读尺寸。
+            if target.state.isMarkdownDocument && target.state.isMarkdownPreview {
+                controller.setWindowSize(FloatingWindowController.initialWindowSize(for: target.state), keepWidth: false, animated: false)
+            }
             activateWindow(controller)
         } else {
             showNewWindow(with: target.state)

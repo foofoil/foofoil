@@ -6,6 +6,34 @@ import SwiftUI
 @MainActor
 @Suite(.serialized)
 struct HistoryWindowFrameTests {
+    @Test
+    func initialDocumentSizePreservesNoteAndWebDefaults() {
+        let state = AppState()
+        #expect(FloatingWindowController.initialWindowSize(for: state) == NSSize(width: 400, height: 400))
+        state.text = "Note"
+        #expect(FloatingWindowController.initialWindowSize(for: state) == NSSize(width: 400, height: 400))
+        state.textURL = URL(fileURLWithPath: "/tmp/document.md")
+        #expect(FloatingWindowController.initialWindowSize(for: state) == NSSize(width: 540, height: 675))
+        state.webURL = URL(string: "https://example.com")
+        #expect(FloatingWindowController.initialWindowSize(for: state) == NSSize(width: 512, height: 512))
+        HistoryManager.shared.removeFromHistory(state.toConfig())
+    }
+
+    @Test(arguments: [true, false])
+    func clipboardTextInitialSizeUsesPresentationMode(isMarkdown: Bool) async throws {
+        let state = AppState()
+        state.openText(isMarkdown ? "# Clipboard document" : "Clipboard note", isMarkdown: isMarkdown)
+        let controller = FloatingWindowController(appState: state)
+        defer {
+            controller.close()
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        let expectedSize = isMarkdown ? NSSize(width: 540, height: 675) : NSSize(width: 400, height: 400)
+        #expect(FloatingWindowController.initialWindowSize(for: state) == expectedSize)
+        let window = try #require(controller.window)
+        #expect(window.frame.size == expectedSize)
+    }
+
     @Test(arguments: [250.0, 650.0], [true, false])
     func restoresTextWindowAfterReset(height: Double, bordered: Bool) async throws {
         try await verifyRestoration(fileExtension: "txt", height: height, bordered: bordered)

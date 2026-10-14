@@ -227,10 +227,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         self.isRestoringSavedWebFrame = (appState.windowFrame != nil && appState.webURL != nil)
         self.pendingSavedFrameRestore = self.isRestoringSavedImageFrame
 
-        // 初始大小默认 400x400，如果是网页模式则默认 512x512
-        let width: CGFloat = appState.webURL != nil ? 512 : 400
-        let height: CGFloat = appState.webURL != nil ? 512 : 400
-        let defaultRect = NSRect(x: 200, y: 200, width: width, height: height)
+        let defaultRect = NSRect(origin: NSPoint(x: 200, y: 200), size: Self.initialWindowSize(for: appState))
         let window = FloatingWindow(contentRect: defaultRect, defer: false)
 
         super.init(window: window)
@@ -297,6 +294,16 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    /// 文件文档采用更大的阅读尺寸；笔记与网页保留各自默认大小。
+    static func initialWindowSize(for appState: AppState) -> NSSize {
+        if appState.webURL != nil { return NSSize(width: 512, height: 512) }
+        if appState.textURL != nil || appState.isExtensionDocument || appState.isPDFDocument
+            || (appState.isMarkdownDocument && appState.isMarkdownPreview) {
+            return NSSize(width: 540, height: 675)
+        }
+        return NSSize(width: 400, height: 400)
     }
 
     required init?(coder: NSCoder) {
@@ -447,7 +454,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
-        // 监听新网页载入以调整窗口大小为默认的 512*512
+        // 新网页保留默认的 512×512 尺寸。
         appState.$webURL
             .sink { [weak self] webURL in
                 guard let self = self, let _ = webURL else { return }
@@ -463,8 +470,24 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                         return
                     }
 
-                    // 新打开网页，将窗口调整为 512*512 默认大小
-                    self.setWindowSize(NSSize(width: 512, height: 512), keepWidth: false, animated: !isFirst)
+                    self.setWindowSize(Self.initialWindowSize(for: self.appState), keepWidth: false, animated: !isFirst)
+                }
+            }
+            .store(in: &cancellables)
+
+        // 文件文档也可载入已有空白箔；首次恢复与历史恢复继续保留保存的窗口框。
+        Publishers.Merge(
+            appState.$textURL.map { $0 != nil }.removeDuplicates().dropFirst(),
+            appState.$extensionSession.map { $0 != nil }.removeDuplicates().dropFirst()
+        )
+            .filter { $0 }
+            .sink { [weak self] _ in
+                guard let self else { return }
+                DispatchQueue.main.async {
+                    guard !self.isRestoringFrame,
+                          self.appState.webURL == nil,
+                          self.appState.textURL != nil || self.appState.isExtensionDocument else { return }
+                    self.setWindowSize(Self.initialWindowSize(for: self.appState), keepWidth: false, animated: false)
                 }
             }
             .store(in: &cancellables)
@@ -702,7 +725,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                 if let targetState = notification.object as? AppState,
                    targetState === self.appState {
                     DispatchQueue.main.async {
-                        let defaultSize = self.appState.webURL != nil ? NSSize(width: 512, height: 512) : NSSize(width: 400, height: 400)
+                        let defaultSize = Self.initialWindowSize(for: self.appState)
                         self.setWindowSize(defaultSize, keepWidth: false, animated: true)
                     }
                 }
