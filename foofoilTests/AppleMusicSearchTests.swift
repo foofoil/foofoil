@@ -155,7 +155,7 @@ struct AppleMusicSearchTests {
     }
 
     @Test func disablingMusicSearchCancelsBothSearchSurfacesAndRejectsLateResults() async throws {
-        var enabled = true
+        let enabled = MainActorTestValue(true)
         var requests = 0
         let item = try song("late", title: "Late Music")
         let search: @MainActor (String) async throws -> [AppleMusicLibraryItem] = { _ in
@@ -168,14 +168,14 @@ struct AppleMusicSearchTests {
         }
         let quick = HistorySearchViewModel(historySearch: { _ in [] }, fileSearch: { _, done in done(.results([])) },
                                           cameraAvailable: { false }, musicSearch: search,
-                                          musicAuthorized: { true }, musicEnabled: { enabled })
+                                          musicAuthorized: { true }, musicEnabled: { enabled.value })
         let expose = FoilExposeModel(items: [], historyItems: [], fileSearch: { _, done in done(.results([])) },
                                     cameraAvailable: { false }, musicSearch: search,
-                                    musicAuthorized: { true }, musicEnabled: { enabled })
+                                    musicAuthorized: { true }, musicEnabled: { enabled.value })
         quick.query = "music"
         expose.searchText = "music"
         try await waitUntil { requests == 2 }
-        enabled = false
+        enabled.value = false
         NotificationCenter.default.post(name: .appleMusicSearchDidChange, object: nil)
         try await waitUntil { !quick.isMusicSearchEnabled && !expose.isMusicSearchEnabled }
         try await Task.sleep(for: .milliseconds(400))
@@ -185,7 +185,7 @@ struct AppleMusicSearchTests {
         expose.searchText = "another"
         try await Task.sleep(for: .milliseconds(300))
         #expect(requests == 2)
-        enabled = true
+        enabled.value = true
         NotificationCenter.default.post(name: .appleMusicSearchDidChange, object: nil)
         try await waitUntil { requests == 4 && !quick.isMusicSearching && !expose.isMusicSearching }
         #expect(quick.musicResults.map(\.id) == [item.id])
@@ -198,18 +198,18 @@ struct AppleMusicSearchTests {
     }
 
     @Test func exposeSkipsUnauthorizedMusicAndRetainsFoilsWhenMusicFails() async throws {
-        var authorized = false
+        let authorized = MainActorTestValue(false)
         var requests = 0
         enum Failure: Error { case unavailable }
         let foil = FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true, title: "Music Note",
                                  symbolName: "doc", contentKind: .text, thumbnailPath: nil)
         let model = FoilExposeModel(items: [], historyItems: [foil], fileSearch: { _, done in done(.results([])) },
                                     cameraAvailable: { false }, musicSearch: { _ in requests += 1; throw Failure.unavailable },
-                                    musicAuthorized: { authorized }, musicEnabled: { true })
+                                    musicAuthorized: { authorized.value }, musicEnabled: { true })
         model.searchText = "Music"
         #expect(!model.isMusicSearching && requests == 0)
         #expect(model.currentItems.map(\.id) == [foil.id])
-        authorized = true
+        authorized.value = true
         NotificationCenter.default.post(name: .appleMusicSearchDidChange, object: nil)
         try await waitUntil { model.musicError != nil }
         #expect(requests == 1)

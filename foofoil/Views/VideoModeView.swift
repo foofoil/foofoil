@@ -109,7 +109,7 @@ struct VideoModeView: View {
         .onReceive(NotificationCenter.default.publisher(for: VideoFrameCapture.notification(for: appState.id))) { _ in
             VideoFrameCapture.capture(player: controller.player, state: appState, displaySize: captureDisplaySize, sourceSize: videoSize)
         }
-        .task(id: url) {
+        .task(id: url) { [appState] in
             subtitles.onChange = { [weak appState] in appState?.saveState() }
             await subtitles.prepare(video: url)
             await subtitles.bindNative(controller.player)

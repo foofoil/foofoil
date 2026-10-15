@@ -43,3 +43,11 @@ private actor SharedApplicationStateLock {
         else { waiters.removeFirst().resume() }
     }
 }
+
+/// 并发回调共享可变测试输入时，用主 actor 隔离的引用保存，避免捕获可变局部变量。
+@MainActor
+final class MainActorTestValue<Value> {
+    var value: Value
+
+    init(_ value: Value) { self.value = value }
+}

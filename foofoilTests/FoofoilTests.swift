@@ -1671,7 +1671,7 @@ struct FoofoilTests {
 
     /// 快捷键设置页搜索：按键位过滤使用注入的当前快捷键；与名称条件取交集。
     @Test func shortcutSearchMatchesShortcutQuery() throws {
-        let provider: (KeyboardShortcutDefinition) -> foofoil.KeyboardShortcut? = { $0.defaultShortcut }
+        let provider: @MainActor (KeyboardShortcutDefinition) -> foofoil.KeyboardShortcut? = { $0.defaultShortcut }
 
         let keyResults = KeyboardShortcutCatalog.searchResults(
             nameQuery: "",
@@ -1827,13 +1827,12 @@ struct FoofoilTests {
         let fileMenu = fileMenuItem?.submenu
         #expect(fileMenu != nil)
 
-        let copyURLFileItem = fileMenu?.items.first { $0.action == Selector(("copyWebURLAction")) }
+        let copyURLFileItem = fileMenu?.items.first { $0.action == #selector(AppDelegate.copyWebURLAction) }
         #expect(copyURLFileItem != nil)
 
-        let openBrowserItem = fileMenu?.items.first { $0.action == Selector(("openInDefaultBrowserAction")) }
+        let openBrowserItem = fileMenu?.items.first { $0.action == #selector(AppDelegate.openInDefaultBrowserAction) }
         #expect(openBrowserItem != nil)
 
-        let state = AppState()
         #expect(copyURLFileItem.map { appDelegate.validateMenuItem($0) } == false)
         #expect(openBrowserItem.map { appDelegate.validateMenuItem($0) } == false)
     }
@@ -2013,20 +2012,6 @@ struct FoofoilTests {
         let attr = try NSAttributedString(data: data, options: [.documentType: NSAttributedString.DocumentType.html, .characterEncoding: String.Encoding.utf8.rawValue], documentAttributes: nil)
         #expect(attr.string.contains("Alice"))
         #expect(attr.string.contains("Name"))
-        // 检查是否包含 NSTextTable（通过附件或表格属性）
-        var hasTableAttribute = false
-        attr.enumerateAttributes(in: NSRange(location: 0, length: attr.length), options: []) { attrs, _, _ in
-            for key in attrs.keys where key.rawValue.contains("Table") || key.rawValue.contains("table") {
-                hasTableAttribute = true
-            }
-            // AppKit 中表格通常以 NSParagraphStyle 的 textBlocks 形式存在
-            if let paragraph = attrs[.paragraphStyle] as? NSParagraphStyle {
-                if !paragraph.textBlocks.isEmpty {
-                    hasTableAttribute = true
-                }
-            }
-        }
-        // 即使没有检测到 table 属性，也应保证文本内容已渲染，不强制 hasTableAttribute
         #expect(attr.length > 0)
     }
 

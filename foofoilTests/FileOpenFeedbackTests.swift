@@ -139,6 +139,29 @@ struct FileOpenFeedbackTests {
         #expect(delegate.windowControllers.contains { $0.appState.isFileOpenFeedback })
     }
 
+    @Test(arguments: [false, true])
+    func deferredBlankCloseWaitsForAllOpensAndPreservesContent(hasContent: Bool) {
+        let delegate = AppDelegate()
+        defer {
+            NotificationCenter.default.removeObserver(delegate)
+            for controller in delegate.windowControllers { controller.close() }
+        }
+        let state = AppState(isIncognito: true)
+        let controller = delegate.showNewWindow(with: state)
+        state.beginPendingContentOpen()
+        state.beginPendingContentOpen()
+        delegate.closeFoilIfStillBlank(controller, for: state)
+        #expect(controller.pendingBlankCloseCancellable != nil)
+
+        state.endPendingContentOpen()
+        #expect(controller.window?.isVisible == true)
+        #expect(controller.pendingBlankCloseCancellable != nil)
+        if hasContent { state.text = "Opened content" }
+        state.endPendingContentOpen()
+        #expect(controller.pendingBlankCloseCancellable == nil)
+        #expect(controller.window?.isVisible == hasContent)
+    }
+
     @Test func emptyDirectoryGetsSeparateFeedback() async throws {
         let root = try directory()
         defer { try? FileManager.default.removeItem(at: root) }

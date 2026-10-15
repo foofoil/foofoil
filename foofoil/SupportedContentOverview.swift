@@ -12,7 +12,7 @@ enum SupportedContentOverview {
     static let sourceFingerprint = "foofoil:supported-file-types-overview"
 
     static func markdown(
-        shortcutProvider: (KeyboardShortcutDefinition) -> KeyboardShortcut? = {
+        shortcutProvider: @MainActor (KeyboardShortcutDefinition) -> KeyboardShortcut? = {
             KeyboardShortcutStore.shared.shortcut(for: $0)
         }
     ) -> String {

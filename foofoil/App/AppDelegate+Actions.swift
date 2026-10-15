@@ -1134,7 +1134,7 @@ extension AppDelegate {
 
 /// 剪贴板内容按打开规则归出的类型：覆盖层提示里的类型名取自这里，
 /// 判定与 openClipboardContentInNewWindow 保持一致，保证“提示什么就打开什么”。
-struct ClipboardOpenableContent: Equatable {
+nonisolated struct ClipboardOpenableContent: Equatable {
     enum Kind: Equatable {
         case folder, file, image, imageList, audio, audioList, appleMusic, video, videoList, pdf, web, htmlFragment, website, markdown, text
 

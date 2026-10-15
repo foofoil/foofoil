@@ -172,10 +172,11 @@ nonisolated enum KeyboardShortcutCatalog {
 
     /// 设置页顶部搜索：按命令名称（本地化标题或说明）和/或当前生效的快捷键过滤。
     /// 两个条件同时给出时取交集；返回的分组都不为空。`shortcutProvider` 供测试注入。
+    @MainActor
     static func searchResults(
         nameQuery: String,
         shortcutQuery: KeyboardShortcut?,
-        shortcutProvider: (KeyboardShortcutDefinition) -> KeyboardShortcut? = {
+        shortcutProvider: @MainActor (KeyboardShortcutDefinition) -> KeyboardShortcut? = {
             KeyboardShortcutStore.shared.shortcut(for: $0)
         }
     ) -> [KeyboardShortcutSearchResult] {

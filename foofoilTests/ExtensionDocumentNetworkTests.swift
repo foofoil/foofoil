@@ -54,6 +54,7 @@ struct ExtensionDocumentNetworkTests {
 
     // MARK: - Helpers
 
+    @MainActor
     private struct Fixture {
         let webView: WKWebView
         let window: NSWindow

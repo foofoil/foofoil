@@ -178,6 +178,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         readingStatePublisher.map { $0[keyPath: keyPath] }.switchToLatest().eraseToAnyPublisher()
     }
 
+    /// 新建空白箔等待异步打开结束的一次性订阅。
+    var pendingBlankCloseCancellable: AnyCancellable?
     private var cancellables = Set<AnyCancellable>()
     private var isRestoringFrame = false
     private var isLiveResizing = false
@@ -2051,6 +2053,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     public func windowWillClose(_ notification: Notification) {
+        pendingBlankCloseCancellable = nil
         appState.readingState.cameraController?.stop()
         pendingFrameSave?.cancel()
         pendingZoomCommit?.cancel()

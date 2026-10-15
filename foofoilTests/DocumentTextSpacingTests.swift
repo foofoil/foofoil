@@ -434,7 +434,7 @@ struct DocumentTextSpacingTests {
         return state.renderedMarkdown
     }
 
-    /// 轮询渲染结果里正文段落的行距；既跑 runloop 让 SwiftUI 派发 onChange，也等待后台渲染任务。
+    /// 轮询渲染结果里正文段落的行距；挂起时让主线程派发 SwiftUI onChange，并等待后台渲染任务。
     private func waitForRenderedParagraphStyle(
         _ state: AppState,
         lineHeightMultiple: Double
@@ -447,7 +447,6 @@ struct DocumentTextSpacingTests {
                abs(style.lineHeightMultiple - lineHeightMultiple) < 0.001 {
                 return style
             }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
             try? await Task.sleep(for: .milliseconds(10))
         }
         return nil
@@ -463,7 +462,6 @@ struct DocumentTextSpacingTests {
                abs(style.lineHeightMultiple - lineHeightMultiple) < 0.001 {
                 return style
             }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
             try? await Task.sleep(for: .milliseconds(5))
         }
         return textView.defaultParagraphStyle

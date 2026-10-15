@@ -89,7 +89,7 @@ struct ExtensionVideoModeView: View {
                 VideoFrameCapture.finish(snapshot.composite(on: image), state: appState)
             }
         }
-        .task(id: appState.extensionSession?.id) {
+        .task(id: appState.extensionSession?.id) { [appState] in
             guard let session = appState.extensionSession else { return }
             subtitles.onChange = { [weak appState] in appState?.saveState() }
             if let url = session.request.primaryFileURL { await subtitles.prepare(video: url) }

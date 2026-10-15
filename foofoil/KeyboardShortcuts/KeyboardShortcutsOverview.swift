@@ -8,7 +8,7 @@ enum KeyboardShortcutsOverview {
     static let sourceFingerprint = "foofoil:keyboard-shortcuts-overview"
 
     static func markdown(
-        shortcutProvider: (KeyboardShortcutDefinition) -> KeyboardShortcut? = {
+        shortcutProvider: @MainActor (KeyboardShortcutDefinition) -> KeyboardShortcut? = {
             KeyboardShortcutStore.shared.shortcut(for: $0)
         }
     ) -> String {

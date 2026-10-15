@@ -123,16 +123,15 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
 
     func closeFoilIfStillBlank(_ controller: FloatingWindowController, for state: AppState) {
         guard state.pendingContentOpenCount == 0 else {
-            var token: NSObjectProtocol?
-            token = NotificationCenter.default.addObserver(
-                forName: .contentOpenDidSettle,
-                object: state,
-                queue: .main
-            ) { [weak self, weak controller, weak state] _ in
-                if let token { NotificationCenter.default.removeObserver(token) }
-                guard let self, let controller, let state else { return }
-                self.closeFoilIfStillBlank(controller, for: state)
-            }
+            // 订阅随窗口释放，首个完成通知后自动取消，避免闭包捕获后再修改观察令牌。
+            controller.pendingBlankCloseCancellable = NotificationCenter.default
+                .publisher(for: .contentOpenDidSettle, object: state)
+                .first()
+                .sink { [weak self, weak controller, weak state] _ in
+                    guard let self, let controller, let state else { return }
+                    controller.pendingBlankCloseCancellable = nil
+                    self.closeFoilIfStillBlank(controller, for: state)
+                }
             return
         }
         // 目录扫描在途时保持现状：与既有行为一致，扫描结果自行决定是否呈现内容。

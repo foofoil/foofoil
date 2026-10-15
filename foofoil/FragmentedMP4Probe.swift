@@ -4,7 +4,7 @@ import Foundation
 extension AVURLAsset {
     /// 创建用于播放或读取元数据的资源。AVFoundation 依据扩展名选择容器解析器，`.m4s` 没有对应类型，
     /// 因此以 MP4 容器提示打开；内容本身仍由系统解析，音视频轨道以文件实际内容为准。
-    static func media(url: URL) -> AVURLAsset {
+    nonisolated static func media(url: URL) -> AVURLAsset {
         guard url.pathExtension.lowercased() == "m4s" else { return AVURLAsset(url: url) }
         let playable = FragmentedMP4PlaybackCopy.playableURL(for: url)
         return AVURLAsset(url: playable, options: [AVURLAssetOverrideMIMETypeKey: "video/mp4"])

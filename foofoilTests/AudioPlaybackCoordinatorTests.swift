@@ -84,15 +84,15 @@ struct AudioPlaybackCoordinatorTests {
         enum ReleaseError: Error { case failed }
         let coordinator = AudioPlaybackCoordinator()
         let old = UUID(), next = UUID()
-        var failing = true
+        let failing = MainActorTestValue(true)
         _ = try await coordinator.acquire(ownerID: old, pause: {
-            if failing { throw ReleaseError.failed }
+            if failing.value { throw ReleaseError.failed }
         })
         await #expect(throws: ReleaseError.self) {
             try await coordinator.acquire(ownerID: next, pause: {})
         }
         #expect(!coordinator.isOwner(next))
-        failing = false
+        failing.value = false
         let token = try await coordinator.acquire(ownerID: next, pause: {})
         #expect(coordinator.isCurrent(ownerID: next, token: token))
     }

@@ -164,7 +164,7 @@ struct ExtensionKitTests {
 
         state.extensionSession = nil
         #expect(provider.didClose == false)
-        await state.extensionSessionCloseTask?.value
+        _ = await state.extensionSessionCloseTask?.value
         #expect(provider.didClose)
     }
 

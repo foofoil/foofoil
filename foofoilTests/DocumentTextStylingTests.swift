@@ -119,7 +119,7 @@ struct DocumentTextStylingTests {
         #expect(await waitForRenderedColor(state, "#00AA00"), "改色后预览未重渲染")
     }
 
-    /// 轮询渲染结果的正文颜色；既跑 runloop 让 SwiftUI 派发 onChange，也等待后台渲染任务。
+    /// 轮询渲染结果的正文颜色；挂起时让主线程派发 SwiftUI onChange，并等待后台渲染任务。
     private func waitForRenderedColor(_ state: AppState, _ hex: String) async -> Bool {
         guard let expected = NSColor(hex: hex) else { return false }
         for _ in 0..<300 {
@@ -128,7 +128,6 @@ struct DocumentTextStylingTests {
                isClose(color, expected) {
                 return true
             }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
             try? await Task.sleep(for: .milliseconds(10))
         }
         return false

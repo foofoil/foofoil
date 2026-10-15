@@ -100,7 +100,7 @@ struct CameraFoilTests {
     @MainActor @Test func cameraSnapshotCacheDoesNotEnableExtraction() throws {
         let state = AppState()
         state.isCamera = true
-        state.imageURL = try #require(state.getCachedImageURL(extension: "png"))
+        state.imageURL = state.getCachedImageURL(extension: "png")
         state.hasExtractableImageText = true
         state.hasExtractableImageSubject = true
         #expect(!state.canExtractTextFromImage)

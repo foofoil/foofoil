@@ -75,11 +75,11 @@ struct ExclusiveHandoffFailureTests {
     @Test func pendingLeaseSurvivesReplacementAndBlocksSameOwner() async throws {
         let coordinator = ExclusivePlaybackCoordinator()
         let owner = UUID(), client = UUID()
-        var failing = true
+        let failing = MainActorTestValue(true)
         var releasedClients: [UUID] = []
         var pending: PendingOutputRelease? = PendingOutputRelease {
             releasedClients.append(client)
-            if failing { throw HandoffTestError.release }
+            if failing.value { throw HandoffTestError.release }
         }
         coordinator.retainPendingRelease(deviceID: "dac", ownerID: owner, pending: pending!)
         // 模拟关闭覆盖暂停请求：不能用默认 client 的释放覆盖真正待释放的租约。
@@ -93,7 +93,7 @@ struct ExclusiveHandoffFailureTests {
             })
         }
         #expect(releasedClients == [client, client])
-        failing = false
+        failing.value = false
         var started = false
         try await coordinator.perform(deviceID: "dac", ownerID: UUID(), pause: {}, start: { started = true })
         #expect(started)
@@ -114,14 +114,14 @@ struct ExclusiveHandoffFailureTests {
     @Test func releaseRecoveryAllowsNextHandoff() async throws {
         let coordinator = ExclusivePlaybackCoordinator()
         let first = UUID(), second = UUID()
-        var failing = true
+        let failing = MainActorTestValue(true)
         try await coordinator.perform(deviceID: "dac", ownerID: first, pause: {
-            if failing { throw HandoffTestError.release }
+            if failing.value { throw HandoffTestError.release }
         }, start: {})
         await #expect(throws: ExclusivePlaybackCoordinator.HandoffError.self) {
             try await coordinator.perform(deviceID: "dac", ownerID: second, pause: {}, start: {})
         }
-        failing = false
+        failing.value = false
         var started = false
         try await coordinator.perform(deviceID: "dac", ownerID: second, pause: {}, start: { started = true })
         #expect(started)
