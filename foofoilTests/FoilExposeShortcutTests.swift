@@ -9,6 +9,7 @@ import AppKit
 import Testing
 @testable import foofoil
 
+@Suite(.sharedApplicationState)
 struct FoilExposeShortcutTests {
     @Test @MainActor func helpDocumentsReuseTheirOpenFoilsAndRefreshContent() throws {
         let delegate = AppDelegate()

@@ -4,7 +4,7 @@ import Testing
 @testable import foofoil
 
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct FileOpenFeedbackTests {
     private func directory() throws -> URL {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

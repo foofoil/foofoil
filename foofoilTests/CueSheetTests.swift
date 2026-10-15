@@ -13,7 +13,7 @@ import AVFoundation
 import FoofoilExtensionKit
 
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct CueSheetTests {
     @Test func cueTimeUsesSeventyFiveFramesPerSecond() {
         #expect(CueTime.parse("00:00:00") == Int64(0))

@@ -215,12 +215,13 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
             )
         }
         engineStorage?.stop()
-        let clientID = activeLeaseClientID ?? deviceServiceClientID
-        Task {
-            _ = try? await ExtensionHost.shared.performAudioDeviceCommand(.init(
-                command: .releasePCM,
-                clientID: clientID
-            ))
+        if let clientID = activeLeaseClientID {
+            Task {
+                _ = try? await ExtensionHost.shared.performAudioDeviceCommand(.init(
+                    command: .releasePCM,
+                    clientID: clientID
+                ))
+            }
         }
     }
 
@@ -351,9 +352,19 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         preparedDeviceID = nil
         preparedSourceSampleRate = nil
         routeGeneration &+= 1
-        let clientID = activeLeaseClientID ?? deviceServiceClientID
+        let clientID = activeLeaseClientID
         activeLeaseClientID = nil
-        queuePCMLeaseRelease(clientID: clientID, deviceID: selectedOutputDeviceID)
+        if let clientID {
+            queuePCMLeaseRelease(clientID: clientID, deviceID: selectedOutputDeviceID)
+        } else {
+            // 系统默认输出没有扩展租约，不能制造永远释放失败的待办；在途准备仍须完成清理。
+            let interrupted = routeTask
+            let ownerID = deviceServiceClientID
+            AudioPlaybackCoordinator.shared.retainPendingRelease(ownerID: ownerID, pending: PendingOutputRelease {
+                await interrupted?.value
+                try await ExclusivePlaybackCoordinator.shared.releasePendingOutputs(ownerID: ownerID)
+            })
+        }
     }
 
     private func queuePCMLeaseRelease(clientID: UUID, deviceID: String?) {

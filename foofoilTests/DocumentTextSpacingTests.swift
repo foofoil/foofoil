@@ -12,7 +12,7 @@ import FoofoilExtensionKit
 
 /// 无排版文档（纯文本/笔记、Markdown）的行距与段距。
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct DocumentTextSpacingTests {
     @Test func partialRedrawIncludesWholeWrappedTable() async throws {
         let previousAppearance = NSApp.appearance

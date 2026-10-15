@@ -7,7 +7,7 @@ import WebKit
 import ImageIO
 @testable import foofoil
 
-@Suite(.serialized) @MainActor
+@Suite(.sharedApplicationState, .serialized) @MainActor
 struct ContentSavingTests {
     @Test(arguments: ContentImageFormat.allCases)
     func imageFormatsProduceMatchingDecodableFiles(_ format: ContentImageFormat) throws {
@@ -197,7 +197,10 @@ struct ContentSavingTests {
         try await Task.sleep(for: .milliseconds(300))
         let root = try #require(controller.window?.contentView)
         let image = try await FoilContentCapture.capture(in: root, state: state)
-        #expect(image.size.height < 500)
+        let marker = try #require(FoilContentCapture.descendants(of: root)
+            .compactMap { $0 as? FoilCaptureArea.Marker }.first { $0.foilID == state.id })
+        let viewport = root.convert(marker.bounds, from: marker).intersection(root.bounds)
+        #expect(abs(image.size.height - viewport.height) < 1)
         #expect(image.size.width > 100)
         #expect(image.cgImage(forProposedRect: nil, context: nil, hints: nil) != nil)
         Attachment.record(image, named: "Markdown visible content", as: .png)

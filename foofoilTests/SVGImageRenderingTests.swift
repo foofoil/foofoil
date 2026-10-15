@@ -5,7 +5,7 @@ import WebKit
 @testable import foofoil
 
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct SVGImageRenderingTests {
     // 开放路径必须继承 fill="none"；滤镜、渐变和 use 引用须由同一渲染器处理。
     private let svg = """

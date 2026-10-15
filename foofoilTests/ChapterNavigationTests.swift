@@ -3,6 +3,7 @@ import Testing
 import FoofoilExtensionKit
 @testable import foofoil
 
+@Suite(.sharedApplicationState)
 struct ChapterNavigationTests {
     @Test @MainActor func chapterOrderSkipsSubsectionsAndStopsAtBoundaries() {
         let state = AppState(isIncognito: true)

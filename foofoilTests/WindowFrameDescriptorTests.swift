@@ -8,7 +8,7 @@ import AppKit
 import Testing
 @testable import foofoil
 
-@Suite
+@Suite(.sharedApplicationState)
 struct WindowFrameDescriptorTests {
     @Test(arguments: [
         NSSize(width: 4000, height: 2000),

@@ -12,7 +12,7 @@ import Testing
 
 /// 图片取字：仅光栅图片箔可用系统 OCR 提取文字，其余内容（网页、PDF、音视频、SVG、Quick Look、纯文本）都不可用。
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct TextExtractionTests {
     /// 取字命令在快捷键设置里可配置：默认 ⌘E，仅对光栅图片有效，改键后存储生效、可恢复默认。
     @Test func extractTextShortcutIsConfigurable() throws {

@@ -4,7 +4,7 @@ import SwiftUI
 @testable import foofoil
 
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct IncognitoFoilTests {
     @Test func contentChangesAndResetNeverEnterHistory() {
         let state = AppState(isIncognito: true)

@@ -32,6 +32,7 @@ extension AppDelegate {
                 }
 
                 let item = NSMenuItem(title: title, action: #selector(openHistoryItemAction(_:)), keyEquivalent: "")
+                item.keyEquivalentModifierMask = []
                 item.withSymbol(config.historyMenuSymbolName)
                 item.representedObject = config
                 item.target = self
@@ -81,6 +82,7 @@ extension AppDelegate {
 
                 // ⌘1-9 不再作为全局菜单快捷键；打开最近历史仅在空白箔窗口内生效。
                 let item = NSMenuItem(title: title, action: #selector(openHistoryItemAction(_:)), keyEquivalent: "")
+                item.keyEquivalentModifierMask = []
                 item.withSymbol(config.historyMenuSymbolName)
                 item.representedObject = config
                 item.target = self

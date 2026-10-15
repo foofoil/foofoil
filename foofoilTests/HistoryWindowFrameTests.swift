@@ -4,7 +4,7 @@ import SwiftUI
 @testable import foofoil
 
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct HistoryWindowFrameTests {
     @Test
     func initialDocumentSizePreservesNoteAndWebDefaults() {

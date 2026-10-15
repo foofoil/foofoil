@@ -25,8 +25,9 @@ final class FoofoilUITests: XCTestCase {
     @MainActor
     func testExample() throws {
         // UI tests must launch the application that they test.
-        let app = XCUIApplication()
+        let app = makeTestApplication()
         app.launch()
+        app.activate()
 
         // Use XCTAssert and related functions to verify your tests produce the correct results.
         // XCUIAutomation Documentation
@@ -35,14 +36,15 @@ final class FoofoilUITests: XCTestCase {
 
     @MainActor
     func testFullScreenShortcutEntersFullScreen() throws {
-        let app = XCUIApplication()
+        let app = makeTestApplication()
         app.launch()
+        app.activate()
 
-        let window = app.windows.firstMatch
+        let window = app.windows.element(boundBy: 0)
         XCTAssertTrue(window.waitForExistence(timeout: 3))
         let windowedFrame = window.frame
 
-        app.typeKey("f", modifierFlags: [.command, .control])
+        window.typeKey("f", modifierFlags: [.command, .control])
         let enteredFullScreen = XCTNSPredicateExpectation(
             predicate: NSPredicate { _, _ in
                 window.exists && window.frame.width > windowedFrame.width + 100
@@ -56,7 +58,7 @@ final class FoofoilUITests: XCTestCase {
     func testLaunchPerformance() throws {
         // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
+            makeTestApplication().launch()
         }
     }
 }

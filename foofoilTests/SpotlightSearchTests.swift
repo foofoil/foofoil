@@ -310,7 +310,7 @@ struct SpotlightGatheringTests {
         }
         query.rows = (0..<16_932).map(row)
         NotificationCenter.default.post(name: .NSMetadataQueryGatheringProgress, object: query)
-        #expect(results.count == 600)
+        #expect(results.count == SearchResultLimits.probe)
         #expect(query.stopCount == 1)
         try await Task.sleep(for: .milliseconds(60))
         #expect(callbacks == 1)

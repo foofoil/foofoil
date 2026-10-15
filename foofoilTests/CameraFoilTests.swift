@@ -4,6 +4,7 @@ import AVFoundation
 import Testing
 @testable import foofoil
 
+@Suite(.sharedApplicationState, .serialized)
 struct CameraFoilTests {
     @Test func cameraKeywordsRequireAvailableDevice() {
         for query in ["摄像", "打开摄像头", "CAMERA", "webcam", "相机"] {
@@ -47,7 +48,7 @@ struct CameraFoilTests {
         let decoded = try JSONDecoder().decode(WindowConfig.self, from: JSONEncoder().encode(config))
         #expect(decoded.isCamera)
         #expect(HistoryContentKind.infer(from: decoded) == .camera)
-        #expect(decoded.historyMenuSymbolName == "camera")
+        #expect(decoded.historyMenuSymbolName == "web.camera")
         #expect(!HistoryContentKind.camera.storesIndexedText)
     }
     @MainActor @Test(arguments: [true, false])
@@ -58,6 +59,7 @@ struct CameraFoilTests {
         let camera = CameraCaptureController()
         state.cameraController = camera
         let controller = FloatingWindowController(appState: state)
+        controller.showWindow(nil)
         let window = try #require(controller.window)
         defer {
             controller.close()
@@ -67,10 +69,16 @@ struct CameraFoilTests {
         var buffer: CVPixelBuffer?
         #expect(CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720, kCVPixelFormatType_32BGRA, nil, &buffer) == kCVReturnSuccess)
         camera.acceptFrame(try #require(buffer))
-        try await Task.sleep(for: .milliseconds(400))
+        // 尺寸发布与窗口布局分两次主队列提交，等待几何结果而不是固定延时。
+        let inset: CGFloat = bordered ? 24 : 0
+        let deadline = ContinuousClock.now + .seconds(3)
+        while ContinuousClock.now < deadline,
+              camera.frameSize != NSSize(width: 1280, height: 720)
+                || abs((window.frame.width - inset) / (window.frame.height - inset) - 1280.0 / 720) >= 0.01 {
+            try await Task.sleep(for: .milliseconds(20))
+        }
         #expect(state.usesImagePresentation)
         #expect(camera.frameSize == NSSize(width: 1280, height: 720))
-        let inset: CGFloat = bordered ? 24 : 0
         #expect(abs((window.frame.width - inset) / (window.frame.height - inset) - 1280.0 / 720) < 0.01)
         if bordered {
             window.setFrame(NSRect(x: window.frame.minX, y: window.frame.minY, width: 500, height: 400), display: false)

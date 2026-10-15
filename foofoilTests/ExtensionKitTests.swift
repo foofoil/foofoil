@@ -12,7 +12,7 @@ import Testing
 import FoofoilExtensionKit
 
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct ExtensionKitTests {
     private func temporaryDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory
@@ -67,6 +67,10 @@ struct ExtensionKitTests {
     }
 
     @Test func appendingToSingleHiFiFileKeepsThePlayingFileFirst() throws {
+        let provider = ExtensionAudioListTestProvider()
+        ExtensionHost.shared.resolver.register(provider)
+        defer { ExtensionHost.shared.resolver.unregister(providerID: provider.descriptor.id) }
+
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
         let current = directory.appendingPathComponent("playing.dsf")
@@ -77,9 +81,10 @@ struct ExtensionKitTests {
         let state = AppState()
         state.extensionSession = ContentSession(
             extensionID: nil,
-            providerID: "audio.hifi",
+            providerID: provider.descriptor.id,
             request: .singleFile(.init(url: current)),
             presentation: .text(titleKey: "Hi-Fi", body: current.lastPathComponent),
+            capabilities: [.init(declaration: .init(id: ExtensionCapabilityIdentifier.mediaTransport, scope: .session), state: .active)],
             mediaPlayback: .init(state: .playing, position: 1, duration: 10, isSeekable: true)
         )
         state.originalImageName = current.lastPathComponent
@@ -629,6 +634,8 @@ struct ExtensionKitTests {
         state.navigatorPanelWidth = 300
 
         let controller = FloatingWindowController(appState: state)
+        controller.showWindow(nil)
+        controller.restoreAfterApplicationUnhide()
         let foilWindow = try #require(controller.window)
         let originalFrame = foilWindow.frame
         let panel = try #require(foilWindow.childWindows?.first)
@@ -657,6 +664,8 @@ struct ExtensionKitTests {
         state.navigatorPanelSide = .left
 
         let controller = FloatingWindowController(appState: state)
+        controller.showWindow(nil)
+        controller.restoreAfterApplicationUnhide()
         defer { controller.close() }
         let foilWindow = try #require(controller.window)
         let panel = try #require(foilWindow.childWindows?.first)
@@ -699,7 +708,7 @@ struct ExtensionKitTests {
         #expect(state.navigatorPanelWidth < widened)
     }
 
-    @Test func navigatorPanelShadowFollowsAlwaysShowModeOnDesktop() async throws {
+    @Test func navigatorPanelKeepsShadowAcrossDesktopVisibilityModes() async throws {
         let contribution = NavigatorContribution(
             id: "builtin.shadow-test",
             titleLocalizationKey: "Navigator",
@@ -712,24 +721,28 @@ struct ExtensionKitTests {
         alwaysState.builtInNavigatorContributions = [contribution]
         alwaysState.navigatorPanelVisibilityMode = .always
         let alwaysController = FloatingWindowController(appState: alwaysState)
+        alwaysController.showWindow(nil)
+        alwaysController.restoreAfterApplicationUnhide()
         defer { alwaysController.close() }
         let alwaysPanel = try #require(alwaysController.window?.childWindows?.first)
         #expect(alwaysPanel.hasShadow)
 
-        // 悬停唤出：面板不带投影。
+        // 悬停唤出同样保留系统投影。
         let hoverState = AppState()
         hoverState.builtInNavigatorContributions = [contribution]
         hoverState.navigatorPanelVisibilityMode = .onHover
         let hoverController = FloatingWindowController(appState: hoverState)
+        hoverController.showWindow(nil)
+        hoverController.restoreAfterApplicationUnhide()
         defer { hoverController.close() }
         let hoverWindow = try #require(hoverController.window)
         hoverController.updateNavigatorEdgeHover(
             at: NSPoint(x: hoverWindow.frame.width / 2, y: hoverWindow.frame.height / 2)
         )
         let hoverPanel = try #require(hoverWindow.childWindows?.first)
-        #expect(hoverPanel.hasShadow == false)
+        #expect(hoverPanel.hasShadow)
 
-        // 运行中切到始终显示：显隐刷新后跟随投影。
+        // 运行中切到始终显示：继续保留投影。
         hoverState.navigatorPanelVisibilityMode = .always
         try await Task.sleep(for: .milliseconds(50))
         #expect(hoverPanel.hasShadow)
@@ -749,6 +762,8 @@ struct ExtensionKitTests {
         ]
         state.navigatorPanelVisibilityMode = .always
         let controller = FloatingWindowController(appState: state)
+        controller.showWindow(nil)
+        controller.restoreAfterApplicationUnhide()
         defer { controller.close() }
         let foilWindow = try #require(controller.window)
         foilWindow.orderFront(nil)
@@ -1248,6 +1263,8 @@ struct ExtensionKitTests {
         state.navigatorPanelVisibilityMode = .always
 
         let controller = FloatingWindowController(appState: state)
+        controller.showWindow(nil)
+        controller.restoreAfterApplicationUnhide()
         let window = try #require(controller.window)
         let originalFrame = window.frame
         let windowedFrame = window.frameDescriptor

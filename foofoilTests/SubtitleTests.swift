@@ -133,7 +133,7 @@ extension SubtitleTests {
 }
 
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct SubtitleThemeTests {
     @Test func customThemesSaveOverwriteRestoreAndDelete() throws {
         let name = "subtitle-themes-\(UUID().uuidString)"

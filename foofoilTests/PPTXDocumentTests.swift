@@ -5,6 +5,7 @@ import Testing
 import FoofoilExtensionKit
 @testable import foofoil
 
+@Suite(.sharedApplicationState)
 struct PPTXDocumentTests {
     @Test func readsSlideOrderTitlesAndPreservesResources() async throws {
         let source = try Self.fixture()

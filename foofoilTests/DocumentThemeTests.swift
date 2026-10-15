@@ -11,7 +11,7 @@ import Testing
 @testable import foofoil
 
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct DocumentThemeTests {
     /// 预设主题色彩合规性：所有预设在亮暗两套外观下均为合法 sRGB 色彩，且对比度均达到 WCAG AAA 标杆（>= 7:1）。
     @Test func presetsHaveValidColorsAndHighContrast() throws {

@@ -11,7 +11,7 @@ import Testing
 /// 取色面板（SVG）与文档样式面板都是应用级/单例窗口：只作用于打开它的那扇箔，
 /// 且箔窗关闭或重置时一并收起。
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct ColorPanelScopeTests {
     /// SVG 取色：其他窗口处于前台时也不能接收这扇箔的面板取色。
     @Test func colorChangesApplyOnlyToOwningFoil() throws {

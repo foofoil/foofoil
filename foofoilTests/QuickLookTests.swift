@@ -3,6 +3,7 @@ import Testing
 @testable import foofoil
 
 @MainActor
+@Suite(.sharedApplicationState)
 struct QuickLookTests {
     @Test(arguments: ["docx", "xlsx", "pptx", "rtf"])
     func opensAndRestoresFallbackDocument(_ ext: String) throws {

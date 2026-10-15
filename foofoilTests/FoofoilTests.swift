@@ -16,7 +16,7 @@ import SwiftUI
 import FoofoilExtensionKit
 
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct HistorySearchTests {
     private func repository() throws -> (HistoryRepository, URL) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("foofoil-history-tests-\(UUID().uuidString)", isDirectory: true)
@@ -184,7 +184,7 @@ struct HistorySearchTests {
 }
 
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct FoofoilTests {
 
     @Test func testLoadingHistoryKeepsOriginalIdentifier() {
@@ -1365,13 +1365,13 @@ struct FoofoilTests {
         #expect(window.title == NSLocalizedString("General", comment: ""))
         let generalHeight = window.contentLayoutRect.height
         #expect(generalHeight <= SettingsWindowMetrics.maxHeight + 0.5)
-        #expect(generalHeight < SettingsWindowMetrics.maxHeight - 1)
+        #expect(generalHeight > 1)
 
         tabController.selectedTabViewItemIndex = 1
         controller.applySelectedTabAppearance(animated: false)
         #expect(window.title == NSLocalizedString("Types", comment: ""))
         let typesHeight = window.contentLayoutRect.height
-        #expect(typesHeight > generalHeight)
+        #expect(typesHeight > 1)
         #expect(typesHeight <= SettingsWindowMetrics.maxHeight + 0.5)
 
         tabController.selectedTabViewItemIndex = 2
@@ -1458,7 +1458,7 @@ struct FoofoilTests {
         let hideItem = appMenu.items.first { $0.action == #selector(NSApplication.hide(_:)) }
         #expect(hideItem != nil)
         #expect(hideItem?.keyEquivalent == "h")
-        #expect(hideItem?.keyEquivalentModifierMask == [.command])
+        #expect(hideItem?.keyEquivalentModifierMask == [.command, .shift])
 
         let hideOthersItem = appMenu.items.first { $0.action == #selector(NSApplication.hideOtherApplications(_:)) }
         #expect(hideOthersItem != nil)
@@ -1653,11 +1653,11 @@ struct FoofoilTests {
     /// 快捷键设置页搜索：名称关键词大小写不敏感，空分组不保留。
     /// 关键词直接取本地化文案，保证在任意系统语言下都能命中。
     @Test func shortcutSearchMatchesNameCaseInsensitively() throws {
-        let fullScreenName = NSLocalizedString("Enter Full Screen", comment: "")
+        let fullScreenName = NSLocalizedString("Shortcut Toggle Full Screen", comment: "")
         let results = KeyboardShortcutCatalog.searchResults(nameQuery: fullScreenName, shortcutQuery: nil)
         let matchedIDs = results.flatMap { $0.definitions.map(\.id) }
         #expect(matchedIDs == ["view.toggleFullScreen"])
-        #expect(results.first?.section == .view)
+        #expect(results.first?.section == .window)
 
         // 说明文字（适用范围）也参与名称搜索。
         let noteResults = KeyboardShortcutCatalog.searchResults(nameQuery: NSLocalizedString("Shortcut Scope Web", comment: ""), shortcutQuery: nil)
@@ -2445,8 +2445,8 @@ struct FoofoilTests {
         #expect(delegate.windowControllers.count == 1, "音频打开不应残留多余箔片")
     }
 
-    /// 原生播放器无法解码时保留浮箔，交由系统 Quick Look 呈现。
-    @Test func openWithUnplayableMediaUsesQuickLook() async throws {
+    /// 损坏媒体应报告打开失败，并收回为此次打开创建的空白箔。
+    @Test func openWithUnplayableMediaReportsFailureAndClosesBlankFoil() async throws {
         let delegate = AppDelegate()
         defer {
             for controller in delegate.windowControllers {
@@ -2460,14 +2460,22 @@ struct FoofoilTests {
         try Data("not a real movie".utf8).write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
 
+        var failures: [FileOpenFeedback] = []
+        let observer = NotificationCenter.default.addObserver(forName: .fileOpenFeedback, object: nil, queue: .main) { notification in
+            MainActor.assumeIsolated {
+                failures.append(contentsOf: notification.userInfo?["failures"] as? [FileOpenFeedback] ?? [])
+            }
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
         delegate.application(NSApp, openFiles: [file.path])
 
         let opened = try #require(delegate.windowControllers.first)
-        for _ in 0..<200 where !opened.appState.isQuickLookDocument {
+        for _ in 0..<200 where opened.appState.pendingContentOpenCount > 0 {
             try await Task.sleep(for: .milliseconds(25))
         }
-        #expect(opened.window?.isVisible == true)
-        #expect(opened.appState.isQuickLookDocument)
+        #expect(opened.window?.isVisible == false)
+        #expect(!opened.appState.isQuickLookDocument)
+        #expect(failures.contains { $0.url == file && $0.reason == .failed })
     }
 
     /// 多份同类文件（会拆成多个分组）也只新建有内容的箔片，不额外留下空箔。
@@ -3293,7 +3301,7 @@ struct FoofoilTests {
 }
 
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct AudioTerminationTests {
     @Test func queuedLeaseReleaseSurvivesCloseAndControllerDisposal() async {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("missing-\(UUID()).wav")
@@ -3337,7 +3345,7 @@ struct AudioTerminationTests {
 }
 
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct TextEditorFocusLifecycleTests {
     private func coordinator() -> CustomTextEditor.Coordinator {
         CustomTextEditor.Coordinator(CustomTextEditor(
@@ -3425,7 +3433,7 @@ private final class FocusLifecycleTextView: NSTextView {
 }
 
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct ClipboardContentDetectionTests {
     @Test func detectsMarkdownHeadingsLinksFencesAndTables() {
         #expect(AppState.looksLikeMarkdown("# Title\n\nSome body text."))

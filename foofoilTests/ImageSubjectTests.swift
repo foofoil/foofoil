@@ -13,13 +13,13 @@ import Testing
 
 /// 图片提取主体：菜单项要等 Vision 检测出可分离主体才可用，提取结果必须是主体外透明的 PNG。
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct ImageSubjectTests {
     /// 主体提取默认不占键位，但要在快捷键设置里可配置，并标注只对图片箔有效。
     @Test func extractSubjectShortcutIsConfigurableWithoutDefault() throws {
         let definition = try #require(KeyboardShortcutCatalog.definition(withID: "edit.extractImageSubject"))
         #expect(definition.defaultShortcut == nil)
-        #expect(definition.noteKey == "Shortcut Scope Images")
+        #expect(definition.noteKey == "Shortcut Scope Detected Image Subject")
 
         let store = KeyboardShortcutStore.shared
         defer { store.reset(definition) }
