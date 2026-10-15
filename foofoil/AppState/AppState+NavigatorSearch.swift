@@ -93,10 +93,14 @@ extension AppState {
 
     /// 折叠分段内的匹配要先展开父级，滚动定位才能命中真实行。
     private func navigateToNavigatorSearchMatch(_ id: String) {
-        if let item = activeNavigatorContribution?.items.first(where: { $0.id == id }),
-           let parentID = item.parentID,
-           !expandedNavigatorItemIDs.contains(parentID) {
-            expandedNavigatorItemIDs.insert(parentID)
+        if let contribution = activeNavigatorContribution {
+            let parents = Dictionary(uniqueKeysWithValues: contribution.items.map { ($0.id, $0.parentID) })
+            var parent = parents[id] ?? nil
+            var seen = Set<String>()
+            while let current = parent, seen.insert(current).inserted {
+                expandedNavigatorItemIDs.insert(current)
+                parent = parents[current] ?? nil
+            }
         }
         navigatorSearchCurrentMatchID = id
     }
@@ -118,7 +122,7 @@ extension AppState {
         guard let contribution = activeNavigatorContribution,
               let item = contribution.items.first(where: { $0.id == id }),
               item.isEnabled else { return }
-        let isDirectory = contribution.items.contains(where: { $0.parentID == id })
+        let isDirectory = contribution.items.contains(where: { $0.parentID == id }) || archiveSession?.isArchiveNode(id) == true
         if isDirectory {
             if expandedNavigatorItemIDs.contains(id) {
                 expandedNavigatorItemIDs.remove(id)

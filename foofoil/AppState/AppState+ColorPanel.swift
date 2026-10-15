@@ -46,7 +46,7 @@ extension AppState {
         private var ownsColorPanel: Bool {
             guard let appDelegate = NSApplication.shared.delegate as? AppDelegate,
                   appDelegate.colorPanelOwner === self else { return false }
-            return appDelegate.windowControllers.contains { $0.appState === self }
+            return appDelegate.windowControllers.contains { $0.appState.readingState === self }
         }
 
         @objc func colorPanelChanged(_ sender: NSColorPanel) {

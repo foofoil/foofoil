@@ -159,3 +159,7 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+## System libarchive
+
+Archive preview dynamically links macOS `/usr/lib/libarchive.2.dylib`. No libarchive implementation or third-party executable is bundled. `ArchiveBridge.h` contains only the C ABI declarations used by foofoil. Development sample verification optionally downloads the libarchive v3.7.4 test corpus, with its BSD license retained in the temporary fixture directory; those samples are not shipped in the application. Upstream: https://github.com/libarchive/libarchive/tree/v3.7.4 .

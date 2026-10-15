@@ -170,6 +170,14 @@ private final class PinGlowView: NSView {
 public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     public let appState: AppState
+
+    /// 切换归档条目时重新订阅正文状态；窗口、历史和目录仍订阅外层 AppState。
+    private var readingStatePublisher: AnyPublisher<AppState, Never> { appState.readingStatePublisher }
+
+    private func contentPublisher<Value>(_ keyPath: KeyPath<AppState, Published<Value>.Publisher>) -> AnyPublisher<Value, Never> {
+        readingStatePublisher.map { $0[keyPath: keyPath] }.switchToLatest().eraseToAnyPublisher()
+    }
+
     private var cancellables = Set<AnyCancellable>()
     private var isRestoringFrame = false
     private var isLiveResizing = false
@@ -223,8 +231,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     public init(appState: AppState) {
         self.appState = appState
         self.navigatorPanelController = NavigatorPanelController(appState: appState)
-        self.isRestoringSavedImageFrame = (appState.windowFrame != nil && appState.usesImagePresentation)
-        self.isRestoringSavedWebFrame = (appState.windowFrame != nil && appState.webURL != nil)
+        self.isRestoringSavedImageFrame = (appState.windowFrame != nil && appState.readingState.usesImagePresentation)
+        self.isRestoringSavedWebFrame = (appState.windowFrame != nil && appState.readingState.webURL != nil)
         self.pendingSavedFrameRestore = self.isRestoringSavedImageFrame
 
         let defaultRect = NSRect(origin: NSPoint(x: 200, y: 200), size: Self.initialWindowSize(for: appState))
@@ -251,18 +259,18 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         applyWindowSizeLimits()
 
         // 预先缓存可能已有的图片/视频/音频展示尺寸
-        if let url = appState.imageURL {
-            if appState.isExternalMediaDocument {
+        if let url = appState.readingState.imageURL {
+            if appState.readingState.isExternalMediaDocument {
                 fetchMediaPresentationSize(for: url) { [weak self] size in
-                    guard let self, self.appState.imageURL == url else { return }
+                    guard let self, self.appState.readingState.imageURL == url else { return }
                     self.currentMediaSize = size
                 }
-            } else if let nsImage = appState.loadImage(from: url) {
+            } else if let nsImage = appState.readingState.loadImage(from: url) {
                 self.currentImageSize = AudioMetadataLoader.layoutSize(nsImage)
             }
-        } else if let url = appState.currentAudioPresentationURL {
+        } else if let url = appState.readingState.currentAudioPresentationURL {
             fetchMediaPresentationSize(for: url) { [weak self] size in
-                guard let self, self.appState.currentAudioPresentationURL == url else { return }
+                guard let self, self.appState.readingState.currentAudioPresentationURL == url else { return }
                 self.currentMediaSize = size
             }
         }
@@ -279,9 +287,9 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         NotificationCenter.default.publisher(for: .mediaPlaybackControlsAutoHideIntervalDidChange)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                guard let self, self.appState.isMediaPlaybackControlsVisible else { return }
+                guard let self, self.appState.readingState.isMediaPlaybackControlsVisible else { return }
                 // 音频控制条不做静止超时，隐藏延迟仅作用于视频。
-                guard !self.appState.isAudioDocument else { return }
+                guard !self.appState.readingState.isAudioDocument else { return }
                 self.scheduleMediaPlaybackControlsHide()
             }
             .store(in: &cancellables)
@@ -298,9 +306,9 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     /// 文件文档采用更大的阅读尺寸；笔记与网页保留各自默认大小。
     static func initialWindowSize(for appState: AppState) -> NSSize {
-        if appState.webURL != nil { return NSSize(width: 512, height: 512) }
-        if appState.textURL != nil || appState.isExtensionDocument || appState.isPDFDocument
-            || (appState.isMarkdownDocument && appState.isMarkdownPreview) {
+        if appState.readingState.webURL != nil { return NSSize(width: 512, height: 512) }
+        if appState.readingState.textURL != nil || appState.readingState.isExtensionDocument || appState.readingState.isPDFDocument
+            || (appState.readingState.isMarkdownDocument && appState.readingState.isMarkdownPreview) {
             return NSSize(width: 540, height: 675)
         }
         return NSSize(width: 400, height: 400)
@@ -340,7 +348,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         guard let window = window else { return }
 
         // 监听图片变化以实时缓存图片/媒体原始尺寸
-        appState.$imageURL
+        contentPublisher(\.$imageURL)
             .sink { [weak self] imageURL in
                 guard let self = self else { return }
                 DispatchQueue.main.async {
@@ -351,21 +359,21 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                         return
                     }
                     self.applyWindowSizeLimits()
-                    if self.appState.isExternalMediaDocument {
+                    if self.appState.readingState.isExternalMediaDocument {
                         self.currentImageSize = nil
                         self.revealMediaPlaybackControlsIfPointerIsInside()
                         self.fetchMediaPresentationSize(for: url) { size in
-                            guard self.appState.imageURL == url else { return }
+                            guard self.appState.readingState.imageURL == url else { return }
                             self.currentMediaSize = size
                         }
                     } else {
-                        if self.appState.isPPTXDocument {
+                        if self.appState.readingState.isPPTXDocument {
                             self.revealMediaPlaybackControlsIfPointerIsInside()
                         } else {
                             self.hideMediaPlaybackControls()
                         }
                         self.currentMediaSize = nil
-                        if let image = self.appState.loadImage(from: url) {
+                        if let image = self.appState.readingState.loadImage(from: url) {
                             self.currentImageSize = AudioMetadataLoader.layoutSize(image)
                         } else {
                             self.currentImageSize = nil
@@ -378,7 +386,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .store(in: &cancellables)
 
         // 音频暂停时常显控制条；恢复播放后按箔窗/目录 hover 推导显隐。视频显隐不随播放状态变化。
-        appState.$isMediaPlaying
+        contentPublisher(\.$isMediaPlaying)
             .sink { [weak self] _ in
                 DispatchQueue.main.async { self?.updateAudioPlaybackControlsVisibility() }
             }
@@ -414,16 +422,16 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .store(in: &cancellables)
 
         // 监听新图片/视频拖入或载入以进行一次自适应大小调整
-        appState.$imageURL
+        contentPublisher(\.$imageURL)
             .sink { [weak self] imageURL in
-                guard let self = self, !self.appState.isCamera, let url = imageURL else { return }
+                guard let self = self, !self.appState.readingState.isCamera, let url = imageURL else { return }
                 let isFirst = self.isFirstImageURLChange
                 self.isFirstImageURLChange = false
 
                 DispatchQueue.main.async {
-                    if self.appState.isExternalMediaDocument {
+                    if self.appState.readingState.isExternalMediaDocument {
                         self.fetchMediaPresentationSize(for: url) { size in
-                            guard self.appState.imageURL == url, let size else { return }
+                            guard self.appState.readingState.imageURL == url, let size else { return }
                             // 音乐列表内切曲与图片列表切图一致：保持上一首的显示面积，按新封面比例缩放。
                             if !isFirst, self.shouldPreserveAudioListDisplayArea {
                                 self.applyImageListSuccessorLayout(imageSize: size, animated: true)
@@ -455,7 +463,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .store(in: &cancellables)
 
         // 新网页保留默认的 512×512 尺寸。
-        appState.$webURL
+        contentPublisher(\.$webURL)
             .sink { [weak self] webURL in
                 guard let self = self, let _ = webURL else { return }
                 let isFirst = self.isFirstWebURLChange
@@ -477,23 +485,23 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
         // 文件文档也可载入已有空白箔；首次恢复与历史恢复继续保留保存的窗口框。
         Publishers.Merge(
-            appState.$textURL.map { $0 != nil }.removeDuplicates().dropFirst(),
-            appState.$extensionSession.map { $0 != nil }.removeDuplicates().dropFirst()
+            contentPublisher(\.$textURL).map { $0 != nil }.removeDuplicates().dropFirst(),
+            contentPublisher(\.$extensionSession).map { $0 != nil }.removeDuplicates().dropFirst()
         )
             .filter { $0 }
             .sink { [weak self] _ in
                 guard let self else { return }
                 DispatchQueue.main.async {
                     guard !self.isRestoringFrame,
-                          self.appState.webURL == nil,
-                          self.appState.textURL != nil || self.appState.isExtensionDocument else { return }
+                          self.appState.readingState.webURL == nil,
+                          self.appState.readingState.textURL != nil || self.appState.readingState.isExtensionDocument else { return }
                     self.setWindowSize(Self.initialWindowSize(for: self.appState), keepWidth: false, animated: false)
                 }
             }
             .store(in: &cancellables)
 
         // 文档类型变化会改变无边框判定（图片/视频/音频、网页、扩展会话），据此同步窗口阴影。
-        Publishers.CombineLatest4(appState.$imageURL, appState.$webURL, appState.$fileList, appState.$extensionSession)
+        Publishers.CombineLatest4(contentPublisher(\.$imageURL), contentPublisher(\.$webURL), contentPublisher(\.$fileList), contentPublisher(\.$extensionSession))
             .sink { [weak self] _, _, _, _ in
                 DispatchQueue.main.async { self?.updateWindowShadow() }
             }
@@ -506,7 +514,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .sink { [weak self] notification in
                 guard let self = self,
                       let targetState = notification.object as? AppState,
-                      targetState === self.appState else { return }
+                      (targetState === self.appState || targetState === self.appState.readingState) else { return }
 
                 self.updateWindowShadow()
 
@@ -528,15 +536,15 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .store(in: &cancellables)
 
         // 摄像头首帧才确定原始尺寸；复用图片布局，恢复历史时保留用户保存的窗口大小。
-        appState.$cameraController
+        contentPublisher(\.$cameraController)
             .map { controller -> AnyPublisher<NSSize?, Never> in
                 controller?.$frameSize.eraseToAnyPublisher() ?? Just(nil).eraseToAnyPublisher()
             }
             .switchToLatest()
             .sink { [weak self] size in
                 DispatchQueue.main.async {
-                    guard let self, self.appState.isCamera, let size,
-                          self.appState.cameraController?.frameSize == size else { return }
+                    guard let self, self.appState.readingState.isCamera, let size,
+                          self.appState.readingState.cameraController?.frameSize == size else { return }
                     self.applyWindowSizeLimits()
                     if self.appState.isFullScreen || self.isTransitioningFullScreen || self.isLiveResizing { return }
                     if self.isRestoringFrame || self.pendingSavedFrameRestore {
@@ -549,11 +557,11 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
-        appState.pptxNavigationController.$slideSize
+        readingStatePublisher.map { $0.pptxNavigationController.$slideSize }.switchToLatest()
             .sink { [weak self] size in
                 DispatchQueue.main.async {
-                    guard let self, self.appState.isPPTXDocument, let size,
-                          self.appState.pptxNavigationController.slideSize == size else { return }
+                    guard let self, self.appState.readingState.isPPTXDocument, let size,
+                          self.appState.readingState.pptxNavigationController.slideSize == size else { return }
                     self.pendingSavedFrameRestore = false
                     if !self.appState.showBorder { self.restoreSavedMediaFrameIfNeeded(contentSize: size) }
                 }
@@ -565,7 +573,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .sink { [weak self] notification in
                 guard let self = self,
                       let targetId = notification.userInfo?["id"] as? UUID,
-                      targetId == self.appState.id,
+                      (targetId == self.appState.id || targetId == self.appState.readingState.id),
                       let pageSize = notification.userInfo?["size"] as? NSSize else { return }
 
                 self.currentPDFPageSize = pageSize
@@ -581,14 +589,14 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .sink { [weak self] notification in
                 guard let self = self,
                       let targetId = notification.userInfo?["id"] as? UUID,
-                      targetId == self.appState.id else { return }
-                if self.appState.isVideoDocument,
+                      (targetId == self.appState.id || targetId == self.appState.readingState.id) else { return }
+                if self.appState.readingState.isVideoDocument,
                    let size = notification.userInfo?["size"] as? NSSize {
                     self.applyMediaPresentationSize(size, animated: true)
                     return
                 }
-                guard self.appState.isAudioDocument,
-                      let url = self.appState.currentAudioPresentationURL else { return }
+                guard self.appState.readingState.isAudioDocument,
+                      let url = self.appState.readingState.currentAudioPresentationURL else { return }
 
                 let preserveDisplayArea = notification.userInfo?["preserveDisplayArea"] as? Bool == true
                 if let size = notification.userInfo?["size"] as? NSSize {
@@ -596,7 +604,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                     return
                 }
                 self.fetchMediaPresentationSize(for: url) { size in
-                    guard self.appState.currentAudioPresentationURL == url, let size else { return }
+                    guard self.appState.readingState.currentAudioPresentationURL == url, let size else { return }
                     self.applyAudioCoverPresentationSize(size, preserveDisplayArea: preserveDisplayArea)
                 }
             }
@@ -607,7 +615,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .sink { [weak self] notification in
                 guard let self = self,
                       let targetId = notification.userInfo?["id"] as? UUID,
-                      targetId == self.appState.id,
+                      (targetId == self.appState.id || targetId == self.appState.readingState.id),
                       let pageSize = notification.userInfo?["size"] as? NSSize else { return }
 
                 self.matchPDFWindowAspectRatio(to: pageSize)
@@ -615,7 +623,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                     NotificationCenter.default.post(
                         name: .shouldApplyPDFScaleToWindow,
                         object: nil,
-                        userInfo: ["id": self.appState.id]
+                        userInfo: ["id": self.appState.readingState.id]
                     )
                 }
             }
@@ -626,7 +634,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .sink { [weak self] notification in
                 guard let self = self else { return }
                 if let targetId = notification.userInfo?["id"] as? UUID,
-                   targetId == self.appState.id,
+                   (targetId == self.appState.id || targetId == self.appState.readingState.id),
                    let frameString = notification.userInfo?["frame"] as? String {
                     self.isRestoringFrame = true
                     self.pendingSavedFrameRestore = true
@@ -647,7 +655,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .sink { [weak self] notification in
                 guard let self = self else { return }
                 if let targetId = notification.userInfo?["id"] as? UUID,
-                   targetId == self.appState.id {
+                   (targetId == self.appState.id || targetId == self.appState.readingState.id) {
                     DispatchQueue.main.async {
                         self.fitImageToWindowWidth(animated: true)
                     }
@@ -660,7 +668,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .sink { [weak self] notification in
                 guard let self = self else { return }
                 if let targetId = notification.userInfo?["id"] as? UUID,
-                   targetId == self.appState.id {
+                   (targetId == self.appState.id || targetId == self.appState.readingState.id) {
                     DispatchQueue.main.async {
                         self.zoomIn()
                     }
@@ -673,7 +681,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .sink { [weak self] notification in
                 guard let self = self else { return }
                 if let targetId = notification.userInfo?["id"] as? UUID,
-                   targetId == self.appState.id {
+                   (targetId == self.appState.id || targetId == self.appState.readingState.id) {
                     DispatchQueue.main.async {
                         self.close()
                     }
@@ -686,7 +694,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .sink { [weak self] notification in
                 guard let self = self else { return }
                 if let targetId = notification.userInfo?["id"] as? UUID,
-                   targetId == self.appState.id {
+                   (targetId == self.appState.id || targetId == self.appState.readingState.id) {
                     let animated = notification.userInfo?["animated"] as? Bool ?? true
                     DispatchQueue.main.async {
                         self.fitWindowToCurrentImageSize(animated: animated)
@@ -700,7 +708,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .sink { [weak self] notification in
                 guard let self = self,
                       let targetId = notification.userInfo?["id"] as? UUID,
-                      targetId == self.appState.id,
+                      (targetId == self.appState.id || targetId == self.appState.readingState.id),
                       let magnification = notification.userInfo?["magnification"] as? CGFloat else { return }
 
                 self.resizeWindowForPinch(magnification: magnification)
@@ -711,7 +719,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .sink { [weak self] notification in
                 guard let self = self,
                       let targetId = notification.userInfo?["id"] as? UUID,
-                      targetId == self.appState.id else { return }
+                      (targetId == self.appState.id || targetId == self.appState.readingState.id) else { return }
 
                 self.pinchResizeInitialSize = nil
                 self.commitInteractiveZoom()
@@ -754,8 +762,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .sink { [weak self] notification in
                 guard let self,
                       let id = notification.userInfo?["id"] as? UUID,
-                      id == self.appState.id else { return }
-                self.appState.advanceFileListAfterPlayback()
+                      id == self.appState.readingState.id else { return }
+                self.appState.readingState.advanceFileListAfterPlayback()
             }
             .store(in: &cancellables)
     }
@@ -824,7 +832,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     /// 与 ContentView 的 `shouldHideBorder` 同源：全屏，或图片/网页/音频箔隐藏了视觉边框。
     private var shouldHideBorder: Bool {
         appState.isFullScreen
-            || ((appState.isCamera || appState.imageURL != nil || appState.webURL != nil || appState.isAudioDocument) && !appState.showBorder)
+            || ((appState.readingState.isCamera || appState.readingState.imageURL != nil || appState.readingState.webURL != nil || appState.readingState.isAudioDocument) && !appState.showBorder)
     }
 
     /// 无边框（含全屏）时关闭系统窗口阴影：透明内容箔片上的阴影会沿内容轮廓描出一圈细黑线。
@@ -833,7 +841,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func setupNavigatorPanelBindings() {
-        appState.$extensionSession
+        contentPublisher(\.$extensionSession)
             .sink { [weak self] _ in
                 DispatchQueue.main.async { self?.updateNavigatorPanelVisibility() }
             }
@@ -849,7 +857,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
-        appState.$fileList
+        contentPublisher(\.$fileList)
             .sink { [weak self] _ in
                 DispatchQueue.main.async { self?.updateNavigatorPanelVisibility() }
             }
@@ -1147,7 +1155,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                 updateNavigatorHoverMonitors()
             }
         }
-        if appState.isAudioDocument {
+        if appState.readingState.isAudioDocument {
             // 音频播放中从目录面板移出时没有箔窗事件可触发隐藏，由这里统一推导显隐。
             let resolvedScreenPoint = screenPoint
                 ?? windowPoint.map { window.convertToScreen(NSRect(origin: $0, size: .zero)).origin }
@@ -1179,7 +1187,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     /// 只由真实指针输入调用；SwiftUI tracking area 重建产生的 entered/exited 不会让控制条自行复现。
     func handleMediaPointerActivity(at point: NSPoint, autoHideInterval: TimeInterval? = nil) {
         guard let window,
-              appState.usesTransientContentControls,
+              appState.readingState.usesTransientContentControls,
               point.x >= 0, point.y >= 0,
               point.x <= window.frame.width, point.y <= window.frame.height else { return }
         revealMediaPlaybackControls(autoHideInterval: autoHideInterval)
@@ -1188,9 +1196,9 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     /// 离开窗口与窗口内静止采用同一延迟；重新进入前控制条仍平滑保留。
     /// 音频例外：显隐由播放状态与箔窗/目录 hover 区域推导，暂停或仍悬停在目录上时继续显示。
     func handleMediaPointerExit(autoHideInterval: TimeInterval? = nil, screenPoint: NSPoint? = nil) {
-        guard appState.usesTransientContentControls,
-              appState.isMediaPlaybackControlsVisible else { return }
-        if appState.isAudioDocument {
+        guard appState.readingState.usesTransientContentControls,
+              appState.readingState.isMediaPlaybackControlsVisible else { return }
+        if appState.readingState.isAudioDocument {
             updateAudioPlaybackControlsVisibility(screenPoint: screenPoint)
         } else {
             scheduleMediaPlaybackControlsHide(after: autoHideInterval)
@@ -1198,7 +1206,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func revealMediaPlaybackControlsIfPointerIsInside() {
-        if appState.isAudioDocument {
+        if appState.readingState.isAudioDocument {
             // 音频显隐与指针是否在箔窗内解耦（暂停时常显），统一交给状态推导。
             updateAudioPlaybackControlsVisibility()
             return
@@ -1211,12 +1219,12 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func revealMediaPlaybackControls(autoHideInterval: TimeInterval? = nil) {
-        guard appState.usesTransientContentControls else {
+        guard appState.readingState.usesTransientContentControls else {
             hideMediaPlaybackControls()
             return
         }
-        appState.isMediaPlaybackControlsVisible = true
-        if appState.isAudioDocument {
+        appState.readingState.isMediaPlaybackControlsVisible = true
+        if appState.readingState.isAudioDocument {
             // 音频：hover 期间持续显示，不做静止超时；显隐由播放状态与 hover 区域统一推导。
             pendingMediaPlaybackControlsHide?.cancel()
             pendingMediaPlaybackControlsHide = nil
@@ -1229,7 +1237,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         pendingMediaPlaybackControlsHide?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            self.appState.isMediaPlaybackControlsVisible = false
+            self.appState.readingState.isMediaPlaybackControlsVisible = false
             self.pendingMediaPlaybackControlsHide = nil
         }
         pendingMediaPlaybackControlsHide = workItem
@@ -1240,18 +1248,18 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     private func hideMediaPlaybackControls() {
         pendingMediaPlaybackControlsHide?.cancel()
         pendingMediaPlaybackControlsHide = nil
-        appState.isMediaPlaybackControlsVisible = false
+        appState.readingState.isMediaPlaybackControlsVisible = false
     }
 
     /// 音频控制条显隐由状态推导：暂停时常显（无论指针在哪）；播放中仅当指针位于箔窗或目录面板上时显示，不做静止超时。
     private func updateAudioPlaybackControlsVisibility(screenPoint: NSPoint? = nil) {
-        guard appState.isAudioDocument else { return }
+        guard appState.readingState.isAudioDocument else { return }
         pendingMediaPlaybackControlsHide?.cancel()
         pendingMediaPlaybackControlsHide = nil
-        let shouldShow = !appState.isMediaPlaying || isPointerOverAudioHoverRegion(screenPoint: screenPoint)
+        let shouldShow = !appState.readingState.isMediaPlaying || isPointerOverAudioHoverRegion(screenPoint: screenPoint)
         // 避免鼠标移动监听高频触发时对相同值重复发布导致内容整树重绘。
-        if appState.isMediaPlaybackControlsVisible != shouldShow {
-            appState.isMediaPlaybackControlsVisible = shouldShow
+        if appState.readingState.isMediaPlaybackControlsVisible != shouldShow {
+            appState.readingState.isMediaPlaybackControlsVisible = shouldShow
         }
     }
 
@@ -1274,7 +1282,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         let needsNavigatorHoverMonitor = !appState.navigatorContributions.isEmpty
             && appState.navigatorPanelVisibilityMode == .onHover
             && (navigatorPanelController.isVisible || appState.isFullScreen)
-        let needsAudioHoverMonitor = appState.isAudioDocument && navigatorPanelController.isVisible
+        let needsAudioHoverMonitor = appState.readingState.isAudioDocument && navigatorPanelController.isVisible
         let needsMonitor = !isTransitioningFullScreen && (needsNavigatorHoverMonitor || needsAudioHoverMonitor)
         if needsMonitor {
             if navigatorHoverLocalMonitor == nil {
@@ -1338,24 +1346,24 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     public func zoomIn() {
-        if appState.webURL != nil {
-            appState.webZoom = AppState.clampWebZoom(appState.webZoom * zoomStep)
+        if appState.readingState.webURL != nil {
+            appState.readingState.webZoom = AppState.clampWebZoom(appState.readingState.webZoom * zoomStep)
             return
         }
-        if appState.isExtensionDocument {
-            appState.documentZoom = AppState.clampDocumentZoom(appState.documentZoom * zoomStep)
+        if appState.readingState.isExtensionDocument {
+            appState.readingState.documentZoom = AppState.clampDocumentZoom(appState.readingState.documentZoom * zoomStep)
             return
         }
         zoomContent(by: zoomStep)
     }
 
     public func zoomOut() {
-        if appState.webURL != nil {
-            appState.webZoom = AppState.clampWebZoom(appState.webZoom / zoomStep)
+        if appState.readingState.webURL != nil {
+            appState.readingState.webZoom = AppState.clampWebZoom(appState.readingState.webZoom / zoomStep)
             return
         }
-        if appState.isExtensionDocument {
-            appState.documentZoom = AppState.clampDocumentZoom(appState.documentZoom / zoomStep)
+        if appState.readingState.isExtensionDocument {
+            appState.readingState.documentZoom = AppState.clampDocumentZoom(appState.readingState.documentZoom / zoomStep)
             return
         }
         zoomContent(by: 1.0 / zoomStep)
@@ -1387,16 +1395,16 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     public func actualSize() {
         if isImageMode {
-            appState.imageScale = 1.0
+            appState.readingState.imageScale = 1.0
             if !appState.showBorder {
                 fitWindowToCurrentImageSize(animated: true)
             }
-        } else if appState.webURL != nil {
-            appState.webZoom = 1.0
-        } else if appState.isExtensionDocument {
-            appState.documentZoom = 1.0
+        } else if appState.readingState.webURL != nil {
+            appState.readingState.webZoom = 1.0
+        } else if appState.readingState.isExtensionDocument {
+            appState.readingState.documentZoom = 1.0
         } else {
-            appState.textFontSize = AppState.defaultTextFontSize
+            appState.readingState.textFontSize = AppState.defaultTextFontSize
         }
     }
 
@@ -1404,7 +1412,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     func applyInteractiveImageZoom(factor: CGFloat) {
         pinchImageBaseScale = nil
         beginInteractiveZoom()
-        appState.imageScale = AppState.clampImageScale(appState.imageScale * Double(factor))
+        appState.readingState.imageScale = AppState.clampImageScale(appState.readingState.imageScale * Double(factor))
         if !appState.showBorder {
             fitWindowToCurrentImageSize(animated: false)
         }
@@ -1415,9 +1423,9 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     func applyInteractiveImageMagnification(_ magnification: CGFloat) {
         beginInteractiveZoom()
         if pinchImageBaseScale == nil {
-            pinchImageBaseScale = appState.imageScale
+            pinchImageBaseScale = appState.readingState.imageScale
         }
-        appState.imageScale = AppState.clampImageScale((pinchImageBaseScale ?? 1) * Double(magnification))
+        appState.readingState.imageScale = AppState.clampImageScale((pinchImageBaseScale ?? 1) * Double(magnification))
         if !appState.showBorder {
             fitWindowToCurrentImageSize(animated: false)
         }
@@ -1430,14 +1438,14 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func beginInteractiveZoom() {
-        appState.isInteractiveZooming = true
+        appState.readingState.isInteractiveZooming = true
     }
 
     func commitInteractiveZoom() {
         pendingZoomCommit?.cancel()
         pendingZoomCommit = nil
         pinchImageBaseScale = nil
-        appState.isInteractiveZooming = false
+        appState.readingState.isInteractiveZooming = false
         if appState.isFullScreen || isTransitioningFullScreen {
             appState.windowFrame = windowedFrameDescriptorBeforeFullScreen ?? appState.windowFrame
         } else if let window = window {
@@ -1457,7 +1465,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     public func fitWindowToCurrentImageSize(showBorderOverride: Bool? = nil, animated: Bool = true) {
         guard let contentSize = currentContentSize() else { return }
-        let displaySize = displaySize(for: contentSize, scale: appState.imageScale)
+        let displaySize = displaySize(for: contentSize, scale: appState.readingState.imageScale)
         let showBorder = showBorderOverride ?? appState.showBorder
         let inset = showBorder ? borderedImageInset : 0
         setWindowSize(
@@ -1472,9 +1480,9 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         guard let window = window, let contentSize = currentContentSize(), contentSize.width > 0 else { return }
         let inset = appState.showBorder ? borderedImageInset : 0
         let availableImageWidth = max(1, window.frame.width - inset)
-        appState.imageScale = Double(availableImageWidth / contentSize.width)
+        appState.readingState.imageScale = Double(availableImageWidth / contentSize.width)
 
-        let displayHeight = contentSize.height * CGFloat(appState.imageScale)
+        let displayHeight = contentSize.height * CGFloat(appState.readingState.imageScale)
         setWindowSize(
             NSSize(width: window.frame.width, height: displayHeight + inset),
             keepWidth: true,
@@ -1484,31 +1492,31 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     private func zoomContent(by factor: Double) {
         if currentContentSize() != nil {
-            appState.imageScale = AppState.clampImageScale(appState.imageScale * factor)
+            appState.readingState.imageScale = AppState.clampImageScale(appState.readingState.imageScale * factor)
             if currentContentSize() != nil && !appState.showBorder {
                 fitWindowToCurrentImageSize(animated: true)
             }
         } else if factor > 1.0 {
-            appState.increaseTextFontSize()
+            appState.readingState.increaseTextFontSize()
         } else {
-            appState.decreaseTextFontSize()
+            appState.readingState.decreaseTextFontSize()
         }
     }
 
     private func currentImage() -> NSImage? {
-        guard let url = appState.imageURL else { return nil }
-        return appState.loadImage(from: url)
+        guard let url = appState.readingState.imageURL else { return nil }
+        return appState.readingState.loadImage(from: url)
     }
 
     private func currentContentSize() -> NSSize? {
-        if appState.isCamera { return appState.cameraController?.frameSize }
-        if appState.isPPTXDocument {
-            return appState.pptxNavigationController.slideSize
+        if appState.readingState.isCamera { return appState.readingState.cameraController?.frameSize }
+        if appState.readingState.isPPTXDocument {
+            return appState.readingState.pptxNavigationController.slideSize
         }
-        if appState.isPDFDocument, let currentPDFPageSize {
+        if appState.readingState.isPDFDocument, let currentPDFPageSize {
             return currentPDFPageSize
         }
-        if appState.isExternalMediaDocument {
+        if appState.readingState.isExternalMediaDocument {
             return currentMediaSize
         }
         if let cached = currentImageSize, cached.width > 0, cached.height > 0 {
@@ -1519,7 +1527,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func imageContentSize(at url: URL) -> NSSize? {
-        guard let image = appState.loadImage(from: url),
+        guard let image = appState.readingState.loadImage(from: url),
               let size = AudioMetadataLoader.layoutSize(image),
               size.width > 0, size.height > 0 else { return nil }
         currentImageSize = size
@@ -1528,7 +1536,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     /// 用户拖入的封面优先于音频内嵌/同目录封面，保证窗口比例跟正在展示的图一致。
     private func audioPresentationSize(overlaying info: AudioTrackInfo) -> NSSize {
-        if let image = appState.customCoverImage,
+        if let image = appState.readingState.customCoverImage,
            let size = AudioMetadataLoader.layoutSize(image) {
             return size
         }
@@ -1537,7 +1545,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     /// 异步读取媒体展示尺寸：视频用画面尺寸，音频用用户替换封面、内嵌/同目录封面或默认卡片尺寸。
     private func fetchMediaPresentationSize(for url: URL, completion: @escaping (NSSize?) -> Void) {
-        if appState.isAudioDocument {
+        if appState.readingState.isAudioDocument {
             Task { [weak self] in
                 let info = await AudioMetadataLoader.load(from: url)
                 await MainActor.run {
@@ -1576,22 +1584,22 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         guard imageSize.width > 0, imageSize.height > 0 else { return }
         let inset = appState.showBorder ? borderedImageInset : 0
         let (targetWindowSize, imageScale) = initialImageWindowSize(imageSize: imageSize, inset: inset)
-        appState.imageScale = Double(imageScale)
+        appState.readingState.imageScale = Double(imageScale)
         setWindowSize(targetWindowSize, keepWidth: false, animated: animated)
     }
 
     private var shouldPreserveImageListDisplayArea: Bool {
-        appState.fileList?.isPresentable == true
-            && appState.fileList?.kind == .image
-            && !appState.isExternalMediaDocument
-            && !appState.isPDFDocument
+        appState.readingState.fileList?.isPresentable == true
+            && appState.readingState.fileList?.kind == .image
+            && !appState.readingState.isExternalMediaDocument
+            && !appState.readingState.isPDFDocument
     }
 
     /// 音乐列表内切曲与图片列表切图一致：保持上一首的显示面积，按新封面比例缩放。
     private var shouldPreserveAudioListDisplayArea: Bool {
-        appState.fileList?.isPresentable == true
-            && appState.fileList?.kind == .audio
-            && appState.isAudioDocument
+        appState.readingState.fileList?.isPresentable == true
+            && appState.readingState.fileList?.kind == .audio
+            && appState.readingState.isAudioDocument
     }
 
     /// 列表内切图/切曲：保持上一张的显示面积，并贴导航栏所在侧垂直居中。
@@ -1607,8 +1615,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             height: max(1, currentFrame.height - inset)
         )
         let nextDisplay = Self.sizeMatchingContentArea(previous: previousDisplay, content: imageSize)
-        appState.imageScale = AppState.clampImageScale(Double(nextDisplay.width / imageSize.width))
-        let displaySize = displaySize(for: imageSize, scale: appState.imageScale)
+        appState.readingState.imageScale = AppState.clampImageScale(Double(nextDisplay.width / imageSize.width))
+        let displaySize = displaySize(for: imageSize, scale: appState.readingState.imageScale)
         let alignment: WindowSizeAlignment = appState.navigatorPanelSide == .left ? .leading : .trailing
         setWindowSize(
             NSSize(width: displaySize.width + inset, height: displaySize.height + inset),
@@ -1636,12 +1644,12 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             maximumContentWidth = max(1, screenFrame.width * initialImageScreenLimit - inset)
             maximumContentHeight = max(1, screenFrame.height * initialImageScreenLimit - inset)
         }
-        if appState.isVideoDocument {
+        if appState.readingState.isVideoDocument {
             let content = Self.initialVideoContentSize(sourceSize: imageSize,
                 maximumSize: NSSize(width: min(720, maximumContentWidth), height: min(480, maximumContentHeight)))
             return (NSSize(width: content.width + inset, height: content.height + inset), content.width / imageSize.width)
         }
-        if appState.isAudioDocument {
+        if appState.readingState.isAudioDocument {
             let audioContentMax = max(1, AudioTrackInfo.initialWindowMaxLength - inset)
             maximumContentWidth = min(maximumContentWidth, audioContentMax)
             maximumContentHeight = min(maximumContentHeight, audioContentMax)
@@ -1739,7 +1747,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func resizeWindowForPinch(magnification: CGFloat) {
-        guard !appState.isCamera, appState.imageURL == nil || appState.isExternalMediaDocument || appState.isQuickLookDocument || appState.webURL != nil, let window = window else { return }
+        guard !appState.readingState.isCamera, appState.readingState.imageURL == nil || appState.readingState.isExternalMediaDocument || appState.readingState.isQuickLookDocument || appState.readingState.webURL != nil, let window = window else { return }
 
         if pinchResizeInitialSize == nil {
             pinchResizeInitialSize = window.frame.size
@@ -1790,7 +1798,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             NotificationCenter.default.post(
                 name: .shouldFitPDFToWindow,
                 object: nil,
-                userInfo: ["id": self.appState.id]
+                userInfo: ["id": self.appState.readingState.id]
             )
             self.scheduleWindowFrameSave()
         }
@@ -1991,8 +1999,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         // 用户松开鼠标结束缩放时，通过重置 resizeIncrements 来解除宽高比锁定，为其余代码主动 setFrame 预留通路，根治死锁
         window?.resizeIncrements = NSSize(width: 1.0, height: 1.0)
         window?.aspectRatio = .zero
-        if isImageMode, !appState.showBorder || appState.isAudioDocument, let window = window, let contentSize = currentContentSize(), contentSize.width > 0 {
-            appState.imageScale = Double(window.frame.width / contentSize.width)
+        if isImageMode, !appState.showBorder || appState.readingState.isAudioDocument, let window = window, let contentSize = currentContentSize(), contentSize.width > 0 {
+            appState.readingState.imageScale = Double(window.frame.width / contentSize.width)
         }
         isLiveResizing = false
         scheduleWindowFrameSave()
@@ -2043,7 +2051,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     public func windowWillClose(_ notification: Notification) {
-        appState.cameraController?.stop()
+        appState.readingState.cameraController?.stop()
         pendingFrameSave?.cancel()
         pendingZoomCommit?.cancel()
         pendingNavigatorPanelHide?.cancel()
@@ -2052,8 +2060,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         removeNavigatorHoverMonitors()
         navigatorPanelController.detachAndClose()
         pinchImageBaseScale = nil
-        if appState.isInteractiveZooming {
-            appState.isInteractiveZooming = false
+        if appState.readingState.isInteractiveZooming {
+            appState.readingState.isInteractiveZooming = false
         }
         if appState.isFullScreen, let windowedFrameDescriptorBeforeFullScreen {
             appState.windowFrame = windowedFrameDescriptorBeforeFullScreen
@@ -2094,12 +2102,12 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private var isImageMode: Bool {
-        appState.usesImagePresentation
+        appState.readingState.usesImagePresentation
     }
 
     /// 音频始终锁定封面/卡片比例；无边框图片与视频拖拽时同样整体等比缩放。
     private func constrainedContentAspectSize() -> NSSize? {
-        if appState.isAudioDocument {
+        if appState.readingState.isAudioDocument {
             if let contentSize = currentContentSize(), contentSize.width > 0, contentSize.height > 0 {
                 return contentSize
             }
@@ -2143,7 +2151,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             restoreSavedMediaFrameIfNeeded(contentSize: size)
             return
         }
-        if hadPreviousMediaSize, appState.isAudioDocument, !appState.isVideoDocument {
+        if hadPreviousMediaSize, appState.readingState.isAudioDocument, !appState.readingState.isVideoDocument {
             applyImageListSuccessorLayout(imageSize: size, animated: animated)
             return
         }
@@ -2197,14 +2205,14 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     /// 历史窗口框已经 setFrame 之后，仅在比例明显不对时按已保存尺寸就近校正。
     private func correctRestoredContentWindowAspect() {
-        if appState.isCamera {
+        if appState.readingState.isCamera {
             if let size = currentContentSize() {
                 pendingSavedFrameRestore = false
                 if !appState.showBorder { restoreSavedMediaFrameIfNeeded(contentSize: size) }
             }
             return
         }
-        if appState.isExternalMediaDocument {
+        if appState.readingState.isExternalMediaDocument {
             // 媒体展示尺寸异步读取，等尺寸到达后由 applyMediaPresentationSize 完成校正。
             if let size = currentMediaSize {
                 pendingSavedFrameRestore = false
@@ -2212,7 +2220,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             }
             return
         }
-        if appState.isPPTXDocument {
+        if appState.readingState.isPPTXDocument {
             pendingSavedFrameRestore = false
             if !appState.showBorder, let size = currentContentSize() {
                 restoreSavedMediaFrameIfNeeded(contentSize: size)
@@ -2222,7 +2230,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         // 文本、网页、PDF 与空白箔没有内容尺寸校正，恢复到此结束；残留标记会让后续拖入的图片
         // 被误判成“仍在恢复历史窗口框”而跳过自动布局。
         pendingSavedFrameRestore = false
-        guard isImageMode, !appState.isPDFDocument, let url = appState.imageURL,
+        guard isImageMode, !appState.readingState.isPDFDocument, let url = appState.readingState.imageURL,
               let size = imageContentSize(at: url) else { return }
         restoreSavedMediaFrameIfNeeded(contentSize: size)
     }
@@ -2283,16 +2291,16 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     private func minimumWindowLength(showBorderOverride: Bool? = nil) -> CGFloat {
         let showBorder = showBorderOverride ?? appState.showBorder
-        let usesCompactMinimum = (isImageMode && !showBorder) || appState.isAudioDocument
+        let usesCompactMinimum = (isImageMode && !showBorder) || appState.readingState.isAudioDocument
         return usesCompactMinimum ? 80 : 150
     }
 
     /// 音视频额外限制最小宽度，保证播放控件单行可完整显示。
     private func minimumWindowSize(showBorderOverride: Bool? = nil) -> NSSize {
         let length = minimumWindowLength(showBorderOverride: showBorderOverride)
-        let width = appState.isExternalMediaDocument
+        let width = appState.readingState.isExternalMediaDocument
             ? max(length, MediaPlaybackBarMetrics.minimumWindowWidth)
-            : (appState.isPPTXDocument ? max(length, PPTXModeView.minimumWindowWidth) : length)
+            : (appState.readingState.isPPTXDocument ? max(length, PPTXModeView.minimumWindowWidth) : length)
         return NSSize(width: width, height: length)
     }
 

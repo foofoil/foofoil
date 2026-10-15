@@ -2,6 +2,7 @@
 #define foofoil_Bridging_Header_h
 
 #include "cmark.h"
+#include "Archive/ArchiveBridge.h"
 #import "AudioPlayerStart.h"
 
 #endif /* foofoil_Bridging_Header_h */

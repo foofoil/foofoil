@@ -196,6 +196,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     public var documentScrollFile: String?
     public var documentScrollFraction: Double?
     public var appleMusicReference: AppleMusicReference?
+    var archiveSource: ArchiveSource?
 
 
     public init(
@@ -247,7 +248,8 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         fileList: FileListState? = nil,
         documentScrollFile: String? = nil,
         documentScrollFraction: Double? = nil,
-        appleMusicReference: AppleMusicReference? = nil
+        appleMusicReference: AppleMusicReference? = nil,
+        archiveSource: ArchiveSource? = nil
     ) {
         self.id = id
         self.imagePath = imagePath
@@ -298,10 +300,11 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.documentScrollFile = documentScrollFile
         self.documentScrollFraction = documentScrollFraction
         self.appleMusicReference = appleMusicReference
+        self.archiveSource = archiveSource
     }
 
     private enum CodingKeys: String, CodingKey {
-        case isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference
+        case isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource
     }
 
     public init(from decoder: Decoder) throws {
@@ -359,6 +362,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         documentScrollFile = try container.decodeIfPresent(String.self, forKey: .documentScrollFile)
         documentScrollFraction = try container.decodeIfPresent(Double.self, forKey: .documentScrollFraction)
         appleMusicReference = try container.decodeIfPresent(AppleMusicReference.self, forKey: .appleMusicReference)
+        archiveSource = try container.decodeIfPresent(ArchiveSource.self, forKey: .archiveSource)
         if let mode = try container.decodeIfPresent(MediaPlaybackMode.self, forKey: .mediaPlaybackMode) {
             mediaPlaybackMode = mode
         } else {

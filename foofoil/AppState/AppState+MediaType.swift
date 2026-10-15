@@ -91,7 +91,7 @@ extension AppState {
 
         /// 全屏视频与 PPT 目录复用控制条的显隐状态和计时器，确保同一配置下同步隐藏。
         var isNavigatorHiddenForVideoInactivity: Bool {
-            isFullScreen && (isVideoDocument || isPPTXDocument) && !isMediaPlaybackControlsVisible
+            isFullScreen && (readingState.isVideoDocument || readingState.isPPTXDocument) && !readingState.isMediaPlaybackControlsVisible
         }
 
         /// 内置音频与扩展音频 chrome 共享封面/元数据呈现时所对应的当前源文件。

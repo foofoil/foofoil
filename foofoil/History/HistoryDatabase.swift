@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 nonisolated final class HistoryDatabase {
-    static let schemaVersion = 20
+    static let schemaVersion = 21
 
     private let queue = DispatchQueue(label: "com.foofoil.history.database", qos: .utility)
     private var connection: OpaquePointer?
@@ -109,8 +109,8 @@ nonisolated final class HistoryDatabase {
                         extension_id, extension_state_reference, navigator_panel_side,
                         navigator_panel_visibility, navigator_panel_width, file_list,
                         document_zoom, document_scroll_file, document_scroll_fraction, text_fingerprint,
-                        image_ocr_text, image_has_subject, image_subject_path, apple_music_reference, subtitle_associations, custom_title
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        image_ocr_text, image_has_subject, image_subject_path, apple_music_reference, subtitle_associations, custom_title, archive_source
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -147,7 +147,7 @@ nonisolated final class HistoryDatabase {
                         image_has_subject=excluded.image_has_subject,
                         image_subject_path=excluded.image_subject_path,
                         subtitle_associations=excluded.subtitle_associations,
-                        apple_music_reference=excluded.apple_music_reference, custom_title=excluded.custom_title
+                        apple_music_reference=excluded.apple_music_reference, custom_title=excluded.custom_title, archive_source=excluded.archive_source
                     """, bindings: [
                         config.id.uuidString, kind.rawValue, title, config.originalImageName,
                         config.imagePath, config.textPath, config.webURLString, config.actualWebURLString,
@@ -173,7 +173,8 @@ nonisolated final class HistoryDatabase {
                         config.imageSubjectPath,
                         try config.appleMusicReference.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
                         try config.subtitleAssociations.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
-                        config.customTitle
+                        config.customTitle,
+                        try config.archiveSource.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) }
                     ])
 
                 let metadata = (
@@ -441,6 +442,7 @@ nonisolated final class HistoryDatabase {
         try addColumnIfMissing("file_list", definition: "file_list TEXT")
         // v20 箔片改名不再覆盖原始文件名，保存与恢复使用独立标题。
         try addColumnIfMissing("custom_title", definition: "custom_title TEXT")
+        try addColumnIfMissing("archive_source", definition: "archive_source TEXT")
         // v10 新增音频同目录封面文件夹的安全范围书签（Base64 文本）；重启后靠它恢复封面访问。
         try addColumnIfMissing("media_sidecar_bookmark", definition: "media_sidecar_bookmark TEXT")
         // v11 用户拖入替换的音频封面缓存路径；重开历史时优先使用这份封面。
@@ -741,6 +743,9 @@ nonisolated final class HistoryDatabase {
                     } ?? nil,
                     appleMusicReference: columns["apple_music_reference"].flatMap { optionalText(statement, $0) }.flatMap {
                         try? JSONDecoder().decode(AppleMusicReference.self, from: Data($0.utf8))
+                    },
+                    archiveSource: columns["archive_source"].flatMap { optionalText(statement, $0) }.flatMap {
+                        try? JSONDecoder().decode(ArchiveSource.self, from: Data($0.utf8))
                     }
                 ))
             }

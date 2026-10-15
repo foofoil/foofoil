@@ -34,7 +34,7 @@ struct ExtensionAudioModeView: View {
         }
         .onAppear {
             appState.isMediaPlaybackControlsVisible = !appState.resumesMediaPlaybackOnActivation
-                || appState.isPointerInsideWindow
+                || appState.presentationWindowState.isPointerInsideWindow
             controller.activateRemoteCommands()
             if appState.resumesMediaPlaybackOnActivation {
                 controller.play()

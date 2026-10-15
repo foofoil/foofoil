@@ -42,22 +42,22 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
 
     func updateExtensionMenuVisibility() {
         extensionMenuItem?.isHidden = !ExtensionProductPolicy.exposesUserManagement
-            || activeAppState?.extensionSession?.commands.isEmpty != false
+            || activeReadingState?.extensionSession?.commands.isEmpty != false
     }
 
     func updateFileMenu(_ menu: NSMenu) {
-        let isWebMode = activeAppState?.webURL != nil
+        let isWebMode = activeReadingState?.webURL != nil
         setMenuItem(withAction: #selector(openInDefaultBrowserAction), in: menu, isHidden: !isWebMode)
         setMenuItem(withAction: #selector(copyWebURLAction), in: menu, isHidden: !isWebMode)
     }
 
     func updateGoMenu(_ menu: NSMenu) {
-        let isPDFDocument = activeAppState?.isPDFDocument == true
-        let hasFileList = activeAppState?.supportsItemNavigation == true
+        let isPDFDocument = activeReadingState?.isPDFDocument == true
+        let hasFileList = activeReadingState?.supportsItemNavigation == true
         for item in menu.items {
             if item.tag == GoMenuItemTag.chapterPrevious || item.tag == GoMenuItemTag.chapterNext {
-                item.isHidden = activeAppState?.chapterNavigatorContribution == nil
-                item.isEnabled = activeAppState?.adjacentChapterID(delta: item.tag == GoMenuItemTag.chapterPrevious ? -1 : 1) != nil
+                item.isHidden = activeReadingState?.chapterNavigatorContribution == nil
+                item.isEnabled = activeReadingState?.adjacentChapterID(delta: item.tag == GoMenuItemTag.chapterPrevious ? -1 : 1) != nil
             } else if item.action == #selector(previousFileListItemAction)
                 || item.action == #selector(nextFileListItemAction) {
                 let isPrimaryArrow = item.tag == GoMenuItemTag.fileListPrevious
@@ -76,7 +76,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
 
     /// “前往”在 PDF 翻页或文件列表切项时显示。
     func updateGoMenuVisibility() {
-        let appState = activeAppState
+        let appState = activeReadingState
         goMenuItem?.isHidden = appState?.isPDFDocument != true
             && appState?.supportsItemNavigation != true
             && appState?.chapterNavigatorContribution == nil
@@ -89,10 +89,10 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         guard let menu = goMenu else { return }
         Self.syncGoMenuKeyEquivalents(
             in: menu,
-            isPDFDocument: activeAppState?.isPDFDocument == true,
-            hasFileList: activeAppState?.supportsItemNavigation == true,
-            verticalArrowsScrollContent: activeAppState?.verticalArrowsScrollContent == true,
-            hasChapters: activeAppState?.chapterNavigatorContribution != nil
+            isPDFDocument: activeReadingState?.isPDFDocument == true,
+            hasFileList: activeReadingState?.supportsItemNavigation == true,
+            verticalArrowsScrollContent: activeReadingState?.verticalArrowsScrollContent == true,
+            hasChapters: activeReadingState?.chapterNavigatorContribution != nil
         )
     }
 
@@ -147,7 +147,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
     }
 
     func updateViewMenu(_ menu: NSMenu) {
-        guard let appState = activeAppState else {
+        guard let appState = activeReadingState else {
             // 没有活跃窗口时，默认隐藏图片专用和网页专用菜单项
             setMenuItem(withAction: #selector(toggleShowBorderAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(toggleImageListSlideshowAction), in: menu, isHidden: true)
@@ -169,7 +169,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         let isImageMode = appState.usesImagePresentation
         let isWebMode = appState.webURL != nil
         // 导航子菜单与换边项随导航内容显隐。
-        let navigatorItemsHidden = appState.navigatorContributions.isEmpty
+        let navigatorItemsHidden = activeAppState?.navigatorContributions.isEmpty != false
         setNavigatorSubmenuHidden(navigatorItemsHidden, in: menu)
         setMenuItem(withAction: #selector(moveNavigatorToOppositeSideAction), in: menu, isHidden: navigatorItemsHidden)
 
@@ -249,21 +249,21 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
 
         if menuItem.action == #selector(openInDefaultBrowserAction) {
             menuItem.title = defaultBrowserInfo().itemTitle
-            return activeAppState?.webURL != nil
+            return activeReadingState?.webURL != nil
         }
 
         if menuItem.action == #selector(copyWebURLAction) {
-            return activeAppState?.webURL != nil
+            return activeReadingState?.webURL != nil
         }
 
         if menuItem.action == #selector(captureVideoFrameAction) {
-            return activeAppState?.isVideoDocument == true
+            return activeReadingState?.isVideoDocument == true
         }
         if menuItem.action == #selector(saveContentImageAction) {
-            return activeAppState?.canSaveContentImage == true
+            return activeReadingState?.canSaveContentImage == true
         }
         if menuItem.action == #selector(saveAsAction) {
-            return activeAppState?.contentSavePayload != nil
+            return activeAppState?.selectedArchiveSession.map { $0.canExport } ?? (activeAppState?.contentSavePayload != nil)
         }
 
         if menuItem.action == #selector(shareAction) {
@@ -272,28 +272,28 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         }
 
         if menuItem.action == #selector(selectColorAction) {
-            return activeAppState?.isSVG == true
+            return activeReadingState?.isSVG == true
         }
 
         if menuItem.action == #selector(extractTextFromImageAction) {
-            return activeAppState?.canExtractImageText == true
+            return activeReadingState?.canExtractImageText == true
         }
 
         if menuItem.action == #selector(extractImageSubjectAction) {
-            return activeAppState?.canExtractImageSubject == true
+            return activeReadingState?.canExtractImageSubject == true
         }
 
         if menuItem.action == #selector(toggleSubtitlesAction) {
-            guard let state = activeAppState, state.isVideoDocument, state.subtitles.hasLoadedSubtitle else { return false }
+            guard let state = activeReadingState, state.isVideoDocument, state.subtitles.hasLoadedSubtitle else { return false }
             menuItem.state = state.subtitles.isHidden ? .off : .on
             return true
         }
         if menuItem.action == #selector(loadSubtitleFileAction) {
-            return activeAppState?.isVideoDocument == true
+            return activeReadingState?.isVideoDocument == true
         }
 
         if menuItem.action == #selector(documentStyleAction) {
-            guard let appState = activeAppState else { return false }
+            guard let appState = activeReadingState else { return false }
             menuItem.title = NSLocalizedString(appState.isVideoDocument ? "Subtitle Style" : "Document Style", comment: "")
             return appState.isVideoDocument || appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling
         }
@@ -309,7 +309,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
 
         if menuItem.action == #selector(toggleShowBorderAction) {
             // 音频也走通用视觉边框，包括无磁盘路径的资料库内容。
-            guard let appState = activeAppState,
+            guard let appState = activeReadingState,
                   !appState.isFullScreen,
                   appState.isCamera || appState.imageURL != nil || appState.webURL != nil || appState.isAudioDocument else {
                 menuItem.state = .off
@@ -365,7 +365,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
 
         if menuItem.action == #selector(fitWindowToImageAction) ||
             menuItem.action == #selector(fitImageToWindowWidthAction) {
-            guard let appState = activeAppState else { return false }
+            guard let appState = activeReadingState else { return false }
             let isImageMode = appState.usesImagePresentation
             return isImageMode && appState.showBorder
         }
@@ -380,22 +380,22 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         }
 
         if menuItem.action == #selector(reloadPageAction) {
-            return activeAppState?.webURL != nil
+            return activeReadingState?.webURL != nil
         }
 
         if menuItem.action == #selector(previousChapterAction) || menuItem.action == #selector(nextChapterAction) {
-            return activeAppState?.adjacentChapterID(delta: menuItem.action == #selector(previousChapterAction) ? -1 : 1) != nil
+            return activeReadingState?.adjacentChapterID(delta: menuItem.action == #selector(previousChapterAction) ? -1 : 1) != nil
         }
 
         if menuItem.action == #selector(previousPDFPageAction) ||
             menuItem.action == #selector(nextPDFPageAction) ||
             menuItem.action == #selector(goToPDFPageAction) {
-            return activeAppState?.isPDFDocument == true
+            return activeReadingState?.isPDFDocument == true
         }
 
         if menuItem.action == #selector(previousFileListItemAction) ||
             menuItem.action == #selector(nextFileListItemAction) {
-            return activeAppState?.supportsItemNavigation == true
+            return activeReadingState?.supportsItemNavigation == true
         }
 
         if menuItem.action == #selector(findNavigatorAction) {

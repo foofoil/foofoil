@@ -174,3 +174,7 @@ Video capabilities live in the sibling `video` repository. `./run` and `./packag
 Videos support external SRT, ASS/SSA and WebVTT subtitles through automatic filename matching, manual loading and drag and drop, with history restoration. The default ⌘I shortcut opens video subtitle styles; font, size, colors, background, shadow, bottom position and delay are saved globally.
 
 ⌘S opens Save Content Image to save the visible content as HEIC by default, with PNG and JPG choices; audio saves its cover when available. ⇧⌘S saves the source file or complete current text; websites save a web archive. Camera, CUE, SACD ISO, and Apple Music do not provide Save As. Both commands are disabled for blank foils. Videos keep their current frame capture behavior and also support saving a copy of the video with ⇧⌘S.
+
+### Archive preview
+
+Browse nested archives in one tree, loading and caching inner directories only when expanded, and preview selected files read-only using the same type detection, default themes, border options, and playback controls as ordinary foils. Related resources are not extracted automatically. Save As exports the selected original file, directory, or root. History records the original archive only. Supported format subsets, encryption, volume handling, and limits are documented in the bundled Supported Content overview and [verification report](docs/archive-preview-verification.zh-CN.md). Encrypted 7z/RAR and split ZIP need another archive backend.

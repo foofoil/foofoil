@@ -511,6 +511,10 @@ struct NavigatorPanelView: View {
                                 .lineLimit(1)
                         }
                     }
+                    if appState.archiveSession?.isLoadingArchiveNode(row.item.id) == true {
+                        ProgressView().controlSize(.small)
+                            .accessibilityLabel(NSLocalizedString("Archive Loading Contents", comment: ""))
+                    }
                     if let badge = row.item.badge, !badge.isEmpty {
                         Text(badge)
                             .font(.caption.monospacedDigit())
@@ -550,6 +554,12 @@ struct NavigatorPanelView: View {
                 }
             }
             .contextMenu {
+                if let archive = appState.archiveSession(forNavigatorID: contribution.id) {
+                    Button(NSLocalizedString("Save As...", comment: "")) {
+                        archive.selectNavigatorItem(row.item.id)
+                        archive.saveSelected()
+                    }
+                }
                 if contribution.allowedActions.contains(.remove) {
                     Button(role: .destructive) {
                         appState.performNavigatorAction(
@@ -728,7 +738,7 @@ struct NavigatorPanelView: View {
 
         func appendChildren(of parentID: String?, depth: Int) {
             for item in children[parentID] ?? [] {
-                let hasChildren = children[item.id]?.isEmpty == false
+                let hasChildren = children[item.id]?.isEmpty == false || appState.archiveSession?.isArchiveNode(item.id) == true
                 rows.append(VisibleRow(item: item, depth: depth, hasChildren: hasChildren))
                 if hasChildren, appState.expandedNavigatorItemIDs.contains(item.id) {
                     appendChildren(of: item.id, depth: depth + 1)

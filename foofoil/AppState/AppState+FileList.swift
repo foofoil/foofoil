@@ -14,7 +14,7 @@ extension AppState {
     static let fileListNavigatorID = "builtin.file-list"
 
     var hasOpenedContent: Bool {
-        isCamera || imageURL != nil
+        archiveSession != nil || isCamera || imageURL != nil
             || webURL != nil
             || textURL != nil
             || extensionSession != nil
@@ -23,6 +23,7 @@ extension AppState {
 
     /// 当前箔片能否作为同类型列表的宿主（含尚未形成列表的单个图片/视频/音频）。
     var listableKind: FileListKind? {
+        if archiveSession != nil || isArchivePreview { return nil }
         if let fileList { return fileList.kind }
         if isPDFDocument || isQuickLookDocument { return nil }
         if isVideoDocument { return .video }
@@ -33,6 +34,7 @@ extension AppState {
 
     /// 非空箔片锁定其文件类型，拖放不能用其它类型替换当前内容。
     var currentDroppedFileKind: DroppedFileKind? {
+        if archiveSession != nil { return .other("archive") }
         if webURL != nil { return .web }
         if isQuickLookDocument, let url = imageURL { return FileListGrouper.dropKind(url: url) }
         if isPDFDocument { return .pdf }
@@ -529,6 +531,7 @@ extension AppState {
     }
 
     var chapterNavigatorContribution: NavigatorContribution? {
+        if let preview = archiveSession?.preview { return preview.chapterNavigatorContribution }
         guard isExtensionDocument else { return nil }
         return extensionSession?.navigatorContributions.first {
             $0.readingOrderItemIDs?.isEmpty == false && $0.allowedActions.contains(.activate)
@@ -546,6 +549,7 @@ extension AppState {
     }
 
     func activateAdjacentChapter(delta: Int) {
+        if let preview = archiveSession?.preview { preview.activateAdjacentChapter(delta: delta); return }
         guard !isNavigatorActionInFlight,
               let contribution = chapterNavigatorContribution,
               let id = adjacentChapterID(delta: delta) else { return }
@@ -572,6 +576,7 @@ extension AppState {
 
     /// 不可编辑的正文（只读文本、Markdown 预览、扩展文档）上下键滚动内容；与 `ContentView` 的内容选择保持一致。
     var verticalArrowsScrollContent: Bool {
+        if let preview = archiveSession?.preview { return preview.verticalArrowsScrollContent }
         if isExtensionDocument { return true }
         if isMarkdownPreview && isMarkdownDocument && !text.isEmpty { return true }
         return textURL != nil && !isMarkdownDocument

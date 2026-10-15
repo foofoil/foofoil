@@ -67,7 +67,7 @@ extension AppDelegate {
 
     @objc func extensionCommandAction(_ sender: NSMenuItem) {
         guard let commandID = sender.representedObject as? String else { return }
-        activeAppState?.performExtensionCommand(commandID)
+        activeReadingState?.performExtensionCommand(commandID)
     }
 
     @discardableResult
@@ -106,12 +106,12 @@ extension AppDelegate {
     }
 
     @objc func captureVideoFrameAction() {
-        guard let state = activeAppState, state.isVideoDocument else { return }
+        guard let state = activeReadingState, state.isVideoDocument else { return }
         NotificationCenter.default.post(name: VideoFrameCapture.notification(for: state.id), object: nil)
     }
 
     @objc func saveContentImageAction() {
-        guard let state = activeAppState, state.canSaveContentImage else { return }
+        guard let state = activeReadingState, state.canSaveContentImage else { return }
         if state.isVideoDocument {
             captureVideoFrameAction()
         } else if state.isCamera {
@@ -142,6 +142,7 @@ extension AppDelegate {
     }
 
     @objc func saveAsAction() {
+        if let archive = activeAppState?.selectedArchiveSession { archive.saveSelected(); return }
         guard let state = activeAppState, let content = state.contentSavePayload else { return }
         if case .webArchive = content {
             NotificationCenter.default.post(
@@ -209,13 +210,13 @@ extension AppDelegate {
     }
 
     @objc func openInDefaultBrowserAction() {
-        guard let appState = activeAppState,
+        guard let appState = activeReadingState,
               let url = appState.actualWebURL ?? appState.webURL else { return }
         NSWorkspace.shared.open(url)
     }
 
     @objc func copyWebURLAction() {
-        guard let appState = activeAppState,
+        guard let appState = activeReadingState,
               let url = appState.actualWebURL ?? appState.webURL else { return }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -739,7 +740,7 @@ extension AppDelegate {
     }
 
     @objc func reloadPageAction() {
-        guard let appState = activeAppState, appState.webURL != nil else { return }
+        guard let appState = activeReadingState, appState.webURL != nil else { return }
         NotificationCenter.default.post(
             name: Notification.Name("reloadWebView_\(appState.id.uuidString)"),
             object: nil
@@ -747,7 +748,7 @@ extension AppDelegate {
     }
 
     @objc func captureImageFoofoilAction() {
-        guard let appState = activeAppState else { return }
+        guard let appState = activeReadingState else { return }
         if appState.isCamera {
             let id = appState.id
             appState.cameraController?.capture { [weak appState] image in
@@ -837,11 +838,11 @@ extension AppDelegate {
     }
 
     @objc func selectColorAction() {
-        activeAppState?.showColorPanel()
+        activeReadingState?.showColorPanel()
     }
 
     @objc func extractTextFromImageAction() {
-        guard let appState = activeAppState else { return }
+        guard let appState = activeReadingState else { return }
         extractTextFromImage(from: appState)
     }
 
@@ -881,7 +882,7 @@ extension AppDelegate {
     }
 
     @objc func extractImageSubjectAction() {
-        guard let appState = activeAppState else { return }
+        guard let appState = activeReadingState else { return }
         extractImageSubject(from: appState)
     }
 
@@ -950,17 +951,17 @@ extension AppDelegate {
     }
 
     @objc func toggleSubtitlesAction() {
-        guard let state = activeAppState, state.isVideoDocument, state.subtitles.hasLoadedSubtitle else { return }
+        guard let state = activeReadingState, state.isVideoDocument, state.subtitles.hasLoadedSubtitle else { return }
         state.subtitles.setVisible(state.subtitles.isHidden)
     }
 
     @objc func loadSubtitleFileAction() {
-        guard let appState = activeAppState, appState.isVideoDocument else { return }
+        guard let appState = activeReadingState, appState.isVideoDocument else { return }
         appState.subtitles.pickFile()
     }
 
     @objc func documentStyleAction() {
-        guard let appState = activeAppState else { return }
+        guard let appState = activeReadingState else { return }
         if appState.isVideoDocument {
             SubtitleStylePanelController.shared.show(for: appState)
             return
@@ -986,11 +987,11 @@ extension AppDelegate {
     }
 
     @objc func previousFileListItemAction() {
-        activeAppState?.activateAdjacentFileListItem(delta: -1)
+        activeReadingState?.activateAdjacentFileListItem(delta: -1)
     }
 
     @objc func nextFileListItemAction() {
-        activeAppState?.activateAdjacentFileListItem(delta: 1)
+        activeReadingState?.activateAdjacentFileListItem(delta: 1)
     }
 
     @objc func findNavigatorAction() {
@@ -1014,7 +1015,7 @@ extension AppDelegate {
     }
 
     func postPDFNavigationNotification(_ name: Notification.Name) {
-        guard let appState = activeAppState, appState.isPDFDocument else { return }
+        guard let appState = activeReadingState, appState.isPDFDocument else { return }
         NotificationCenter.default.post(name: name, object: nil, userInfo: ["id": appState.id])
     }
 
@@ -1047,21 +1048,21 @@ extension AppDelegate {
     }
 
     @objc func fitWindowToImageAction() {
-        guard let appState = activeAppState,
+        guard let appState = activeReadingState,
               appState.imageURL != nil && appState.webURL == nil,
               appState.effectiveShowBorder else { return }
         activeWindowController?.fitWindowToCurrentImageSize()
     }
 
     @objc func fitImageToWindowWidthAction() {
-        guard let appState = activeAppState,
+        guard let appState = activeReadingState,
               appState.imageURL != nil && appState.webURL == nil,
               appState.effectiveShowBorder else { return }
         activeWindowController?.fitImageToWindowWidth()
     }
 
     @objc func zoomOutWindowAction() {
-        guard let appState = activeAppState, !appState.isFullScreen else { return }
+        guard let appState = activeReadingState, !appState.isFullScreen else { return }
         let isImageMode = appState.imageURL != nil && appState.webURL == nil
         if isImageMode {
             if appState.showBorder {
@@ -1075,7 +1076,7 @@ extension AppDelegate {
     }
 
     @objc func zoomInWindowAction() {
-        guard let appState = activeAppState, !appState.isFullScreen else { return }
+        guard let appState = activeReadingState, !appState.isFullScreen else { return }
         let isImageMode = appState.imageURL != nil && appState.webURL == nil
         if isImageMode {
             if appState.showBorder {

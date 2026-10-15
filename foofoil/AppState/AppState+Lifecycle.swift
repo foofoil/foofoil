@@ -17,6 +17,8 @@ import FoofoilExtensionKit
 
 extension AppState {
         public func resetContent() {
+            archiveSession?.close()
+            archiveSession = nil
             fileOpenFeedback = []
             closesEmptyWindowAfterFileOpenFailure = false
             appleMusicItem = nil
@@ -81,6 +83,10 @@ extension AppState {
 
         /// 窗口关闭时显式结束扩展会话：会话 close 幂等，避免视图树延迟释放导致设备或临时文件在进程存活期间不释放。
         func endExtensionSessionOnWindowClose() {
+            // 关闭后仍保留原包元数据，窗口最后一次 saveState 必须能写回原包来源。
+            archiveSession?.close()
+            currentMediaRouteGeneration &+= 1
+            cancelAudioListDetection()
             guard extensionSession != nil else { return }
             extensionSession = nil
             extensionFallbackProviderID = nil

@@ -853,8 +853,8 @@ final class FoilExposeController {
             let contentKind = config.contentKind ?? HistoryContentKind.infer(from: config)
             // 与 HistoryCardView 的缩略图兜底一致：网页整页截图、PDF 与图片原文件都在 imagePath；
             // 音视频原文件不是图片，摄像头箔的 imagePath 只是保存的截图，均不回退。
-            var thumbnailPath = config.thumbnailPath
-            if thumbnailPath == nil, contentKind != .audio, contentKind != .video, contentKind != .camera {
+            var thumbnailPath = contentKind == .archive ? nil : config.thumbnailPath
+            if thumbnailPath == nil, contentKind != .audio, contentKind != .video, contentKind != .camera, contentKind != .archive {
                 thumbnailPath = config.imagePath
             }
             // 文档型箔片没有缩略图文件，用窗口里的实时正文生成截断预览。
@@ -884,8 +884,8 @@ final class FoilExposeController {
             let contentKind = config.contentKind ?? HistoryContentKind.infer(from: config)
             // 与 HistoryCardView 的缩略图兜底一致：网页整页截图、PDF 与图片原文件都在 imagePath；
             // 音视频原文件不是图片，摄像头箔的 imagePath 只是保存的截图，均不回退。
-            var thumbnailPath = config.thumbnailPath
-            if thumbnailPath == nil, contentKind != .audio, contentKind != .video, contentKind != .camera {
+            var thumbnailPath = contentKind == .archive ? nil : config.thumbnailPath
+            if thumbnailPath == nil, contentKind != .audio, contentKind != .video, contentKind != .camera, contentKind != .archive {
                 thumbnailPath = config.imagePath
             }
             var title = config.historyMenuDisplayName

@@ -150,6 +150,7 @@ extension AppState {
         session: ContentSession,
         preferredItemID: String?
     ) {
+        guard !isArchivePreview else { return }
         guard let queue = ExtensionPlaybackSupport.containerPlaybackQueue(from: session) else { return }
         let normalizedPath = url.resolvingSymlinksInPath().standardizedFileURL.path
         // 只有扩展安装的容器曲目带 containerTrackID。宿主先解析的 CUE 曲目没有不透明 ID，

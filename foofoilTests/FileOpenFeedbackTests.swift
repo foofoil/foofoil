@@ -12,11 +12,23 @@ struct FileOpenFeedbackTests {
         return url
     }
 
+    @Test func sourceFilesAreNotRejectedAsExecutables() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = AppState(isIncognito: true)
+        for ext in ["js", "ts", "sh", "py", "swift"] {
+            let url = root.appendingPathComponent("source." + ext)
+            try Data("source text".utf8).write(to: url)
+            #expect(state.initialFileOpenFailure(url) == nil)
+        }
+    }
+
     @Test func distinguishesUnsupportedMissingAndKnownPreviewDocuments() throws {
         let root = try directory()
         defer { try? FileManager.default.removeItem(at: root) }
         let state = AppState()
-        let archive = root.appendingPathComponent("archive.zip")
+        let archive = root.appendingPathComponent("installer.dmg")
         let document = root.appendingPathComponent("document.docx")
         try Data([0, 1]).write(to: archive)
         try Data([0, 1]).write(to: document)
@@ -53,7 +65,7 @@ struct FileOpenFeedbackTests {
     @Test func unsupportedDropPreservesExistingContentAndHistoryIdentity() throws {
         let root = try directory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let archive = root.appendingPathComponent("archive.zip")
+        let archive = root.appendingPathComponent("installer.dmg")
         try Data([0]).write(to: archive)
         let state = AppState()
         state.text = "Existing note"
@@ -71,7 +83,7 @@ struct FileOpenFeedbackTests {
     @Test func clipboardUnsupportedFilesNeverConsumeExistingEmptyFoil() throws {
         let root = try directory()
         defer { try? FileManager.default.removeItem(at: root) }
-        let archive = root.appendingPathComponent("archive.zip")
+        let archive = root.appendingPathComponent("installer.dmg")
         try Data([0]).write(to: archive)
         let delegate = AppDelegate()
         defer {

@@ -18,6 +18,7 @@ import FoofoilExtensionKit
 
 extension AppState {
         public func openImage(url: URL) {
+            clearArchiveForNewContent()
             appleMusicItem = nil
             applyImage(url: url, originalName: url.lastPathComponent, rotatesIdentity: true, clearsFileList: true)
         }
@@ -66,12 +67,14 @@ extension AppState {
 
         /// 打开本地视频；与图片不同，视频不复制到缓存目录，仅记录原始路径。
         public func openVideo(url: URL) {
+            clearArchiveForNewContent()
             appleMusicItem = nil
             openExternalMedia(url: url, holdsSecurityAccess: false)
         }
 
         /// 打开本地音频；与视频相同，不复制到缓存目录，仅记录原始路径。
         public func openAudio(url: URL) {
+            clearArchiveForNewContent()
             appleMusicItem = nil
             openExternalMedia(url: url, holdsSecurityAccess: false)
         }
@@ -218,6 +221,7 @@ extension AppState {
 
         /// 音频会话内成功读取同目录封面后保存其所在文件夹的书签，重启后无需再次授权即可显示封面。
         func recordSidecarCoverAccess(for audioURL: URL) {
+            guard !isArchivePreview else { return }
             let directory = audioURL.deletingLastPathComponent()
             let directoryPath = directory.resolvingSymlinksInPath().standardizedFileURL.path
             if let existing = accessingSidecarDirectoryURL,
@@ -236,6 +240,7 @@ extension AppState {
         /// （本次或并发请求获得授权）时为 true；目录本来就可读则返回 false（首次读取已带授权，无需重读）。
         /// 取消会记住该目录，避免同一文件夹反复打扰。
         func ensureAudioDirectoryAccess(for audioURL: URL, forCuePlayback: Bool = false) async -> Bool {
+            guard !isArchivePreview else { return false }
             let directory = audioURL.deletingLastPathComponent()
             // 目录已可读（已持有授权、无需授权或确实没有封面文件）时不必请求
             guard !AudioMetadataLoader.isCoverDirectoryAccessible(for: audioURL) else { return false }
@@ -505,6 +510,7 @@ extension AppState {
         }
 
         public func openWeb(url: URL, originalName: String? = nil) {
+            clearArchiveForNewContent()
             let targetID = (imageURL != nil || webURL != nil || textURL != nil || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 ? UUID()
                 : id
@@ -581,6 +587,7 @@ extension AppState {
         }
 
         public func openTextFile(url: URL) {
+            clearArchiveForNewContent()
             let targetID = (imageURL != nil || webURL != nil || textURL != nil || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 ? UUID()
                 : id
@@ -695,6 +702,10 @@ extension AppState {
                 reportFileOpenFeedback([.init(url: url, reason: .unreadable)])
                 return
             }
+            if ArchiveReader.recognizes(url) { openArchive(url: url); return }
+            if !isArchivePreview {
+                clearArchiveForNewContent()
+            }
             currentMediaRouteGeneration &+= 1
 
             if FileListGrouper.isCueFile(url) {
@@ -805,7 +816,7 @@ extension AppState {
                     )
                     self.stampHostListWithExtensionQueueIDs(outcome.session)
                     self.holdExtensionAudioFileAccess(for: outcome.session)
-                    if let extensionID = outcome.session.extensionID {
+                    if !self.isArchivePreview, let extensionID = outcome.session.extensionID {
                         let payload = try JSONEncoder().encode(outcome.session)
                         self.extensionStateReference = try ExtensionHost.shared.stateStore.save(
                             extensionID: extensionID,
@@ -869,6 +880,7 @@ extension AppState {
         /// 这里是它们唯一的缩略图来源；已有缩略图时不再重复写入，除非强制覆盖。
         /// 多分区列表的缩略图由后台索引按各分区封面拼成宫格，单曲封面不能覆盖它。
         func persistDisplayedArtworkForHistory(_ image: NSImage?, force: Bool = false) {
+            guard !isArchivePreview else { return }
             guard let image else { return }
             if (fileList?.sections.count ?? 0) >= 2 { return }
             let destination = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -1002,7 +1014,7 @@ extension AppState {
                         return
                     }
                     self.extensionSession = outcome.session
-                    if let extensionID = outcome.session.extensionID {
+                    if !self.isArchivePreview, let extensionID = outcome.session.extensionID {
                         self.extensionStateReference = try ExtensionHost.shared.stateStore.save(
                             extensionID: extensionID, schemaVersion: 1,
                             payload: JSONEncoder().encode(outcome.session), reference: outcome.session.id.uuidString.lowercased())
@@ -1101,7 +1113,7 @@ extension AppState {
                     )
                     self.stampHostListWithExtensionQueueIDs(outcome.session)
                     self.holdExtensionAudioFileAccess(for: outcome.session)
-                    if let extensionID = outcome.session.extensionID {
+                    if !self.isArchivePreview, let extensionID = outcome.session.extensionID {
                         let payload = try JSONEncoder().encode(outcome.session)
                         self.extensionStateReference = try ExtensionHost.shared.stateStore.save(
                             extensionID: extensionID,
@@ -1159,7 +1171,7 @@ extension AppState {
             guard extensionSession?.id == sessionID else { return }
             extensionSession = updated
             isMediaPlaying = false
-            if let extensionID = updated.extensionID, let reference = extensionStateReference {
+            if !self.isArchivePreview, let extensionID = updated.extensionID, let reference = extensionStateReference {
                 _ = try? ExtensionHost.shared.stateStore.save(
                     extensionID: extensionID, schemaVersion: 1,
                     payload: JSONEncoder().encode(updated), reference: reference
@@ -1269,7 +1281,7 @@ extension AppState {
                     // 进度最多每五秒保存一次扩展快照，避免每秒写盘或刷新历史排序。
                     let persistsState = operation.mediaAction != .refresh
                     let checkpointsPlayback = Date().timeIntervalSince(self.lastExtensionPlaybackCheckpoint) >= 5
-                    if persistsState || checkpointsPlayback,
+                    if !self.isArchivePreview, persistsState || checkpointsPlayback,
                        let extensionID = updated.extensionID,
                        let reference = self.extensionStateReference {
                         let payload = try JSONEncoder().encode(updated)
@@ -1316,6 +1328,11 @@ extension AppState {
         }
 
         func performNavigatorAction(_ action: NavigatorAction) {
+            if let archive = archiveSession(forNavigatorID: action.contributionID) {
+                if action.kind == .activate, let id = action.itemIDs.first { archive.selectNavigatorItem(id) }
+                return
+            }
+            if let preview = archiveSession?.preview { preview.performNavigatorAction(action); return }
             if let contribution = builtInNavigatorContributions.first(where: {
                 $0.id == action.contributionID
             }) {
@@ -1363,7 +1380,7 @@ extension AppState {
                         return
                     }
                     self.extensionSession = updated
-                    if let extensionID = updated.extensionID,
+                    if !self.isArchivePreview, let extensionID = updated.extensionID,
                        let reference = self.extensionStateReference {
                         let payload = try JSONEncoder().encode(updated)
                         try ExtensionHost.shared.stateStore.save(
@@ -1417,6 +1434,7 @@ extension AppState {
         }
 
         public func saveWebScreenshot(_ image: NSImage) {
+            guard !isArchivePreview else { return }
             guard webURL != nil || isCamera else { return }
             let sourceID = id
 
@@ -1443,6 +1461,7 @@ extension AppState {
         }
 
         public func openImage(image: NSImage, originalName: String? = nil, imageSource: ImageSource? = nil) {
+            clearArchiveForNewContent()
             if hasOpenedContent {
                 self.id = UUID()
             }

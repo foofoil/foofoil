@@ -60,7 +60,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func isBlank(_ appState: AppState) -> Bool {
-        !appState.isFileOpenFeedback && appState.appleMusicReference == nil && !appState.isCamera && appState.imageURL == nil
+        appState.archiveSession == nil && !appState.isFileOpenFeedback && appState.appleMusicReference == nil && !appState.isCamera && appState.imageURL == nil
             && appState.webURL == nil
             && appState.textURL == nil
             && appState.extensionSession == nil

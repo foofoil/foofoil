@@ -147,7 +147,7 @@ final class NavigatorPanelController: NSWindowController {
         panel.contentView = hostingView
         super.init(window: panel)
         panel.handleKeyDown = { [weak appState] event in
-            appState?.handleFileListKeyDown(event) == true
+            appState?.handleArchiveTreeKeyDown(event) == true || appState?.handleFileListKeyDown(event) == true
         }
         panel.onDeleteSelected = { [weak appState] in
             guard let appState,

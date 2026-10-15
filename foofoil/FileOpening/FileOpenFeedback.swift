@@ -25,7 +25,8 @@ extension AppState {
             let values = try url.resourceValues(forKeys: [.isDirectoryKey, .isPackageKey, .isReadableKey])
             if values.isReadable == false { return .init(url: url, reason: .unreadable) }
             if values.isDirectory == true && values.isPackage != true { return nil }
-            if canUseKnownQuickLookPreview(url) { return nil }
+            // 源码/脚本可能同时符合 executable；文本入口优先，不能被二进制文件过滤误拒绝。
+            if isTextFile(url: url) || canUseKnownQuickLookPreview(url) || ArchiveReader.recognizes(url) { return nil }
             if let type = UTType(filenameExtension: url.pathExtension),
                ["public.archive", "public.executable", "com.apple.application-bundle", "com.apple.disk-image", "com.apple.installer-package"].contains(where: {
                    UTType($0).map { type.conforms(to: $0) } ?? false
@@ -52,6 +53,7 @@ extension AppState {
 
     func reportFileOpenFeedback(_ failures: [FileOpenFeedback]) {
         guard !failures.isEmpty else { return }
+        if isArchivePreview { fileOpenFeedback = failures; return }
         NotificationCenter.default.post(name: .fileOpenFeedback, object: self,
             userInfo: ["failures": failures, "batchID": fileOpenFeedbackBatchID])
     }

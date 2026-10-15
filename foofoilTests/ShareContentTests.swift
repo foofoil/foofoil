@@ -19,7 +19,7 @@ struct ShareContentTests {
     }
 
     @Test func sharingMenuKeepsSupportedContentAndUnspecifiedFileURLs() throws {
-        for type in ["public.png", "com.adobe.pdf", "public.mp3", "public.mpeg-4", "public.plain-text",
+        for type in ["public.zip-archive", "public.png", "com.adobe.pdf", "public.mp3", "public.mpeg-4", "public.plain-text",
                      "public.folder", "org.idpf.epub-container", "app.foofoil.audio.dsf", "public.iso-image",
                      "org.openxmlformats.wordprocessingml.document"] {
             #expect(try sharingMenuAccepts([["public.file-url", type]]))
@@ -32,11 +32,11 @@ struct ShareContentTests {
     }
 
     @Test func sharingMenuRejectsKnownUnsupportedFilesEvenWithURLRepresentation() throws {
-        for type in ["public.zip-archive", "com.apple.disk-image-udif", "com.apple.application-bundle",
+        for type in ["com.apple.disk-image-udif", "com.apple.application-bundle",
                      "public.executable", "com.apple.installer-package-archive"] {
             #expect(try !sharingMenuAccepts([["public.file-url", "public.url", type]]))
         }
-        #expect(try !sharingMenuAccepts([["public.file-url", "public.png"], ["public.file-url", "public.zip-archive"]]))
+        #expect(try !sharingMenuAccepts([["public.file-url", "public.png"], ["public.file-url", "com.apple.disk-image-udif"]]))
         #expect(try !sharingMenuAccepts([]))
     }
 

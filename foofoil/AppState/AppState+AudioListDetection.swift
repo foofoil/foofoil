@@ -15,7 +15,7 @@ import Foundation
 extension AppState {
     /// 启动一次列表检测；非普通音频（CUE、SACD ISO、视频）直接忽略。
     func detectAudioListIfNeeded(for url: URL) {
-        guard Self.isAudioFile(url: url),
+        guard !isArchivePreview, Self.isAudioFile(url: url),
               !FileListGrouper.isCueFile(url),
               !FileListGrouper.isSACDISOFile(url) else { return }
         cancelAudioListDetection()

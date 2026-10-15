@@ -49,7 +49,9 @@ public class AppState: NSObject, ObservableObject, Identifiable {
 
     @Published public var isCommandKeyPressed: Bool = false
     /// 由窗口内容区的 AppKit tracking area 驱动，供需要整窗 hover 的内容控件使用。
-    @Published var isPointerInsideWindow: Bool = false
+    @Published var isPointerInsideWindow: Bool = false {
+        didSet { archiveSession?.preview?.isPointerInsideWindow = isPointerInsideWindow }
+    }
     /// 音视频控制条独立于整窗 hover。视频在鼠标静止超时后即使仍在窗口内也会隐藏；
     /// 音频由暂停状态与箔窗/目录 hover 推导显隐，不做静止超时。
     @Published var isMediaPlaybackControlsVisible: Bool = false
@@ -58,7 +60,9 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     @Published var isCapturingContentImage = false
     @Published public var isLoading: Bool = false
     /// 原生全屏只是一种瞬时展示状态，不写入窗口历史；退出后恢复原有边框偏好。
-    @Published public var isFullScreen: Bool = false
+    @Published public var isFullScreen: Bool = false {
+        didSet { archiveSession?.preview?.isFullScreen = isFullScreen }
+    }
     /// 仅用于路由网页编辑控件的键盘快捷键，不需要持久化。
     @Published public var isWebEditableElementFocused: Bool = false
     /// 扩展会话仅通过可序列化描述驱动宿主展示，不让扩展 View 穿过 ABI/XPC 边界。
@@ -80,9 +84,12 @@ public class AppState: NSObject, ObservableObject, Identifiable {
             let newID = extensionSession?.extensionID
             if let oldValue {
                 let precedingClose = extensionSessionCloseTask
+                // 原生运行时完成关闭（或释放失败后的重试）之前保护解密预览缓存。
+                let previewRetention = ArchivePreviewRetention(archivePreviewLease)
                 let pending = PendingOutputRelease {
                     _ = await precedingClose?.value
                     try await ExtensionHost.shared.closeSessionAndWait(oldValue)
+                    previewRetention.lease = nil
                     if let oldID { ExtensionHost.shared.releaseSession(extensionID: oldID) }
                 }
                 AudioPlaybackCoordinator.shared.cancel(ownerID: oldValue.id)
@@ -129,8 +136,13 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     var navigatorActionGeneration: UInt64 = 0
 
     /// Built-in 与扩展统一投影到同一宿主导航模型；同一窗口只会有一个主内容来源。
+    @Published var archiveSession: ArchiveSession?
+    var isArchivePreview = false
+    weak var archiveWindowOwner: AppState?
+    var archivePreviewLease: ArchivePreviewLease?
     @Published var builtInNavigatorContributions: [NavigatorContribution] = []
     var navigatorContributions: [NavigatorContribution] {
+        if let archiveSession { return [archiveSession.contribution] }
         if !builtInNavigatorContributions.isEmpty { return builtInNavigatorContributions }
         return extensionSession?.navigatorContributions ?? []
     }
@@ -232,12 +244,19 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     /// 嵌平时底部控制条相对内容区的额外让位：
     /// 始终显示模式下内容已整体让位，控制条不再重复内缩；悬停模式面板覆盖内容，控制条单独让位。
     var fullScreenNavigatorControlBarInset: CGFloat {
-        fullScreenNavigatorInset - fullScreenNavigatorContentInset
+        if let archiveWindowOwner { return archiveWindowOwner.fullScreenNavigatorControlBarInset }
+        return fullScreenNavigatorInset - fullScreenNavigatorContentInset
     }
 
     @Published var activeNavigatorContributionID: String?
     @Published var expandedNavigatorItemIDs: Set<String> = [] {
-        didSet { refreshMarkdownOutlineSelection() }
+        didSet {
+            if let archiveSession {
+                for id in oldValue.subtracting(expandedNavigatorItemIDs) { archiveSession.setArchiveExpanded(id, expanded: false) }
+                for id in expandedNavigatorItemIDs.subtracting(oldValue) { archiveSession.setArchiveExpanded(id, expanded: true) }
+            }
+            refreshMarkdownOutlineSelection()
+        }
     }
     /// 导航列表搜索：仅当前会话有效，不持久化；⌘F 进入并聚焦，⌘G/⇧⌘G 定位匹配。
     @Published var isNavigatorSearchActive = false
@@ -353,7 +372,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
             imageSubjectCutoutURL = nil
             if let url = imageURL {
                 // 视频/音频不复制到应用缓存目录，仅记录原始文件路径。
-                if !Self.isExternalMediaFile(url: url) && !isQuickLookDocument {
+                if !isArchivePreview && !Self.isExternalMediaFile(url: url) && !isQuickLookDocument {
                     // 切到非媒体内容时释放旧文件的安全范围访问授权
                     stopVideoAccess()
                     let cacheDir = getCachedImageURL()?.deletingLastPathComponent()
@@ -478,7 +497,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     /// 空白箔：尚未加载任何图像、网页、扩展会话或关联文件，且用户尚未输入任何文本内容。
     /// 在用户输入内容前空白箔不是文档类型，不显示文档背景，也不允许配置样式和主题。
     public var isBlank: Bool {
-        appleMusicReference == nil && !isCamera && imageURL == nil
+        archiveSession == nil && appleMusicReference == nil && !isCamera && imageURL == nil
             && webURL == nil
             && textURL == nil
             && extensionSession == nil
@@ -514,6 +533,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     @Published public var showBorder: Bool {
         didSet {
             guard showBorder != oldValue else { return }
+            if let owner = archiveWindowOwner, owner.showBorder != showBorder { owner.showBorder = showBorder }
+            if let preview = archiveSession?.preview, preview.showBorder != showBorder { preview.showBorder = showBorder }
             saveState()
             NotificationCenter.default.post(name: .showBorderDidChange, object: self)
         }
@@ -690,7 +711,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.fileList = nil
         self.fileListRevision = 0
 
-        if let path = config.imagePath {
+        if let path = config.imagePath, config.contentKind != .archive {
             let url = URL(fileURLWithPath: path)
             // 视频/音频经安全范围书签恢复沙盒访问（重启后路径直接不可达）
             if config.contentKind == .quickLook || Self.isExternalMediaFileName(config.originalImageName ?? path) {
@@ -755,6 +776,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         restoreExtensionSession(from: config)
         restoreCustomCover(from: config)
         appleMusicReference = config.appleMusicReference
+        if let source = config.archiveSource, !source.volumes.isEmpty { restoreArchive(source) }
         // 在调用 saveState 时避免触发死循环；视频经书签恢复后可能重建了书签，也需要落盘
         if let path = config.imagePath, !FileManager.default.fileExists(atPath: path) {
             if Self.findCachedImageInDirectory(for: config.id) != nil || Self.findLegacyCachedImageInDirectory() != nil {
@@ -812,6 +834,9 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     }
 
     deinit {
+        if let closingArchive = archiveSession {
+            Task { @MainActor in closingArchive.close() }
+        }
         cameraController?.stop()
         navigatorMetadataTask?.cancel()
         renderTask?.cancel()

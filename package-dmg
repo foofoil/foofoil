@@ -191,6 +191,15 @@ done
 
 # 4. 签名：由内到外，先插件再 app。
 if (( SIGN_ENABLED )); then
+    # Release 构建禁用 Xcode 签名；分享 appex 也必须先建立自己的资源封印，宿主签名不会递归补齐。
+    print "Signing share extensions..."
+    for share_bundle in foofoilShareExtension.appex foofoilIncognitoShareExtension.appex; do
+        share_path="$APP_PATH/Contents/PlugIns/$share_bundle"
+        [[ -d "$share_path" ]] || continue
+        codesign --force --options runtime "${TIMESTAMP_FLAG[@]}" \
+            --entitlements "$SCRIPT_DIR/Config/foofoilShareExtension.entitlements" \
+            --sign "$CODESIGN_IDENTITY" "$share_path"
+    done
     print "Signing plugins..."
     for def in "${EXTENSION_DEFS[@]}"; do
         rest="${def#*:}"

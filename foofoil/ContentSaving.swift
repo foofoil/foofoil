@@ -267,8 +267,13 @@ struct FoilCaptureArea: NSViewRepresentable {
     }
     static func capture(in root: NSView, state: AppState) async throws -> NSImage {
         let sourceID = state.id
+        let windowState = state.presentationWindowState
         state.isCapturingContentImage = true
-        defer { state.isCapturingContentImage = false }
+        windowState.isCapturingContentImage = true
+        defer {
+            state.isCapturingContentImage = false
+            windowState.isCapturingContentImage = false
+        }
         // 让 SwiftUI 收起控件并提交到窗口合成器；不改变正文滚动位置和缩放。
         try await Task.sleep(for: .milliseconds(50))
         root.layoutSubtreeIfNeeded()

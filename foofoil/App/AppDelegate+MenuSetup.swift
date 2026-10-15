@@ -664,7 +664,7 @@ extension AppDelegate {
 
     func rebuildExtensionMenu(_ menu: NSMenu) {
         menu.removeAllItems()
-        guard let commands = activeAppState?.extensionSession?.commands else { return }
+        guard let commands = activeReadingState?.extensionSession?.commands else { return }
         appendExtensionCommands(commands, parentID: nil, to: menu)
     }
 
@@ -698,9 +698,9 @@ extension AppDelegate {
         menu.removeAllItems()
         defer { applyKeyboardShortcuts(to: menu) }
 
-        if activeAppState?.imageURL != nil, activeAppState?.webURL == nil {
+        if activeReadingState?.imageURL != nil, activeReadingState?.webURL == nil {
             // 视频/音频没有“拷贝图片”能力，不提供该菜单项。
-            if activeAppState?.isExternalMediaDocument != true {
+            if activeReadingState?.isExternalMediaDocument != true {
                 // 不设 target，让 Cmd+C 经由 responder chain 到当前图片窗口；文本编辑器仍可优先处理复制。
                 let copyImageItem = NSMenuItem(
                     title: NSLocalizedString("Copy Image", comment: ""),
@@ -709,7 +709,7 @@ extension AppDelegate {
                 )
                 copyImageItem.withSymbol("photo.on.rectangle")
                 menu.addItem(copyImageItem)
-            } else if activeAppState?.isAudioDocument == true {
+            } else if activeReadingState?.isAudioDocument == true {
                 // 音频箔的 ⌘C 复制封面图；无封面时由 validateMenuItem 禁用。
                 let copyCoverItem = NSMenuItem(
                     title: NSLocalizedString("Copy Cover", comment: ""),
@@ -741,12 +741,12 @@ extension AppDelegate {
         menu.addItem(cutItem)
 
         // 音频箔没有可复制的文本或图片内容，⌘C 改为复制当前封面；仍经由 responder chain 交给当前窗口。
-        let copyTitle = activeAppState?.isAudioDocument == true ? "Copy Cover" : "Copy"
+        let copyTitle = activeReadingState?.isAudioDocument == true ? "Copy Cover" : "Copy"
         let copyItem = NSMenuItem(title: NSLocalizedString(copyTitle, comment: ""), action: #selector(EditMenuCommands.copy(_:)), keyEquivalent: "c")
         copyItem.withSymbol("doc.on.doc")
         menu.addItem(copyItem)
 
-        if activeAppState?.webURL != nil {
+        if activeReadingState?.webURL != nil {
             let copyURLItem = NSMenuItem(
                 title: NSLocalizedString("Copy URL", comment: ""),
                 action: #selector(copyWebURLAction),
@@ -814,8 +814,8 @@ extension AppDelegate {
               let item = menu.items.first(where: { $0.action == #selector(extractTextFromImageAction) }) else {
             return
         }
-        item.isHidden = activeAppState?.isVideoDocument == true
-        let isAvailable = activeAppState?.canExtractImageText == true
+        item.isHidden = activeReadingState?.isVideoDocument == true
+        let isAvailable = activeReadingState?.canExtractImageText == true
         item.isEnabled = isAvailable
         let shortcut = isAvailable ? KeyboardShortcutStore.shared.shortcut(forID: "edit.extractText") : nil
         item.keyEquivalent = shortcut?.keyEquivalent ?? ""
@@ -829,8 +829,8 @@ extension AppDelegate {
               let item = menu.items.first(where: { $0.action == #selector(extractImageSubjectAction) }) else {
             return
         }
-        item.isHidden = activeAppState?.isVideoDocument == true
-        let isAvailable = activeAppState?.canExtractImageSubject == true
+        item.isHidden = activeReadingState?.isVideoDocument == true
+        let isAvailable = activeReadingState?.canExtractImageSubject == true
         item.isEnabled = isAvailable
         let shortcut = isAvailable ? KeyboardShortcutStore.shared.shortcut(forID: "edit.extractImageSubject") : nil
         item.keyEquivalent = shortcut?.keyEquivalent ?? ""

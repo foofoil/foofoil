@@ -89,7 +89,7 @@ extension AppDelegate {
             if let item = state.appleMusicItem {
                 rows.append(.init(key: "Foil Info Artist", value: item.subtitle))
             }
-        } else if kind == .image || kind == .pdf || kind == .ebook || kind == .quickLook || kind == .audio || kind == .video || config.textPath != nil {
+        } else if kind == .archive || kind == .image || kind == .pdf || kind == .ebook || kind == .quickLook || kind == .audio || kind == .video || config.textPath != nil {
             rows.append(.init(key: "Foil Info File Path", value: NSLocalizedString("Foil Info Path Unknown", comment: "")))
             rows.append(.init(key: "Foil Info File Size", value: NSLocalizedString("Foil Info Unknown", comment: "")))
         }

@@ -56,7 +56,7 @@ struct ExtensionVideoModeView: View {
                     }
                     Spacer()
                     MediaPlaybackBar(appState: appState, controller: controller)
-                        .padding(appState.navigatorPanelSide == .left ? .leading : .trailing,
+                        .padding(appState.presentationWindowState.navigatorPanelSide == .left ? .leading : .trailing,
                                  appState.fullScreenNavigatorControlBarInset)
                 }
             }

@@ -122,6 +122,7 @@ extension AppState {
 
         /// 将用户打开的本地文件复制到应用缓存，之后不再依赖源文件。
         func cacheImportedFile(from sourceURL: URL, kind: String, for windowId: UUID? = nil) -> URL? {
+            if isArchivePreview { return sourceURL }
             guard sourceURL.isFileURL else { return sourceURL }
             guard !Self.isManagedCacheURL(sourceURL) else { return sourceURL }
             guard let destinationURL = getCachedContentURL(kind: kind, for: windowId, extension: sourceURL.pathExtension) else { return nil }
@@ -302,6 +303,7 @@ extension AppState {
         }
 
         func cacheImage(from sourceURL: URL, itemToken: String? = nil) -> URL? {
+            if isArchivePreview { return sourceURL }
 
             let ext = sourceURL.pathExtension.lowercased()
             let shouldCompressToHEIC = ["png", "bmp", "tiff", "tif"].contains(ext)

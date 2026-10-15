@@ -1,6 +1,476 @@
 {
   "sourceLanguage": "en",
   "strings": {
+      "Archive Loading Contents": {
+        "localizations": {
+          "en": { "stringUnit": { "state": "translated", "value": "Loading contents…" } },
+          "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在读取内容…" } }
+        }
+      },
+      "Archive Original Destination": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Choose a destination different from the original archive and its volumes."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "请选择与原压缩包及其分卷不同的保存位置。"
+            }
+          }
+        }
+      },
+      "Archive Original Size Format": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Original size: %@"
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "原始大小：%@"
+            }
+          }
+        }
+      },
+      "Archive Compressed Size Unknown": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Compressed size per entry is unavailable."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "无法获取单个条目的压缩后大小。"
+            }
+          }
+        }
+      },
+      "Archive Unsupported Encryption": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "This encryption method is not supported by the system archive reader. Use a dedicated archive app."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "系统压缩包读取器不支持此加密方式，请使用专用解压工具。"
+            }
+          }
+        }
+      },
+      "Archive Unsupported Volumes": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Split ZIP archives are not supported by the system archive reader. Use a dedicated archive app."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "系统压缩包读取器不支持 ZIP 分卷，请使用专用解压工具。"
+            }
+          }
+        }
+      },
+      "Archive Locate Volumes": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Locate Volumes…"
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "定位分卷…"
+            }
+          }
+        }
+      },
+      "Archive Contents": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Archive Contents"
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "压缩包内容"
+            }
+          }
+        }
+      },
+      "Archive Select File": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Please select a file to open"
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "请选择要打开的文件"
+            }
+          }
+        }
+      },
+      "Archive Directory": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Directory"
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "目录"
+            }
+          }
+        }
+      },
+      "Archive File": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "File"
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "文件"
+            }
+          }
+        }
+      },
+      "Archive Unsafe Path": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "The archive contains an unsafe or excessively deep path."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "压缩包包含不安全或层级过深的路径。"
+            }
+          }
+        }
+      },
+      "Archive Resource Limit": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "The operation exceeded the archive resource limit. Save the content separately or use a dedicated archive app."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "操作超过压缩包资源限额，请另存内容或使用专用解压工具。"
+            }
+          }
+        }
+      },
+      "Archive Source Changed": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "The source archive or a volume changed. Reload the archive before continuing."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "原压缩包或分卷已变化，请重新加载压缩包。"
+            }
+          }
+        }
+      },
+      "Archive Password Required": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "A password is required, incorrect, or unsupported by this system. Damaged encrypted data may produce the same error."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "需要密码、密码错误或当前系统不支持此加密方式；加密数据损坏也可能导致此错误。"
+            }
+          }
+        }
+      },
+      "Archive Export Conflict": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Names conflict, or the destination directory already exists. Choose a new name or save conflicting files individually."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "存在重名冲突或目标目录已存在，请选择新名称，或逐个另存冲突文件。"
+            }
+          }
+        }
+      },
+      "Archive Unsupported Entry": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "This entry or archive combination is not supported. Links and special files are not restored."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "不支持此条目或压缩包组合；不会恢复链接和特殊文件。"
+            }
+          }
+        }
+      },
+      "Archive Read Failed": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "The archive could not be read. It may be damaged, inaccessible, missing a volume, or use an unsupported algorithm."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "无法读取压缩包：可能已损坏、无访问权限、缺少分卷或使用了不支持的算法。"
+            }
+          }
+        }
+      },
+      "Archive Save Before Opening": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Save this file before opening it. For CUE, save its directory to keep the associated audio files."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "请先另存此文件后再打开。CUE 请另存所在目录，以保留配套音频。"
+            }
+          }
+        }
+      },
+      "Archive Preview Limit": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "This file exceeds the preview limit. You can still save it separately."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "此文件超过预览限额，仍可另存为。"
+            }
+          }
+        }
+      },
+      "Archive Export Complete Format": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Saved. Skipped %ld links or special entries."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "保存完成，跳过 %ld 个链接或特殊条目。"
+            }
+          }
+        }
+      },
+      "Archive Export Cancelled": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Saving was cancelled. No incomplete output was committed."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "已取消保存，未提交不完整输出。"
+            }
+          }
+        }
+      },
+      "Archive Reload": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Reload Archive"
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "重新加载压缩包"
+            }
+          }
+        }
+      },
+      "Archive Exporting": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Saving archive content…"
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "正在保存压缩包内容…"
+            }
+          }
+        }
+      },
+      "Archive Related Resources": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Preview is read-only. Related resources are not extracted; save the directory if they are needed."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "预览为只读，不提取关联资源；如需配套资源，请另存所在目录。"
+            }
+          }
+        }
+      },
+      "Archive Password Title": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Unlock Archive"
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "解锁压缩包"
+            }
+          }
+        }
+      },
+      "Archive Password": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Password"
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "密码"
+            }
+          }
+        }
+      },
+      "Archive Unlock": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Unlock"
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "解锁"
+            }
+          }
+        }
+      },
+      "Archive Volume Access": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Select the folder containing all archive volumes. Missing or conflicting volumes cannot be opened."
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "请选择包含全部分卷的文件夹，缺卷或冲突的卷组无法打开。"
+            }
+          }
+        }
+      },
+      "Foil Info Type 13": {
+        "localizations": {
+          "en": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "Archive"
+            }
+          },
+          "zh-Hans": {
+            "stringUnit": {
+              "state": "translated",
+              "value": "压缩包"
+            }
+          }
+        }
+      },
       "Previous Chapter": {
         "localizations": {
           "en": {

@@ -73,7 +73,7 @@ struct VideoModeView: View {
                 MediaPlaybackBar(appState: appState, controller: controller)
                     // 只收窄控制条，视频画面保持原有全屏尺寸。
                     // 始终显示模式下内容区已整体被面板挤占，这里只补覆盖模式的增量。
-                    .padding(appState.navigatorPanelSide == .left ? .leading : .trailing,
+                    .padding(appState.presentationWindowState.navigatorPanelSide == .left ? .leading : .trailing,
                              appState.fullScreenNavigatorControlBarInset)
                     .transition(.move(edge: .bottom))
                     .zIndex(1)

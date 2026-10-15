@@ -12,19 +12,33 @@ import FoofoilExtensionKit
 
 public struct ContentView: View {
     @ObservedObject var appState: AppState
+
+    public init(appState: AppState) { self.appState = appState }
+
+    public var body: some View {
+        if let session = appState.archiveSession {
+            ArchiveFoilView(windowState: appState, session: session)
+        } else {
+            FoilContentView(appState: appState, windowState: appState)
+        }
+    }
+}
+
+/// 包内外共用完整的正文、背景、留白和交互；窗口与导航始终归实际箔片。
+struct FoilContentView: View {
+    @ObservedObject var appState: AppState
+    @ObservedObject var windowState: AppState
+    var archive: ArchiveSession? = nil
     @Environment(\.colorScheme) private var colorScheme
     @State private var isResizingWindowWithPinch = false
     @State private var pdfPageIndicator: String?
     @State private var pdfPageIndicatorDismissTask: DispatchWorkItem?
     @State private var flashOpacity: Double = 0.0
 
-    public init(appState: AppState) {
-        self.appState = appState
-    }
 
     public var body: some View {
         // 网页和图片都支持仅隐藏视觉边框；网页切换边框不应改变窗口的缩放规则。
-        let shouldHideBorder = appState.isFullScreen
+        let shouldHideBorder = windowState.isFullScreen
             || ((appState.isCamera || appState.imageURL != nil || appState.webURL != nil || appState.isAudioDocument) && !appState.showBorder)
         // 网页即使同时保留了截图缓存，也不能套用图片无边框模式的最小尺寸规则。
         let isImageMode = appState.usesImagePresentation
@@ -42,11 +56,11 @@ public struct ContentView: View {
         // 与毛玻璃圆角同心的内缩圆角：内容越贴边，圆角越接近窗口的 12pt 圆角。
         let contentBackgroundCornerRadius: CGFloat = shouldHideBorder ? 0 : max(0, 12 - contentPadding)
         // 嵌平“始终显示”时被导航面板挤占的内容宽度；其余情况为 0。
-        let navigatorContentInset = appState.fullScreenNavigatorContentInset
+        let navigatorContentInset = windowState.fullScreenNavigatorContentInset
 
         ZStack {
             // 毛玻璃背景 (玻璃拟态效果)
-            if appState.isFullScreen {
+            if windowState.isFullScreen {
                 // 全屏统一使用无圆角的整屏背景，不继承窗口态的有/无边框外观。
                 VisualEffectView(material: .hudWindow, blendingMode: .behindWindow)
             } else if !shouldHideBorder {
@@ -62,7 +76,9 @@ public struct ContentView: View {
 
             // 内容区域
             Group {
-                if appState.isFileOpenFeedback {
+                if let archive, archive.preview == nil || appState.isFileOpenFeedback {
+                    ArchiveContentView(session: archive)
+                } else if appState.isFileOpenFeedback {
                     FileOpenFeedbackView(failures: appState.fileOpenFeedback) {
                         NotificationCenter.default.post(
                             name: .shouldCloseWindow,
@@ -70,7 +86,7 @@ public struct ContentView: View {
                             userInfo: ["id": appState.id]
                         )
                     }
-                } else if appState.isLoading {
+                } else if appState.isLoading || (appState.isArchivePreview && !appState.hasOpenedContent) {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .scaleEffect(1.2)
@@ -144,9 +160,9 @@ public struct ContentView: View {
             .padding(contentPadding)
             // 嵌平“始终显示”时侧边栏以分栏形式挤占内容空间而不是盖在内容上；
             // 悬停模式侧边栏覆盖内容，内容保持原位。拖拽调宽时跟随指针即时变化不动画。
-            .padding(appState.navigatorPanelSide == .left ? .leading : .trailing, navigatorContentInset)
+            .padding(windowState.navigatorPanelSide == .left ? .leading : .trailing, navigatorContentInset)
             .animation(
-                appState.isAdjustingNavigatorPanelWidth
+                windowState.isAdjustingNavigatorPanelWidth
                     ? nil
                     : .easeInOut(duration: 0.25),
                 value: navigatorContentInset
@@ -162,18 +178,18 @@ public struct ContentView: View {
                 .opacity(flashOpacity)
                 .allowsHitTesting(false)
 
-            FullScreenNavigatorOverlay(appState: appState)
-                .opacity(appState.isCapturingContentImage ? 0 : 1)
+            FullScreenNavigatorOverlay(appState: windowState)
+                .opacity(windowState.isCapturingContentImage ? 0 : 1)
         }
         .frame(minWidth: minimumWidth, minHeight: minimumLength)
         // Finder 文件由 FloatingWindow 直接读取粘贴板，确保多选批次不会被 SwiftUI 拆丢。
         // 增加高精细度细微边框，且拖拽时显示蓝色高亮边框
         .overlay(
             RoundedRectangle(cornerRadius: shouldHideBorder ? 0 : 12)
-                .stroke(appState.isFileDropTargeted ? Color.blue.opacity(0.8) : (shouldHideBorder ? Color.clear : Color.white.opacity(0.15)), lineWidth: appState.isFileDropTargeted ? 3 : 1)
+                .stroke(windowState.isFileDropTargeted ? Color.blue.opacity(0.8) : (shouldHideBorder ? Color.clear : Color.white.opacity(0.15)), lineWidth: windowState.isFileDropTargeted ? 3 : 1)
         )
         .overlay(alignment: .bottom) {
-            if let pdfPageIndicator, !appState.isCapturingContentImage {
+            if let pdfPageIndicator, !windowState.isCapturingContentImage {
                 Text(pdfPageIndicator)
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .monospacedDigit()
@@ -190,7 +206,7 @@ public struct ContentView: View {
         .onChange(of: colorScheme) { _, newScheme in
             appState.adaptDocumentColorsToAppearanceChange(toDarkAppearance: newScheme == .dark)
         }
-        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("flashWindow_\(appState.id.uuidString)"))) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("flashWindow_\(windowState.id.uuidString)"))) { _ in
             // 瞬间变白（0.85 不透明度）
             flashOpacity = 0.85
             // 渐变褪去
@@ -244,7 +260,7 @@ public struct ContentView: View {
                     NotificationCenter.default.post(
                         name: .shouldResizeWindowWithPinch,
                         object: nil,
-                        userInfo: ["id": appState.id, "magnification": value]
+                        userInfo: ["id": windowState.id, "magnification": value]
                     )
                 }
                 .onEnded { _ in
@@ -253,18 +269,18 @@ public struct ContentView: View {
                     NotificationCenter.default.post(
                         name: .shouldEndWindowPinchResize,
                         object: nil,
-                        userInfo: ["id": appState.id]
+                        userInfo: ["id": windowState.id]
                     )
                     isResizingWindowWithPinch = false
                 }
         )
         .contextMenu {
-            Toggle(isOn: $appState.isPinned) {
+            Toggle(isOn: $windowState.isPinned) {
                 Label(NSLocalizedString("Toggle Pin (ContextMenu)", comment: ""), systemImage: "pin")
             }
                 .configuredKeyboardShortcut("view.togglePin")
 
-            if !appState.isFullScreen && (appState.usesImagePresentation || appState.webURL != nil || appState.isAudioDocument) {
+            if !windowState.isFullScreen && (appState.usesImagePresentation || appState.webURL != nil || appState.isAudioDocument) {
                 Toggle(isOn: $appState.showBorder) {
                     Label(NSLocalizedString("Border (ContextMenu)", comment: ""), systemImage: "rectangle")
                 }
@@ -294,7 +310,7 @@ public struct ContentView: View {
                 Label("Save As...", systemImage: "square.and.arrow.down")
             }
             .keyboardShortcut("s", modifiers: [.command, .shift])
-            .disabled(appState.contentSavePayload == nil)
+            .disabled(windowState.selectedArchiveSession.map { !$0.canExport } ?? (appState.contentSavePayload == nil))
 
             if appState.isVideoDocument {
                 SubtitleVisibilityToggle(controller: appState.subtitles)
@@ -392,7 +408,7 @@ public struct ContentView: View {
             Divider()
 
             Button(action: {
-                appState.resetContent()
+                windowState.resetContent()
             }) {
                 Label(NSLocalizedString("Reset (ContextMenu)", comment: ""), systemImage: "arrow.counterclockwise")
             }
@@ -402,7 +418,7 @@ public struct ContentView: View {
                 NotificationCenter.default.post(
                     name: .shouldCloseWindow,
                     object: nil,
-                    userInfo: ["id": appState.id]
+                    userInfo: ["id": windowState.id]
                 )
             }) {
                 Label(NSLocalizedString("Close (ContextMenu)", comment: ""), systemImage: "xmark.circle")

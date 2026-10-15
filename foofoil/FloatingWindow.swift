@@ -195,7 +195,7 @@ public class FloatingWindow: NSWindow {
            !controller.appState.isNavigatorSearchActive,
            KeyboardShortcut.effectiveModifiers(for: event).isEmpty,
            event.keyCode == 125 || event.keyCode == 126 {
-            scrollReadOnlyContent(by: event.keyCode == 125 ? 1 : -1, isExtensionDocument: controller.appState.isExtensionDocument)
+            scrollReadOnlyContent(by: event.keyCode == 125 ? 1 : -1, isExtensionDocument: controller.appState.readingState.isExtensionDocument)
             return
         }
 
@@ -208,7 +208,7 @@ public class FloatingWindow: NSWindow {
         // PDF 翻页使用窗口级键盘事件，避免焦点落在 PDFView 的子视图时快捷键失效。
         if event.type == .keyDown,
            let controller = self.windowController as? FloatingWindowController,
-           controller.appState.isPDFDocument {
+           controller.appState.readingState.isPDFDocument {
             let notificationName: Notification.Name?
             if KeyboardShortcutStore.shared.matches(event, identifier: "go.previousPage") {
                 notificationName = .shouldGoToPreviousPDFPage
@@ -222,7 +222,7 @@ public class FloatingWindow: NSWindow {
                 NotificationCenter.default.post(
                     name: notificationName,
                     object: nil,
-                    userInfo: ["id": controller.appState.id]
+                    userInfo: ["id": controller.appState.readingState.id]
                 )
                 return
             }
@@ -237,7 +237,7 @@ public class FloatingWindow: NSWindow {
 
         // 无边框 PDF 的缩放只调整窗口；手势结束后再由 PDFKit 适配新的窗口尺寸。
         if let controller = self.windowController as? FloatingWindowController,
-           controller.appState.isPDFDocument,
+           controller.appState.readingState.isPDFDocument,
            !controller.appState.isFullScreen,
            !controller.appState.showBorder {
             if event.type == .scrollWheel {
@@ -289,9 +289,9 @@ public class FloatingWindow: NSWindow {
                 let multiplier: CGFloat = event.hasPreciseScrollingDeltas ? 0.003 : 0.03
                 let factor = 1.0 + delta * multiplier
 
-                if appState.usesImagePresentation && !appState.isAudioDocument && !(appState.isVideoDocument && appState.showBorder) {
+                if appState.readingState.usesImagePresentation && !appState.readingState.isAudioDocument && !(appState.readingState.isVideoDocument && appState.showBorder) {
                     // 有边框 PDF 保留 PDFViewer 的原生缩放与滚动响应。
-                    if appState.isPDFDocument && appState.showBorder {
+                    if appState.readingState.isPDFDocument && appState.showBorder {
                         super.sendEvent(event)
                         return
                     }
@@ -314,15 +314,15 @@ public class FloatingWindow: NSWindow {
         // 触摸板捏合：图片改内容缩放（无边框时同步窗口）；其余模式只改窗口大小。过程中不写历史。
         if event.type == .magnify, let controller = self.windowController as? FloatingWindowController {
             let appState = controller.appState
-            let isImageMagnify = appState.usesImagePresentation
-                && !appState.isExternalMediaDocument
-                && !appState.isPDFDocument
-                && !appState.isQuickLookDocument
-            let isWindowMagnify = appState.imageURL == nil
-                || appState.isExternalMediaDocument
-                || appState.isQuickLookDocument
-                || appState.webURL != nil
-                || (appState.isPDFDocument && !appState.showBorder)
+            let isImageMagnify = appState.readingState.usesImagePresentation
+                && !appState.readingState.isExternalMediaDocument
+                && !appState.readingState.isPDFDocument
+                && !appState.readingState.isQuickLookDocument
+            let isWindowMagnify = appState.readingState.imageURL == nil
+                || appState.readingState.isExternalMediaDocument
+                || appState.readingState.isQuickLookDocument
+                || appState.readingState.webURL != nil
+                || (appState.readingState.isPDFDocument && !appState.showBorder)
 
             if isImageMagnify || isWindowMagnify {
                 let phase = event.phase
@@ -393,18 +393,18 @@ public class FloatingWindow: NSWindow {
     /// 播放控制在内容视图前匹配，设置变更后旧键位不再触发。
     private func handleMediaShortcut(_ event: NSEvent) -> Bool {
         guard let controller = windowController as? FloatingWindowController,
-              controller.appState.isExternalMediaDocument else { return false }
+              controller.appState.readingState.isExternalMediaDocument else { return false }
         let shortcuts = KeyboardShortcutStore.shared
         if shortcuts.matches(event, identifier: "playback.toggle") {
             if !event.isARepeat {
                 NotificationCenter.default.post(name: .shouldToggleVideoPlayback, object: nil,
-                                                userInfo: ["id": controller.appState.id])
+                                                userInfo: ["id": controller.appState.readingState.id])
             }
             return true
         }
         for (identifier, keyCode) in [("playback.backward", UInt16(123)), ("playback.forward", UInt16(124))] {
             if shortcuts.matches(event, identifier: identifier) {
-                postMediaSeek(keyCode: keyCode, for: controller.appState)
+                postMediaSeek(keyCode: keyCode, for: controller.appState.readingState)
                 return true
             }
         }
@@ -591,7 +591,7 @@ public class FloatingWindow: NSWindow {
 
     @objc public func copy(_ sender: Any?) {
         guard let controller = windowController as? FloatingWindowController else { return }
-        if controller.appState.isPDFDocument,
+        if controller.appState.readingState.isPDFDocument,
            let pdfView = contentView?.findSubview(ofType: PDFView.self) {
             if let selection = pdfView.currentSelection,
                let text = selection.string,
@@ -600,29 +600,29 @@ public class FloatingWindow: NSWindow {
             } else {
                 pdfView.copyCurrentPageToPasteboard()
             }
-        } else if controller.appState.isCamera {
-            controller.appState.cameraController?.capture { image in
+        } else if controller.appState.readingState.isCamera {
+            controller.appState.readingState.cameraController?.capture { image in
                 guard let image else { return }
                 let pasteboard = NSPasteboard.general
                 pasteboard.clearContents()
                 pasteboard.writeObjects([image])
             }
-        } else if controller.appState.isAudioDocument {
-            controller.appState.copyAudioCoverToPasteboard()
-        } else if !controller.appState.isExternalMediaDocument {
-            controller.appState.copyCurrentImageToPasteboard()
+        } else if controller.appState.readingState.isAudioDocument {
+            controller.appState.readingState.copyAudioCoverToPasteboard()
+        } else if !controller.appState.readingState.isExternalMediaDocument {
+            controller.appState.readingState.copyCurrentImageToPasteboard()
         }
     }
 
     public override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(FloatingWindow.copy(_:)) {
             guard let controller = windowController as? FloatingWindowController else { return false }
-            if controller.appState.isAudioDocument {
-                return controller.appState.audioCoverImage != nil
+            if controller.appState.readingState.isAudioDocument {
+                return controller.appState.readingState.audioCoverImage != nil
             }
-            return controller.appState.isCamera
-                ? controller.appState.cameraController?.hasFrame == true
-                : controller.appState.imageURL != nil && controller.appState.webURL == nil && !controller.appState.isExternalMediaDocument
+            return controller.appState.readingState.isCamera
+                ? controller.appState.readingState.cameraController?.hasFrame == true
+                : controller.appState.readingState.imageURL != nil && controller.appState.readingState.webURL == nil && !controller.appState.readingState.isExternalMediaDocument
         }
         return super.validateMenuItem(menuItem)
     }
@@ -676,7 +676,7 @@ public class FloatingWindow: NSWindow {
             let identifier = chars == "[" ? "view.fitWindowToImage" : "view.fitImageToWindowWidth"
             if delegate?.isUsingDefaultShortcut(identifier) == true,
                let controller = windowController as? FloatingWindowController {
-                let isImageMode = controller.appState.usesImagePresentation
+                let isImageMode = controller.appState.readingState.usesImagePresentation
                 if isImageMode && controller.appState.showBorder {
                     if chars == "[" {
                         controller.fitWindowToCurrentImageSize()

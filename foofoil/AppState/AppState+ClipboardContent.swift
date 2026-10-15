@@ -129,6 +129,7 @@ extension AppState {
 
     /// 打开剪贴板等无来源文件的文本；`isMarkdown` 决定进入 Markdown 预览还是普通笔记。
     public func openText(_ content: String, isMarkdown: Bool) {
+        clearArchiveForNewContent()
         resetFileList()
         clearCustomCover()
 
@@ -161,6 +162,7 @@ extension AppState {
     /// 将 HTML 源码写入网页缓存文件后按网页打开。
     @discardableResult
     public func openHTML(_ html: String, originalName: String? = nil) -> Bool {
+        clearArchiveForNewContent()
         guard !html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               let destinationURL = getCachedContentURL(kind: "web", extension: "html"),
               (try? ContentCache.shared.write(Data(html.utf8), to: destinationURL)) != nil else {

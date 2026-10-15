@@ -32,6 +32,7 @@ struct WebView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
+        if appState.isArchivePreview { configuration.websiteDataStore = .nonPersistent() }
         configuration.userContentController.add(
             context.coordinator,
             name: Coordinator.editableFocusHandlerName

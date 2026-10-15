@@ -17,7 +17,7 @@ import FoofoilExtensionKit
 
 extension AppState {
         public func saveState() {
-            guard !isIncognito, !isFileOpenFeedback, !isBatchUpdating, !isAdjustingDocumentStyling else { return }
+            guard !isArchivePreview, !isIncognito, !isFileOpenFeedback, !isBatchUpdating, !isAdjustingDocumentStyling else { return }
             if hasOpenedContent || appleMusicReference != nil {
                 if !fileOpenFeedback.isEmpty { fileOpenFeedback = [] }
                 closesEmptyWindowAfterFileOpenFailure = false
@@ -29,12 +29,14 @@ extension AppState {
             }
             let config = toConfig()
             let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if appleMusicReference != nil || isCamera || imageURL != nil || webURL != nil || textURL != nil || extensionSession != nil || !trimmedText.isEmpty {
+            if archiveSession != nil || appleMusicReference != nil || isCamera || imageURL != nil || webURL != nil || textURL != nil || extensionSession != nil || !trimmedText.isEmpty {
                 HistoryManager.shared.addToHistory(config)
             }
         }
 
         public func loadConfig(_ config: WindowConfig) {
+            archiveSession?.close()
+            archiveSession = nil
             appleMusicItem = nil
             // 即使连续载入同一条历史，也必须使上一轮异步恢复失效。
             currentMediaRouteGeneration &+= 1
@@ -100,7 +102,7 @@ extension AppState {
                 )
             }
 
-            if let path = config.imagePath {
+            if let path = config.imagePath, config.contentKind != .archive {
                 let url = URL(fileURLWithPath: path)
                 // 视频/音频经安全范围书签恢复沙盒访问（重启后路径直接不可达）
                 if config.contentKind == .quickLook || Self.isExternalMediaFileName(config.originalImageName ?? path) {
@@ -184,6 +186,7 @@ extension AppState {
                 self.text = config.text
             }
             self.appleMusicReference = config.appleMusicReference
+            if let source = config.archiveSource, !source.volumes.isEmpty { restoreArchive(source) }
         }
 
         /// 恢复图片箔的派生内容缓存（OCR 文字与主体抠图）以及菜单可用性判断所需的"已分析"标记。
@@ -220,6 +223,15 @@ extension AppState {
         }
 
         public func toConfig() -> WindowConfig {
+            if let archiveSession {
+                return WindowConfig(id: id, imagePath: archiveSession.source.primaryURL.path,
+                    originalImageName: archiveSession.source.primaryURL.lastPathComponent,
+                    isPinned: isPinned, opacity: opacity, windowFrame: windowFrame,
+                    createdAt: createdAt, contentKind: .archive, sourceFingerprint: sourceFingerprint,
+                    customTitle: customTitle, videoBookmark: archiveSession.source.volumes.first?.bookmark,
+                    navigatorPanelSide: navigatorPanelSide, navigatorPanelVisibilityMode: navigatorPanelVisibilityMode,
+                    navigatorPanelWidth: navigatorPanelWidth, archiveSource: archiveSession.source)
+            }
             // 视频扩展也记录原文件来源，供历史存活检查及重启后授权恢复使用。
             let videoResource = isVideoDocument ? extensionSession.flatMap { ExtensionPlaybackSupport.authorizedResource(in: $0, fileList: fileList) } : nil
             return WindowConfig(
