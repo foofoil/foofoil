@@ -385,7 +385,7 @@ extension AppDelegate {
         viewMenu.addItem(NSMenuItem.separator())
 
         // 侧边栏显示模式收进子菜单：顶部为循环切换项（带快捷键），下面是三个单选模式；换边项仍在视图菜单一层。
-        let navigatorMenu = NSMenu(title: NSLocalizedString("Navigator", comment: ""))
+        let navigatorMenu = NSMenu(title: NSLocalizedString("Navigator Visibility", comment: ""))
         let cycleNavigatorItem = NSMenuItem(
             title: NSLocalizedString("Cycle Navigator Visibility", comment: ""),
             action: #selector(toggleNavigatorPanelAction),
@@ -406,7 +406,7 @@ extension AppDelegate {
             modeItem.target = self
             navigatorMenu.addItem(modeItem)
         }
-        let navigatorMenuItem = NSMenuItem(title: NSLocalizedString("Navigator", comment: ""), action: nil, keyEquivalent: "")
+        let navigatorMenuItem = NSMenuItem(title: NSLocalizedString("Navigator Visibility", comment: ""), action: nil, keyEquivalent: "")
         navigatorMenuItem.withSymbol("sidebar.squares.leading")
         navigatorMenuItem.submenu = navigatorMenu
         viewMenu.addItem(navigatorMenuItem)

@@ -284,7 +284,7 @@ struct NavigatorPanelView: View {
 
     /// 显示模式子菜单，与视图菜单同构：循环切换项带快捷键，下面是三个单选模式。
     private var navigatorVisibilityMenu: some View {
-        Menu(NSLocalizedString("Navigator", comment: "")) {
+        Menu(NSLocalizedString("Navigator Visibility", comment: "")) {
             Button {
                 appState.cycleNavigatorPanelVisibilityMode()
             } label: {
@@ -337,8 +337,8 @@ struct NavigatorPanelView: View {
             Label(
                 NSLocalizedString(
                     appState.navigatorPanelSide == .left
-                        ? "Move Navigator to Right Side"
-                        : "Move Navigator to Left Side",
+                        ? "Move to Right Side"
+                        : "Move to Left Side",
                     comment: ""
                 ),
                 systemImage: appState.navigatorPanelSide == .left ? "sidebar.right" : "sidebar.left"

@@ -7985,6 +7985,40 @@
         "en": {
           "stringUnit": {
             "state": "translated",
+            "value": "Move Navigator to Left Side"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导航面板移到左侧"
+          }
+        }
+      }
+    },
+    "Move Navigator to Right Side": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Move Navigator to Right Side"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导航面板移到右侧"
+          }
+        }
+      }
+    },
+    "Move to Left Side": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
             "value": "Move to Left Side"
           }
         },
@@ -7996,7 +8030,7 @@
         }
       }
     },
-    "Move Navigator to Right Side": {
+    "Move to Right Side": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -8109,6 +8143,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "SACD"
+          }
+        }
+      }
+    },
+    "Navigator Visibility": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Navigator Visibility"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导航面板显示"
           }
         }
       }

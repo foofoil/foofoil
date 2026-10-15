@@ -1783,9 +1783,9 @@ struct FoofoilTests {
             return
         }
 
-        // 显示模式收进“导航面板”子菜单：循环切换项在顶部，其后是三个单选模式。
+        // 显示模式收进“导航面板显示”子菜单：循环切换项在顶部，其后是三个单选模式。
         let navigatorSubmenu = try #require(viewMenu.items.first {
-            $0.submenu?.title == NSLocalizedString("Navigator", comment: "")
+            $0.submenu?.title == NSLocalizedString("Navigator Visibility", comment: "")
         }?.submenu)
         let cycle = try #require(navigatorSubmenu.items.first { $0.action == #selector(AppDelegate.toggleNavigatorPanelAction) })
         #expect(cycle.title == NSLocalizedString("Cycle Navigator Visibility", comment: ""))
