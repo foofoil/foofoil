@@ -52,6 +52,8 @@ private struct SearchResultRow: View {
                 RoundedRectangle(cornerRadius: 7).fill(Color.secondary.opacity(0.12))
                 if let image = thumbnail.image {
                     Image(nsImage: image).resizable().scaledToFill()
+                } else if symbolName == AppleMusicReference.symbolName {
+                    AppleMusicTypeIcon(size: 28)
                 } else {
                     Image(systemName: symbolName).font(.title2).foregroundStyle(.secondary)
                 }
@@ -60,7 +62,11 @@ private struct SearchResultRow: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     if showsInlineIcon {
-                        Image(systemName: symbolName).foregroundStyle(.secondary)
+                        if symbolName == AppleMusicReference.symbolName {
+                            AppleMusicTypeIcon(size: 14)
+                        } else {
+                            Image(systemName: symbolName).foregroundStyle(.secondary)
+                        }
                     }
                     Text(title).font(.headline).lineLimit(1)
                     if let page = pageNumber {
@@ -122,7 +128,7 @@ struct AppleMusicLinkResultRow: View {
             AsyncImage(url: item?.artwork?.url(width: 112, height: 112)) { image in
                 image.resizable().scaledToFill()
             } placeholder: {
-                Image(systemName: AppleMusicReference.symbolName).font(.title2).foregroundStyle(.secondary)
+                AppleMusicTypeIcon(size: 36)
             }
             .frame(width: 56, height: 56).clipped().clipShape(RoundedRectangle(cornerRadius: 5))
             VStack(alignment: .leading, spacing: 4) {

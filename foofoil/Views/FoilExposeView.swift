@@ -972,6 +972,9 @@ struct FoilExposeItemView: View {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                                 .padding(12)
                             typeIconBadge
+                        } else if item.symbolName == AppleMusicReference.symbolName {
+                            // Apple Music 历史/搜索条目使用品牌红底白音符，避免看起来与普通音频图标相同。
+                            AppleMusicTypeIcon(size: item.contentKind == .camera ? 56 : 34)
                         } else {
                             // 没有缩略图时用大号类型图标占位，仍能看出内容类型；摄像头箔不展示画面，图标更大。
                             Image(systemName: item.symbolName)
@@ -1028,12 +1031,17 @@ struct FoilExposeItemView: View {
         VStack {
             Spacer()
             HStack {
-                Image(systemName: item.symbolName)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.92))
-                    .frame(width: 22, height: 22)
-                    .background(Circle().fill(Color.black.opacity(0.55)))
-                    .overlay(Circle().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
+                if item.symbolName == AppleMusicReference.symbolName {
+                    AppleMusicTypeIcon(size: 20)
+                        .frame(width: 22, height: 22)
+                } else {
+                    Image(systemName: item.symbolName)
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.92))
+                        .frame(width: 22, height: 22)
+                        .background(Circle().fill(Color.black.opacity(0.55)))
+                        .overlay(Circle().stroke(Color.white.opacity(0.18), lineWidth: 0.5))
+                }
                 Spacer()
             }
         }
@@ -1097,11 +1105,16 @@ private struct FoilExposeSearchResultView: View {
     var body: some View {
         Button(action: onOpen) {
             HStack(spacing: 10) {
-                Image(systemName: symbolName)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .frame(width: 30, height: 30)
-                    .background(RoundedRectangle(cornerRadius: 7).fill(Color.white.opacity(0.1)))
+                if symbolName == AppleMusicReference.symbolName {
+                    AppleMusicTypeIcon(size: 24)
+                        .frame(width: 30, height: 30)
+                } else {
+                    Image(systemName: symbolName)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .frame(width: 30, height: 30)
+                        .background(RoundedRectangle(cornerRadius: 7).fill(Color.white.opacity(0.1)))
+                }
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 13, weight: .medium))

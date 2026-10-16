@@ -116,8 +116,14 @@ struct HistoryCardView: View {
         }
     }
 
+    @ViewBuilder
     private var audioPlaceholder: some View {
-        mediaPlaceholder(systemName: config.appleMusicReference != nil ? AppleMusicReference.symbolName : "music.note")
+        if config.appleMusicReference != nil {
+            AppleMusicTypeIcon(size: 36)
+                .frame(width: 60, height: 60)
+        } else {
+            mediaPlaceholder(systemName: "music.note")
+        }
     }
 
     private var videoPlaceholder: some View {
@@ -165,11 +171,17 @@ struct HistoryCardView: View {
     @ViewBuilder
     private var mediaKindOverlay: some View {
         if isAudioHistory || isVideoHistory {
-            Image(systemName: isAudioHistory ? (config.appleMusicReference != nil ? AppleMusicReference.symbolName : "music.note") : "play.fill")
-                .font(.system(size: 22, weight: .semibold))
-                .foregroundStyle(.white.opacity(0.82))
-                .shadow(color: .black.opacity(0.5), radius: 3, y: 1)
-                .accessibilityHidden(true)
+            if isAudioHistory && config.appleMusicReference != nil {
+                AppleMusicTypeIcon(size: 24)
+                    .shadow(color: .black.opacity(0.5), radius: 3, y: 1)
+                    .accessibilityHidden(true)
+            } else {
+                Image(systemName: isAudioHistory ? "music.note" : "play.fill")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.82))
+                    .shadow(color: .black.opacity(0.5), radius: 3, y: 1)
+                    .accessibilityHidden(true)
+            }
         }
     }
 
