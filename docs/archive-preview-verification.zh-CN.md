@@ -167,3 +167,26 @@ RAR4/RAR5 卷组在索引前验证末卷 ENDARC 记录、CRC 和后续卷标志�
 
 
 本轮相关套件 79 项测试通过（动态参数展开为 82 次），随后归档套件 24 项复测通过，包含新增总深度边界及跨层深度超限时丢弃目录的检查。实际窗口验证：Unified-Preview.zip 中选中 nested.zip 不打开其目录，点展开箭头后内容直接挂在原节点下；折叠/再展开恢复已读子树，当前 EPUB 正文不变；包内 EPUB 从 Chapter One 翻至 Chapter Two，侧栏始终显示压缩包树，没有导航来源切换菜单或书籍目录。已执行 `./run` 构建并启动当前应用。
+
+## 容器格式、普通 ISO 与双模式历史（2026-10-16）
+
+- 新增默认包浏览：APK、JAR/WAR/EAR、CBZ/CBR/CB7/CBT、KRA。继续使用系统 libarchive，不增加依赖，不执行安装包，不反编译编译资源。
+- 启用系统 ISO 9660 读取器，无需挂载；常见 Joliet/Rock Ridge 扩展由读取器处理。纯 UDF 与 DMG 不在此次支持范围，已有大小和输出预算继续适用。
+- `.iso` 优先通过现有音频 provider 的内容探测识别 SACD，宿主不重复实现 SACD 格式解析。外部及包内 SACD 均保留音频呈现；普通内嵌 ISO 仅在展开时读取目录，选择时可提取并缓存以区分 SACD。
+- Office ZIP 容器（含宏、模板及 OpenDocument 格式）与 EPUB 保留原预览。“文件 → 打开包内容”和正文上下文菜单在新箔片中打开原包。旧版 DOC/XLS/PPT 无此入口。
+- 历史按来源及是否包浏览分别去重；同一文档普通预览和包浏览各自保留记录，包记录恢复为未选择状态的包树，文档记录仍恢复原阅读器。保留文件名和独立图标，不以缓存文件名作为标题。
+- 从包内文档另开时，普通箔复制到统一管理的持久缓存，并将来源纳入缓存引用和活动路径保护；无痕箔只共享临时租约。创建会话时即传入租约，覆盖异步扫描生命周期。原文件移动时，菜单优先使用当前会话解析后的实际资源。
+
+自动验证：
+
+- 72 项回归通过（ArchiveContainerTests、ArchiveTests、HistorySearchTests、ShareContentTests、FileOpenFeedbackTests、ContentCacheTests、NavigatorSearchTests、ChapterNavigationTests）；对应日志 `/tmp/foofoil-containers-final-tests.log`。
+- 随后补充原文件路径失效回归，7 项容器专项全部通过（参数化测试另有动态用例），日志 `/tmp/foofoil-containers-menu-tests.log`。
+- 覆盖改后缀的 ZIP 容器实际正文预览、自建 ISO 9660 读取与原字节导出、嵌套 ISO、SACD sniff 分流、Office/EPUB 新建包会话与恢复、两种历史反复打开互不覆盖、包内文档的无痕租约及普通持久缓存。
+- `./run` 成功构建并启动，日志 `/tmp/foofoil-containers-run.log`。此次未重新执行 Release 打包与公证。
+
+原生界面验证：
+
+- 自建 DOCX 默认显示 Quick Look 正文；“打开包内容”新建包箔，根节点保留 `Package-Preview.docx`，`word/document.xml` 使用共用代码高亮预览。
+- 历史菜单同时显示两条 Word 记录，选择普通预览记录仍恢复 Word 正文。
+- 自建 EPUB 默认显示章节正文，“打开包内容”另开根节点为 `Package-Book.epub` 的包树，含 mimetype、META-INF、OEBPS。
+- 系统生成的 ISO 9660/Joliet 镜像直接显示 `Ordinary.iso` 目录，内部 `script.js` 正常显示代码，无挂载操作。
