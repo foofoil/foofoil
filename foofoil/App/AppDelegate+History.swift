@@ -110,28 +110,6 @@ extension AppDelegate {
     public func openSearchResultInNewWindow(id: UUID) {
         guard let config = HistoryRepository.shared.config(id: id),
               SettingsStore.shared.appleMusicLibraryEnabled || config.appleMusicReference == nil else { return }
-        let requiredPaths = [config.imagePath, config.textPath].compactMap { $0 }
-        if requiredPaths.contains(where: { !FileManager.default.fileExists(atPath: $0) }) {
-            // 音视频经安全范围书签仍可访问时放行（沙盒重启后路径直接不可达但授权可恢复）。
-            let kind = config.contentKind ?? HistoryContentKind.infer(from: config)
-            let isExternalMedia = kind == .video || kind == .audio
-            if isExternalMedia, let bookmark = config.videoBookmark, AppState.resolveVideoBookmark(bookmark) != nil {
-                openHistoryConfig(config: config, id: id)
-                return
-            }
-            // 音视频源文件缺失时直接移除历史记录，不再提示。
-            if isExternalMedia {
-                HistoryRepository.shared.remove(id: config.id)
-                HistoryManager.shared.refresh()
-                HistorySearchWindowController.shared.dismiss()
-                return
-            }
-            let alert = NSAlert()
-            alert.messageText = NSLocalizedString("History Content Missing Title", comment: "")
-            alert.informativeText = NSLocalizedString("History Content Missing Message", comment: "")
-            alert.runModal()
-            return
-        }
         openHistoryConfig(config: config, id: id)
     }
 
@@ -139,10 +117,17 @@ extension AppDelegate {
         let musicController = config.appleMusicReference == nil ? nil : windowControllers.first { $0.appState.appleMusicReference != nil && !$0.appState.isIncognito }
         if let controller = musicController ?? availableBlankWindowController {
             controller.appState.saveState()
-            controller.appState.loadConfig(config)
+            guard controller.appState.loadConfig(config) else {
+                HistorySearchWindowController.shared.dismiss()
+                return
+            }
             activateWindow(controller)
         } else {
-            let state = AppState(config: config)
+            let state = AppState()
+            guard state.loadConfig(config) else {
+                HistorySearchWindowController.shared.dismiss()
+                return
+            }
             let controller = FloatingWindowController(appState: state)
             if config.windowFrame == nil { controller.window?.center() }
             addWindowController(controller)
@@ -158,47 +143,8 @@ extension AppDelegate {
               SettingsStore.shared.appleMusicLibraryEnabled || config.appleMusicReference == nil else { return }
 
         NSApp.activate(ignoringOtherApps: true)
-        if config.appleMusicReference != nil {
-            openHistoryConfig(config: config, id: config.id)
-            return
-        }
-
-        // 优先在当前活跃的空白窗口中加载
-        if let activeState = activeAppState {
-            if isBlank(activeState) && !activeState.isIncognito {
-                withAnimation(.easeInOut(duration: 0.35)) {
-                    activeState.loadConfig(config)
-                }
-                activeWindowController?.window?.makeKeyAndOrderFront(nil)
-                return
-            }
-        }
-
-        // 否则，创建一个新窗口并加载该历史项
-        let state = AppState()
-        state.loadConfig(config)
-        let controller = FloatingWindowController(appState: state)
-
-        // 只有当历史记录中没有保存窗口的位置时，才需要将其居中或根据 keyWindow 偏移
-        if config.windowFrame == nil {
-            if let keyWindow = NSApplication.shared.keyWindow {
-                let keyFrame = keyWindow.frame
-                let size = controller.window?.frame.size ?? NSSize(width: 400, height: 400)
-                let offsetFrame = NSRect(
-                    x: keyFrame.minX + 30,
-                    y: keyFrame.minY - 30,
-                    width: size.width,
-                    height: size.height
-                )
-                controller.window?.setFrame(offsetFrame, display: true)
-            } else {
-                controller.window?.center()
-            }
-        }
-
-        addWindowController(controller)
-        controller.showWindow(nil)
-        controller.window?.makeKeyAndOrderFront(nil)
+        // 所有历史入口共用恢复结果，失败时只显示反馈箔，不再创建空白内容窗口。
+        openHistoryConfig(config: config, id: config.id)
     }
 
     @objc func clearHistoryAction() {

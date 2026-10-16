@@ -7,18 +7,23 @@ public final class HistoryManager: ObservableObject {
     public static let shared = HistoryManager()
 
     @Published public private(set) var historyConfigs: [WindowConfig] = []
+    private var checkingFiles = false
+    private let fileCheckQueue = DispatchQueue(label: "com.foofoil.history.file-check", qos: .utility)
     private let repository = HistoryRepository.shared
     private let listSaveQueue = DispatchQueue(label: "com.foofoil.history.large-list", qos: .utility)
     private var pendingListConfigs: [UUID: WindowConfig] = [:]
     private var listSaveWorkItem: DispatchWorkItem?
     private var historyMutationGeneration: UInt64 = 0
 
-    private init() { refresh() }
+    private init() {
+        refresh()
+        ContentCache.shared.recoverOrphanBodies()
+    }
 
     public func refresh() {
         let configs = repository.recent(limit: 30)
-        if Thread.isMainThread { historyConfigs = configs }
-        else { DispatchQueue.main.async { self.historyConfigs = configs } }
+        if Thread.isMainThread { historyConfigs = configs; checkFileReferences() }
+        else { DispatchQueue.main.async { self.historyConfigs = configs; self.checkFileReferences() } }
     }
 
     public func addToHistory(_ config: WindowConfig) {
@@ -40,15 +45,18 @@ public final class HistoryManager: ObservableObject {
         ContentIndexCoordinator.shared.schedule(config: config)
     }
 
-    public func removeFromHistory(_ config: WindowConfig) {
+    public func removeFromHistory(_ config: WindowConfig, preservingLegacyBody: Bool = false) {
         historyMutationGeneration &+= 1
         pendingListConfigs.removeValue(forKey: config.id)
         // 排空已提交写入，防止后台任务在删除之后重新创建历史项。
         listSaveQueue.sync {}
         ContentIndexCoordinator.shared.cancel(historyID: config.id)
-        repository.remove(id: config.id)
+        guard repository.remove(ids: [config.id]) else { return }
+        forgetRestoration(ids: [config.id])
         let referencedPaths = Set(repository.recent(limit: Int.max).flatMap(cachePaths(for:)))
-        removeCacheFiles(for: config, preserving: activeCachePaths().union(referencedPaths))
+        let legacyPaths = preservingLegacyBody ? config.legacyExternalBodyPaths : []
+        removeCacheFiles(for: config, preserving: referencedPaths.union(legacyPaths))
+        ContentCache.shared.retire(Set(cachePaths(for: config)).subtracting(legacyPaths))
         refreshUI()
     }
 
@@ -73,10 +81,14 @@ public final class HistoryManager: ObservableObject {
                 let preservedPaths = activePaths.union(referencedPaths)
                 for path in candidatePaths where !preservedPaths.contains(path) {
                     let url = URL(fileURLWithPath: path)
-                    if AppState.isManagedCacheURL(url) { try? FileManager.default.removeItem(at: url) }
+                    if AppState.isManagedCacheURL(url) { ContentCache.shared.retire([path]) }
                 }
                 continuation.resume(returning: true)
             }
+        }
+        if success {
+            forgetRestoration(ids: ids)
+            ContentCache.shared.retire(candidatePaths)
         }
         refreshUI()
         return success
@@ -99,7 +111,7 @@ public final class HistoryManager: ObservableObject {
         for directoryURL in AppState.cacheDirectoryURLs() {
             guard let enumerator = FileManager.default.enumerator(at: directoryURL, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else { continue }
             for case let fileURL as URL in enumerator where AppState.isManagedCacheURL(fileURL) && !activePaths.contains(fileURL.path) {
-                try? FileManager.default.removeItem(at: fileURL)
+                ContentCache.shared.retire([fileURL.path])
             }
         }
         clearThumbnailFiles(preserving: activeIDs)
@@ -121,6 +133,66 @@ public final class HistoryManager: ObservableObject {
                     }
                 } else {
                     try? FileManager.default.removeItem(at: fileURL)
+                }
+            }
+        }
+    }
+
+    nonisolated private static func snapshotData(_ config: WindowConfig) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return try encoder.encode(config)
+    }
+
+    private func forgetRestoration(ids: Set<UUID>) {
+        SettingsStore.shared.lastOpenWindowConfigs.removeAll { ids.contains($0.id) }
+        SettingsStore.shared.windowConfigs.removeAll { ids.contains($0.id) }
+        for id in ids {
+            for root in AppState.cacheDirectoryURLs() {
+                try? FileManager.default.removeItem(at: root.appendingPathComponent("Thumbnails/\(id).heic"))
+            }
+        }
+    }
+
+    /// 单队列分批检查；结果提交前比对完整快照，避免覆盖窗口期间的新状态。
+    func checkFileReferences() {
+        guard !checkingFiles else { return }
+        checkingFiles = true
+        Task { @MainActor in
+            defer { checkingFiles = false }
+            var cursor: UUID?
+            while true {
+                let batchCursor = cursor
+                let results: [(WindowConfig, (config: WindowConfig, missing: Bool))] = await withCheckedContinuation { continuation in
+                    fileCheckQueue.async {
+                        let batch = self.repository.fileCheckBatch(after: batchCursor)
+                        continuation.resume(returning: batch.map { ($0, $0.resolvingFileReferences()) })
+                    }
+                }
+                guard let last = results.last else { break }
+                cursor = last.0.id
+                for (old, result) in results { applyFileReferenceResult(old, result: result) }
+                historyConfigs = repository.recent(limit: 30)
+            }
+        }
+    }
+
+    /// 结果提交与设置检查在主线程完成；供异步竞态回归直接验证。
+    func applyFileReferenceResult(_ old: WindowConfig, result: (config: WindowConfig, missing: Bool)) {
+        guard let current = repository.config(id: old.id),
+              (try? Self.snapshotData(current)) == (try? Self.snapshotData(old)) else { return }
+        if result.missing {
+            if SettingsStore.shared.automaticallyRemoveMissingHistory { removeFromHistory(current, preservingLegacyBody: true) }
+        } else if (try? Self.snapshotData(result.config)) != (try? Self.snapshotData(old)) {
+            // 关闭清理时也不能静默裁剪文件列表。
+            if SettingsStore.shared.automaticallyRemoveMissingHistory || result.config.fileList?.items.count == old.fileList?.items.count {
+                _ = repository.upsert(result.config)
+                if let state = (NSApplication.shared.delegate as? AppDelegate)?.windowControllers.first(where: { $0.appState.id == old.id })?.appState,
+                   let list = result.config.fileList, list.items.count != old.fileList?.items.count {
+                    let previousID = state.fileList?.currentID
+                    state.fileList = list
+                    state.syncFileListNavigator()
+                    if previousID != list.currentID { state.presentFileListItem(id: list.currentID, rotatesIdentity: false) }
                 }
             }
         }
@@ -179,6 +251,8 @@ public final class HistoryManager: ObservableObject {
 
     private func cachePaths(for config: WindowConfig) -> [String] {
         var paths = [config.imagePath, config.textPath, config.customCoverPath, config.imageSubjectPath].compactMap { $0 }
+        paths.append(contentsOf: config.fileList?.items.map(\.path) ?? [])
+        paths.append(contentsOf: config.archiveSource?.volumes.map(\.path) ?? [])
         if let value = config.webURLString, let url = URL(string: value), url.isFileURL { paths.append(url.path) }
         if let imagePath = config.imagePath,
            let copy = FragmentedMP4PlaybackCopy.copyURL(for: URL(fileURLWithPath: imagePath)) {
@@ -190,11 +264,12 @@ public final class HistoryManager: ObservableObject {
     private func removeCacheFiles(for config: WindowConfig, preserving paths: Set<String>) {
         for path in cachePaths(for: config) where !paths.contains(path) {
             let url = URL(fileURLWithPath: path)
-            if AppState.isManagedCacheURL(url) { try? FileManager.default.removeItem(at: url) }
+            if AppState.isManagedCacheURL(url) { ContentCache.shared.retire([path]) }
         }
     }
 
     private func hasPersistableContent(_ config: WindowConfig) -> Bool {
-        config.appleMusicReference != nil || config.extensionID != nil || config.imagePath != nil || config.webURLString != nil || config.textPath != nil || !config.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        guard config.sourceFingerprint?.hasPrefix("archive-entry:") != true else { return false }
+        return config.appleMusicReference != nil || config.extensionID != nil || config.imagePath != nil || config.webURLString != nil || config.textPath != nil || !config.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }

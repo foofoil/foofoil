@@ -26,6 +26,17 @@ struct HistoryCardView: View {
                     .opacity(isPressed ? 0.7 : (isHovered ? 1.0 : 0.95))
             )
             .cornerRadius(8)
+            .overlay(alignment: .bottomTrailing) {
+                if config.isClipboardContent {
+                    Image(systemName: "doc.on.clipboard")
+                        .font(.system(size: 10))
+                        .padding(4)
+                        .background(.regularMaterial, in: Circle())
+                        .padding(3)
+                        .help(Text("From Clipboard"))
+                        .accessibilityLabel(Text("From Clipboard"))
+                }
+            }
             .overlay(
                 shortcutOverlay
                     .animation(.easeInOut(duration: 0.15), value: shortcutText)

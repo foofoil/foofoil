@@ -10,6 +10,7 @@ nonisolated public struct HistorySearchResult: Identifiable, Sendable, Equatable
     public let score: Double
     public var sourcePath: String? = nil
     public var isAppleMusic: Bool = false
+    public var isClipboardContent: Bool = false
     public var symbolName: String { isAppleMusic ? AppleMusicReference.symbolName : contentKind.symbolName }
 }
 

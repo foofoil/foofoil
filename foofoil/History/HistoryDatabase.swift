@@ -212,6 +212,16 @@ nonisolated final class HistoryDatabase {
         try queue.sync { try updateIndexStatus(id: id, status: status, error: error) }
     }
 
+    /// 文件检查按主键分页，不随历史删除或访问时间更新跳过后续记录。
+    func fileCheckBatch(after id: UUID?, limit: Int) throws -> [WindowConfig] {
+        try queue.sync {
+            if let id {
+                return try queryConfigs("SELECT * FROM history_items WHERE id > ? ORDER BY id LIMIT ?", bindings: [id.uuidString, limit])
+            }
+            return try queryConfigs("SELECT * FROM history_items ORDER BY id LIMIT ?", bindings: [limit])
+        }
+    }
+
     func recent(limit: Int) throws -> [WindowConfig] {
         try queue.sync {
             try queryConfigs("SELECT * FROM history_items ORDER BY last_opened_at DESC LIMIT ?", bindings: [limit])

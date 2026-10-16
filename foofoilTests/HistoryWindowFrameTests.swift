@@ -89,7 +89,7 @@ struct HistoryWindowFrameTests {
         var config = storedConfig ?? documentConfig
         if storedConfig == nil { config.windowFrame = capturedFrame }
         withAnimation(.easeInOut(duration: 0.35)) {
-            state.loadConfig(config)
+            _ = state.loadConfig(config)
         }
         try await Task.sleep(for: .milliseconds(600))
         #expect(abs(window.frame.minX - savedFrame.minX) < 1)

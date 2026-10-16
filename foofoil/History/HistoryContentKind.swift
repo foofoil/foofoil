@@ -69,7 +69,10 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
         }
         if name.hasSuffix(".md") || name.hasSuffix(".markdown") { return .markdown }
         if name.hasSuffix(".csv") { return .csv }
-        if config.textPath != nil { return .text }
+        if let path = config.textPath {
+            if AppState.isManagedCacheURL(URL(fileURLWithPath: path)), config.originalImageName == nil { return .note }
+            return .text
+        }
         return .note
     }
 }

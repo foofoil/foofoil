@@ -68,7 +68,7 @@ extension AppState {
     }
 
     func restoreFileList(from config: WindowConfig) {
-        guard var list = config.fileList, list.isPresentable else {
+        guard var list = config.fileList, !list.items.isEmpty else {
             resetFileList()
             return
         }
@@ -579,7 +579,7 @@ extension AppState {
         if let preview = archiveSession?.preview { return preview.verticalArrowsScrollContent }
         if isExtensionDocument { return true }
         if isMarkdownPreview && isMarkdownDocument && !text.isEmpty { return true }
-        return textURL != nil && !isMarkdownDocument
+        return isReadOnlyTextFile && !isMarkdownDocument
     }
 
     func activateAdjacentFileListItem(delta: Int, wraps: Bool = false) {

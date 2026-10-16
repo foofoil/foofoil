@@ -2,9 +2,9 @@ import Foundation
 
 nonisolated enum SharedFileImport {
     /// 仅导入分享扩展标记的临时文件；Finder 分享的原文件和目录继续使用原路径。
-    static func persist(_ urls: [URL], root: URL? = nil) throws -> [URL] {
+    static func persist(_ urls: [URL], root: URL? = nil, isIncognito: Bool = false) throws -> [URL] {
         let root = root ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("foofoil/Shared Items", isDirectory: true)
+            .appendingPathComponent(isIncognito ? "foofoil/Session Shared Items" : "foofoil/Shared Items", isDirectory: true)
         var created: [URL] = []
         do {
             return try urls.map { source in

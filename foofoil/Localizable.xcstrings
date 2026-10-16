@@ -1,6 +1,54 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "From Clipboard": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "From Clipboard"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "来自剪贴板"
+          }
+        }
+      }
+    },
+    "Missing History Cleanup Note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enabled by default. Keeps files on offline volumes and entries that need authorization."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认开启。离线卷、需要授权和暂时不可用的记录会保留。"
+          }
+        }
+      }
+    },
+    "Automatically Remove Missing History": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatically remove history for missing files"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动清理找不到文件的历史记录"
+          }
+        }
+      }
+    },
     "Open Package Contents": {
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Open Package Contents" } },
@@ -610,13 +658,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Least recently opened records are removed when needed. Open content is preserved."
+            "value": "Limits rebuildable previews and derived files. Saved clipboard content is retained until its history is deleted."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "空间不足时清除最久未访问的记录，保留正在打开的内容。"
+            "value": "限制可重建的预览与派生文件。剪贴板正文保留到对应历史被删除。"
           }
         }
       }

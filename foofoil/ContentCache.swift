@@ -7,6 +7,10 @@ nonisolated final class ContentCache: @unchecked Sendable {
     static let defaultLimit: Int64 = 2 * 1024 * 1024 * 1024
     private let queue = DispatchQueue(label: "com.foofoil.content-cache", qos: .utility)
     private let lock = NSLock()
+    private var retiredPaths: Set<String> = []
+    private var cleanupScheduled = false
+    private var leasedPaths: [String: Int] = [:]
+    private let bodyQueue = DispatchQueue(label: "com.foofoil.managed-body", qos: .utility)
     private var activeIDs: Set<UUID> = []
     private var activePaths: Set<String> = []
     private let repository: HistoryRepository
@@ -21,9 +25,114 @@ nonisolated final class ContentCache: @unchecked Sendable {
 
     func protect(_ ids: Set<UUID>, paths: Set<String> = []) {
         lock.lock()
+        let changed = activeIDs != ids || activePaths != paths
         activeIDs = ids
         activePaths = paths
         lock.unlock()
+        if changed { collectRetired() }
+    }
+
+    /// 正文不属于容量淘汰缓存；串行写入确保快速连续编辑不会乱序覆盖。
+    func enqueueBodyWrite(_ data: Data, to url: URL, completion: @escaping @Sendable (Error?) -> Void = { _ in }) {
+        retain([url.path])
+        bodyQueue.async {
+            defer { self.release([url.path]) }
+            do { try data.write(to: url, options: .atomic); completion(nil) }
+            catch { NSLog("托管正文保存失败：%@", error.localizedDescription); completion(error) }
+        }
+    }
+
+    func flushBodyWrites() { bodyQueue.sync {} }
+    func flushCleanup() { queue.sync {} }
+
+    private func owns(_ url: URL) -> Bool {
+        if AppState.isManagedCacheURL(url) { return true }
+        // 测试可注入隔离目录；运行时目录仍只来自应用支持路径。
+        return directories().contains { $0.standardizedFileURL.path == url.deletingLastPathComponent().standardizedFileURL.path }
+            && ["managed_body_", "session_body_", "cached_image_", "cached_text_", "cached_web_", "cached_cover_", "cached_subject_"].contains { url.lastPathComponent.hasPrefix($0) }
+    }
+
+    func hasLease(for path: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return (leasedPaths[path] ?? 0) > 0
+    }
+
+    func retain(_ paths: Set<String>) {
+        lock.lock()
+        for path in paths { leasedPaths[path, default: 0] += 1 }
+        lock.unlock()
+    }
+
+    func release(_ paths: Set<String>) {
+        lock.lock()
+        for path in paths { leasedPaths[path, default: 0] -= 1 }
+        lock.unlock()
+        collectRetired()
+    }
+
+    func retire(_ paths: Set<String>) {
+        let shareRoots = paths.compactMap { AppState.managedShareRoot(for: URL(fileURLWithPath: $0))?.path }
+        lock.lock(); retiredPaths.formUnion(paths); retiredPaths.formUnion(shareRoots); lock.unlock()
+        collectRetired()
+    }
+
+    private func collectRetired() {
+        lock.lock()
+        guard !retiredPaths.isEmpty, !cleanupScheduled else { lock.unlock(); return }
+        cleanupScheduled = true
+        lock.unlock()
+        queue.async {
+            var referenced: Set<String> = []
+            for config in self.repository.recent(limit: Int.max) {
+                referenced.formUnion([config.imagePath, config.textPath, config.customCoverPath, config.imageSubjectPath].compactMap { $0 })
+                if let value = config.webURLString, let url = URL(string: value), url.isFileURL { referenced.insert(url.path) }
+                referenced.formUnion(config.fileList?.items.map(\.path) ?? [])
+                referenced.formUnion(config.archiveSource?.volumes.map(\.path) ?? [])
+            }
+            self.lock.lock()
+            defer { self.cleanupScheduled = false; self.lock.unlock() }
+            for path in self.retiredPaths {
+                let prefix = path + "/"
+                guard !self.activePaths.contains(where: { $0 == path || $0.hasPrefix(prefix) }),
+                      !referenced.contains(where: { $0 == path || $0.hasPrefix(prefix) }),
+                      !self.leasedPaths.contains(where: { ($0.key == path || $0.key.hasPrefix(prefix)) && $0.value > 0 }) else { continue }
+                let url = URL(fileURLWithPath: path)
+                if self.owns(url) {
+                    try? FileManager.default.removeItem(at: url)
+                    let parent = url.deletingLastPathComponent()
+                    if ["Shared Items", "Session Shared Items"].contains(parent.deletingLastPathComponent().lastPathComponent),
+                       (try? FileManager.default.contentsOfDirectory(atPath: parent.path).isEmpty) == true {
+                        try? FileManager.default.removeItem(at: parent)
+                    }
+                }
+                self.retiredPaths.remove(path)
+            }
+        }
+    }
+
+    /// 只回收新生命周期明确拥有的残留；旧缓存可能是唯一正文，留给显式处置。
+    func recoverOrphanBodies() {
+        queue.async {
+            let cutoff = Date().addingTimeInterval(-86400)
+            for directory in self.directories() {
+                guard let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey]) else { continue }
+                let candidates = files.filter {
+                    ($0.lastPathComponent.hasPrefix("session_body_") || $0.lastPathComponent.hasPrefix("managed_body_")) &&
+                    ((try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantFuture) < cutoff
+                }
+                self.retire(Set(candidates.map(\.path)))
+                let shares = directory.appendingPathComponent("Session Shared Items")
+                if let enumerator = FileManager.default.enumerator(at: shares, includingPropertiesForKeys: [.contentModificationDateKey, .isRegularFileKey]) {
+                    for case let url as URL in enumerator {
+                        if let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .isRegularFileKey]),
+                           values.isRegularFile == true, (values.contentModificationDate ?? .distantFuture) < cutoff {
+                            self.retire([url.path])
+                        }
+                    }
+                }
+            }
+        }
     }
 
     var usage: Int64 { queue.sync { files().values.reduce(0, +) } }
@@ -48,6 +157,14 @@ nonisolated final class ContentCache: @unchecked Sendable {
     }
 
     func write(to destination: URL, produce: (URL) throws -> Void) throws {
+        if destination.lastPathComponent.hasPrefix("managed_body_") || destination.lastPathComponent.hasPrefix("session_body_") {
+            let temporary = destination.deletingLastPathComponent().appendingPathComponent(".body-\(UUID()).tmp")
+            defer { try? FileManager.default.removeItem(at: temporary) }
+            try produce(temporary)
+            if FileManager.default.fileExists(atPath: destination.path) { _ = try FileManager.default.replaceItemAt(destination, withItemAt: temporary) }
+            else { try FileManager.default.moveItem(at: temporary, to: destination) }
+            return
+        }
         let temporary = destination.deletingLastPathComponent().appendingPathComponent(".cache-\(UUID().uuidString).tmp")
         defer { try? FileManager.default.removeItem(at: temporary) }
         try produce(temporary)
@@ -70,7 +187,10 @@ nonisolated final class ContentCache: @unchecked Sendable {
         var result: [String: Int64] = [:]
         for directory in directories() {
             guard let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey], options: [.skipsHiddenFiles]) else { continue }
-            for case let url as URL in enumerator where AppState.isManagedCacheURL(url) || (url.deletingLastPathComponent().lastPathComponent == "Thumbnails" && UUID(uuidString: url.deletingPathExtension().lastPathComponent) != nil) {
+            for case let url as URL in enumerator where AppState.isManagedCacheURL(url) ||
+                (url.deletingLastPathComponent().standardizedFileURL.path == directory.standardizedFileURL.path && ["cached_image_", "cached_text_", "cached_web_", "cached_cover_", "cached_subject_"].contains(where: { url.lastPathComponent.hasPrefix($0) })) || (url.deletingLastPathComponent().lastPathComponent == "Thumbnails" && UUID(uuidString: url.deletingPathExtension().lastPathComponent) != nil) {
+                guard !url.lastPathComponent.hasPrefix("managed_body_"), !url.lastPathComponent.hasPrefix("session_body_"),
+                      !url.path.contains("/Shared Items/"), !url.path.contains("/Session Shared Items/") else { continue }
                 guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]), values.isRegularFile == true else { continue }
                 result[url.path] = Int64(values.fileSize ?? 0)
             }
@@ -100,7 +220,7 @@ nonisolated final class ContentCache: @unchecked Sendable {
         let protected = active.union(configs.filter { config in excluded.contains(where: { $0.contains(config.id.uuidString) }) }.map(\.id))
         let references = Dictionary(uniqueKeysWithValues: configs.map { ($0.id, paths(for: $0, files: cached)) })
         let protectedPaths = configs.filter { protected.contains($0.id) }.reduce(into: excluded.union(openPaths)) { $0.formUnion(references[$1.id] ?? []) }
-        var candidates: [(WindowConfig?, Set<String>)] = []
+        var candidates: [Set<String>] = []
         let referenced = references.values.reduce(into: Set<String>()) { $0.formUnion($1) }
         // 无历史引用的残留缓存优先回收。
         let orphanPaths = cached.keys.sorted {
@@ -108,30 +228,24 @@ nonisolated final class ContentCache: @unchecked Sendable {
             let second = (try? FileManager.default.attributesOfItem(atPath: $1)[.modificationDate] as? Date) ?? .distantPast
             return first == second ? $0 < $1 : first < second
         }
-        for path in orphanPaths where !referenced.contains(path) && !protectedPaths.contains(path) && !protected.contains(where: { path.contains($0.uuidString) }) {
-            candidates.append((nil, [path]))
+        for path in orphanPaths where !["cached_image", "cached_text_", "cached_web_", "cached_package_"].contains(where: { URL(fileURLWithPath: path).lastPathComponent.hasPrefix($0) }) && !referenced.contains(path) && !protectedPaths.contains(path) && !protected.contains(where: { path.contains($0.uuidString) }) {
+            candidates.append([path])
         }
-        var owners: [String: Int] = [:]
-        for paths in references.values {
-            for path in paths { owners[path, default: 0] += 1 }
+        // 历史仍引用的正文不可淘汰；只清理可重新生成的缩略图和派生资源。
+        var bodies: Set<String> = []
+        for config in configs {
+            bodies.formUnion([config.imagePath, config.textPath].compactMap { $0 })
+            if let value = config.webURLString, let url = URL(string: value), url.isFileURL { bodies.insert(url.path) }
+            bodies.formUnion(config.fileList?.items.map(\.path) ?? [])
+            bodies.formUnion(config.archiveSource?.volumes.map(\.path) ?? [])
         }
-        for config in configs.reversed() where !protected.contains(config.id) {
-            let paths = references[config.id] ?? []
-            guard paths.contains(where: { cached[$0] != nil }), paths.isDisjoint(with: protectedPaths) else { continue }
-            var removable: Set<String> = []
-            for path in paths {
-                owners[path, default: 0] -= 1
-                if owners[path] == 0, !excluded.contains(path) { removable.insert(path) }
-            }
-            candidates.append((config, removable))
+        for path in referenced where cached[path] != nil && !bodies.contains(path) && !protectedPaths.contains(path) {
+            candidates.append([path])
         }
         // 先确认空间足够，避免写入注定失败却已删除用户历史。
-        let available = Set(candidates.flatMap { $0.1 }).reduce(Int64(0)) { $0 + (cached[$1] ?? 0) }
+        let available = Set(candidates.flatMap { $0 }).reduce(Int64(0)) { $0 + (cached[$1] ?? 0) }
         guard total - available <= limit else { throw CocoaError(.fileWriteOutOfSpace) }
-        for (config, paths) in candidates where total > limit {
-            if let config {
-                guard repository.remove(ids: [config.id]) else { throw CocoaError(.fileWriteUnknown) }
-            }
+        for paths in candidates where total > limit {
             for path in paths where cached[path] != nil {
                 if FileManager.default.fileExists(atPath: path) { try FileManager.default.removeItem(atPath: path) }
                 total -= cached[path] ?? 0

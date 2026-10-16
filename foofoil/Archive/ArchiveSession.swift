@@ -67,7 +67,10 @@ nonisolated final class ArchivePreviewLease: Sendable {
     }
     var canExport: Bool { selected.map { $0.isDirectory || $0.isRegular } == true && !exporting && index != nil }
 
+    let hasTemporarySource: Bool
+
     init(source: ArchiveSource, sourceLease: ArchivePreviewLease? = nil) {
+        self.hasTemporarySource = sourceLease != nil
         self.sourceLease = sourceLease
         var urls: [URL] = []
         var accessed: [URL] = []

@@ -15,6 +15,49 @@ import SwiftUI
 
 
 extension AppState {
+        /// 每个窗口只结束自己成功取得的安全范围访问。
+        func retainFileAccess(to url: URL) {
+            guard !isArchivePreview else { return }
+            if accessingVideoURL == url { return }
+            stopVideoAccess()
+            videoBookmarkData = nil
+            mediaSidecarBookmarkData = nil
+            guard url.isFileURL, !Self.isManagedCacheURL(url) else { return }
+            if url.startAccessingSecurityScopedResource() { accessingVideoURL = url }
+            videoBookmarkData = Self.makeSecurityScopedBookmark(for: url)
+        }
+
+        func managedBodyURL(extension ext: String) -> URL? {
+            guard let root = Self.getFoofoilDirectoryURL() else { return nil }
+            try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let prefix = isIncognito ? "session_body_" : "managed_body_"
+            let url = root.appendingPathComponent("\(prefix)\(UUID().uuidString).\(ext)")
+            ownedBodyPaths.insert(url.path)
+            return url
+        }
+
+        /// 便笺与剪贴板正文走同一托管路径；编辑防抖后才写入，不回写外部原文件。
+        func persistManagedTextIfNeeded(createIfNeeded: Bool = false) {
+            guard (!text.isEmpty || textURL != nil), imageURL == nil, webURL == nil, extensionSession == nil,
+                  sourceFingerprint != KeyboardShortcutsOverview.sourceFingerprint,
+                  sourceFingerprint != SupportedContentOverview.sourceFingerprint else { return }
+            if textURL == nil, createIfNeeded {
+                textURL = managedBodyURL(extension: isMarkdownPreview && isMarkdownDocument ? "md" : "txt")
+            }
+            guard let url = textURL, Self.isManagedCacheURL(url) else { return }
+            if let previous = lastManagedTextWrite, previous.url == url, previous.text == text { return }
+            lastManagedTextWrite = (url, text)
+            let content = Data(text.utf8)
+            ContentCache.shared.enqueueBodyWrite(content, to: url) { [weak self] error in
+                guard error != nil else { return }
+                Task { @MainActor [weak self] in
+                    guard let self, self.textURL == url else { return }
+                    self.lastManagedTextWrite = nil
+                    self.reportFileOpenFeedback([.init(url: url, reason: .failed)])
+                }
+            }
+        }
+
         // MARK: - Cache Management Helpers
 
         /// 将旧版本 Flofoil/Flamina 的数据目录迁移到 foofoil，仅在新目录不存在时执行。
@@ -63,10 +106,30 @@ extension AppState {
             return urls
         }
 
+        /// 临时分享导出的一个 UUID 目录是同一所有权单元；子目录条目也不能冒充用户原文件。
+        nonisolated static func managedShareRoot(for url: URL) -> URL? {
+            guard url.isFileURL, let support = getFoofoilDirectoryURL() else { return nil }
+            let resolved = url.resolvingSymlinksInPath().standardizedFileURL
+            for name in ["Shared Items", "Session Shared Items"] {
+                let root = support.appendingPathComponent(name).resolvingSymlinksInPath().standardizedFileURL
+                guard resolved.path.hasPrefix(root.path + "/") else { continue }
+                let relative = resolved.path.dropFirst(root.path.count + 1).split(separator: "/")
+                if let first = relative.first, UUID(uuidString: String(first)) != nil {
+                    return root.appendingPathComponent(String(first), isDirectory: true)
+                }
+            }
+            return nil
+        }
+
         /// 仅识别由本应用写入的缓存文件，避免误删 Application Support 中的其他内容。
         public nonisolated static func isManagedCacheURL(_ url: URL) -> Bool {
-            let name = url.lastPathComponent
-            return name.hasPrefix("cached_image") ||
+            let resolved = url.resolvingSymlinksInPath().standardizedFileURL
+            if Self.managedShareRoot(for: resolved) != nil { return true }
+            guard cacheDirectoryURLs().contains(where: {
+                resolved.deletingLastPathComponent().path == $0.resolvingSymlinksInPath().standardizedFileURL.path
+            }) else { return false }
+            let name = resolved.lastPathComponent
+            return name.hasPrefix("managed_body_") || name.hasPrefix("session_body_") || name.hasPrefix("cached_image") ||
                 name.hasPrefix("cached_text_") ||
                 name.hasPrefix("cached_web_") ||
                 name.hasPrefix("cached_cover_") ||
@@ -78,7 +141,7 @@ extension AppState {
         /// 当前窗口正在使用的本地缓存路径；分片媒体的播放副本随源文件一并保留。
         public var cachedContentPaths: Set<String> {
             let playbackCopies = [imageURL].compactMap { $0 }.compactMap(FragmentedMP4PlaybackCopy.copyURL(for:))
-            return ([imageURL, textURL, webURL, customCoverURL] + playbackCopies + (archiveSession?.source.volumes.map { URL(fileURLWithPath: $0.path) } ?? []))
+            return ([imageURL, textURL, webURL, customCoverURL] + playbackCopies + (fileList?.items.map(\.url) ?? []) + (archiveSession?.source.volumes.map { URL(fileURLWithPath: $0.path) } ?? []))
                 .compactMap { $0 }
                 .filter { $0.isFileURL && Self.isManagedCacheURL($0) }
                 .map(\.path)
@@ -121,22 +184,6 @@ extension AppState {
             }
         }
 
-        /// 将用户打开的本地文件复制到应用缓存，之后不再依赖源文件。
-        func cacheImportedFile(from sourceURL: URL, kind: String, for windowId: UUID? = nil) -> URL? {
-            if isArchivePreview { return sourceURL }
-            guard sourceURL.isFileURL else { return sourceURL }
-            guard !Self.isManagedCacheURL(sourceURL) else { return sourceURL }
-            guard let destinationURL = getCachedContentURL(kind: kind, for: windowId, extension: sourceURL.pathExtension) else { return nil }
-
-            do {
-                try ContentCache.shared.copy(from: sourceURL, to: destinationURL)
-                return destinationURL
-            } catch {
-                print("Failed to copy \(kind) file to cache: \(error)")
-                return nil
-            }
-        }
-
         /// 缓存文件名包含窗口 UUID，不能用于识别重复来源；这里保留规范化后的原文件路径。
         static func localSourceFingerprint(for url: URL) -> String? {
             guard url.isFileURL, !isManagedCacheURL(url) else { return nil }
@@ -144,95 +191,9 @@ extension AppState {
         }
 
         func clearCachedImages() {
-            guard let foofoilURL = AppState.getFoofoilDirectoryURL() else {
-                return
-            }
-            guard FileManager.default.fileExists(atPath: foofoilURL.path) else { return }
-
-            // 获取历史记录里被引用的所有图片路径，防止物理删除仍然被历史引用的图片
-            let historyPaths = HistoryManager.shared.historyConfigs.compactMap { $0.imagePath }
-
-            if let files = try? FileManager.default.contentsOfDirectory(at: foofoilURL, includingPropertiesForKeys: nil) {
-                for file in files {
-                    if file.lastPathComponent.hasPrefix("cached_image_\(id.uuidString)") {
-                        if !historyPaths.contains(file.path) {
-                            try? FileManager.default.removeItem(at: file)
-                        }
-                    }
-                }
-            }
-        }
-
-        static func findCachedImageInDirectory(for id: UUID) -> URL? {
-            // 优先在新目录查找，找不到则回退到旧 Flofoil 目录
-            for baseURL in cacheDirectoryURLs() {
-                if let files = try? FileManager.default.contentsOfDirectory(at: baseURL, includingPropertiesForKeys: nil) {
-                    for file in files where file.lastPathComponent.hasPrefix("cached_image_\(id.uuidString)") {
-                        return file
-                    }
-                }
-            }
-            return nil
-        }
-
-        static func findLegacyCachedImageInDirectory() -> URL? {
-            for baseURL in cacheDirectoryURLs() {
-                if let files = try? FileManager.default.contentsOfDirectory(at: baseURL, includingPropertiesForKeys: nil) {
-                    for file in files where file.lastPathComponent.hasPrefix("cached_image") && !file.lastPathComponent.contains("_") {
-                        return file
-                    }
-                }
-            }
-            return nil
-        }
-
-        func convertToHEIC(sourceURL: URL, destURL: URL, quality: Float = 0.85) -> Bool {
-            guard let imageSource = CGImageSourceCreateWithURL(sourceURL as CFURL, nil),
-                  let cgImage = CGImageSourceCreateImageAtIndex(imageSource, 0, nil) else {
-                return false
-            }
-
-            let data = NSMutableData()
-            guard let destination = CGImageDestinationCreateWithData(data, UTType.heic.identifier as CFString, 1, nil) else {
-                return false
-            }
-
-            let options: [CFString: Any] = [
-                kCGImageDestinationLossyCompressionQuality: quality
-            ]
-
-            CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
-            guard CGImageDestinationFinalize(destination) else { return false }
-            return (try? ContentCache.shared.write(data as Data, to: destURL)) != nil
-        }
-
-        func convertNSImageToHEIC(image: NSImage, destURL: URL, quality: Float = 0.8, backingScaleFactor: CGFloat = 1.0) -> Bool {
-            guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
-                return false
-            }
-
-            let data = NSMutableData()
-            guard let destination = CGImageDestinationCreateWithData(data, UTType.heic.identifier as CFString, 1, nil) else {
-                return false
-            }
-
-            let dpi = 72.0 * Double(backingScaleFactor)
-            let tiffProperties: [CFString: Any] = [
-                kCGImagePropertyTIFFXResolution: dpi,
-                kCGImagePropertyTIFFYResolution: dpi,
-                kCGImagePropertyTIFFResolutionUnit: 2 // Inches
-            ]
-
-            let options: [CFString: Any] = [
-                kCGImageDestinationLossyCompressionQuality: quality,
-                kCGImagePropertyDPIWidth: dpi,
-                kCGImagePropertyDPIHeight: dpi,
-                kCGImagePropertyTIFFDictionary: tiffProperties
-            ]
-
-            CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
-            guard CGImageDestinationFinalize(destination) else { return false }
-            return (try? ContentCache.shared.write(data as Data, to: destURL)) != nil
+            guard let root = Self.getFoofoilDirectoryURL(),
+                  let files = try? FileManager.default.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { return }
+            ContentCache.shared.retire(Set(files.filter { $0.lastPathComponent.hasPrefix("cached_image_\(id.uuidString)") }.map(\.path)))
         }
 
         public func createNewFoofoilFromScreenshot(image: NSImage, backingScaleFactor: CGFloat) {
@@ -240,12 +201,20 @@ extension AppState {
             let formattedTitle = String(format: NSLocalizedString("Web Screenshot: %@", comment: ""), webTitle)
 
             let newId = UUID()
-            guard let destURL = self.getCachedImageURL(for: newId, extension: "heic") else { return }
+            guard let destURL = self.managedBodyURL(extension: "png") else { return }
+            ownedBodyPaths.remove(destURL.path)
+            ContentCache.shared.retain([destURL.path])
 
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                guard let self = self else { return }
-                if self.convertNSImageToHEIC(image: image, destURL: destURL, quality: 0.8, backingScaleFactor: backingScaleFactor) {
+                guard let self = self else {
+                    ContentCache.shared.release([destURL.path]); ContentCache.shared.retire([destURL.path]); return
+                }
+                if let tiff = image.tiffRepresentation,
+                   let bitmap = NSBitmapImageRep(data: tiff),
+                   let png = bitmap.representation(using: .png, properties: [:]),
+                   (try? ContentCache.shared.write(png, to: destURL)) != nil {
                     DispatchQueue.main.async {
+                        defer { ContentCache.shared.release([destURL.path]); ContentCache.shared.retire([destURL.path]) }
                         NotificationCenter.default.post(
                             name: .createNewFoofoilFromImage,
                             object: nil,
@@ -258,7 +227,9 @@ extension AppState {
                         )
                     }
                 } else {
-                    print("Failed to compress and save heic image foofoil")
+                    ContentCache.shared.release([destURL.path])
+                    ContentCache.shared.retire([destURL.path])
+                    print("Failed to save screenshot")
                 }
             }
         }
@@ -303,35 +274,4 @@ extension AppState {
             return image
         }
 
-        func cacheImage(from sourceURL: URL, itemToken: String? = nil) -> URL? {
-            if isArchivePreview { return sourceURL }
-
-            let ext = sourceURL.pathExtension.lowercased()
-            let shouldCompressToHEIC = ["png", "bmp", "tiff", "tif"].contains(ext)
-
-            if shouldCompressToHEIC, let destURL = getCachedImageURL(extension: "heic", itemToken: itemToken) {
-                if convertToHEIC(sourceURL: sourceURL, destURL: destURL) {
-                    return destURL
-                }
-                // 如果 HEIC 压缩失败，继续尝试使用原始格式拷贝
-            }
-
-            guard let destURL = getCachedImageURL(extension: sourceURL.pathExtension, itemToken: itemToken) else { return nil }
-
-            do {
-                try ContentCache.shared.copy(from: sourceURL, to: destURL)
-                return destURL
-            } catch {
-                print("Failed to copy image to cache: \(error)")
-                if let data = try? Data(contentsOf: sourceURL) {
-                    do {
-                        try ContentCache.shared.write(data, to: destURL)
-                        return destURL
-                    } catch {
-                        print("Failed to write image data to cache: \(error)")
-                    }
-                }
-            }
-            return nil
-        }
 }

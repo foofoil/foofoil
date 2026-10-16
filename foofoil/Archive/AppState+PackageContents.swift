@@ -26,26 +26,15 @@ extension AppState {
         return sourceFingerprint
     }
 
-    /// 包内文档另开后拥有自己的来源生命周期；普通箔持久缓存，无痕箔仅保留临时租约。
+    /// 原包直接引用；从包内提取的文档另开后共享临时租约，不生成独立可恢复正文。
     func makePackageContentsState() async throws -> AppState? {
         guard let source = packageContentsURL else { return nil }
         let target = AppState(isIncognito: isIncognito)
         let lease = archivePreviewLease
         let displayName = originalImageName ?? source.lastPathComponent
-        let keepsTemporarySource = isArchivePreview && isIncognito
         let fingerprint = packageContentsFingerprint
-        var url = source
-        if isArchivePreview && !isIncognito {
-            guard let destination = target.getCachedContentURL(kind: "package", extension: source.pathExtension) else {
-                throw CocoaError(.fileWriteUnknown)
-            }
-            try await Task.detached(priority: .userInitiated) {
-                try ContentCache.shared.copy(from: source, to: destination)
-            }.value
-            url = destination
-        }
-        target.openArchive(url: url, displayName: displayName, fingerprint: fingerprint,
-                           sourceLease: keepsTemporarySource ? lease : nil)
+        target.openArchive(url: source, displayName: displayName, fingerprint: fingerprint,
+                           sourceLease: isArchivePreview ? lease : nil)
         return target.archiveSession == nil ? nil : target
     }
 }

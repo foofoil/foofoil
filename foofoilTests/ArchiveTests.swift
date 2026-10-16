@@ -38,7 +38,8 @@ struct ArchiveTests {
             #expect(preview.archiveWindowOwner === owner)
             #expect(owner.readingState === preview)
             owner.showBorder = false
-            #expect(!preview.showBorder)
+            // 包内文本与普通文本一样采用固定边框；不能以包窗口绕过其展示规则。
+            #expect(preview.showBorder)
             preview.showBorder = true
             #expect(owner.showBorder)
             owner.isFullScreen = true

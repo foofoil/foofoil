@@ -309,7 +309,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     /// 文件文档采用更大的阅读尺寸；笔记与网页保留各自默认大小。
     static func initialWindowSize(for appState: AppState) -> NSSize {
         if appState.readingState.webURL != nil { return NSSize(width: 512, height: 512) }
-        if appState.readingState.textURL != nil || appState.readingState.isExtensionDocument || appState.readingState.isPDFDocument
+        if appState.readingState.isReadOnlyTextFile || appState.readingState.isExtensionDocument || appState.readingState.isPDFDocument
             || (appState.readingState.isMarkdownDocument && appState.readingState.isMarkdownPreview) {
             return NSSize(width: 540, height: 675)
         }
@@ -2077,6 +2077,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
            }) ?? false) == false {
             AppleMusicPlaybackController.stopIfActive()
         }
+        appState.persistManagedTextIfNeeded(createIfNeeded: !appState.isIncognito)
         appState.endExtensionSessionOnWindowClose()
         appState.saveState()
 

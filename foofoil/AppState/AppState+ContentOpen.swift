@@ -58,11 +58,9 @@ extension AppState {
             self.stopCamera()
             self.webURL = nil
             self.actualWebURL = nil
-            if let cachedURL = cacheImage(from: url, itemToken: cacheToken) {
-                self.imageURL = cachedURL
-            } else {
-                self.imageURL = url
-            }
+            self.textURL = nil
+            self.text = ""
+            self.imageURL = url
         }
 
         /// 打开本地视频；与图片不同，视频不复制到缓存目录，仅记录原始路径。
@@ -154,6 +152,8 @@ extension AppState {
                 fileList = list
             }
             self.quickLookSourceURL = usesQuickLook ? url : nil
+            self.textURL = nil
+            self.text = ""
             self.imageURL = url
         }
 
@@ -177,26 +177,10 @@ extension AppState {
         /// 书签缺失或失效时，进程内仍有授权（如拖入后未重启）则直接使用原始路径。
         /// 返回 (播放 URL, 应持久化的书签, 已持有授权的 URL)；无法访问时返回 nil。
         static func restoreVideoAccess(config: WindowConfig, fallbackURL: URL) -> (url: URL, bookmark: Data?, accessedURL: URL?)? {
-            if let bookmark = config.videoBookmark {
-                var isStale = false
-                if let url = try? URL(
-                    resolvingBookmarkData: bookmark,
-                    options: .withSecurityScope,
-                    bookmarkDataIsStale: &isStale
-                ) {
-                    let accessed = url.startAccessingSecurityScopedResource()
-                    if FileManager.default.fileExists(atPath: url.path) {
-                        // 书签过期（如文件被移动）时按解析出的新位置重建并持久化
-                        let newBookmark = isStale ? Self.makeSecurityScopedBookmark(for: url) : bookmark
-                        return (url, newBookmark, accessed ? url : nil)
-                    }
-                    if accessed {
-                        url.stopAccessingSecurityScopedResource()
-                    }
-                }
-            }
-            guard FileManager.default.fileExists(atPath: fallbackURL.path) else { return nil }
-            return (fallbackURL, Self.makeSecurityScopedBookmark(for: fallbackURL), nil)
+            let resolved = FileReference.resolve(fallbackURL, bookmark: config.videoBookmark)
+            guard resolved.status == .available else { return nil }
+            let accessed = resolved.url.startAccessingSecurityScopedResource()
+            return (resolved.url, resolved.bookmark ?? Self.makeSecurityScopedBookmark(for: resolved.url), accessed ? resolved.url : nil)
         }
 
         /// 解析音频同目录封面文件夹的安全范围书签并校验文件夹仍存在。
@@ -514,17 +498,7 @@ extension AppState {
             let targetID = (imageURL != nil || webURL != nil || textURL != nil || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 ? UUID()
                 : id
-            let cachedURL: URL
-            if url.isFileURL {
-                guard let copiedURL = cacheImportedFile(from: url, kind: "web", for: targetID) else {
-                    reportFileOpenFeedback([.init(url: url, reason: .unreadable)])
-                    return
-                }
-                cachedURL = copiedURL
-            } else {
-                // 远程网页以 URL 为内容来源，不属于本地文件缓存。
-                cachedURL = url
-            }
+            let cachedURL = url
 
             isBatchUpdating = true
             defer {
@@ -545,8 +519,11 @@ extension AppState {
             self.imageScale = 1.0
             self.createdAt = Date()
             self.imageURL = nil
+            self.textURL = nil
+            self.text = ""
             self.stopCamera()
             self.webURL = cachedURL
+            retainFileAccess(to: url)
             self.actualWebURL = nil
         }
 
@@ -591,10 +568,9 @@ extension AppState {
             let targetID = (imageURL != nil || webURL != nil || textURL != nil || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 ? UUID()
                 : id
-            guard let cachedURL = cacheImportedFile(from: url, kind: "text", for: targetID) else {
-                reportFileOpenFeedback([.init(url: url, reason: .unreadable)])
-                return
-            }
+            let cachedURL = url
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
 
             isBatchUpdating = true
             defer {
@@ -628,6 +604,7 @@ extension AppState {
                     self.isMarkdownPreview = false
                 }
                 self.createdAt = Date()
+                retainFileAccess(to: url)
             } catch {
                 reportFileOpenFeedback([.init(url: url, reason: .failed)])
                 print("Failed to read text file: \(error)")
@@ -816,6 +793,7 @@ extension AppState {
                     self.text = ""
                     self.originalImageName = url.lastPathComponent
                     self.sourceFingerprint = Self.localSourceFingerprint(for: url)
+                    self.videoBookmarkData = Self.makeSecurityScopedBookmark(for: url)
                     self.extensionSession = outcome.session
                     self.extensionFallbackProviderID = outcome.failures.first?.providerID
                     self.extensionStateReference = nil
@@ -1470,37 +1448,40 @@ extension AppState {
             }
         }
 
-        public func openImage(image: NSImage, originalName: String? = nil, imageSource: ImageSource? = nil) {
+        public func openImage(image: NSImage, originalName: String? = nil, imageSource: ImageSource? = nil, originalData: Data? = nil, filenameExtension: String = "png") {
             clearArchiveForNewContent()
             if hasOpenedContent {
                 self.id = UUID()
             }
             resetFileList()
             self.isLoading = true
+            stopVideoAccess()
+            let requestID = id
+            guard let destURL = managedBodyURL(extension: originalData == nil ? "png" : filenameExtension) else { isLoading = false; return }
+            ContentCache.shared.retain([destURL.path])
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                guard let self = self else { return }
-                guard let tiffData = image.tiffRepresentation,
-                      let bitmapImage = NSBitmapImageRep(data: tiffData),
-                      let pngData = bitmapImage.representation(using: .png, properties: [:]) else {
-                    DispatchQueue.main.async {
-                        self.isLoading = false
+                guard let self = self else { ContentCache.shared.release([destURL.path]); ContentCache.shared.retire([destURL.path]); return }
+                let pngData: Data
+                if let originalData { pngData = originalData }
+                else {
+                    guard let tiffData = image.tiffRepresentation,
+                          let bitmap = NSBitmapImageRep(data: tiffData),
+                          let data = bitmap.representation(using: .png, properties: [:]) else {
+                        ContentCache.shared.release([destURL.path])
+                        ContentCache.shared.retire([destURL.path])
+                        DispatchQueue.main.async { if self.id == requestID { self.isLoading = false } }
+                        return
                     }
-                    return
-                }
-
-                self.clearCachedImages()
-                guard let destURL = self.getCachedImageURL(extension: "png") else {
-                    DispatchQueue.main.async {
-                        self.isLoading = false
-                    }
-                    return
+                    pngData = data
                 }
 
                 do {
                     try ContentCache.shared.write(pngData, to: destURL)
                     DispatchQueue.main.async {
+                        defer { ContentCache.shared.release([destURL.path]) }
+                        guard self.id == requestID else { ContentCache.shared.retire([destURL.path]); return }
                         self.isBatchUpdating = true
-                        self.sourceFingerprint = nil
+                        self.sourceFingerprint = imageSource == .clipboard ? "clipboard:\(requestID)" : nil
                         self.originalImageName = originalName ?? "dropped_image.png"
                         self.imageSource = imageSource
                         self.showBorder = false
@@ -1508,15 +1489,19 @@ extension AppState {
                         self.stopCamera()
                         self.webURL = nil
                         self.actualWebURL = nil
+                        self.textURL = nil
+                        self.text = ""
                         self.imageURL = destURL
                         self.isBatchUpdating = false
                         self.isLoading = false
                         self.saveState()
                     }
                 } catch {
+                    ContentCache.shared.release([destURL.path])
+                    ContentCache.shared.retire([destURL.path])
                     print("Failed to save dropped image to cache: \(error)")
                     DispatchQueue.main.async {
-                        self.isLoading = false
+                        if self.id == requestID { self.isLoading = false }
                     }
                 }
             }

@@ -35,6 +35,9 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             updateGoMenu(goMenu)
         } else if let viewMenu, menu === viewMenu {
             updateViewMenu(menu)
+        } else if let historyMenu, menu === historyMenu {
+            HistoryManager.shared.checkFileReferences()
+            updateHistoryMenu()
         } else if let extensionMenu, menu === extensionMenu {
             rebuildExtensionMenu(menu)
         }

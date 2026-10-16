@@ -12,7 +12,7 @@ import Testing
 @testable import foofoil
 
 @MainActor
-@Suite(.serialized)
+@Suite(.sharedApplicationState, .serialized)
 struct ContentBackgroundTests {
     /// 只有文档箔提供内容背景色：图片、视频、音频以自身画面填充箔片，窗口只作画框。
     @Test func onlyDocumentFoilsSupportContentBackgroundColor() {
@@ -243,6 +243,8 @@ struct ContentBackgroundTests {
         }
         state.originalImageName = "photo.png"
         state.imageURL = imageURL
+        // 原文件的 DPI／点尺寸不再被转码改变；明确采用铺满模式，避免依赖旧 HEIC 的尺寸损失。
+        state.showBorder = false
         state.backgroundColorHex = "#123456"
 
         let size = CGSize(width: 400, height: 400)

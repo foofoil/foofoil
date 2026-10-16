@@ -9,7 +9,7 @@ import Foundation
 @MainActor
 enum SupportedContentOverview {
     // 保留已打开文档的历史身份，改名后仍可刷新原有记录。
-    static let sourceFingerprint = "foofoil:supported-file-types-overview"
+    nonisolated static let sourceFingerprint = "foofoil:supported-file-types-overview"
 
     static func markdown(
         shortcutProvider: @MainActor (KeyboardShortcutDefinition) -> KeyboardShortcut? = {

@@ -175,7 +175,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     public var mediaPlaybackMode: MediaPlaybackMode
     /// 旧字段：仅表示是否单曲循环，随 `mediaPlaybackMode` 写入以兼容旧解码。
     public var isVideoLooping: Bool
-    /// 视频/音频原始文件的安全范围书签；沙盒授权仅随进程有效，靠它在 app 重启后恢复访问权限。
+    /// 外部原文件的安全范围书签（保留原字段名）；图片、文本、网页与媒体共用，重启后恢复访问。
     public var subtitleAssociations: [String: SubtitleAssociation]?
     public var videoBookmark: Data?
     /// 音频同目录封面所在文件夹的安全范围书签；重启后恢复访问以保证封面可再次读取。
@@ -542,6 +542,8 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
             }
         } else if self.originalImageName?.lowercased().hasSuffix(".csv") == true {
             return self.originalImageName ?? ""
+        } else if let path = textPath, AppState.isManagedCacheURL(URL(fileURLWithPath: path)), originalImageName == nil, !text.isEmpty {
+            return AppState.plainTextHistoryTitle(from: text) ?? NSLocalizedString("Untitled Note", comment: "")
         } else if let textPath = self.textPath {
             return self.originalImageName ?? URL(fileURLWithPath: textPath).lastPathComponent
         } else if let originalImageName,
@@ -728,6 +730,11 @@ public class SettingsStore {
             guard newValue != startupBehavior else { return }
             userDefaults.set(newValue.rawValue, forKey: Keys.startupBehavior)
         }
+    }
+
+    public var automaticallyRemoveMissingHistory: Bool {
+        get { userDefaults.object(forKey: "automaticallyRemoveMissingHistory") as? Bool ?? true }
+        set { userDefaults.set(newValue, forKey: "automaticallyRemoveMissingHistory") }
     }
 
     public var lastOpenWindowConfigs: [WindowConfig] {

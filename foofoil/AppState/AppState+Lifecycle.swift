@@ -17,6 +17,8 @@ import FoofoilExtensionKit
 
 extension AppState {
         public func resetContent() {
+            ContentCache.shared.retire(ownedBodyPaths)
+            stopVideoAccess()
             archiveSession?.close()
             archiveSession = nil
             fileOpenFeedback = []

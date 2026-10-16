@@ -3,6 +3,8 @@ import Foundation
 nonisolated public final class HistoryRepository: @unchecked Sendable {
     public static let shared = HistoryRepository()
 
+    private let mutationLock = NSRecursiveLock()
+    private var deletedIDs: Set<UUID> = []
     private let database: HistoryDatabase?
     public let initializationError: Error?
 
@@ -19,32 +21,21 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
 
     @discardableResult
     public func upsert(_ config: WindowConfig) -> Bool {
-        guard let database else { return false }
+        mutationLock.lock()
+        defer { mutationLock.unlock() }
+        guard !deletedIDs.contains(config.id), let database else { return false }
         do { try database.upsert(config); return true }
         catch { NSLog("历史保存失败：%@", error.localizedDescription); return false }
+    }
+
+    func fileCheckBatch(after id: UUID?, limit: Int = 32) -> [WindowConfig] {
+        (try? database?.fileCheckBatch(after: id, limit: limit)) ?? []
     }
 
     public func recent(limit: Int = 30) -> [WindowConfig] {
         guard let database else { return [] }
         do {
-            let configs = try database.recent(limit: limit)
-            // 音视频历史仅记录原始文件路径；源文件已不存在（且书签也无法解析）时移除该条历史记录。
-            return configs.filter { config in
-                // 资料库来源由 MusicKit 判断可用性；没有磁盘路径不代表内容已丢失。
-                if config.appleMusicReference != nil { return true }
-                let kind = config.contentKind ?? HistoryContentKind.infer(from: config)
-                guard kind == .video || kind == .audio || kind == .quickLook else { return true }
-                // 路径当前可达（进程内仍有授权），或安全范围书签仍可解析出存在的文件，均保留
-                if let path = config.imagePath, FileManager.default.fileExists(atPath: path) { return true }
-                if let bookmark = config.videoBookmark, AppState.resolveVideoBookmark(bookmark) != nil { return true }
-                // 扩展音频不占用 imagePath/videoBookmark，以宿主列表项的存活为准；
-                // 至少一项可达即保留，全部丢失才移除。
-                if config.extensionID != nil,
-                   let list = config.fileList, list.isPresentable,
-                   list.items.contains(where: { Self.isFileListItemAlive($0) }) { return true }
-                remove(id: config.id)
-                return false
-            }
+            return try database.recent(limit: limit)
         }
         catch { NSLog("最近历史读取失败：%@", error.localizedDescription); return [] }
     }
@@ -59,22 +50,35 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
     }
 
     public func touch(id: UUID) { try? database?.touch(id: id) }
-    public func remove(id: UUID) { try? database?.remove(id: id) }
+    public func remove(id: UUID) { _ = remove(ids: [id]) }
     public func updateThumbnailPath(id: UUID, path: String) { try? database?.updateThumbnailPath(id: id, path: path) }
 
-    /// 宿主列表项存活即视为来源仍在：书签可解析，或无书签但路径存在。
-    private static func isFileListItemAlive(_ item: FileListItem) -> Bool {
-        if let bookmark = item.bookmark, AppState.resolveVideoBookmark(bookmark) != nil { return true }
-        return FileManager.default.fileExists(atPath: item.path)
-    }
     @discardableResult
     func remove(ids: Set<UUID>) -> Bool {
         guard let database else { return false }
-        do { try database.remove(ids: ids); return true }
+        mutationLock.lock()
+        defer { mutationLock.unlock() }
+        do {
+            try database.remove(ids: ids)
+            deletedIDs.formUnion(ids)
+            return true
+        }
         catch { NSLog("批量删除历史失败：%@", error.localizedDescription); return false }
     }
 
-    public func removeAll(excluding ids: Set<UUID>) { try? database?.removeAll(excluding: ids) }
+    public func removeAll(excluding ids: Set<UUID>) {
+        mutationLock.lock()
+        defer { mutationLock.unlock() }
+        let removed = Set(recent(limit: Int.max).map(\.id)).subtracting(ids)
+        do { try database?.removeAll(excluding: ids); deletedIDs.formUnion(removed) }
+        catch { NSLog("历史清除失败：%@", error.localizedDescription) }
+    }
+
+    public func wasDeleted(_ id: UUID) -> Bool {
+        mutationLock.lock()
+        defer { mutationLock.unlock() }
+        return deletedIDs.contains(id)
+    }
     public func rename(id: UUID, title: String) { try? database?.rename(id: id, title: title) }
     public var searchDatabaseSize: Int64 { database?.searchDatabaseSize() ?? 0 }
 
@@ -118,7 +122,8 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                         matchedPageNumber: best.pageNumber,
                         score: self.score(best, query: normalizedQuery),
                         sourcePath: best.sourceFingerprint.flatMap { $0.hasPrefix("file:") ? String($0.dropFirst(5)) : nil },
-                        isAppleMusic: best.isAppleMusic
+                        isAppleMusic: best.isAppleMusic,
+                        isClipboardContent: best.sourceFingerprint?.hasPrefix("clipboard:") == true
                     ))
                 }
                 return results.sorted { lhs, rhs in

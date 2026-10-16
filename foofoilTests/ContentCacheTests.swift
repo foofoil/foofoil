@@ -27,16 +27,13 @@ struct ContentCacheTests {
         #expect(repository.upsert(WindowConfig(id: recentID, text: "recent", textPath: recent.path)))
         repository.touch(id: oldID)
         #expect(cache.usage == 120)
-        // 最近访问 old，应该清除 recent。
-        try cache.setLimit(100)
+        // 有历史引用的正文不再受容量淘汰；无法满足限额时保留全部记录。
+        #expect(throws: CocoaError.self) { try cache.setLimit(100) }
         #expect(FileManager.default.fileExists(atPath: old.path))
-        #expect(!FileManager.default.fileExists(atPath: recent.path))
-        #expect(repository.config(id: recentID) == nil)
-        #expect(cache.usage == 60)
-        let new = root.appendingPathComponent("cached_text_\(UUID()).txt")
-        try cache.write(Data(repeating: 3, count: 50), to: new)
-        #expect(cache.usage == 50)
-        #expect(repository.config(id: oldID) == nil)
+        #expect(FileManager.default.fileExists(atPath: recent.path))
+        #expect(repository.config(id: recentID) != nil)
+        #expect(repository.config(id: oldID) != nil)
+        #expect(cache.usage == 120)
     }
 
     @Test func confirmationAndInsufficientSpacePreserveExistingCache() throws {

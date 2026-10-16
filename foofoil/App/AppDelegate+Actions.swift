@@ -455,7 +455,9 @@ extension AppDelegate {
 
         if let image = clipboardImage() {
             let target = clipboardContentTarget(isIncognito: isIncognito)
-            target.state.openImage(image: image, imageSource: .clipboard)
+            let representation = Self.clipboardImageRepresentation(from: .general)
+            target.state.openImage(image: image, imageSource: .clipboard,
+                                   originalData: representation?.data, filenameExtension: representation?.ext ?? "png")
             presentClipboardTarget(target)
             return true
         }
@@ -581,6 +583,14 @@ extension AppDelegate {
     func clipboardFileURLs(from pasteboard: NSPasteboard = .general) -> [URL] {
         let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
         return (pasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL]) ?? []
+    }
+
+    /// 只读取实际图片数据，不通过 URL 表示下载；保留原始无损或动画表示。
+    static func clipboardImageRepresentation(from pasteboard: NSPasteboard) -> (data: Data, ext: String)? {
+        for (type, ext) in [(NSPasteboard.PasteboardType.png, "png"), (.init("com.compuserve.gif"), "gif"), (.init("public.jpeg"), "jpg"), (.tiff, "tiff")] {
+            if let data = pasteboard.data(forType: type), NSImage(data: data) != nil { return (data, ext) }
+        }
+        return nil
     }
 
     func clipboardImage() -> NSImage? {
@@ -786,8 +796,8 @@ extension AppDelegate {
                     if let website = AppState.websiteURL(fromClipboardText: text) { openSharedWebsite(website, isIncognito: isIncognito) }
                     else {
                         let state = AppState(isIncognito: isIncognito)
-                        if AppState.looksLikeHTML(text) { _ = state.openHTML(text, originalName: NSLocalizedString("Clipboard Web Page", comment: "")) }
-                        else { state.openText(text, isMarkdown: AppState.looksLikeMarkdown(text)) }
+                        if AppState.looksLikeHTML(text) { _ = state.openHTML(text, originalName: NSLocalizedString("Untitled Page", comment: ""), isClipboard: false) }
+                        else { state.openText(text, isMarkdown: AppState.looksLikeMarkdown(text), isClipboard: false) }
                         showNewWindow(with: state)
                     }
                 }
@@ -835,7 +845,8 @@ extension AppDelegate {
             createdAt: Date()
         )
 
-        let newState = AppState(config: config, isIncognito: userInfo["isIncognito"] as? Bool ?? false)
+        let newState = AppState(isIncognito: userInfo["isIncognito"] as? Bool ?? false)
+        guard newState.loadConfig(config) else { return }
 
         // 显示新窗口
         showNewWindow(with: newState)
@@ -884,7 +895,7 @@ extension AppDelegate {
     /// 把识别到的文字在新箔片中以纯文本打开，复用"新建空白箔"的窗口通道。
     private func presentExtractedText(_ recognized: String, isIncognito: Bool) {
         let state = AppState(isIncognito: isIncognito)
-        state.openText(recognized, isMarkdown: false)
+        state.openText(recognized, isMarkdown: false, isClipboard: false)
         showNewWindow(with: state)
     }
 

@@ -1250,6 +1250,11 @@ struct ExtensionKitTests {
 
     @Test func fullScreenLifecycleKeepsWindowedBorderAndFramePreferences() throws {
         let state = AppState()
+        let directory = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let image = directory.appendingPathComponent("fullscreen.svg")
+        try Data("<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'></svg>".utf8).write(to: image)
+        state.openImage(url: image)
         state.showBorder = true
         state.isPinned = true
         state.builtInNavigatorContributions = [
@@ -1477,6 +1482,7 @@ struct ExtensionKitTests {
         defer { try? FileManager.default.removeItem(at: directory) }
         let sourceURL = directory.appendingPathComponent("album.historydsd")
         try Data("DSD".utf8).write(to: sourceURL)
+        try Data("PCM".utf8).write(to: directory.appendingPathComponent("one.mp3"))
         let savedSession = ContentSession(
             extensionID: provider.descriptor.extensionID,
             providerID: provider.descriptor.id,
@@ -1807,7 +1813,8 @@ struct ExtensionKitTests {
 
         let ids = Set(repository.recent(limit: 30).map(\.id))
         #expect(ids.contains(aliveID))
-        #expect(!ids.contains(deadID))
+        #expect(ids.contains(deadID))
+        #expect(repository.config(id: deadID)?.resolvingFileReferences().missing == true)
     }
 
     /// 无 imagePath 的扩展音频也进媒体卡：有缩略图显示封面，否则按 kind 显示音视频占位；

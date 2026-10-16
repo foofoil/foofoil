@@ -10,6 +10,7 @@ import ServiceManagement
 import MusicKit
 
 struct GeneralSettingsView: View {
+    @AppStorage("automaticallyRemoveMissingHistory") private var automaticallyRemoveMissingHistory = true
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @State private var startupBehavior = SettingsStore.shared.startupBehavior
     @State private var navigatorPanelSide = SettingsStore.shared.navigatorPanelSide
@@ -56,6 +57,8 @@ struct GeneralSettingsView: View {
             }
 
             Section {
+                Toggle("Automatically Remove Missing History", isOn: $automaticallyRemoveMissingHistory)
+                Text("Missing History Cleanup Note").font(.caption).foregroundStyle(.secondary)
                 HStack {
                     SettingsRowLabel(
                         title: NSLocalizedString("Cache Limit", comment: ""),

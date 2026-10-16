@@ -912,6 +912,11 @@ struct FoilExposeItemView: View {
                         Image(systemName: item.isHistoryEntry ? "clock.arrow.circlepath" : "macwindow")
                             .foregroundStyle(item.isHistoryEntry ? Color.white.opacity(0.6) : .mint)
                     }
+                    if item.isClipboardContent {
+                        Image(systemName: "doc.on.clipboard")
+                            .help(Text("From Clipboard"))
+                            .accessibilityLabel(Text("From Clipboard"))
+                    }
                     Text(item.title)
                         .foregroundStyle(.white.opacity(0.9))
                         .lineLimit(1)

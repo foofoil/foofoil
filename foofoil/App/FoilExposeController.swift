@@ -75,6 +75,7 @@ struct FoilExposeItem: Identifiable {
     let contentKind: HistoryContentKind
     let thumbnailPath: String?
     /// 历史配置记录的外部源文件路径；用于让 Spotlight 文件结果避开已展示的同一文件。
+    var isClipboardContent: Bool = false
     var sourcePath: String? = nil
     /// 文档型箔片（笔记/文本/Markdown/CSV）的截断正文，供缩略图位置直接展示内容；其余类型为 nil。
     var bodyPreview: String? = nil
@@ -871,6 +872,7 @@ final class FoilExposeController {
                 symbolName: config.historyMenuSymbolName,
                 contentKind: contentKind,
                 thumbnailPath: thumbnailPath,
+                isClipboardContent: config.isClipboardContent,
                 sourcePath: Self.sourcePath(from: config),
                 bodyPreview: bodyPreview,
                 allowsTitleEditing: controller.appState.toConfig().canRenameTitle
@@ -880,7 +882,8 @@ final class FoilExposeController {
 
     /// 历史记录条目：最近的历史配置，附在打开的箔片之后，点击/回车恢复为新箔片窗口。
     private static func collectHistoryItems() -> [FoilExposeItem] {
-        HistoryRepository.shared.recent(limit: 500).map { config in
+        HistoryManager.shared.checkFileReferences()
+        return HistoryRepository.shared.recent(limit: 500).map { config in
             let contentKind = config.contentKind ?? HistoryContentKind.infer(from: config)
             // 与 HistoryCardView 的缩略图兜底一致：网页整页截图、PDF 与图片原文件都在 imagePath；
             // 音视频原文件不是图片，摄像头箔的 imagePath 只是保存的截图，均不回退。
@@ -900,6 +903,7 @@ final class FoilExposeController {
                 symbolName: config.historyMenuSymbolName,
                 contentKind: contentKind,
                 thumbnailPath: thumbnailPath,
+                isClipboardContent: config.isClipboardContent,
                 sourcePath: Self.sourcePath(from: config),
                 bodyPreview: FoilExposeItem.makeBodyPreview(kind: contentKind, text: config.text),
                 allowsTitleEditing: config.canRenameTitle

@@ -10,7 +10,7 @@ struct HistorySearchResultRow: View {
         SearchResultRow(
             symbolName: result.symbolName,
             title: result.title,
-            snippet: result.matchedSnippet,
+            snippet: result.isClipboardContent ? NSLocalizedString("From Clipboard", comment: "") : result.matchedSnippet,
             pageNumber: result.matchedPageNumber,
             thumbnailPath: result.thumbnailPath,
             showsInlineIcon: true,

@@ -99,7 +99,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
                     for isIncognito in [false, true] {
                         let batch = urls.filter { ShareStaging.isIncognito($0) == isIncognito }
                         guard !batch.isEmpty else { continue }
-                        let imported = try await Task.detached { try SharedFileImport.persist(batch) }.value
+                        let imported = try await Task.detached { try SharedFileImport.persist(batch, isIncognito: isIncognito) }.value
                         ShareDiagnostics.logger.notice("Import complete: \(imported.count, privacy: .public) files, incognito=\(isIncognito, privacy: .public)")
                         self?.openFilesInNewFoil(imported, isIncognito: isIncognito)
                     }
@@ -199,7 +199,12 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
                 let savedConfigs = SettingsStore.shared.lastOpenWindowConfigs.filter { SettingsStore.shared.appleMusicLibraryEnabled || $0.appleMusicReference == nil }
                 if !savedConfigs.isEmpty {
                     for config in savedConfigs {
-                        let state = AppState(config: config)
+                        if SettingsStore.shared.automaticallyRemoveMissingHistory, config.resolvingFileReferences().missing {
+                            HistoryManager.shared.removeFromHistory(config, preservingLegacyBody: true)
+                            continue
+                        }
+                        let state = AppState()
+                        guard state.loadConfig(config) else { continue }
                         let controller = FloatingWindowController(appState: state)
                         if config.windowFrame == nil { controller.window?.center() }
                         addWindowController(controller)
@@ -232,17 +237,20 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 无痕箔仅活在本次运行中，不参与退出时的窗口恢复快照。
     var restorableWindowConfigs: [WindowConfig] {
-        windowControllers.filter { !$0.appState.isFileOpenFeedback && !$0.appState.isIncognito }.map { $0.appState.toConfig() }
+        windowControllers.filter { !$0.appState.isFileOpenFeedback && !$0.appState.isIncognito && !$0.appState.isArchivePreview && $0.appState.archiveSession?.hasTemporarySource != true && !HistoryRepository.shared.wasDeleted($0.appState.id) }.map { $0.appState.toConfig() }
     }
 
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard !isTerminating else { return .terminateLater }
         isTerminating = true
         // 保存当前活跃窗口配置，用于下次启动恢复
+        for controller in windowControllers { controller.appState.persistManagedTextIfNeeded(createIfNeeded: true) }
+        ContentCache.shared.flushBodyWrites()
         let activeConfigs = restorableWindowConfigs
         SettingsStore.shared.lastOpenWindowConfigs = activeConfigs
 
         HistoryManager.shared.flushPendingListSaves()
+        ContentCache.shared.flushBodyWrites()
         // 进程退出只会自动归还 hog，不会恢复采样率；先停 PCM 引擎，再等待扩展恢复设备。
         AppleMusicPlaybackController.stopIfActive()
         AudioPlaybackController.stopAllOutputsForTermination()
@@ -292,6 +300,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
 
     public func removeWindowController(_ controller: FloatingWindowController) {
         guard let index = windowControllers.firstIndex(where: { $0 === controller }) else { return }
+        ContentCache.shared.retire(controller.appState.cachedContentPaths)
         windowControllers.remove(at: index)
         ContentCache.shared.protect(Set(windowControllers.map { $0.appState.id }), paths: Set(windowControllers.flatMap { $0.appState.cachedContentPaths }))
         syncFoilSpaceJoining()

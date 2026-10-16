@@ -114,6 +114,7 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
     }
 
     private func show(mode: HistorySearchMode, initialQuery: String? = nil) {
+        HistoryManager.shared.checkFileReferences()
         guard let panel = window else { return }
 
         let activeWindow: NSWindow? = {

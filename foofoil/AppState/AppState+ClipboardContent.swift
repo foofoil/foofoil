@@ -128,7 +128,7 @@ extension AppState {
     }
 
     /// 打开剪贴板等无来源文件的文本；`isMarkdown` 决定进入 Markdown 预览还是普通笔记。
-    public func openText(_ content: String, isMarkdown: Bool) {
+    public func openText(_ content: String, isMarkdown: Bool, isClipboard: Bool = true) {
         clearArchiveForNewContent()
         resetFileList()
         clearCustomCover()
@@ -144,7 +144,9 @@ extension AppState {
             self.id = UUID()
         }
         stopVideoAccess()
-        self.sourceFingerprint = nil
+        videoBookmarkData = nil
+        mediaSidecarBookmarkData = nil
+        self.sourceFingerprint = isClipboard ? "clipboard:\(id)" : nil
         // Markdown 依赖文件名后缀进入预览，无来源文件时给出稳定的未命名名称。
         self.originalImageName = isMarkdown ? "\(NSLocalizedString("Untitled Markdown", comment: "")).md" : nil
         self.imageSource = nil
@@ -154,6 +156,7 @@ extension AppState {
         self.actualWebURL = nil
         self.textURL = nil
         self.text = content
+        self.textURL = managedBodyURL(extension: isMarkdown ? "md" : "txt")
         self.isMarkdownPreview = isMarkdown
         self.showBorder = true
         self.createdAt = Date()
@@ -161,14 +164,16 @@ extension AppState {
 
     /// 将 HTML 源码写入网页缓存文件后按网页打开。
     @discardableResult
-    public func openHTML(_ html: String, originalName: String? = nil) -> Bool {
+    public func openHTML(_ html: String, originalName: String? = nil, isClipboard: Bool = true) -> Bool {
         clearArchiveForNewContent()
         guard !html.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-              let destinationURL = getCachedContentURL(kind: "web", extension: "html"),
+              let destinationURL = managedBodyURL(extension: "html"),
               (try? ContentCache.shared.write(Data(html.utf8), to: destinationURL)) != nil else {
             return false
         }
         openWeb(url: destinationURL, originalName: originalName)
+        sourceFingerprint = isClipboard ? "clipboard:\(id)" : nil
+        saveState()
         return true
     }
 

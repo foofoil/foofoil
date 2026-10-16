@@ -5,7 +5,7 @@ import Foundation
 enum KeyboardShortcutsOverview {
     nonisolated static let changedKeyStart = "\u{F001B}"
     nonisolated static let changedKeyEnd = "\u{F001C}"
-    static let sourceFingerprint = "foofoil:keyboard-shortcuts-overview"
+    nonisolated static let sourceFingerprint = "foofoil:keyboard-shortcuts-overview"
 
     static func markdown(
         shortcutProvider: @MainActor (KeyboardShortcutDefinition) -> KeyboardShortcut? = {

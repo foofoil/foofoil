@@ -16,6 +16,11 @@ import FoofoilExtensionKit
 
 
 extension AppState {
+        var isReadOnlyTextFile: Bool {
+            guard let textURL else { return false }
+            return !Self.isManagedCacheURL(textURL)
+        }
+
         public var isSVG: Bool {
             guard let name = originalImageName?.lowercased() else { return false }
             return name.hasSuffix(".svg")

@@ -190,4 +190,80 @@ struct FileOpenFeedbackTests {
         #expect(!state.hasOpenedContent)
     }
 
+    @Test(arguments: [true, false], [true, false])
+    func missingBorderlessHistoryDoesNotCreateEmptyWindow(cleanupEnabled: Bool, brokenBookmark: Bool) throws {
+        let previous = SettingsStore.shared.automaticallyRemoveMissingHistory
+        SettingsStore.shared.automaticallyRemoveMissingHistory = cleanupEnabled
+        defer { SettingsStore.shared.automaticallyRemoveMissingHistory = previous }
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let config = WindowConfig(id: UUID(), imagePath: root.appendingPathComponent("deleted.png").path,
+                                  originalImageName: "deleted.png", showBorder: false,
+                                  videoBookmark: brokenBookmark ? Data("broken bookmark".utf8) : nil)
+        #expect(HistoryRepository.shared.upsert(config))
+        defer { HistoryRepository.shared.remove(id: config.id) }
+        let delegate = AppDelegate()
+        defer {
+            NotificationCenter.default.removeObserver(delegate)
+            for controller in delegate.windowControllers { controller.close() }
+        }
+        let item = NSMenuItem()
+        item.representedObject = config
+        delegate.openHistoryItemAction(item)
+        #expect(delegate.windowControllers.count == 1)
+        let feedback = try #require(delegate.windowControllers.first)
+        #expect(feedback.appState.isFileOpenFeedback)
+        #expect(feedback.appState.showBorder)
+        #expect(feedback.appState.imageURL == nil)
+        #expect(feedback.appState.textURL == nil)
+        #expect((HistoryRepository.shared.config(id: config.id) == nil) == (cleanupEnabled && !brokenBookmark))
+    }
+
+    @Test func failedHistoryRestorePreservesExistingWindowContent() throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = AppState(isIncognito: true)
+        state.openText("Keep this note", isMarkdown: false, isClipboard: false)
+        let body = try #require(state.textURL)
+        defer { try? FileManager.default.removeItem(at: body) }
+        let originalID = state.id
+        let config = WindowConfig(id: UUID(), imagePath: root.appendingPathComponent("deleted.png").path,
+                                  originalImageName: "deleted.png", opacity: 0.2, showBorder: false,
+                                  videoBookmark: Data("broken bookmark".utf8))
+        #expect(!state.loadConfig(config))
+        #expect(state.id == originalID)
+        #expect(state.text == "Keep this note")
+        #expect(state.textURL == body)
+        #expect(state.imageURL == nil)
+        #expect(state.showBorder)
+        #expect(state.opacity == 1)
+        #expect(!state.isBatchUpdating)
+    }
+
+    @Test func missingSearchResultPreservesBlankWindowAndShowsOnlyFeedback() throws {
+        let previous = SettingsStore.shared.automaticallyRemoveMissingHistory
+        SettingsStore.shared.automaticallyRemoveMissingHistory = false
+        defer { SettingsStore.shared.automaticallyRemoveMissingHistory = previous }
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let config = WindowConfig(id: UUID(), imagePath: root.appendingPathComponent("deleted.png").path,
+                                  originalImageName: "deleted.png", showBorder: false)
+        #expect(HistoryRepository.shared.upsert(config))
+        defer { HistoryRepository.shared.remove(id: config.id) }
+        let delegate = AppDelegate()
+        defer {
+            NotificationCenter.default.removeObserver(delegate)
+            for controller in delegate.windowControllers { controller.close() }
+        }
+        let blank = delegate.showNewWindow(with: AppState())
+        let originalID = blank.appState.id
+        delegate.openSearchResultInNewWindow(id: config.id)
+        #expect(delegate.windowControllers.count == 2)
+        #expect(blank.appState.id == originalID)
+        #expect(blank.appState.isBlank)
+        #expect(blank.appState.showBorder)
+        #expect(delegate.windowControllers.filter { $0.appState.isFileOpenFeedback }.count == 1)
+        #expect(HistoryRepository.shared.config(id: config.id) != nil)
+    }
+
 }

@@ -21,7 +21,9 @@ extension AppState {
               imageTextDetectedURL != url,
               imageTextDetectionTask == nil else { return }
         let generation = imageTextDetectionGeneration
+        ContentCache.shared.retain([url.path])
         imageTextDetectionTask = Task { @MainActor [weak self] in
+            defer { ContentCache.shared.release([url.path]) }
             let text = await Task.detached(priority: .utility) {
                 (try? ImageOCRIndexer.recognize(url: url)) ?? ""
             }.value

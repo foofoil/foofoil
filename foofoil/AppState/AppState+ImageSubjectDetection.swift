@@ -22,7 +22,9 @@ extension AppState {
               imageSubjectDetectionTask == nil,
               let cutoutURL = imageSubjectCacheURL() else { return }
         let generation = imageSubjectDetectionGeneration
+        ContentCache.shared.retain([url.path, cutoutURL.path])
         imageSubjectDetectionTask = Task { @MainActor [weak self] in
+            defer { ContentCache.shared.release([url.path, cutoutURL.path]) }
             // 一次请求同时给出"是否有主体"与抠图结果，避免检测与提取各跑一遍 Vision。
             let extracted = await Task.detached(priority: .utility) {
                 ImageSubjectExtractor.writeSubjectPNG(from: url, to: cutoutURL)
@@ -30,7 +32,10 @@ extension AppState {
             guard !Task.isCancelled,
                   let self,
                   self.imageSubjectDetectionGeneration == generation,
-                  self.imageURL == url else { return }
+                  self.imageURL == url else {
+                ContentCache.shared.retire([cutoutURL.path])
+                return
+            }
             if !extracted {
                 // 无主体或写盘失败：清理可能残留的旧缓存，避免被当作有效抠图。
                 try? FileManager.default.removeItem(at: cutoutURL)

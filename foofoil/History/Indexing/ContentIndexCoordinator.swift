@@ -26,9 +26,11 @@ public final class ContentIndexCoordinator: @unchecked Sendable {
         // 其它内容沿用路径去重（追加目录会改变分区集合）。
         let sectionKey = config.fileList.map { $0.sections.map(\.id).joined(separator: ",") } ?? ""
         let usesSectionThumbnail = kind == .audio && (config.fileList?.sections.count ?? 0) >= 2
+        let attributes = try? FileManager.default.attributesOfItem(atPath: path)
+        let revision = "\(attributes?[.modificationDate] as? Date ?? .distantPast)|\(attributes?[.size] as? NSNumber ?? 0)"
         let scheduleKey = usesSectionThumbnail
             ? "sections|\(sectionKey)|\(config.customCoverPath ?? "")"
-            : "\(path)|\(config.customCoverPath ?? "")"
+            : "\(path)|\(revision)|\(config.customCoverPath ?? "")"
         lock.lock()
         if !force, scheduledPaths[config.id] == scheduleKey {
             lock.unlock()
@@ -38,6 +40,8 @@ public final class ContentIndexCoordinator: @unchecked Sendable {
         scheduledPaths[config.id] = scheduleKey
         lock.unlock()
         let operation = BlockOperation()
+        ContentCache.shared.retain([path])
+        operation.completionBlock = { ContentCache.shared.release([path]) }
         operation.addExecutionBlock { [weak operation] in
             guard operation?.isCancelled == false else { return }
             do {
@@ -45,6 +49,12 @@ public final class ContentIndexCoordinator: @unchecked Sendable {
                 let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
                     .appendingPathComponent("foofoil", isDirectory: true)
                 let thumbnailURL = root.appendingPathComponent("Thumbnails").appendingPathComponent("\(config.id.uuidString).heic")
+                defer {
+                    if HistoryRepository.shared.config(id: config.id) == nil { try? FileManager.default.removeItem(at: thumbnailURL) }
+                }
+                let source = FileReference.resolve(URL(fileURLWithPath: path), bookmark: config.videoBookmark)
+                let accessed = source.url.startAccessingSecurityScopedResource()
+                defer { if accessed { source.url.stopAccessingSecurityScopedResource() } }
 
                 // 多分区音频列表用各分区封面拼宫格；封面不足两张时回退单封面。
                 var generatedThumbnail = false
@@ -59,20 +69,21 @@ public final class ContentIndexCoordinator: @unchecked Sendable {
                 }
                 if !generatedThumbnail {
                     generatedThumbnail = HistoryThumbnailGenerator.generateThumbnail(
-                        for: URL(fileURLWithPath: path),
+                        for: source.url,
                         kind: kind,
                         destinationURL: thumbnailURL,
                         customCoverURL: config.customCoverPath.map { URL(fileURLWithPath: $0) }
                     )
                 }
-                if generatedThumbnail {
+                if generatedThumbnail, operation?.isCancelled == false,
+                   HistoryRepository.shared.config(id: config.id) != nil {
                     HistoryRepository.shared.updateThumbnailPath(id: config.id, path: thumbnailURL.path)
                     HistoryManager.shared.refresh()
                 }
 
                 // 2. 提取文本 OCR 并进行索引；音视频没有可 OCR 的画面，音频改为索引曲目元数据
                 if kind == .audio {
-                    let info = AudioMetadataLoader.loadSynchronously(from: URL(fileURLWithPath: path))
+                    let info = AudioMetadataLoader.loadSynchronously(from: source.url)
                     let text = [info.title, info.artist, info.album, info.albumArtist, info.composer, info.genre, info.year]
                         .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
                         .filter { !$0.isEmpty }
@@ -85,9 +96,9 @@ public final class ContentIndexCoordinator: @unchecked Sendable {
                 } else if kind != .video {
                     let chunks: [(String, Int?)]
                     if kind == .pdf {
-                        chunks = try PDFTextIndexer.extract(url: URL(fileURLWithPath: path)) { operation?.isCancelled ?? true }
+                        chunks = try PDFTextIndexer.extract(url: source.url) { operation?.isCancelled ?? true }
                     } else {
-                        chunks = [(try ImageOCRIndexer.recognize(url: URL(fileURLWithPath: path)), nil)]
+                        chunks = [(try ImageOCRIndexer.recognize(url: source.url), nil)]
                     }
                     guard operation?.isCancelled == false,
                           HistoryRepository.shared.config(id: config.id)?.imagePath == path else { return }

@@ -644,6 +644,7 @@ extension AppDelegate {
         let historyMenu = NSMenu(title: NSLocalizedString("History", comment: ""))
         historyMenuItem.submenu = historyMenu
         self.historyMenu = historyMenu
+        historyMenu.delegate = self
         mainMenu.addItem(historyMenuItem)
 
         // 5. Help 菜单

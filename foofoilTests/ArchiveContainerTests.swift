@@ -208,10 +208,10 @@ struct ArchiveContainerTests {
             }
         }
         #expect(package.isIncognito == privateMode)
-        #expect((package.archiveSession?.sourceLease != nil) == privateMode)
-        #expect(AppState.isManagedCacheURL(source) == !privateMode)
+        #expect(package.archiveSession?.sourceLease != nil)
+        #expect(!AppState.isManagedCacheURL(source))
         #expect(package.toConfig().originalImageName == "report.docx")
-        if !privateMode { #expect(package.cachedContentPaths.contains(source.path)) }
+        #expect(HistoryRepository.shared.config(id: packageID) == nil)
         owner.resetContent()
         preview = nil
         try await wait { package.archiveSession?.busy == false }

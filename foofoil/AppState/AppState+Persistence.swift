@@ -17,7 +17,15 @@ import FoofoilExtensionKit
 
 extension AppState {
         public func saveState() {
-            guard !isArchivePreview, !isIncognito, !isFileOpenFeedback, !isBatchUpdating, !isAdjustingDocumentStyling else { return }
+            guard !isArchivePreview, archiveSession?.hasTemporarySource != true, !isFileOpenFeedback, !isBatchUpdating, !isAdjustingDocumentStyling else { return }
+            persistManagedTextIfNeeded()
+            let unused = ownedBodyPaths.subtracting(cachedContentPaths)
+            if !isLoading { ContentCache.shared.retire(unused); ownedBodyPaths.subtract(unused) }
+            if let delegate = NSApplication.shared.delegate as? AppDelegate {
+                ContentCache.shared.protect(Set(delegate.windowControllers.map { $0.appState.id }).union([id]),
+                    paths: Set(delegate.windowControllers.flatMap { $0.appState.cachedContentPaths }).union(cachedContentPaths))
+            }
+            guard !isIncognito, !HistoryRepository.shared.wasDeleted(id) else { return }
             if hasOpenedContent || appleMusicReference != nil {
                 if !fileOpenFeedback.isEmpty { fileOpenFeedback = [] }
                 closesEmptyWindowAfterFileOpenFailure = false
@@ -34,7 +42,23 @@ extension AppState {
             }
         }
 
-        public func loadConfig(_ config: WindowConfig) {
+        @discardableResult
+        public func loadConfig(_ inputConfig: WindowConfig) -> Bool {
+            if let path = inputConfig.textPath, Self.isManagedCacheURL(URL(fileURLWithPath: path)),
+               ContentCache.shared.hasLease(for: path) { ContentCache.shared.flushBodyWrites() }
+            let resolution = inputConfig.resolvingFileReferences(removeMissingItems: SettingsStore.shared.automaticallyRemoveMissingHistory)
+            let config = resolution.config
+            if resolution.missing, SettingsStore.shared.automaticallyRemoveMissingHistory {
+                HistoryManager.shared.removeFromHistory(inputConfig, preservingLegacyBody: true)
+                if let failure = config.historyRestoreFileFailure() { reportFileOpenFeedback([failure]) }
+                return false
+            }
+            // 先确认正文可读，再覆盖窗口状态；失败不继承旧历史的无边框设置或留下占位窗口。
+            if let failure = config.historyRestoreFileFailure() {
+                reportFileOpenFeedback([failure])
+                return false
+            }
+            stopVideoAccess()
             archiveSession?.close()
             archiveSession = nil
             appleMusicItem = nil
@@ -45,6 +69,10 @@ extension AppState {
             defer {
                 isBatchUpdating = false
                 saveState()
+                if let url = imageURL, !Self.isManagedCacheURL(url), !isIncognito,
+                   !HistoryRepository.shared.wasDeleted(id) {
+                    ContentIndexCoordinator.shared.schedule(config: toConfig(), force: true)
+                }
                 updateRenderedMarkdown()
             }
 
@@ -106,7 +134,7 @@ extension AppState {
             if let path = config.imagePath, config.contentKind != .archive {
                 let url = URL(fileURLWithPath: path)
                 // 视频/音频经安全范围书签恢复沙盒访问（重启后路径直接不可达）
-                if config.contentKind == .quickLook || Self.isExternalMediaFileName(config.originalImageName ?? path) {
+                if !Self.isManagedCacheURL(url) {
                     // 加载新配置前先释放旧的媒体授权
                     stopVideoAccess()
                     if let restored = Self.restoreVideoAccess(config: config, fallbackURL: url) {
@@ -122,9 +150,10 @@ extension AppState {
                             mediaSidecarBookmarkData = sidecar.refreshedBookmark ?? sidecarBookmark
                         }
                     } else {
-                        self.videoBookmarkData = nil
                         self.mediaSidecarBookmarkData = nil
-                        self.imageURL = nil
+                        self.imageURL = url
+                        self.videoBookmarkData = config.videoBookmark
+                        reportFileOpenFeedback([.init(url: url, reason: .unreadable)])
                     }
                 } else if FileManager.default.fileExists(atPath: url.path) {
                     self.imageURL = url
@@ -154,6 +183,7 @@ extension AppState {
             if config.isCamera { openCamera() }
             if let webStr = config.webURLString, let url = URL(string: webStr) {
                 self.webURL = url
+                if url.isFileURL { retainFileAccess(to: url) }
             } else {
                 self.webURL = nil
             }
@@ -171,16 +201,19 @@ extension AppState {
                 self.text = SupportedContentOverview.markdown()
             } else if let path = config.textPath {
                 let url = URL(fileURLWithPath: path)
+                retainFileAccess(to: url)
                 if FileManager.default.fileExists(atPath: url.path) {
                     self.textURL = url
                     do {
                         self.text = try Self.readTextContent(from: url)
                     } catch {
-                        self.text = config.text
+                        self.text = ""
+                        reportFileOpenFeedback([.init(url: url, reason: .unreadable)])
                     }
                 } else {
-                    self.textURL = nil
-                    self.text = config.text
+                    self.textURL = url
+                    self.text = ""
+                    reportFileOpenFeedback([.init(url: url, reason: .unreadable)])
                 }
             } else {
                 self.textURL = nil
@@ -188,11 +221,13 @@ extension AppState {
             }
             self.appleMusicReference = config.appleMusicReference
             if let source = config.archiveSource, !source.volumes.isEmpty { restoreArchive(source) }
+            return true
         }
 
         /// 恢复图片箔的派生内容缓存（OCR 文字与主体抠图）以及菜单可用性判断所需的"已分析"标记。
         /// 结论存在就让检测直接跳过；主体结论存在但抠图缓存丢失时，保留结论并允许检测重新生成。
         func restoreImageDerivedContent(from config: WindowConfig) {
+            if let path = config.imagePath, !Self.isManagedCacheURL(URL(fileURLWithPath: path)) { return }
             imageOCRText = config.imageOCRText
             if let text = config.imageOCRText, imageURL != nil {
                 hasExtractableImageText = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -270,7 +305,7 @@ extension AppState {
                     isMarkdownPreview: isMarkdownPreview,
                     textPath: textURL?.path,
                     extensionID: extensionSession?.extensionID,
-                    fileList: fileList?.isPresentable == true ? fileList : nil
+                    fileList: fileList?.items.isEmpty == false ? fileList : nil
                 )),
                 sourceFingerprint: sourceFingerprint,
                 customTitle: customTitle,
@@ -289,7 +324,7 @@ extension AppState {
                 navigatorPanelSide: navigatorPanelSide,
                 navigatorPanelVisibilityMode: navigatorPanelVisibilityMode,
                 navigatorPanelWidth: navigatorPanelWidth,
-                fileList: fileList?.isPresentable == true ? fileList : nil,
+                fileList: fileList?.items.isEmpty == false ? fileList : nil,
                 documentScrollFile: extensionDocumentScrollFile,
                 documentScrollFraction: extensionDocumentScrollFraction,
                 appleMusicReference: appleMusicReference,

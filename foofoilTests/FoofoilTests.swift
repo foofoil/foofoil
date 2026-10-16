@@ -121,7 +121,7 @@ struct HistorySearchTests {
         #expect(history.first?.sourceFingerprint == fingerprint)
     }
 
-    @Test func recentHistoryDropsVideoEntriesWithMissingSourceFile() throws {
+    @Test func recentHistoryReadDoesNotDeleteMissingFiles() throws {
         let (repository, directory) = try repository()
         defer { try? FileManager.default.removeItem(at: directory) }
 
@@ -144,10 +144,10 @@ struct HistorySearchTests {
         )))
 
         let recent = repository.recent()
-        #expect(!recent.contains(where: { $0.id == missingID }))
+        #expect(recent.contains(where: { $0.id == missingID }))
         #expect(recent.contains(where: { $0.id == existingID }))
         // 缺失源文件的记录已被物理移除
-        #expect(repository.config(id: missingID) == nil)
+        #expect(repository.config(id: missingID) != nil)
     }
 
     @Test func recentHistoryKeepsVideoEntriesWithResolvableBookmark() throws {
@@ -179,7 +179,7 @@ struct HistorySearchTests {
 
         let recent = repository.recent()
         #expect(recent.contains(where: { $0.id == bookmarkedID }))
-        #expect(!recent.contains(where: { $0.id == missingID }))
+        #expect(recent.contains(where: { $0.id == missingID }))
     }
 }
 
@@ -1057,48 +1057,34 @@ struct FoofoilTests {
         #expect(state.webURL == nil)
     }
 
-    @Test func testOpenedTextFileUsesCachedCopy() throws {
-        let sourceURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("foofoil-text-source-\(UUID().uuidString).txt")
-        let content = "缓存后的文本内容"
-        try content.write(to: sourceURL, atomically: true, encoding: .utf8)
-        defer { try? FileManager.default.removeItem(at: sourceURL) }
-
+    @Test func testOpenedTextFileReferencesOriginal() throws {
+        let source = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).txt")
+        defer { try? FileManager.default.removeItem(at: source) }
+        try "first".write(to: source, atomically: true, encoding: .utf8)
         let state = AppState()
-        state.openTextFile(url: sourceURL)
-
-        let cachedURL = try #require(state.textURL)
-        #expect(cachedURL != sourceURL)
-        #expect(cachedURL.lastPathComponent == "cached_text_\(state.id.uuidString).txt")
-        #expect(FileManager.default.fileExists(atPath: cachedURL.path))
-
-        try FileManager.default.removeItem(at: sourceURL)
-        let restoredState = AppState(config: state.toConfig())
-        #expect(restoredState.text == content)
-
-        let config = try #require(SettingsStore.shared.historyConfigs.first(where: { $0.id == state.id }))
+        state.openTextFile(url: source)
+        #expect(state.textURL == source)
+        #expect(state.videoBookmarkData != nil)
+        let config = state.toConfig()
+        try "replacement".write(to: source, atomically: true, encoding: .utf8)
+        let reopened = AppState(config: config)
+        #expect(reopened.text == "replacement")
         HistoryManager.shared.removeFromHistory(config)
-        #expect(FileManager.default.fileExists(atPath: cachedURL.path) == false)
+        #expect(FileManager.default.fileExists(atPath: source.path))
+        reopened.saveState()
+        #expect(HistoryRepository.shared.config(id: config.id) == nil)
     }
 
-    @Test func testOpenedLocalWebFileUsesCachedCopy() throws {
-        let sourceURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("foofoil-web-source-\(UUID().uuidString).html")
-        try "<html><body>缓存网页</body></html>".write(to: sourceURL, atomically: true, encoding: .utf8)
-        defer { try? FileManager.default.removeItem(at: sourceURL) }
-
+    @Test func testOpenedLocalWebFileReferencesOriginal() throws {
+        let source = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).html")
+        defer { try? FileManager.default.removeItem(at: source) }
+        try "<p>original</p>".write(to: source, atomically: true, encoding: .utf8)
         let state = AppState()
-        state.openWeb(url: sourceURL)
-
-        let cachedURL = try #require(state.webURL)
-        #expect(cachedURL != sourceURL)
-        #expect(cachedURL.lastPathComponent == "cached_web_\(state.id.uuidString).html")
-        try FileManager.default.removeItem(at: sourceURL)
-        #expect(FileManager.default.fileExists(atPath: cachedURL.path))
-
-        let config = try #require(SettingsStore.shared.historyConfigs.first(where: { $0.id == state.id }))
-        HistoryManager.shared.removeFromHistory(config)
-        #expect(FileManager.default.fileExists(atPath: cachedURL.path) == false)
+        state.openWeb(url: source)
+        #expect(state.webURL == source)
+        #expect(state.videoBookmarkData != nil)
+        HistoryManager.shared.removeFromHistory(state.toConfig())
+        #expect(FileManager.default.fileExists(atPath: source.path))
     }
 
     @Test func testClearHistoryPreservesActiveCacheAndRemovesOtherCacheFiles() throws {
@@ -1128,7 +1114,7 @@ struct FoofoilTests {
 
         let activeCacheURL = try #require(activeState.imageURL)
         #expect(FileManager.default.fileExists(atPath: activeCacheURL.path))
-        #expect(FileManager.default.fileExists(atPath: historicalCacheURL.path) == false)
+        #expect(FileManager.default.fileExists(atPath: historicalCacheURL.path))
         #expect(FileManager.default.fileExists(atPath: orphanCacheURL.path) == false)
         #expect(SettingsStore.shared.historyConfigs.map(\.id) == [activeConfig.id])
 
@@ -1310,9 +1296,7 @@ struct FoofoilTests {
         // 验证缓存后，imageURL 应当指向应用沙盒内的 Application Support 目录中的 cached_image.png
         let cachedURL = state.imageURL
         #expect(cachedURL != nil)
-        #expect(cachedURL != sourceURL)
-        #expect(cachedURL?.lastPathComponent == "cached_image_\(state.id.uuidString).png")
-        #expect(cachedURL?.path.contains("/Library/Application Support/foofoil") == true)
+        #expect(cachedURL == sourceURL)
 
         // 验证文件是否实际写入成功且内容一致
         #expect(FileManager.default.fileExists(atPath: cachedURL!.path) == true)
@@ -1338,7 +1322,7 @@ struct FoofoilTests {
         if let config = savedConfig {
             HistoryManager.shared.removeFromHistory(config)
         }
-        #expect(FileManager.default.fileExists(atPath: cachedURL!.path) == false)
+        #expect(FileManager.default.fileExists(atPath: sourceURL.path))
 
         // 清理临时源文件
         try? FileManager.default.removeItem(at: sourceURL)
@@ -2212,7 +2196,7 @@ struct FoofoilTests {
             )
             #expect(state.fileList?.currentID == otherID)
             #expect(state.originalImageName == second.lastPathComponent || state.originalImageName == third.lastPathComponent)
-            #expect(state.imageURL?.path.contains(otherID) == true)
+            #expect(state.imageURL == state.fileList?.currentItem?.url)
         }
         #expect(state.fileList?.items.count == 3)
         #expect(state.id == originalID)
@@ -3487,7 +3471,7 @@ struct ClipboardContentDetectionTests {
         #expect(markdownState.isMarkdownDocument)
         #expect(markdownState.imageURL == nil)
         #expect(markdownState.webURL == nil)
-        #expect(markdownState.textURL == nil)
+        #expect(markdownState.textURL.map(AppState.isManagedCacheURL) == true)
 
         let noteState = AppState()
         noteState.openText("普通笔记", isMarkdown: false)

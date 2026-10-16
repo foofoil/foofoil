@@ -11,6 +11,12 @@ nonisolated enum FoilInformation {
     }
 
     @MainActor static func sourceURL(for config: WindowConfig) -> URL? {
+        if config.isClipboardContent { return nil }
+        if let bookmark = config.videoBookmark,
+           let fallback = config.textPath ?? config.imagePath ?? config.webURLString.flatMap({ URL(string: $0)?.path }) {
+            let resolved = FileReference.resolve(URL(fileURLWithPath: fallback), bookmark: bookmark)
+            if resolved.status == .available, !AppState.isManagedCacheURL(resolved.url) { return resolved.url }
+        }
         if let item = config.fileList?.currentItem {
             if let bookmark = item.bookmark, let url = AppState.resolveVideoBookmark(bookmark) {
                 return url
@@ -82,7 +88,9 @@ extension AppDelegate {
         var rows = [FoilInformation.Row(key: "Foil Info Title", value: config.historyMenuDisplayName),
                     .init(key: "Foil Info Type", value: NSLocalizedString("Foil Info Type \(kind.rawValue)", comment: "")),
                     .init(key: "Foil Info Window Size", value: "\(Int(size.width.rounded())) × \(Int(size.height.rounded())) pt")]
-        if let source {
+        if config.isClipboardContent {
+            rows.append(.init(key: "Foil Info Source", value: NSLocalizedString("From Clipboard", comment: "")))
+        } else if let source {
             rows.append(.init(key: "Foil Info File Path", value: source.path))
         } else if state.appleMusicReference != nil {
             rows.append(.init(key: "Foil Info Source", value: "Apple Music"))
@@ -93,7 +101,7 @@ extension AppDelegate {
             rows.append(.init(key: "Foil Info File Path", value: NSLocalizedString("Foil Info Path Unknown", comment: "")))
             rows.append(.init(key: "Foil Info File Size", value: NSLocalizedString("Foil Info Unknown", comment: "")))
         }
-        if kind == .web, source == nil {
+        if kind == .web, source == nil, !config.isClipboardContent {
             if let url = config.webURLString { rows.append(.init(key: "Foil Info Initial URL", value: url)) }
             if let url = config.actualWebURLString ?? config.webURLString { rows.append(.init(key: "Foil Info Current URL", value: url)) }
         }

@@ -375,17 +375,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
             hasExtractableImageSubject = false
             imageSubjectCutoutURL = nil
             if let url = imageURL {
-                // 视频/音频不复制到应用缓存目录，仅记录原始文件路径。
-                if !isArchivePreview && !Self.isExternalMediaFile(url: url) && !isQuickLookDocument {
-                    // 切到非媒体内容时释放旧文件的安全范围访问授权
-                    stopVideoAccess()
-                    let cacheDir = getCachedImageURL()?.deletingLastPathComponent()
-                    let isAlreadyCached = cacheDir.map { url.path.hasPrefix($0.path) } ?? false
-                    if !isAlreadyCached {
-                        if let cachedURL = cacheImage(from: url) {
-                            imageURL = cachedURL
-                        }
-                    }
+                if !isArchivePreview, !Self.isExternalMediaFile(url: url), !isQuickLookDocument {
+                    retainFileAccess(to: url)
                 }
                 saveState()
             } else {
@@ -430,6 +421,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         }
     }
 
+    var ownedBodyPaths: Set<String> = []
+    var lastManagedTextWrite: (url: URL, text: String)?
     var saveTask: Task<Void, Never>?
     var imageListSlideshowWorkItem: DispatchWorkItem?
 
@@ -459,6 +452,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
                 saveTask = Task {
                     try? await Task.sleep(nanoseconds: 800_000_000) // 800ms 防抖落盘
                     if Task.isCancelled { return }
+                    self.persistManagedTextIfNeeded(createIfNeeded: true)
                     self.saveState()
                 }
             }
@@ -537,7 +531,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     @Published public var showBorder: Bool {
         didSet {
             // 本应固定边框的文档类型不允许进入无边框模式；切回有边框并放弃本次切换。
-            if !supportsBorderToggle, showBorder != true {
+            if !isBatchUpdating, !supportsBorderToggle, showBorder != true {
                 showBorder = true
                 return
             }
@@ -669,145 +663,9 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         case url(URL)
     }
 
-    public init(config: WindowConfig, isIncognito: Bool = false) {
-        self.isIncognito = isIncognito
-        self.id = config.id
-        self.sourceFingerprint = config.sourceFingerprint
-        self.isPinned = config.isPinned
-        self.opacity = config.opacity
-        if config.sourceFingerprint == KeyboardShortcutsOverview.sourceFingerprint {
-            self.textURL = nil
-            self.text = KeyboardShortcutsOverview.markdown()
-        } else if config.sourceFingerprint == SupportedContentOverview.sourceFingerprint {
-            self.textURL = nil
-            self.text = SupportedContentOverview.markdown()
-        } else if let path = config.textPath {
-            let url = URL(fileURLWithPath: path)
-            if FileManager.default.fileExists(atPath: url.path) {
-                self.textURL = url
-                do {
-                    self.text = try Self.readTextContent(from: url)
-                } catch {
-                    self.text = config.text
-                }
-            } else {
-                self.textURL = nil
-                self.text = config.text
-            }
-        } else {
-            self.textURL = nil
-            self.text = config.text
-        }
-        self.isMarkdownPreview = config.isMarkdownPreview
-        self.windowFrame = config.windowFrame
-        self.originalImageName = config.sourceFingerprint == SupportedContentOverview.sourceFingerprint
-                ? NSLocalizedString("Supported Content Overview", comment: "") + ".md"
-                : config.originalImageName
-        self.customTitle = config.customTitle
-        self.imageSource = config.imageSource
-        self.showBorder = config.showBorder
-        self.showCodeLineNumbers = config.showCodeLineNumbers ?? true
-        self.imageScale = Self.clampImageScale(config.imageScale)
-        self.textFontSize = Self.clampTextFontSize(config.textFontSize)
-        self.webZoom = Self.clampWebZoom(config.webZoom)
-        self.documentZoom = Self.clampDocumentZoom(config.documentZoom)
-        self.createdAt = config.createdAt
-        self.svgColor = config.svgColor
-        self.backgroundColorHex = config.backgroundColorHex
-        self.textColorHex = config.textColorHex
-        self.documentThemeId = config.documentThemeId
-        self.documentFontName = config.documentFontName
-        self.documentLineSpacing = config.documentLineSpacing
-        self.documentParagraphSpacing = config.documentParagraphSpacing
-        self.mediaPlaybackMode = config.mediaPlaybackMode
-        self.extensionSession = nil
-        self.extensionFallbackProviderID = nil
-        self.extensionStateReference = config.extensionStateReference
-        self.extensionDocumentScrollFile = config.documentScrollFile
-        self.extensionDocumentScrollFraction = Self.clampScrollFraction(config.documentScrollFraction)
-        self.navigatorPanelSide = config.navigatorPanelSide
-        self.navigatorPanelVisibilityMode = config.navigatorPanelVisibilityMode
-        self.navigatorPanelWidth = NavigatorPanelMetrics.clampWidth(config.navigatorPanelWidth)
-        self.fileList = nil
-        self.fileListRevision = 0
-
-        if let path = config.imagePath, config.contentKind != .archive {
-            let url = URL(fileURLWithPath: path)
-            // 视频/音频经安全范围书签恢复沙盒访问（重启后路径直接不可达）
-            if config.contentKind == .quickLook || Self.isExternalMediaFileName(config.originalImageName ?? path) {
-                if let restored = Self.restoreVideoAccess(config: config, fallbackURL: url) {
-                    self.accessingVideoURL = restored.accessedURL
-                    self.videoBookmarkData = restored.bookmark
-                    self.quickLookSourceURL = config.contentKind == .quickLook ? restored.url : nil
-                    self.imageURL = restored.url
-                    // 音频再恢复同目录封面文件夹的访问，保证封面在重启后仍可读取
-                    if Self.isAudioFileName(config.originalImageName ?? path),
-                       let sidecarBookmark = config.mediaSidecarBookmark,
-                       let sidecar = Self.restoreSidecarCoverAccess(bookmark: sidecarBookmark) {
-                        if sidecar.accessed { accessingSidecarDirectoryURL = sidecar.directory }
-                        mediaSidecarBookmarkData = sidecar.refreshedBookmark ?? sidecarBookmark
-                    }
-                } else {
-                    self.videoBookmarkData = nil
-                    self.mediaSidecarBookmarkData = nil
-                    self.imageURL = nil
-                }
-            } else if FileManager.default.fileExists(atPath: url.path) {
-                self.imageURL = url
-            } else if let resolvedURL = Self.findCachedImageInDirectory(for: config.id) {
-                self.imageURL = resolvedURL
-                self.svgColor = config.svgColor
-            } else if let legacyURL = Self.findLegacyCachedImageInDirectory() {
-                self.imageURL = legacyURL
-                self.svgColor = config.svgColor
-            } else {
-                self.imageURL = nil
-            }
-        } else {
-            self.imageURL = nil
-        }
-
-        // 扩展音频（DSF/DFF/SACD 经 Hi-Fi 播放，含目录列表）不占用 imageURL，
-        // 同目录封面书签必须独立于 imagePath 恢复，否则每次重启都会重新弹出目录授权。
-        if config.imagePath == nil, accessingSidecarDirectoryURL == nil {
-            if let bookmark = config.mediaSidecarBookmark,
-               let sidecar = Self.restoreSidecarCoverAccess(bookmark: bookmark) {
-                if sidecar.accessed { accessingSidecarDirectoryURL = sidecar.directory }
-                mediaSidecarBookmarkData = sidecar.refreshedBookmark ?? bookmark
-            } else if config.mediaSidecarBookmark == nil {
-                mediaSidecarBookmarkData = nil
-            }
-        }
-
-        if let webStr = config.webURLString, let url = URL(string: webStr) {
-            self.webURL = url
-        } else {
-            self.webURL = nil
-        }
-
-        if let actualWebStr = config.actualWebURLString, let url = URL(string: actualWebStr) {
-            self.actualWebURL = url
-        } else {
-            self.actualWebURL = nil
-        }
-        super.init()
-        if config.isCamera { openCamera() }
-        restoreFileList(from: config)
-        restoreExtensionSession(from: config)
-        restoreCustomCover(from: config)
-        appleMusicReference = config.appleMusicReference
-        if let source = config.archiveSource, !source.volumes.isEmpty { restoreArchive(source) }
-        // 在调用 saveState 时避免触发死循环；视频经书签恢复后可能重建了书签，也需要落盘
-        if let path = config.imagePath, !FileManager.default.fileExists(atPath: path) {
-            if Self.findCachedImageInDirectory(for: config.id) != nil || Self.findLegacyCachedImageInDirectory() != nil {
-                saveState()
-            }
-        }
-        if Self.isExternalMediaFileName(config.originalImageName ?? ""),
-           videoBookmarkData != config.videoBookmark || mediaSidecarBookmarkData != config.mediaSidecarBookmark {
-            saveState()
-        }
-        updateRenderedMarkdown()
+    public convenience init(config: WindowConfig, isIncognito: Bool = false) {
+        self.init(id: config.id, isIncognito: isIncognito)
+        loadConfig(config)
     }
 
     public init(id: UUID = UUID(), isIncognito: Bool = false) {
@@ -855,6 +713,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     }
 
     deinit {
+        ContentCache.shared.retire(ownedBodyPaths)
         if let closingArchive = archiveSession {
             Task { @MainActor in closingArchive.close() }
         }

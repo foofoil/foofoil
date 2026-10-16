@@ -68,7 +68,7 @@ struct TextEditorModeView: View {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 // 整个滚动视图避开四边缩放热区，滚动条首尾也不会触发角部缩放。
                                 .padding(appState.isFullScreen ? 0 : FloatingWindow.resizeHitThickness + 1)
-                        } else if appState.isArchivePreview || (appState.textURL != nil && !appState.isMarkdownDocument) {
+                        } else if appState.isArchivePreview || (appState.isReadOnlyTextFile && !appState.isMarkdownDocument) {
                             // 已识别语言的代码优先用 WebKit 语法着色；超限、未识别或失败时回退原生只读视图。
                             if let languageID = appState.webCodePreviewLanguageID, !codePreviewFailed {
                                 ReadOnlyCodeView(
@@ -134,7 +134,7 @@ struct TextEditorModeView: View {
                                                     let isCurrentlyBlank = appState.imageURL == nil && appState.webURL == nil && appState.text.isEmpty
                                                     if isCurrentlyBlank {
                                                         withAnimation(.easeInOut(duration: 0.35)) {
-                                                            appState.loadConfig(config)
+                                                            _ = appState.loadConfig(config)
                                                         }
                                                     } else {
                                                         appState.loadConfig(config)
