@@ -1,6 +1,12 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Open Package Contents": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Open Package Contents" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开包内容" } }
+      }
+    },
       "Archive Loading Contents": {
         "localizations": {
           "en": { "stringUnit": { "state": "translated", "value": "Loading contents…" } },

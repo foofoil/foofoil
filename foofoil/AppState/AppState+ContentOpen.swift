@@ -707,7 +707,12 @@ extension AppState {
                 reportFileOpenFeedback([.init(url: url, reason: .unreadable)])
                 return
             }
-            if ArchiveReader.recognizes(url) { openArchive(url: url); return }
+            // ISO 先让已通过内容探测的音频 provider 接管（SACD），其余交给镜像目录读取器。
+            if ArchiveReader.recognizes(url),
+               !(url.pathExtension.lowercased() == "iso" && ExtensionHost.shared.canOpenAsAudio(url: url)) {
+                openArchive(url: url)
+                return
+            }
             if !isArchivePreview {
                 clearArchiveForNewContent()
             }

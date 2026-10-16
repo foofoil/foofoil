@@ -12,6 +12,7 @@ int archive_read_support_filter_gzip(struct archive *);
 int archive_read_support_filter_bzip2(struct archive *);
 int archive_read_support_filter_xz(struct archive *);
 int archive_read_support_format_zip(struct archive *);
+int archive_read_support_format_iso9660(struct archive *);
 int archive_read_support_format_tar(struct archive *);
 int archive_read_support_format_7zip(struct archive *);
 int archive_read_support_format_rar(struct archive *);

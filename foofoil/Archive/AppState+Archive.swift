@@ -77,7 +77,7 @@ extension AppState {
         resetFileList()
     }
 
-    func restoreArchive(_ source: ArchiveSource) {
+    func restoreArchive(_ source: ArchiveSource, sourceLease: ArchivePreviewLease? = nil) {
         guard !source.volumes.isEmpty else { return }
         imageURL = nil
         textURL = nil
@@ -85,7 +85,7 @@ extension AppState {
         webURL = nil
         actualWebURL = nil
         extensionSession = nil
-        let session = ArchiveSession(source: source)
+        let session = ArchiveSession(source: source, sourceLease: sourceLease)
         session.windowState = presentationWindowState
         archiveSession = session
         session.locateVolumes = { [weak self, weak session] in
@@ -102,13 +102,14 @@ extension AppState {
         session.load()
     }
 
-    func openArchive(url: URL) {
+    func openArchive(url: URL, displayName: String? = nil, fingerprint: String? = nil, sourceLease: ArchivePreviewLease? = nil) {
         do {
-            let source = try archiveVolumes(for: url)
+            var source = try archiveVolumes(for: url)
+            source.displayName = displayName
             resetContent()
-            originalImageName = source.primaryURL.lastPathComponent
-            sourceFingerprint = Self.localSourceFingerprint(for: source.primaryURL)
-            restoreArchive(source)
+            originalImageName = source.name
+            sourceFingerprint = fingerprint ?? Self.localSourceFingerprint(for: source.primaryURL)
+            restoreArchive(source, sourceLease: sourceLease)
             saveState()
         } catch is CancellationError {
             return

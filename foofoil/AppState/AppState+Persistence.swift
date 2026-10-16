@@ -226,7 +226,7 @@ extension AppState {
         public func toConfig() -> WindowConfig {
             if let archiveSession {
                 return WindowConfig(id: id, imagePath: archiveSession.source.primaryURL.path,
-                    originalImageName: archiveSession.source.primaryURL.lastPathComponent,
+                    originalImageName: archiveSession.source.name,
                     isPinned: isPinned, opacity: opacity, windowFrame: windowFrame,
                     createdAt: createdAt, contentKind: .archive, sourceFingerprint: sourceFingerprint,
                     customTitle: customTitle, videoBookmark: archiveSession.source.volumes.first?.bookmark,

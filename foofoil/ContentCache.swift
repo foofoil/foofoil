@@ -80,6 +80,7 @@ nonisolated final class ContentCache: @unchecked Sendable {
 
     private func paths(for config: WindowConfig, files: [String: Int64]) -> Set<String> {
         var paths = Set([config.imagePath, config.textPath, config.customCoverPath, config.imageSubjectPath].compactMap { $0 })
+        paths.formUnion(config.archiveSource?.volumes.map(\.path) ?? [])
         if let value = config.webURLString, let url = URL(string: value), url.isFileURL { paths.insert(url.path) }
         if let path = config.imagePath, let copy = FragmentedMP4PlaybackCopy.copyURL(for: URL(fileURLWithPath: path)) { paths.insert(copy.path) }
         // 列表图片和派生文件也属于同一条记录。

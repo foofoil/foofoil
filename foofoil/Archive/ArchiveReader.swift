@@ -6,6 +6,8 @@ nonisolated public struct ArchiveSource: Codable, Sendable, Equatable {
         var bookmark: Data?
     }
     var volumes: [Volume]
+    var displayName: String? = nil
+    var name: String { displayName ?? primaryURL.lastPathComponent }
     var primaryURL: URL { URL(fileURLWithPath: volumes[0].path) }
 }
 
@@ -46,7 +48,17 @@ nonisolated enum ArchiveReader {
     static let maximumEntries = 100_000
     static let maximumDepth = 128
     static let maximumExportBytes: Int64 = 20 * 1_024 * 1_024 * 1_024
-    static let extensions: Set<String> = ["zip", "zipx", "tar", "tgz", "gz", "bz2", "xz", "tbz", "tbz2", "txz", "7z", "rar"]
+    static let extensions: Set<String> = ["zip", "zipx", "tar", "tgz", "gz", "bz2", "xz", "tbz", "tbz2", "txz", "7z", "rar", "apk", "jar", "war", "ear", "cbz", "cbr", "cb7", "cbt", "kra", "iso"]
+
+    // 文档的 ZIP 容器仅由“打开包内容”显式进入，不抢占原有阅读器。
+    static let documentExtensions: Set<String> = [
+        "epub", "docx", "docm", "dotx", "dotm", "xlsx", "xlsm", "xlsb", "xltx", "xltm",
+        "pptx", "pptm", "potx", "potm", "ppsx", "ppsm", "odt", "ods", "odp", "odg", "ott", "ots", "otp", "otg"
+    ]
+
+    static func supportsPackageContents(_ url: URL) -> Bool {
+        documentExtensions.contains(url.pathExtension.lowercased())
+    }
 
     static func recognizes(_ url: URL) -> Bool {
         extensions.contains(url.pathExtension.lowercased()) || url.lastPathComponent.range(of: #"\.(7z\.\d{3}|r\d{2}|z\d{2})$"#, options: [.regularExpression, .caseInsensitive]) != nil
@@ -175,6 +187,7 @@ nonisolated enum ArchiveReader {
         archive_read_support_filter_xz(reader)
         archive_read_support_format_zip(reader)
         archive_read_support_format_tar(reader)
+        archive_read_support_format_iso9660(reader)
         archive_read_support_format_7zip(reader)
         archive_read_support_format_rar(reader)
         archive_read_support_format_rar5(reader)

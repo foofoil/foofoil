@@ -265,6 +265,9 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         if menuItem.action == #selector(saveContentImageAction) {
             return activeReadingState?.canSaveContentImage == true
         }
+        if menuItem.action == #selector(openPackageContentsAction) {
+            return activeReadingState?.packageContentsURL != nil
+        }
         if menuItem.action == #selector(saveAsAction) {
             return activeAppState?.selectedArchiveSession.map { $0.canExport } ?? (activeAppState?.contentSavePayload != nil)
         }

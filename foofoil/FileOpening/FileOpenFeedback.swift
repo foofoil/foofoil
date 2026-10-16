@@ -63,6 +63,6 @@ extension AppState {
     /// 预览能力与缩略图能力并不完全等价：已知文档直接保留预览，未知类型只在系统能生成内容缩略图时打开。
     func canUseKnownQuickLookPreview(_ url: URL) -> Bool {
         let extensions: Set<String> = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "pages", "numbers", "key", "rtf", "rtfd", "odt", "ods", "odp", "epub"]
-        return extensions.contains(url.pathExtension.lowercased())
+        return extensions.contains(url.pathExtension.lowercased()) || ArchiveReader.supportsPackageContents(url)
     }
 }

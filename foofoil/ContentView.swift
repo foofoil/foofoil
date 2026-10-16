@@ -312,6 +312,14 @@ struct FoilContentView: View {
             .keyboardShortcut("s", modifiers: [.command, .shift])
             .disabled(windowState.selectedArchiveSession.map { !$0.canExport } ?? (appState.contentSavePayload == nil))
 
+            if appState.packageContentsURL != nil {
+                Button {
+                    (NSApp.delegate as? AppDelegate)?.openPackageContentsAction()
+                } label: {
+                    Label("Open Package Contents", systemImage: "archivebox")
+                }
+            }
+
             if appState.isVideoDocument {
                 SubtitleVisibilityToggle(controller: appState.subtitles)
                 Button { appState.subtitles.pickFile() } label: {

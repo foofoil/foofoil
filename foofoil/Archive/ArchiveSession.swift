@@ -35,8 +35,9 @@ nonisolated final class ArchivePreviewLease: Sendable {
     private weak var passwordTarget: ArchiveSession?
     private var passwordNodeID: String?
     /// 内层包的来源必须覆盖异步扫描、预览与导出的整个生命周期。
-    private var sourceLease: ArchivePreviewLease?
+    private(set) var sourceLease: ArchivePreviewLease?
     private final class NestedArchive {
+        var isAudio = false
         var lease: ArchivePreviewLease?
         var session: ArchiveSession?
         var task: Task<Void, Never>?
@@ -61,12 +62,13 @@ nonisolated final class ArchivePreviewLease: Sendable {
     }
     var passwordPromptName: String {
         passwordNodeID.flatMap { itemLocations[$0]?.entry.name }
-            ?? passwordTarget?.source.primaryURL.lastPathComponent
-            ?? source.primaryURL.lastPathComponent
+            ?? passwordTarget?.source.name
+            ?? source.name
     }
     var canExport: Bool { selected.map { $0.isDirectory || $0.isRegular } == true && !exporting && index != nil }
 
-    init(source: ArchiveSource) {
+    init(source: ArchiveSource, sourceLease: ArchivePreviewLease? = nil) {
+        self.sourceLease = sourceLease
         var urls: [URL] = []
         var accessed: [URL] = []
         var refreshed: [ArchiveSource.Volume] = []
@@ -77,7 +79,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
             urls.append(url)
             refreshed.append(.init(path: url.path, bookmark: AppState.makeSecurityScopedBookmark(for: url)))
         }
-        self.source = ArchiveSource(volumes: refreshed)
+        self.source = ArchiveSource(volumes: refreshed, displayName: source.displayName)
         self.urls = urls
         self.accessedURLs = accessed
     }
@@ -148,6 +150,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
         }
         let origin = location.origin ?? self
         guard let index = origin.index else { return }
+        let cachedLease = nestedArchives[id]?.lease
         let node = NestedArchive()
         nestedArchives[id] = node
         let urls = origin.urls, password = origin.password, queue = origin.workQueue, entry = location.entry
@@ -157,6 +160,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
             defer { withExtendedLifetime(sourceLease) {} }
             let worker = Task.detached(priority: .userInitiated) {
                 if let rootIndex { try await rootQueue.validate(urls: rootURLs, index: rootIndex) }
+                if let cachedLease { return cachedLease }
                 return try await queue.preview(urls: urls, index: index, entry: entry, password: password, limit: ArchiveReader.maximumExportBytes)
             }
             do {
@@ -164,8 +168,19 @@ nonisolated final class ArchivePreviewLease: Sendable {
                 guard let self, let node, !Task.isCancelled, self.nestedArchives[id] === node else { return }
                 let cachedBytes = self.nestedArchives.values.reduce(Int64(0)) { $0 + ($1.lease?.byteCount ?? 0) }
                 guard lease.byteCount <= ArchiveReader.maximumExportBytes - cachedBytes else { throw ArchiveFailure.limit }
-                let child = ArchiveSession(source: ArchiveSource(volumes: [.init(path: lease.directory.appendingPathComponent(entry.name).path)]))
-                child.sourceLease = lease
+                let sourceURL = lease.directory.appendingPathComponent(entry.name)
+                // 内层 ISO 在首次读取后使用同一内容探测分流，SACD 保持音频叶节点。
+                if sourceURL.pathExtension.lowercased() == "iso", ExtensionHost.shared.canOpenAsAudio(url: sourceURL) {
+                    node.lease = lease
+                    node.isAudio = true
+                    node.task = nil
+                    self.projectIndex()
+                    self.objectWillChange.send()
+                    self.onChange?()
+                    if self.selectedID == id { self.select(id) }
+                    return
+                }
+                let child = ArchiveSession(source: ArchiveSource(volumes: [.init(path: lease.directory.appendingPathComponent(entry.name).path)]), sourceLease: lease)
                 node.lease = lease
                 node.session = child
                 node.task = nil
@@ -248,11 +263,11 @@ nonisolated final class ArchivePreviewLease: Sendable {
                 let parentID = entry.parentID.map { $0 == "root" && parent != nil ? parent! : prefix + $0 }
                 itemLocations[id] = (origin, entry)
                 itemParents[id] = parentID
-                let isArchive = entry.isRegular && ArchiveReader.recognizes(URL(fileURLWithPath: entry.path))
+                let isArchive = entry.isRegular && nestedArchives[id]?.isAudio != true && ArchiveReader.recognizes(URL(fileURLWithPath: entry.path))
                 if isArchive { archiveNodeIDs.insert(id) }
                 let node = nestedArchives[id]
                 let subtitle = isLoadingArchiveNode(id) ? NSLocalizedString("Archive Loading Contents", comment: "") : (node?.error ?? node?.session?.message)
-                items.append(NavigatorItem(id: id, parentID: parentID, title: entry.id == "root" ? source.primaryURL.lastPathComponent : entry.name,
+                items.append(NavigatorItem(id: id, parentID: parentID, title: entry.id == "root" ? source.name : entry.name,
                     subtitle: subtitle,
                     symbolName: entry.isDirectory ? "folder" : (isArchive ? "archivebox" : (entry.encrypted ? "lock.doc" : "doc")),
                     badge: counts[entry.path, default: 0] > 1 ? entry.ordinal.map { ($0 + 1).formatted() } : nil))
@@ -330,7 +345,9 @@ nonisolated final class ArchivePreviewLease: Sendable {
         selectedID = id
         message = nil
         onChange?()
-        guard let entry = selected, !entry.isDirectory, !isArchiveNode(id) else { return }
+        guard let entry = selected, !entry.isDirectory else { return }
+        let isISO = (entry.name as NSString).pathExtension.lowercased() == "iso"
+        guard !isArchiveNode(id) || isISO else { return }
         guard entry.isRegular else { message = NSLocalizedString("Archive Unsupported Entry", comment: ""); return }
         // 文件类型不设另一份白名单；统一交给普通打开入口。解压仍受总输出预算约束。
         let limit = ArchiveReader.maximumExportBytes
@@ -341,16 +358,32 @@ nonisolated final class ArchivePreviewLease: Sendable {
         let token = generation
         let urls = origin.urls, password = origin.password, workQueue = origin.workQueue, sourceLease = origin.sourceLease
         let rootQueue = self.workQueue, rootURLs = self.urls, rootIndex = self.index
+        let cachedLease = nestedArchives[id]?.lease
         task = Task { [weak self] in
             defer { withExtendedLifetime(sourceLease) {} }
             let worker = Task.detached(priority: .userInitiated) {
                 if let rootIndex { try await rootQueue.validate(urls: rootURLs, index: rootIndex) }
+                if let cachedLease { return cachedLease }
                 return try await workQueue.preview(urls: urls, index: index, entry: entry, password: password, limit: limit)
             }
 
             do {
                 let lease = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
                 guard let self, !Task.isCancelled, self.generation == token else { return }
+                if isISO {
+                    let node = self.nestedArchives[id] ?? NestedArchive()
+                    let cachedBytes = self.nestedArchives.values.reduce(Int64(0)) { $0 + ($1.lease?.byteCount ?? 0) } - (node.lease?.byteCount ?? 0)
+                    guard lease.byteCount <= ArchiveReader.maximumExportBytes - cachedBytes else { throw ArchiveFailure.limit }
+                    node.lease = lease
+                    node.isAudio = ExtensionHost.shared.canOpenAsAudio(url: lease.directory.appendingPathComponent(entry.name))
+                    self.nestedArchives[id] = node
+                    self.projectIndex()
+                    if !node.isAudio {
+                        self.busy = false
+                        self.onChange?()
+                        return
+                    }
+                }
                 let state = AppState(isIncognito: self.windowState?.isIncognito ?? true)
                 state.isArchivePreview = true
                 state.archiveWindowOwner = self.windowState

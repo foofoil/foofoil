@@ -72,7 +72,7 @@ Share menus in compatible macOS apps can open URLs, text, images, documents, aud
 
 You can open the system sharing settings directly from Settings > General > Share Menu and enable foofoil.
 
-The Share menu filters attachments with a known content type. Apps that supply only a generic file URL may still show foofoil. A mixed selection containing a known unsupported type hides the entry; ISO disc images remain available for SACD content.
+The Share menu filters attachments with a known content type. Apps that supply only a generic file URL may still show foofoil. A mixed selection containing a known unsupported type hides the entry; ISO disc images remain available for SACD audio and ISO 9660 file browsing.
 
 Files that cannot be opened from drag and drop, the clipboard, or sharing appear in a separate bordered feedback foil with their system icons, filenames, and reason. Existing foils are preserved, even if blank. Feedback foils are excluded from history and restart restoration; failures from the same batch are collected together. Known Quick Look documents retain their preview; unknown formats are previewed only when the system can generate a content thumbnail.
 
@@ -97,6 +97,12 @@ Video history thumbnails use the midpoint of the video to avoid opening black or
 ⇧⌘S saves the source file, or the complete current text/Markdown source including edits. EPUB saves the original EPUB file; websites save a `.webarchive`. Camera, CUE tracks, SACD ISO, and Apple Music do not provide Save As. Both commands are disabled for blank foils.
 
 ## Archives
+
+APK, JAR/WAR/EAR, CBZ/CBR/CB7/CBT comic archives, and KRA projects open as packages using the same archive tree and previews. Compiled resources (such as Android binary XML and DEX) are not decompiled. Comic archives show their files rather than a dedicated comic reader.
+
+Office ZIP containers (.docx/.docm/.dotx/.dotm, .xlsx/.xlsm/.xlsb/.xltx/.xltm, .pptx/.pptm/.potx/.potm/.ppsx/.ppsm and OpenDocument formats) and EPUB keep their normal document preview. Choose File → Open Package Contents, or the corresponding context-menu command, to browse their internal files in a new foil. Preview and package browsing keep separate history records; reopening either record restores its own mode. Legacy .doc/.xls/.ppt files are not ZIP containers and do not offer this command.
+
+Ordinary ISO 9660 images, including common Joliet/Rock Ridge extensions, can be browsed without mounting. SACD images are detected by the audio reader and retain track playback. UDF-only images and DMG are unsupported. Nested ISO files are extracted on selection to distinguish audio from file images, or on expansion; their directory is read only when expanded, and their extracted source is cached for the session.
 
 Open ZIP/ZIP64, TAR/PAX, TGZ/TAR.GZ, TAR.BZ2, TAR.XZ, GZ/BZ2/XZ streams, 7z, and RAR/RAR5 using the file picker, drag and drop, clipboard, or Share menu. The archive tree owns the navigator; select a file to preview it. Nothing opens automatically. Text is read-only. EPUB chapter commands remain available while its table of contents is hidden. Markdown outlines are also hidden in archive foils. Nested archives expand in the same tree: only expanding a node extracts that archive and reads its directory. Loaded directories are cached for the session; collapsing a node cancels unfinished loads below it. Unopened nested archives are never scanned. Search covers only directories already loaded. History keeps only the original archive reference and a fixed icon; reopening starts with no selection.
 

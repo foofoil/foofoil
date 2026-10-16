@@ -13,7 +13,7 @@ struct ArchiveContentView: View {
                 Image(systemName: session.selected?.isDirectory == true ? "folder" : "archivebox")
                     .font(.largeTitle).foregroundStyle(.secondary)
                 if let entry = session.selected {
-                    Text(entry.id == "root" ? session.source.primaryURL.lastPathComponent : entry.name).font(.headline)
+                    Text(entry.id == "root" ? session.source.name : entry.name).font(.headline)
                     Text(entry.path.isEmpty ? "/" : entry.path).font(.caption).textSelection(.enabled).id(entry.id)
                     Text(entry.isDirectory ? NSLocalizedString("Archive Directory", comment: "") : UTType(filenameExtension: (entry.path as NSString).pathExtension)?.localizedDescription ?? NSLocalizedString("Archive File", comment: ""))
                     if let size = entry.size {

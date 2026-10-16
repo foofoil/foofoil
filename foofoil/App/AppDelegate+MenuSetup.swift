@@ -149,6 +149,12 @@ extension AppDelegate {
 
         fileMenu.addItem(NSMenuItem.separator())
 
+        let packageContentsItem = NSMenuItem(title: NSLocalizedString("Open Package Contents", comment: ""),
+                                             action: #selector(openPackageContentsAction), keyEquivalent: "")
+        packageContentsItem.withSymbol("archivebox")
+        packageContentsItem.target = self
+        fileMenu.addItem(packageContentsItem)
+
         let addToListItem = NSMenuItem(
             title: NSLocalizedString("Add to List...", comment: ""),
             action: #selector(addToFileListAction),

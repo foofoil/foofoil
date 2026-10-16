@@ -71,13 +71,14 @@ extension AppState {
                 name.hasPrefix("cached_web_") ||
                 name.hasPrefix("cached_cover_") ||
                 name.hasPrefix("cached_subject_") ||
+                name.hasPrefix("cached_package_") ||
                 name.hasPrefix(FragmentedMP4PlaybackCopy.filePrefix)
         }
 
         /// 当前窗口正在使用的本地缓存路径；分片媒体的播放副本随源文件一并保留。
         public var cachedContentPaths: Set<String> {
             let playbackCopies = [imageURL].compactMap { $0 }.compactMap(FragmentedMP4PlaybackCopy.copyURL(for:))
-            return ([imageURL, textURL, webURL, customCoverURL] + playbackCopies)
+            return ([imageURL, textURL, webURL, customCoverURL] + playbackCopies + (archiveSession?.source.volumes.map { URL(fileURLWithPath: $0.path) } ?? []))
                 .compactMap { $0 }
                 .filter { $0.isFileURL && Self.isManagedCacheURL($0) }
                 .map(\.path)

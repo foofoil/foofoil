@@ -67,10 +67,10 @@ nonisolated final class HistoryDatabase {
                 let old = try fetchItem(id: config.id)
                 var duplicateCreatedAt: Date?
 
-                // 同一本地来源再次打开时只更新一条历史，不因新的窗口 UUID 重复记录。
+                // 同一本地来源在同一打开方式内去重；包浏览与普通预览各保留自己的历史。
                 // 列表会话没有单文件 fingerprint，避免打开其中某一项时吞掉整份列表。
                 if kind != .note, config.fileList?.isPresentable != true, let fingerprint = config.sourceFingerprint,
-                   let duplicate = try findSourceDuplicate(fingerprint: fingerprint, excluding: config.id) {
+                   let duplicate = try findSourceDuplicate(fingerprint: fingerprint, isArchive: kind == .archive, excluding: config.id) {
                     duplicateCreatedAt = duplicate.createdAt
                     try deleteItem(id: duplicate.id)
                 }
@@ -661,10 +661,10 @@ nonisolated final class HistoryDatabase {
             """, bindings: [id.uuidString, inputURL, actualURL, inputURL, actualURL]).first
     }
 
-    private func findSourceDuplicate(fingerprint: String, excluding id: UUID) throws -> WindowConfig? {
+    private func findSourceDuplicate(fingerprint: String, isArchive: Bool, excluding id: UUID) throws -> WindowConfig? {
         try queryConfigs(
-            "SELECT * FROM history_items WHERE id != ? AND source_fingerprint = ? ORDER BY created_at ASC LIMIT 1",
-            bindings: [id.uuidString, fingerprint]
+            "SELECT * FROM history_items WHERE id != ? AND source_fingerprint = ? AND (content_kind = ?) = ? ORDER BY created_at ASC LIMIT 1",
+            bindings: [id.uuidString, fingerprint, HistoryContentKind.archive.rawValue, isArchive ? 1 : 0]
         ).first
     }
 
