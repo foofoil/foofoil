@@ -71,6 +71,7 @@ extension AppState {
             self.builtInNavigatorContributions = []
             self.builtInNavigatorActionHandler = nil
             self.isNavigatorPanelExplicitlyVisible = false
+            self.navigatorFocusedItemID = nil
             self.activeNavigatorContributionID = nil
             self.expandedNavigatorItemIDs = []
             isBatchUpdating = false

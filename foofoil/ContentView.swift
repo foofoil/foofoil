@@ -16,10 +16,17 @@ public struct ContentView: View {
     public init(appState: AppState) { self.appState = appState }
 
     public var body: some View {
-        if let session = appState.archiveSession {
-            ArchiveFoilView(windowState: appState, session: session)
-        } else {
-            FoilContentView(appState: appState, windowState: appState)
+        Group {
+            if let session = appState.archiveSession {
+                ArchiveFoilView(windowState: appState, session: session)
+            } else {
+                FoilContentView(appState: appState, windowState: appState)
+            }
+        }
+        // 包内切换文件会重建正文；导航宿主保持独立身份，避免切换后丢失键盘焦点。
+        .overlay {
+            FullScreenNavigatorOverlay(appState: appState)
+                .opacity(appState.isCapturingContentImage ? 0 : 1)
         }
     }
 }
@@ -178,8 +185,6 @@ struct FoilContentView: View {
                 .opacity(flashOpacity)
                 .allowsHitTesting(false)
 
-            FullScreenNavigatorOverlay(appState: windowState)
-                .opacity(windowState.isCapturingContentImage ? 0 : 1)
         }
         .frame(minWidth: minimumWidth, minHeight: minimumLength)
         // Finder 文件由 FloatingWindow 直接读取粘贴板，确保多选批次不会被 SwiftUI 拆丢。
@@ -460,7 +465,7 @@ private struct FullScreenNavigatorOverlay: View {
         // 固定覆盖层容器，只让面板自身从对应侧边滑入，避免按整个窗口宽度移动。
         ZStack(alignment: appState.navigatorPanelSide == .left ? .leading : .trailing) {
             if isVisible {
-                NavigatorPanelView(appState: appState, isFullScreenOverlay: true)
+                FullScreenNavigatorHost(appState: appState)
                     .frame(width: CGFloat(appState.navigatorPanelWidth))
                     .transition(.move(edge: appState.navigatorPanelSide == .left ? .leading : .trailing))
             }

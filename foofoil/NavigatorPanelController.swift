@@ -11,6 +11,7 @@ import FoofoilExtensionKit
 
 /// 伴随窗口用 NSWindow 而不是 NSPanel：NSPanel 默认 canHide=false，作子窗口会阻止宿主箔 ⌘H 隐藏，并挡住后续新建的箔。
 final class NavigatorPanel: NSWindow {
+    weak var navigationState: AppState?
     var onDeleteSelected: (() -> Void)?
     var handleKeyDown: ((NSEvent) -> Bool)?
     /// 与导航栏宽度手柄同侧：左挂为左缘，右挂为右缘。
@@ -35,7 +36,25 @@ final class NavigatorPanel: NSWindow {
             dragAttachedFoofoil(with: event)
             return
         }
+        prepareNavigatorFocus(for: event)
+        if event.type == .keyDown, handleKeyDown?(event) == true { return }
         super.sendEvent(event)
+    }
+
+    override func makeFirstResponder(_ responder: NSResponder?) -> Bool {
+        let accepted = super.makeFirstResponder(responder)
+        synchronizeNavigatorFocus(navigationState)
+        return accepted
+    }
+
+    override func becomeKey() {
+        super.becomeKey()
+        synchronizeNavigatorFocus(navigationState)
+    }
+
+    override func resignKey() {
+        super.resignKey()
+        synchronizeNavigatorFocus(navigationState)
     }
 
     override func keyDown(with event: NSEvent) {
@@ -137,7 +156,8 @@ final class NavigatorPanelController: NSWindowController {
         panel.level = .normal
         panel.animationBehavior = .utilityWindow
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        let hostingView = NSHostingView(rootView: NavigatorPanelView(appState: appState))
+        panel.navigationState = appState
+        let hostingView = NavigatorHostingView(appState: appState)
         hostingView.wantsLayer = true
         hostingView.layer?.borderWidth = 0
         hostingView.layer?.borderColor = NSColor.clear.cgColor
@@ -147,7 +167,7 @@ final class NavigatorPanelController: NSWindowController {
         panel.contentView = hostingView
         super.init(window: panel)
         panel.handleKeyDown = { [weak appState] event in
-            appState?.handleArchiveTreeKeyDown(event) == true || appState?.handleFileListKeyDown(event) == true
+            appState?.handleNavigatorKeyDown(event) == true || appState?.handleFileListKeyDown(event) == true
         }
         panel.onDeleteSelected = { [weak appState] in
             guard let appState,

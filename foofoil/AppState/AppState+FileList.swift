@@ -656,7 +656,7 @@ extension AppState {
             endNavigatorSearch()
             return true
         }
-        guard supportsItemNavigation, !isPDFDocument else { return false }
+        guard !isNavigatorSearchActive, supportsItemNavigation, !isPDFDocument else { return false }
         let shortcuts = KeyboardShortcutStore.shared
         let modifiers = KeyboardShortcut.effectiveModifiers(for: event)
         let key = event.charactersIgnoringModifiers?.lowercased()

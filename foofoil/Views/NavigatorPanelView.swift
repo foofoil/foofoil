@@ -18,6 +18,7 @@ struct NavigatorPanelView: View {
     /// 鼠标是否悬停在固定标题上，触发标题跑马灯。
     @State private var isHoveringNavigatorHeader = false
     @FocusState private var isSearchFieldFocused: Bool
+    @Environment(\.controlActiveState) private var controlActiveState
     /// 模式切换反馈的闪烁透明度，以及本视图已播放过的反馈 id。
     @State private var feedbackOpacity = 0.0
     @State private var playedFeedbackID: UUID?
@@ -110,6 +111,7 @@ struct NavigatorPanelView: View {
             selectFirstContributionIfNeeded()
         }
         .onChange(of: activeContribution?.id) { _, _ in
+            appState.navigatorFocusedItemID = nil
             appState.endNavigatorSearch()
         }
         .onChange(of: appState.navigatorSearchQuery) { _, _ in
@@ -442,8 +444,13 @@ struct NavigatorPanelView: View {
                             }
                         }
                     }
+                    .onChange(of: appState.navigatorFocusedItemID) { _, id in
+                        guard appState.isNavigatorFocused, let id else { return }
+                        Task { @MainActor in proxy.scrollTo(id) }
+                    }
                     // 目录随正文滚动时，把当前节滚入可见区；未指定 anchor 时只做最小滚动，避免列表跳动。
                     .onChange(of: contribution.selectedItemIDs) { _, ids in
+                        if !appState.isNavigatorFocused { appState.navigatorFocusedItemID = nil }
                         guard contribution.id == AppState.markdownOutlineNavigatorID, let id = ids.first else { return }
                         Task { @MainActor in
                             withAnimation(.easeInOut(duration: 0.18)) {
@@ -457,13 +464,18 @@ struct NavigatorPanelView: View {
     }
 
     private func navigatorRow(_ row: VisibleRow, contribution: NavigatorContribution) -> some View {
-        let isSelected = contribution.selectedItemIDs.contains(row.item.id)
+        let isSelected = appState.navigatorFocusedItemID != nil
+            ? appState.navigatorFocusedItemID == row.item.id : contribution.selectedItemIDs.contains(row.item.id)
+        let selectionColor = appState.isNavigatorFocused && controlActiveState != .inactive
+            ? Color.accentColor.opacity(0.20) : Color(nsColor: .unemphasizedSelectedContentBackgroundColor)
         let thumbnailPath = imageThumbnailPath(for: row.item.id, contribution: contribution)
         let indent = CGFloat(row.depth) * 14
         // 层级缩进与箭头槽位（大纲叶子的对齐占位）计入按钮标签，使整行都是点击区域，文字位置不变。
         let gutter: CGFloat = (row.hasChildren || contribution.style == .outline) ? 35 : 0
         let rowContent = HStack(spacing: 0) {
             Button {
+                appState.navigatorFocusRequest &+= 1
+                appState.navigatorFocusedItemID = nil
                 appState.performNavigatorAction(
                     NavigatorAction(
                         contributionID: contribution.id,
@@ -535,6 +547,7 @@ struct NavigatorPanelView: View {
             .overlay(alignment: .leading) {
                 if row.hasChildren {
                     Button {
+                        appState.navigatorFocusRequest &+= 1
                         if appState.expandedNavigatorItemIDs.contains(row.item.id) {
                             appState.expandedNavigatorItemIDs.remove(row.item.id)
                         } else {
@@ -576,13 +589,14 @@ struct NavigatorPanelView: View {
             }
         }
         .background(
-            isSelected ? Color.accentColor.opacity(0.20) : Color.clear,
+            isSelected ? selectionColor : Color.clear,
             in: RoundedRectangle(cornerRadius: 7, style: .continuous)
         )
         .overlay {
             if appState.isNavigatorSearchActive, appState.navigatorSearchCurrentMatchID == row.item.id {
                 RoundedRectangle(cornerRadius: 7, style: .continuous)
-                    .strokeBorder(Color.accentColor, lineWidth: 1.5)
+                    .strokeBorder(appState.isNavigatorFocused && controlActiveState != .inactive
+                                  ? Color.accentColor : Color(nsColor: .unemphasizedSelectedContentBackgroundColor), lineWidth: 1.5)
                     .allowsHitTesting(false)
             }
         }

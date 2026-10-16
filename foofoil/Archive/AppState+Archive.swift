@@ -33,7 +33,7 @@ extension AppState {
               !isNavigatorSearchActive,
               !((NSApp.keyWindow?.firstResponder as? NSTextView)?.isEditable ?? false) else { return false }
         let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
-        guard modifiers.isEmpty, [123, 124, 125, 126, 36, 49].contains(event.keyCode) else { return false }
+        guard modifiers.isEmpty, [123, 124, 125, 126, 36, 76, 49].contains(event.keyCode) else { return false }
         let entries = Dictionary(uniqueKeysWithValues: contribution.items.map { ($0.id, $0) })
         let children = Dictionary(grouping: contribution.items, by: \.parentID)
         var visible = [NavigatorItem]()
@@ -53,12 +53,14 @@ extension AppState {
                 if expandedNavigatorItemIDs.contains(selected.id) { expandedNavigatorItemIDs.remove(selected.id) }
                 else if let parent = selected.parentID, entries[parent] != nil { archive.selectNavigatorItem(parent) }
             }
-        case 124:
+        case 124, 36, 76:
             if let selected {
-                if !expandedNavigatorItemIDs.contains(selected.id), children[selected.id] != nil || archive.isArchiveNode(selected.id) {
+                if !expandedNavigatorItemIDs.contains(selected.id), children[selected.id] != nil || archive.isArchiveNode(selected.id) || archive.selected?.isDirectory == true {
                     expandedNavigatorItemIDs.insert(selected.id)
                 } else if let first = children[selected.id]?.first {
                     archive.selectNavigatorItem(first.id)
+                } else if event.keyCode != 124 {
+                    archive.selectNavigatorItem(selected.id)
                 }
             }
         default:

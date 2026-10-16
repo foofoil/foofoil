@@ -54,6 +54,22 @@ public class FloatingWindow: NSWindow {
 
     }
 
+    public override func makeFirstResponder(_ responder: NSResponder?) -> Bool {
+        let accepted = super.makeFirstResponder(responder)
+        synchronizeNavigatorFocus((windowController as? FloatingWindowController)?.appState)
+        return accepted
+    }
+
+    public override func becomeKey() {
+        super.becomeKey()
+        synchronizeNavigatorFocus((windowController as? FloatingWindowController)?.appState)
+    }
+
+    public override func resignKey() {
+        super.resignKey()
+        synchronizeNavigatorFocus((windowController as? FloatingWindowController)?.appState)
+    }
+
     public override func setFrame(_ frameRect: NSRect, display flag: Bool) {
         let controller = windowController as? FloatingWindowController
         guard !styleMask.contains(.fullScreen), controller?.usesFullScreenFrame != true,
@@ -188,6 +204,11 @@ public class FloatingWindow: NSWindow {
             return
         }
 
+        prepareNavigatorFocus(for: event)
+        if event.type == .keyDown,
+           let state = (windowController as? FloatingWindowController)?.appState,
+           state.handleNavigatorKeyDown(event) { return }
+
         // 不可编辑正文的上下键滚动内容，先于列表切项处理；搜索输入中仍交给导航搜索。
         if event.type == .keyDown,
            let controller = self.windowController as? FloatingWindowController,
@@ -201,7 +222,7 @@ public class FloatingWindow: NSWindow {
 
         if event.type == .keyDown,
            let controller = self.windowController as? FloatingWindowController,
-           (controller.appState.handleChapterKeyDown(event) || controller.appState.handleFileListKeyDown(event)) {
+           (controller.appState.handleNavigatorKeyDown(event) || controller.appState.handleChapterKeyDown(event) || controller.appState.handleFileListKeyDown(event)) {
             return
         }
 
@@ -636,7 +657,7 @@ public class FloatingWindow: NSWindow {
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
         // 列表切项必须赶在主菜单匹配 PDF 翻页方向键之前处理。
         if let controller = windowController as? FloatingWindowController,
-           (controller.appState.handleChapterKeyDown(event) || controller.appState.handleFileListKeyDown(event)) {
+           (controller.appState.handleNavigatorKeyDown(event) || controller.appState.handleChapterKeyDown(event) || controller.appState.handleFileListKeyDown(event)) {
             return true
         }
 

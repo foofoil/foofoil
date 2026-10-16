@@ -248,6 +248,10 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         return fullScreenNavigatorInset - fullScreenNavigatorContentInset
     }
 
+    /// 仅会话内的键盘焦点和树游标，不写入阅读历史。
+    @Published var isNavigatorFocused = false
+    @Published var navigatorFocusRequest: UInt64 = 0
+    @Published var navigatorFocusedItemID: String?
     @Published var activeNavigatorContributionID: String?
     @Published var expandedNavigatorItemIDs: Set<String> = [] {
         didSet {
