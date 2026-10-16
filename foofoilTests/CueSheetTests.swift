@@ -491,9 +491,9 @@ struct CueSheetTests {
 
         let grid = try #require(NSImage(contentsOf: destination))
         let rep = try #require(grid.representations.first)
-        // 两列 128 点单元格 + 4 点间隔 = 260；三张封面排成两行。
-        #expect(rep.pixelsWide == 260)
-        #expect(rep.pixelsHigh == 260)
+        // 两列单元格 + 4 点间隔后整体等于单封面缩略图边长；三张封面排成两行。
+        #expect(rep.pixelsWide == HistoryThumbnailGenerator.pixelSize)
+        #expect(rep.pixelsHigh == HistoryThumbnailGenerator.pixelSize)
 
         // 两张封面同样保持方形四宫格（下方留空），不能横向铺开超出边界。
         let twoDestination = directory.appendingPathComponent("grid-two.heic")
@@ -503,8 +503,8 @@ struct CueSheetTests {
         ))
         let twoGrid = try #require(NSImage(contentsOf: twoDestination))
         let twoRep = try #require(twoGrid.representations.first)
-        #expect(twoRep.pixelsWide == 260)
-        #expect(twoRep.pixelsHigh == 260)
+        #expect(twoRep.pixelsWide == HistoryThumbnailGenerator.pixelSize)
+        #expect(twoRep.pixelsHigh == HistoryThumbnailGenerator.pixelSize)
 
         // 少于两张封面时不生成宫格，交给调用方回退单封面。
         #expect(!HistoryThumbnailGenerator.generateGridThumbnail(images: [makeImage(.red)], destinationURL: destination))

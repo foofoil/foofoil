@@ -41,7 +41,7 @@ struct AppleMusicHistoryArtworkTests {
         #expect(HistoryContentKind.audio.symbolName == "music.note")
         let source = try #require(CGImageSourceCreateWithURL(destination as CFURL, nil))
         let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
-        #expect(image.width == 128 && image.height == 128)
+        #expect(image.width == HistoryThumbnailGenerator.pixelSize && image.height == HistoryThumbnailGenerator.pixelSize)
         let reused = await AppleMusicHistoryArtwork.cache(url: url, reference: reference, historyID: config.id,
                                                           repository: repository, destinationURL: destination) { _ in
             Issue.record("Cached artwork must not download again")

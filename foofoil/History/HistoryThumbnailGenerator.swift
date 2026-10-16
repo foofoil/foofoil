@@ -14,6 +14,14 @@ import ImageIO
 /// 历史记录缩略图生成器，支持将图片与 PDF 生成为正方形的 HEIC 缩略图
 public enum HistoryThumbnailGenerator {
 
+    /// 历史缩略图最终的正方形边长（像素）。覆盖层卡片自适应列宽最大约 300pt，视网膜 2x 下约
+    /// 600px，加上悬停放大后仍有余量，故取 640；旧数据不迁移，仅在缩略图重建时按新尺寸生成。
+    public nonisolated static let pixelSize = 640
+
+    /// 解码中间尺寸：取最终尺寸的 2 倍，保证居中裁成正方形后短边仍不缩水，
+    /// 避免宽幅原图裁出的正方形被放大而发糊。
+    private nonisolated static var decodePixelSize: Int { pixelSize * 2 }
+
     /// 生成缩略图并保存到指定路径
     /// - Parameters:
     ///   - url: 原文件路径（图片或 PDF）
@@ -30,16 +38,16 @@ public enum HistoryThumbnailGenerator {
 
         switch kind {
         case .image:
-            // 使用 CGImageSource 快速载入，设置最大宽高为 512，避免将超大原图完全加载进内存
+            // 使用 CGImageSource 快速载入，限制最长边避免将超大原图完全加载进内存
             guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return false }
             let options: [CFString: Any] = [
                 kCGImageSourceCreateThumbnailFromImageAlways: true,
-                kCGImageSourceThumbnailMaxPixelSize: 512,
+                kCGImageSourceThumbnailMaxPixelSize: Self.decodePixelSize,
                 kCGImageSourceCreateThumbnailWithTransform: true
             ]
             if let mediumCGImage = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) {
-                // 裁剪为正方形并缩放到 128x128 像素
-                finalImage = cropAndResize(mediumCGImage, to: 128)
+                // 裁剪为正方形并缩放到最终像素尺寸
+                finalImage = cropAndResize(mediumCGImage, to: Self.pixelSize)
             }
 
         case .pdf:
@@ -47,15 +55,15 @@ public enum HistoryThumbnailGenerator {
             guard let document = PDFDocument(url: url), document.pageCount > 0,
                   let page = document.page(at: 0) else { return false }
             let box = page.bounds(for: .mediaBox)
-            // 先按比例限制最大边为 256 生成一张稍微大一点的页面图以提供裁剪余量
-            let scale = 256.0 / max(box.width, box.height)
+            // 先按比例限制最大边生成一张稍大一点的页面图以提供裁剪余量
+            let scale = Double(Self.decodePixelSize) / max(box.width, box.height)
             let size = NSSize(width: box.width * scale, height: box.height * scale)
             let nsImage = page.thumbnail(of: size, for: .mediaBox)
             if let tiffData = nsImage.tiffRepresentation,
                let source = CGImageSourceCreateWithData(tiffData as CFData, nil),
                let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) {
-                // 裁剪为正方形并缩放到 128x128 像素
-                finalImage = cropAndResize(cgImage, to: 128)
+                // 裁剪为正方形并缩放到最终像素尺寸
+                finalImage = cropAndResize(cgImage, to: Self.pixelSize)
             }
 
         case .video:
@@ -63,7 +71,7 @@ public enum HistoryThumbnailGenerator {
             let asset = AVURLAsset.media(url: url)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
-            generator.maximumSize = CGSize(width: 512, height: 512)
+            generator.maximumSize = CGSize(width: Self.decodePixelSize, height: Self.decodePixelSize)
             generator.requestedTimeToleranceBefore = .zero
             generator.requestedTimeToleranceAfter = .zero
             let semaphore = DispatchSemaphore(value: 0)
@@ -76,7 +84,7 @@ public enum HistoryThumbnailGenerator {
             }
             semaphore.wait()
             if let cgImage = generatedImage {
-                finalImage = cropAndResize(cgImage, to: 128)
+                finalImage = cropAndResize(cgImage, to: Self.pixelSize)
             }
 
         case .audio:
@@ -85,12 +93,12 @@ public enum HistoryThumbnailGenerator {
                FileManager.default.fileExists(atPath: customCoverURL.path),
                let artwork = NSImage(contentsOf: customCoverURL),
                let cgImage = artwork.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-                finalImage = cropAndResize(cgImage, to: 128)
+                finalImage = cropAndResize(cgImage, to: Self.pixelSize)
             } else {
                 let info = AudioMetadataLoader.loadSynchronously(from: url)
                 if let artwork = info.artwork,
                    let cgImage = artwork.cgImage(forProposedRect: nil, context: nil, hints: nil) {
-                    finalImage = cropAndResize(cgImage, to: 128)
+                    finalImage = cropAndResize(cgImage, to: Self.pixelSize)
                 }
             }
 
@@ -111,10 +119,10 @@ public enum HistoryThumbnailGenerator {
         guard let source = CGImageSourceCreateWithData(data as CFData, [kCGImageSourceShouldCache: false] as CFDictionary),
               let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                 kCGImageSourceCreateThumbnailFromImageAlways: true,
-                kCGImageSourceThumbnailMaxPixelSize: 512,
+                kCGImageSourceThumbnailMaxPixelSize: Self.decodePixelSize,
                 kCGImageSourceCreateThumbnailWithTransform: true
               ] as CFDictionary),
-              let thumbnail = cropAndResize(image, to: 128) else { return false }
+              let thumbnail = cropAndResize(image, to: Self.pixelSize) else { return false }
         return write(thumbnail, to: destinationURL)
     }
 
@@ -127,8 +135,9 @@ public enum HistoryThumbnailGenerator {
 
         let columns = 2
         let rows = 2
-        let cellSize = 128
         let gap = 4
+        // 每个单元格加上间隔后整体正好等于单封面缩略图的边长，保证两类缩略图分辨率一致。
+        let cellSize = (pixelSize - gap) / columns
         let width = columns * cellSize + (columns - 1) * gap
         let height = rows * cellSize + (rows - 1) * gap
         guard let context = CGContext(
@@ -182,7 +191,7 @@ public enum HistoryThumbnailGenerator {
     /// 无 imagePath 的扩展音频走不到后台索引，这是它们唯一的缩略图来源。
     public static func writeDisplayedArtwork(_ image: NSImage, historyID: UUID) -> URL? {
         guard let cgImage = image.cgImage(forProposedRect: nil, context: nil, hints: nil),
-              let thumbnail = cropAndResize(cgImage, to: 128) else { return nil }
+              let thumbnail = cropAndResize(cgImage, to: Self.pixelSize) else { return nil }
         let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("foofoil", isDirectory: true)
         let destinationURL = root.appendingPathComponent("Thumbnails")

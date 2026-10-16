@@ -36,13 +36,13 @@ private actor FoilExposeDecodeLimiter {
     }
 }
 
-/// 覆盖层缩略图的异步解码：512 像素足够卡片显示，带缓存与并发限制，复用历史 HEIC/原路径文件。
+/// 覆盖层缩略图的异步解码：按历史缩略图边长上限解码即可满足卡片显示，带缓存与并发限制，复用历史 HEIC/原路径文件。
 @MainActor
 final class FoilExposeThumbnailLoader: ObservableObject {
     private static let decodeLimiter = FoilExposeDecodeLimiter(limit: 2)
     private static let cache: NSCache<NSString, NSImage> = {
         let cache = NSCache<NSString, NSImage>()
-        // 512 px RGBA 缩略图约 1 MB；覆盖层一次性展示的条目有限，双重限制兜底防无界增长。
+        // 640 px RGBA 缩略图约 1.6 MB；覆盖层一次性展示的条目有限，双重限制兜底防无界增长。
         cache.countLimit = 80
         cache.totalCostLimit = 64 * 1024 * 1024
         return cache
@@ -67,7 +67,7 @@ final class FoilExposeThumbnailLoader: ObservableObject {
                   ] as CFDictionary),
                   let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, [
                     kCGImageSourceCreateThumbnailFromImageAlways: true,
-                    kCGImageSourceThumbnailMaxPixelSize: 512,
+                    kCGImageSourceThumbnailMaxPixelSize: HistoryThumbnailGenerator.pixelSize,
                     kCGImageSourceCreateThumbnailWithTransform: true,
                     kCGImageSourceShouldCacheImmediately: true
                   ] as CFDictionary) else { return nil }
