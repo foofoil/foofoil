@@ -21,7 +21,8 @@ struct DocumentStyleView: View {
     @State private var replacementThemeID = ""
 
     @State private var catalog: DocumentFontCatalog.Catalog?
-    @State private var chineseOnly = false
+    /// 字体列表是否按筛选条件收窄；代码内容筛选等宽字体，其余内容筛选中文字体。
+    @State private var filterOnly = false
     @State private var query = ""
     @State private var selectedFamily: String?
 
@@ -85,8 +86,12 @@ struct DocumentStyleView: View {
             let loaded = await DocumentFontCatalog.load()
             catalog = loaded
             selectedFamily = resolvedFamily(in: loaded)
-            chineseOnly = SettingsStore.shared.documentFontsChineseOnly
-                ?? DocumentFontCatalog.prefersChineseFonts(text: appState.text)
+            if appState.presentsAsCode {
+                filterOnly = SettingsStore.shared.documentFontsMonospacedOnly ?? true
+            } else {
+                filterOnly = SettingsStore.shared.documentFontsChineseOnly
+                    ?? DocumentFontCatalog.prefersChineseFonts(text: appState.text)
+            }
         }
     }
 
@@ -238,10 +243,19 @@ struct DocumentStyleView: View {
     private var fontSection: some View {
         section(NSLocalizedString("Font", comment: "")) {
             VStack(alignment: .leading, spacing: 8) {
-                Toggle(NSLocalizedString("Chinese Fonts Only", comment: ""), isOn: $chineseOnly)
+                Toggle(
+                    fontFilter == .monospaced
+                        ? NSLocalizedString("Monospaced Fonts Only", comment: "")
+                        : NSLocalizedString("Chinese Fonts Only", comment: ""),
+                    isOn: $filterOnly
+                )
                     .toggleStyle(.checkbox)
-                    .onChange(of: chineseOnly) { _, newValue in
-                        SettingsStore.shared.documentFontsChineseOnly = newValue
+                    .onChange(of: filterOnly) { _, newValue in
+                        if fontFilter == .monospaced {
+                            SettingsStore.shared.documentFontsMonospacedOnly = newValue
+                        } else {
+                            SettingsStore.shared.documentFontsChineseOnly = newValue
+                        }
                     }
 
                 TextField(NSLocalizedString("Search Fonts", comment: ""), text: $query)
@@ -469,9 +483,14 @@ struct DocumentStyleView: View {
 
     // MARK: - 字体列表
 
+    /// 代码内容使用等宽筛选，其余文档使用中文字体筛选。
+    private var fontFilter: DocumentFontCatalog.FontFilter {
+        appState.presentsAsCode ? .monospaced : .chinese
+    }
+
     private var visibleFamilies: [DocumentFontCatalog.Family] {
         guard let catalog else { return [] }
-        let families = catalog.families(chineseOnly: chineseOnly)
+        let families = catalog.families(filter: filterOnly ? fontFilter : .all)
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return families }
         // 中文字体显示中文名，搜索时同时匹配中文显示名与系统字族名。

@@ -634,7 +634,8 @@ extension AppState {
             }
         }
 
-        nonisolated static let textFilenameExtensions: Set<String> = ["txt", "md", "markdown", "csv", "json", "xml", "yaml", "yml", "ini", "conf", "plist", "log", "swift", "py", "js", "ts", "sh", "css", "php", "c", "cpp", "h", "java", "go", "rs", "sql", "rb"]
+        nonisolated static let textFilenameExtensions: Set<String> = Set(["txt", "md", "markdown", "csv", "conf", "log"])
+            .union(CodeLanguage.recognizedExtensions)
 
         func isTextFile(url: URL) -> Bool {
             let ext = url.pathExtension.lowercased()
@@ -647,6 +648,10 @@ extension AppState {
             }
 
             if Self.textFilenameExtensions.contains(ext) {
+                return true
+            }
+            // 固定文件名（Makefile、Dockerfile、.zshrc 等）没有可靠扩展名，不依赖系统 UTType 注册。
+            if CodeLanguage.languageID(forFileName: url.lastPathComponent) != nil {
                 return true
             }
 

@@ -713,6 +713,12 @@ extension AppDelegate {
         activeAppState?.showBorder.toggle()
     }
 
+    /// 只读代码文件的行号显示；作用于当前活动箔（压缩包内容随所属窗口同步）。
+    @objc func toggleCodeLineNumbersAction() {
+        guard let appState = activeReadingState, appState.codeLanguageID != nil else { return }
+        appState.showCodeLineNumbers.toggle()
+    }
+
     @objc func toggleFullScreenAction() {
         activeWindowController?.toggleFullScreen()
     }

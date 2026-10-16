@@ -154,6 +154,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             setMenuItem(withAction: #selector(reloadPageAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(captureImageFoofoilAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(documentStyleAction), in: menu, isHidden: true)
+            setMenuItem(withAction: #selector(toggleCodeLineNumbersAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(loadSubtitleFileAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(toggleSubtitlesAction), in: menu, isHidden: true)
             setMenuItem(withAction: #selector(selectColorAction), in: menu, isHidden: true)
@@ -206,6 +207,8 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             in: menu,
             isHidden: !(appState.isVideoDocument || appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling)
         )
+
+        setMenuItem(withAction: #selector(toggleCodeLineNumbersAction), in: menu, isHidden: appState.codeLanguageID == nil)
 
         // 3. Fit Window to Image & Fit Image to Window Width 菜单项 - 仅图片且有边框时可见
         let showFitOptions = isImageMode && appState.effectiveShowBorder
@@ -296,6 +299,15 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             guard let appState = activeReadingState else { return false }
             menuItem.title = NSLocalizedString(appState.isVideoDocument ? "Subtitle Style" : "Document Style", comment: "")
             return appState.isVideoDocument || appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling
+        }
+
+        if menuItem.action == #selector(toggleCodeLineNumbersAction) {
+            guard let appState = activeReadingState, appState.codeLanguageID != nil else {
+                menuItem.state = .off
+                return false
+            }
+            menuItem.state = appState.showCodeLineNumbers ? .on : .off
+            return true
         }
 
         if menuItem.action == #selector(openClipboardContentAction) || menuItem.action == #selector(openClipboardIncognitoAction) {

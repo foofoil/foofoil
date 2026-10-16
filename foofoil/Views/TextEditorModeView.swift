@@ -17,11 +17,31 @@ struct TextEditorModeView: View {
     @State private var showRenameAlert = false
     @State private var newTitleText = ""
     @State private var targetRenameConfig: WindowConfig? = nil
+    /// 代码 WebKit 预览失败后回退原生视图；换内容时重新尝试。
+    @State private var codePreviewFailed = false
     @Environment(\.colorScheme) private var colorScheme
 
     /// 文本通道（编辑、只读、Markdown）共用的字体：跟随箔的文档字体与字号。
     private var documentTextFont: NSFont {
         appState.documentFont(size: CGFloat(appState.textFontSize))
+    }
+
+    private var codePreviewStyle: CodePreviewStyle {
+        let isDark: Bool
+        if let appearance = DocumentPageInjection.appearance(hex: appState.contentBackgroundHex) {
+            isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        } else {
+            isDark = colorScheme == .dark
+        }
+        return CodePreviewStyle(
+            fontFamily: DocumentFontCatalog.cssFontFamily(named: appState.documentStylingFontName) ?? DocumentFontCatalog.defaultCodeFontFamily,
+            fontSize: appState.textFontSize,
+            lineHeight: appState.documentLineHeightMultiple,
+            paragraphSpacing: (appState.documentParagraphSpacingMultiple ?? 0) * appState.textFontSize,
+            textColor: appState.documentTextColor?.toHex(),
+            isDark: isDark,
+            showsLineNumbers: appState.showCodeLineNumbers
+        )
     }
 
     var body: some View {
@@ -49,14 +69,26 @@ struct TextEditorModeView: View {
                                 // 整个滚动视图避开四边缩放热区，滚动条首尾也不会触发角部缩放。
                                 .padding(appState.isFullScreen ? 0 : FloatingWindow.resizeHitThickness + 1)
                         } else if appState.isArchivePreview || (appState.textURL != nil && !appState.isMarkdownDocument) {
-                            ReadOnlyTextView(
-                                text: appState.text,
-                                font: documentTextFont,
-                                textColor: appState.documentTextColor,
-                                lineHeightMultiple: appState.documentLineHeightMultiple,
-                                paragraphSpacingMultiple: appState.documentParagraphSpacingMultiple
-                            )
-                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            // 已识别语言的代码优先用 WebKit 语法着色；超限、未识别或失败时回退原生只读视图。
+                            if let languageID = appState.webCodePreviewLanguageID, !codePreviewFailed {
+                                ReadOnlyCodeView(
+                                    text: appState.text,
+                                    languageID: languageID,
+                                    style: codePreviewStyle,
+                                    onFailure: { codePreviewFailed = true }
+                                )
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            } else {
+                                ReadOnlyTextView(
+                                    text: appState.text,
+                                    font: documentTextFont,
+                                    textColor: appState.documentTextColor,
+                                    lineHeightMultiple: appState.documentLineHeightMultiple,
+                                    paragraphSpacingMultiple: appState.documentParagraphSpacingMultiple,
+                                    codeLineNumbersVisible: appState.codeLanguageID == nil ? nil : appState.showCodeLineNumbers
+                                )
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
                         } else {
                             CustomTextEditor(
                                 text: $appState.text,
@@ -267,6 +299,13 @@ struct TextEditorModeView: View {
             if appState.isMarkdownPreview && appState.isMarkdownDocument {
                 appState.refreshMarkdownRendering()
             }
+        }
+        // 回退只针对当前内容：换了文件或文本后重新尝试代码预览。
+        .onChange(of: appState.text) { _, _ in
+            codePreviewFailed = false
+        }
+        .onChange(of: appState.textURL) { _, _ in
+            codePreviewFailed = false
         }
     }
 }

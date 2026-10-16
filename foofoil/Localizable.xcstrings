@@ -1335,6 +1335,22 @@
       }
     }
   },
+  "Show Line Numbers": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Show Line Numbers"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "显示行号"
+        }
+      }
+    }
+  },
   "Show Subtitles": {
     "localizations": {
       "en": {
@@ -8943,6 +8959,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "重置"
+          }
+        }
+      }
+    },
+    "Monospaced Fonts Only": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monospaced Fonts Only"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只显示等宽字体"
           }
         }
       }

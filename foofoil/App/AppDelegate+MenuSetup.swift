@@ -500,6 +500,16 @@ extension AppDelegate {
         documentStyleItem.target = self
         viewMenu.addItem(documentStyleItem)
 
+        // Show Line Numbers - 只读代码文件的行号开关，仅代码内容可见。
+        let lineNumbersItem = NSMenuItem(
+            title: NSLocalizedString("Show Line Numbers", comment: ""),
+            action: #selector(toggleCodeLineNumbersAction),
+            keyEquivalent: ""
+        )
+        lineNumbersItem.withSymbol("list.number")
+        lineNumbersItem.target = self
+        viewMenu.addItem(lineNumbersItem)
+
         let loadSubtitleItem = NSMenuItem(title: NSLocalizedString("Load Subtitle File", comment: ""),
                                           action: #selector(loadSubtitleFileAction), keyEquivalent: "")
         loadSubtitleItem.withSymbol("captions.bubble")

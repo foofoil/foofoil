@@ -365,7 +365,10 @@ nonisolated final class ArchivePreviewLease: Sendable {
                         self?.onChange?()
                     }
                 state.openFile(url: lease.directory.appendingPathComponent(entry.name))
-                if let windowState = self.windowState { state.showBorder = windowState.showBorder }
+                if let windowState = self.windowState {
+                    state.showBorder = windowState.showBorder
+                    state.showCodeLineNumbers = windowState.showCodeLineNumbers
+                }
                 self.busy = false
                 self.onChange?()
             } catch {

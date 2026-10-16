@@ -80,7 +80,7 @@ struct DocumentTextStylingTests {
         #expect(catalog.families.contains { $0.members.isEmpty } == false, "存在没有字型的字族")
         #expect(catalog.families.allSatisfy { !$0.displayName.isEmpty }, "存在空的字体显示名")
 
-        let chinese = catalog.families(chineseOnly: true)
+        let chinese = catalog.families(filter: .chinese)
         #expect(!chinese.isEmpty, "没有筛出中文字体")
         #expect(chinese.count < catalog.families.count, "中文字体筛选没有生效")
         // 系统语言含中文时，带中文本地化的中文字体显示中文名，而不是英文字族名。

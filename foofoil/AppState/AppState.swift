@@ -545,6 +545,16 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         showBorder && !isFullScreen
     }
 
+    /// 只读代码预览（WebKit 与原生回退）是否显示行号；压缩包内的预览与所属窗口保持一致。
+    @Published public var showCodeLineNumbers: Bool {
+        didSet {
+            guard showCodeLineNumbers != oldValue else { return }
+            if let owner = archiveWindowOwner, owner.showCodeLineNumbers != showCodeLineNumbers { owner.showCodeLineNumbers = showCodeLineNumbers }
+            if let preview = archiveSession?.preview, preview.showCodeLineNumbers != showCodeLineNumbers { preview.showCodeLineNumbers = showCodeLineNumbers }
+            saveState()
+        }
+    }
+
     @Published public var imageScale: Double {
         didSet {
             let clamped = Self.clampImageScale(imageScale)
@@ -687,6 +697,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.customTitle = config.customTitle
         self.imageSource = config.imageSource
         self.showBorder = config.showBorder
+        self.showCodeLineNumbers = config.showCodeLineNumbers ?? true
         self.imageScale = Self.clampImageScale(config.imageScale)
         self.textFontSize = Self.clampTextFontSize(config.textFontSize)
         self.webZoom = Self.clampWebZoom(config.webZoom)
@@ -807,6 +818,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.customTitle = nil
         self.imageSource = nil
         self.showBorder = true
+        self.showCodeLineNumbers = true
         self.imageScale = 1.0
         self.textFontSize = Self.defaultTextFontSize
         self.webZoom = 1.0

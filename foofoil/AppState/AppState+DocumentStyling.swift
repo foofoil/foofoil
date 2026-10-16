@@ -58,9 +58,12 @@ extension AppState {
         supportsDocumentTextStyling ? documentFontName : nil
     }
 
-    /// 文本通道（AppKit）使用的字体；未自选或不是文档内容时回退通道默认字体。
+    /// 文本通道（AppKit）使用的字体；未自选时代码用等宽字体，其余内容回退通道默认字体。
     func documentFont(size: CGFloat) -> NSFont {
-        DocumentFontCatalog.font(named: documentStylingFontName, size: size)
+        if documentStylingFontName == nil, presentsAsCode {
+            return DocumentFontCatalog.defaultCodeFont(size: size)
+        }
+        return DocumentFontCatalog.font(named: documentStylingFontName, size: size)
     }
 
     /// 文档内容注入网页（扩展文档）时使用的字体；未自选字体时返回 nil，不覆盖文档自身排版。

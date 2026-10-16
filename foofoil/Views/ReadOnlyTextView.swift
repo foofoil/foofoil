@@ -14,6 +14,8 @@ struct ReadOnlyTextView: View {
     let textColor: NSColor?
     let lineHeightMultiple: Double?
     let paragraphSpacingMultiple: Double?
+    /// 已识别语言的代码文件才传入：nil 表示普通文本，不创建行号栏；布尔值表示行号是否可见。
+    var codeLineNumbersVisible: Bool? = nil
 
     var body: some View {
         ReadOnlyTextNSView(
@@ -21,7 +23,8 @@ struct ReadOnlyTextView: View {
             font: font,
             textColor: textColor,
             lineHeightMultiple: lineHeightMultiple,
-            paragraphSpacingMultiple: paragraphSpacingMultiple
+            paragraphSpacingMultiple: paragraphSpacingMultiple,
+            codeLineNumbersVisible: codeLineNumbersVisible
         )
     }
 }
@@ -32,8 +35,13 @@ struct ReadOnlyTextNSView: NSViewRepresentable {
     let textColor: NSColor?
     let lineHeightMultiple: Double?
     let paragraphSpacingMultiple: Double?
+    let codeLineNumbersVisible: Bool?
     // 与 Markdown 预览一致的文档内边距，保证滚动条贴边且首尾留白随内容滚动。
     private let documentPadding: CGFloat = 24
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSScrollView()
@@ -75,6 +83,12 @@ struct ReadOnlyTextNSView: NSViewRepresentable {
         textView.textContainerInset = NSSize(width: documentPadding, height: documentPadding)
 
         scrollView.documentView = textView
+        if codeLineNumbersVisible != nil {
+            let ruler = CodeLineNumberRulerView(scrollView: scrollView, textView: textView)
+            scrollView.verticalRulerView = ruler
+            scrollView.hasVerticalRuler = true
+            context.coordinator.ruler = ruler
+        }
         return scrollView
     }
 
@@ -82,6 +96,10 @@ struct ReadOnlyTextNSView: NSViewRepresentable {
         if let textView = nsView.documentView as? NSTextView {
             if textView.string != text {
                 textView.string = text
+            }
+            if let codeLineNumbersVisible {
+                nsView.rulersVisible = codeLineNumbersVisible
+                context.coordinator.updateLineNumbers(for: text)
             }
             // 仅在字体或颜色变化时重设，避免每次更新都重置输入属性（影响输入法与撤销）
             if textView.font?.fontName != font.fontName || textView.font?.pointSize != font.pointSize {
@@ -97,6 +115,28 @@ struct ReadOnlyTextNSView: NSViewRepresentable {
                 paragraphSpacingMultiple: paragraphSpacingMultiple,
                 fontSize: font.pointSize
             )
+            context.coordinator.ruler?.refresh()
+        }
+    }
+
+    final class Coordinator {
+        weak var ruler: CodeLineNumberRulerView?
+        private var indexedText: String?
+        private var indexGeneration = 0
+
+        /// 行起点索引在后台计算；结果未就绪前行号栏为空，文本照常显示。
+        func updateLineNumbers(for text: String) {
+            guard ruler != nil, indexedText != text else { return }
+            indexedText = text
+            indexGeneration += 1
+            let generation = indexGeneration
+            Task { @MainActor [weak self] in
+                let starts = await Task.detached(priority: .utility) {
+                    CodeLineNumberRulerView.lineStarts(in: text)
+                }.value
+                guard let self, generation == self.indexGeneration else { return }
+                self.ruler?.setLineStarts(starts)
+            }
         }
     }
 }

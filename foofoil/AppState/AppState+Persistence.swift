@@ -59,6 +59,7 @@ extension AppState {
             self.customTitle = config.customTitle
             self.imageSource = config.imageSource
             self.showBorder = config.showBorder
+            self.showCodeLineNumbers = config.showCodeLineNumbers ?? true
             self.imageScale = Self.clampImageScale(config.imageScale)
             self.textFontSize = Self.clampTextFontSize(config.textFontSize)
             self.webZoom = Self.clampWebZoom(config.webZoom)
@@ -291,7 +292,8 @@ extension AppState {
                 fileList: fileList?.isPresentable == true ? fileList : nil,
                 documentScrollFile: extensionDocumentScrollFile,
                 documentScrollFraction: extensionDocumentScrollFraction,
-                appleMusicReference: appleMusicReference
+                appleMusicReference: appleMusicReference,
+                showCodeLineNumbers: showCodeLineNumbers
             )
         }
 

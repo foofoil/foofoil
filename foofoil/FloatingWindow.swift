@@ -366,6 +366,11 @@ public class FloatingWindow: NSWindow {
             webView.evaluateJavaScript("window.scrollBy(0, \(CGFloat(direction) * step));")
             return
         }
+        // 代码预览是专用 WebKit 视图，不能按通用 WKWebView 处理（网页与 EPUB 保持原行为）。
+        if let codeView = Self.descendant(of: contentView, as: CodePreviewWebView.self) {
+            codeView.scrollContent(by: CGFloat(direction) * step)
+            return
+        }
         // 只滚动只读文本视图；可编辑编辑器保留原生光标与上下移动。
         guard let scrollView = Self.descendant(of: contentView, as: NSScrollView.self, where: {
             ($0.documentView as? NSTextView)?.isEditable == false

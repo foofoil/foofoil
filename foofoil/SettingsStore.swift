@@ -197,6 +197,8 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     public var documentScrollFraction: Double?
     public var appleMusicReference: AppleMusicReference?
     var archiveSource: ArchiveSource?
+    /// 只读代码预览是否显示行号；为空时按显示处理。
+    public var showCodeLineNumbers: Bool?
 
 
     public init(
@@ -249,7 +251,8 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         documentScrollFile: String? = nil,
         documentScrollFraction: Double? = nil,
         appleMusicReference: AppleMusicReference? = nil,
-        archiveSource: ArchiveSource? = nil
+        archiveSource: ArchiveSource? = nil,
+        showCodeLineNumbers: Bool? = nil
     ) {
         self.id = id
         self.imagePath = imagePath
@@ -301,10 +304,11 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.documentScrollFraction = documentScrollFraction
         self.appleMusicReference = appleMusicReference
         self.archiveSource = archiveSource
+        self.showCodeLineNumbers = showCodeLineNumbers
     }
 
     private enum CodingKeys: String, CodingKey {
-        case isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource
+        case isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource, showCodeLineNumbers
     }
 
     public init(from decoder: Decoder) throws {
@@ -363,6 +367,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         documentScrollFraction = try container.decodeIfPresent(Double.self, forKey: .documentScrollFraction)
         appleMusicReference = try container.decodeIfPresent(AppleMusicReference.self, forKey: .appleMusicReference)
         archiveSource = try container.decodeIfPresent(ArchiveSource.self, forKey: .archiveSource)
+        showCodeLineNumbers = try container.decodeIfPresent(Bool.self, forKey: .showCodeLineNumbers)
         if let mode = try container.decodeIfPresent(MediaPlaybackMode.self, forKey: .mediaPlaybackMode) {
             mediaPlaybackMode = mode
         } else {
@@ -632,6 +637,7 @@ public class SettingsStore {
         static let showsMediaBottomProgressBar = "showsMediaBottomProgressBar"
         static let confirmClosingPlayingAudio = "confirmClosingPlayingAudio"
         static let documentFontsChineseOnly = "documentFontsChineseOnly"
+        static let documentFontsMonospacedOnly = "documentFontsMonospacedOnly"
         static let customDocumentThemes = "customDocumentThemes"
         static let startupBehavior = "startupBehavior"
         static let lastOpenWindowConfigs = "lastOpenWindowConfigs"
@@ -684,6 +690,18 @@ public class SettingsStore {
                 userDefaults.set(newValue, forKey: Keys.documentFontsChineseOnly)
             } else {
                 userDefaults.removeObject(forKey: Keys.documentFontsChineseOnly)
+            }
+        }
+    }
+
+    /// 代码内容的字体列表是否只显示等宽字体；未设置时默认开启，与代码的默认等宽字体一致。
+    var documentFontsMonospacedOnly: Bool? {
+        get { userDefaults.object(forKey: Keys.documentFontsMonospacedOnly) as? Bool }
+        set {
+            if let newValue {
+                userDefaults.set(newValue, forKey: Keys.documentFontsMonospacedOnly)
+            } else {
+                userDefaults.removeObject(forKey: Keys.documentFontsMonospacedOnly)
             }
         }
     }

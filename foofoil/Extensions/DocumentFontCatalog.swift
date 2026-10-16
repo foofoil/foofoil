@@ -32,18 +32,30 @@ enum DocumentFontCatalog {
         var id: String { postScriptName }
     }
 
-    /// 一次枚举的结果：字族列表 + 其中覆盖汉字的字族名。
+    /// 字体列表的筛选条件：中文覆盖（普通文档）或等宽（代码）。
+    enum FontFilter: Sendable {
+        case all
+        case chinese
+        case monospaced
+    }
+
+    /// 一次枚举的结果：字族列表 + 覆盖汉字的字族名 + 等宽字族名。
     /// 面板打开时取一次，之后开关只做本地筛选。
     struct Catalog: Sendable {
         let families: [Family]
         let chineseFamilyNames: Set<String>
+        let monospacedFamilyNames: Set<String>
 
-        func families(chineseOnly: Bool) -> [Family] {
-            chineseOnly ? families.filter { chineseFamilyNames.contains($0.name) } : families
+        func families(filter: FontFilter) -> [Family] {
+            switch filter {
+            case .all: families
+            case .chinese: families.filter { chineseFamilyNames.contains($0.name) }
+            case .monospaced: families.filter { monospacedFamilyNames.contains($0.name) }
+            }
         }
     }
 
-    /// 枚举系统字体；汉字覆盖判定与中文名解析放到后台线程，避免面板打开时卡主线程。
+    /// 枚举系统字体；汉字覆盖与等宽判定、中文名解析放到后台线程，避免面板打开时卡主线程。
     static func load() async -> Catalog {
         if let cachedCatalog { return cachedCatalog }
         let enumerated = NSFontManager.shared.availableFontFamilies.map { family in
@@ -51,12 +63,17 @@ enum DocumentFontCatalog {
         }
         let catalog = await Task.detached(priority: .userInitiated) {
             let chineseFamilyNames = Set(enumerated.filter { supportsChinese($0.members) }.map(\.name))
+            let monospacedFamilyNames = Set(enumerated.filter { isMonospaced($0.members) }.map(\.name))
             let families = enumerated.map { family -> Family in
                 guard chineseFamilyNames.contains(family.name),
                       let displayName = chineseFamilyName(family.members) else { return family }
                 return Family(name: family.name, displayName: displayName, members: family.members)
             }
-            return Catalog(families: families, chineseFamilyNames: chineseFamilyNames)
+            return Catalog(
+                families: families,
+                chineseFamilyNames: chineseFamilyNames,
+                monospacedFamilyNames: monospacedFamilyNames
+            )
         }.value
         cachedCatalog = catalog
         return catalog
@@ -101,6 +118,14 @@ enum DocumentFontCatalog {
         return font
     }
 
+    /// 代码内容的默认字体：系统等宽字体（SF Mono）。
+    static func defaultCodeFont(size: CGFloat) -> NSFont {
+        NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+    }
+
+    /// 代码内容默认字体的 CSS 字族；与 `defaultCodeFont` 对应，用于代码预览页面。
+    static let defaultCodeFontFamily = "ui-monospace, SFMono-Regular, Menlo, monospace"
+
     /// 字体名 → 注入网页（电子书/扩展文档）的 font-family 值；未选择时返回 nil，保留文档自身排版。
     static func cssFontFamily(named name: String?) -> String? {
         guard let name, let font = NSFont(name: name, size: 12) else { return nil }
@@ -118,6 +143,13 @@ enum DocumentFontCatalog {
                 return false
             }
             return glyphs.allSatisfy { $0 != 0 }
+        }
+    }
+
+    /// 字族是否含等宽字型：任一字型为固定字距即视为等宽字族，与汉字覆盖判定的口径一致。
+    nonisolated private static func isMonospaced(_ members: [Member]) -> Bool {
+        members.contains { member in
+            NSFont(name: member.postScriptName, size: 12)?.isFixedPitch == true
         }
     }
 
