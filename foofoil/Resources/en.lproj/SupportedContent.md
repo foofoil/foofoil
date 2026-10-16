@@ -29,9 +29,11 @@ You can also type directly into a blank foil to write a note.
 | PDF | .pdf | Read, turn pages, and jump to a page |
 | Markdown | .md, .markdown | Read formatted content, jump to headings from the Outline in the navigator, and adjust reading styles |
 | Tables | .csv | Browse data in rows and columns |
-| Text and code | {{textExtensions}}, etc. | Read text and adjust fonts, colors, and spacing |
+| Text and code | {{textExtensions}}, etc. | Read text and adjust fonts, colors, and spacing; recognized source code is shown with syntax highlighting |
 | Web pages and archives | .html, .htm, .xhtml, .webarchive | Browse web content; you can also enter a URL directly |
 | Books | .epub | Read by chapter and resume where you left off; encrypted books are not supported |
+
+Source files with a recognized extension or file name, such as .swift, .kt, .zig, .toml, Dockerfile, or Makefile, are highlighted offline. Highlighting is read-only: copying returns only the source text, and View → Show Line Numbers toggles line numbers for the current foil. Code larger than 512 KB, and files whose language is not recognized, are shown as plain text. Markdown, HTML, and SVG keep their own display.
 
 ## Audio and Video
 
