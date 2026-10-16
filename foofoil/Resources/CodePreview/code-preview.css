@@ -1,0 +1,167 @@
+:root {
+    color-scheme: light dark;
+    --font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-size: 16px;
+    --line-height: normal;
+    --paragraph-spacing: 0px;
+    --digits: 1;
+    --muted: #8c959f;
+    --token-keyword: #cf222e;
+    --token-string: #0a3069;
+    --token-comment: #6e7781;
+    --token-number: #0550ae;
+    --token-title: #8250df;
+    --token-type: #953800;
+    --token-tag: #116329;
+    --token-deletion: #82071e;
+    --token-addition: #116329;
+    --line-hover: rgba(0, 0, 0, 0.05);
+}
+
+:root[data-theme="dark"] {
+    --line-hover: rgba(255, 255, 255, 0.08);
+    --muted: #6e7681;
+    --token-keyword: #ff7b72;
+    --token-string: #a5d6ff;
+    --token-comment: #8b949e;
+    --token-number: #79c0ff;
+    --token-title: #d2a8ff;
+    --token-type: #ffa657;
+    --token-tag: #7ee787;
+    --token-deletion: #ffa198;
+    --token-addition: #7ee787;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow-wrap: anywhere;
+}
+
+body {
+    color: var(--text, CanvasText);
+    -webkit-font-smoothing: antialiased;
+}
+
+.code {
+    padding: 24px;
+    font-family: var(--font-family);
+    font-size: var(--font-size);
+    line-height: var(--line-height);
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+.l {
+    display: grid;
+    grid-template-columns: calc(var(--digits) * 1ch + 16px) minmax(0, 1fr);
+    margin-bottom: var(--paragraph-spacing);
+}
+
+.no-ln .l {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.l.is-hovered {
+    background-color: var(--line-hover);
+}
+
+.n {
+    grid-column: 1;
+    padding-right: 16px;
+    text-align: right;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.no-ln .n {
+    display: none;
+}
+
+.no-ln .c {
+    grid-column: 1;
+}
+
+.c {
+    grid-column: 2;
+    min-width: 0;
+    white-space: pre-wrap;
+    tab-size: 4;
+}
+
+/* 空行仍占一行高度；伪元素不进入 textContent，也不会被复制。 */
+.c:empty::after {
+    content: "\200B";
+}
+
+.c span {
+    font: inherit;
+}
+
+.hljs-keyword,
+.hljs-doctag,
+.hljs-meta .hljs-keyword,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-selector-tag {
+    color: var(--token-keyword);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-char.escape_ {
+    color: var(--token-string);
+}
+
+.hljs-comment,
+.hljs-quote {
+    color: var(--token-comment);
+}
+
+.hljs-number,
+.hljs-numbers,
+.hljs-literal,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-meta {
+    color: var(--token-number);
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-title.class_,
+.hljs-function,
+.hljs-section,
+.hljs-selector-class,
+.hljs-selector-id {
+    color: var(--token-title);
+}
+
+.hljs-type,
+.hljs-built_in,
+.hljs-variable,
+.hljs-params,
+.hljs-template-variable.hljs-type {
+    color: var(--token-type);
+}
+
+.hljs-tag,
+.hljs-name,
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-link {
+    color: var(--token-tag);
+}
+
+.hljs-deletion {
+    color: var(--token-deletion);
+}
+
+.hljs-addition {
+    color: var(--token-addition);
+}
