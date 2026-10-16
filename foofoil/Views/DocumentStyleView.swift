@@ -243,20 +243,22 @@ struct DocumentStyleView: View {
     private var fontSection: some View {
         section(NSLocalizedString("Font", comment: "")) {
             VStack(alignment: .leading, spacing: 8) {
-                Toggle(
-                    fontFilter == .monospaced
-                        ? NSLocalizedString("Monospaced Fonts Only", comment: "")
-                        : NSLocalizedString("Chinese Fonts Only", comment: ""),
-                    isOn: $filterOnly
-                )
-                    .toggleStyle(.checkbox)
-                    .onChange(of: filterOnly) { _, newValue in
-                        if fontFilter == .monospaced {
-                            SettingsStore.shared.documentFontsMonospacedOnly = newValue
-                        } else {
-                            SettingsStore.shared.documentFontsChineseOnly = newValue
+                if showsFontFilterToggle {
+                    Toggle(
+                        fontFilter == .monospaced
+                            ? NSLocalizedString("Monospaced Fonts Only", comment: "")
+                            : NSLocalizedString("Chinese Fonts Only", comment: ""),
+                        isOn: $filterOnly
+                    )
+                        .toggleStyle(.checkbox)
+                        .onChange(of: filterOnly) { _, newValue in
+                            if fontFilter == .monospaced {
+                                SettingsStore.shared.documentFontsMonospacedOnly = newValue
+                            } else {
+                                SettingsStore.shared.documentFontsChineseOnly = newValue
+                            }
                         }
-                    }
+                }
 
                 TextField(NSLocalizedString("Search Fonts", comment: ""), text: $query)
                     .textFieldStyle(.roundedBorder)
@@ -486,6 +488,13 @@ struct DocumentStyleView: View {
     /// 代码内容使用等宽筛选，其余文档使用中文字体筛选。
     private var fontFilter: DocumentFontCatalog.FontFilter {
         appState.presentsAsCode ? .monospaced : .chinese
+    }
+
+    /// 是否显示字体筛选开关：「只显示中文字体」只对中文系统用户有意义；
+    /// 代码内容的等宽筛选始终显示；筛选已经生效（如英文系统打开中文正文）时也保留开关，
+    /// 避免出现无法关闭的筛选。
+    private var showsFontFilterToggle: Bool {
+        fontFilter == .monospaced || DocumentFontCatalog.systemPrefersChinese() || filterOnly
     }
 
     private var visibleFamilies: [DocumentFontCatalog.Family] {

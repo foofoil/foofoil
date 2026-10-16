@@ -99,6 +99,21 @@ struct DocumentTextStylingTests {
         }
     }
 
+    /// 中文字体相关选项只在系统语言含中文时出现；代码内容的等宽选项不受影响。
+    @Test func systemPrefersChineseMatchesPreferredLanguage() {
+        #expect(DocumentFontCatalog.systemPrefersChinese(systemLanguages: ["zh-Hans-CN"]))
+        #expect(DocumentFontCatalog.systemPrefersChinese(systemLanguages: ["en-US", "zh-Hant"]))
+        #expect(!DocumentFontCatalog.systemPrefersChinese(systemLanguages: ["en-US"]))
+        #expect(!DocumentFontCatalog.systemPrefersChinese(systemLanguages: []))
+    }
+
+    /// 自动筛选中文字体仍需同时覆盖「中文系统」与「英文系统打开中文正文」两种情形。
+    @Test func prefersChineseFontsCombinesSystemLanguageAndText() {
+        #expect(DocumentFontCatalog.prefersChineseFonts(systemLanguages: ["zh-Hans"], text: ""))
+        #expect(DocumentFontCatalog.prefersChineseFonts(systemLanguages: ["en-US"], text: "汉字标题"))
+        #expect(!DocumentFontCatalog.prefersChineseFonts(systemLanguages: ["en-US"], text: "Plain English"))
+    }
+
     /// 视图层接线：预览已经开着的箔上改文字颜色，屏幕上的预览会按新颜色重渲染。
     @Test func markdownPreviewRerendersWhenTextColorChanges() async throws {
         let state = AppState()

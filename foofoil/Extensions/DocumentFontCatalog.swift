@@ -79,13 +79,18 @@ enum DocumentFontCatalog {
         return catalog
     }
 
+    /// 系统首选语言是否为中文。
+    static func systemPrefersChinese(systemLanguages: [String] = Locale.preferredLanguages) -> Bool {
+        systemLanguages.contains { $0.hasPrefix("zh") }
+    }
+
     /// 自动判定「优先列中文字体」：系统首选语言是中文，或当前箔正文含统一表意文字。
     /// 面板里用户手动切换后以设置为准（`SettingsStore.documentFontsChineseOnly`）。
     static func prefersChineseFonts(
         systemLanguages: [String] = Locale.preferredLanguages,
         text: String
     ) -> Bool {
-        if systemLanguages.contains(where: { $0.hasPrefix("zh") }) { return true }
+        if systemPrefersChinese(systemLanguages: systemLanguages) { return true }
         return text.unicodeScalars.contains { scalar in
             (0x3400...0x4DBF).contains(scalar.value) || (0x4E00...0x9FFF).contains(scalar.value)
         }
