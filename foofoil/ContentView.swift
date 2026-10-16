@@ -45,8 +45,9 @@ struct FoilContentView: View {
 
     public var body: some View {
         // 网页和图片都支持仅隐藏视觉边框；网页切换边框不应改变窗口的缩放规则。
+        // 仅允许可切换边框的类型进入无边框模式；固定边框类型始终保留代码箔式的边框。
         let shouldHideBorder = windowState.isFullScreen
-            || ((appState.isCamera || appState.imageURL != nil || appState.webURL != nil || appState.isAudioDocument) && !appState.showBorder)
+            || ((appState.isCamera || appState.imageURL != nil || appState.webURL != nil || appState.isAudioDocument) && appState.supportsBorderToggle && !appState.showBorder)
         // 网页即使同时保留了截图缓存，也不能套用图片无边框模式的最小尺寸规则。
         let isImageMode = appState.usesImagePresentation
         let usesCompactMinimumSize = isImageMode && !appState.effectiveShowBorder
@@ -57,7 +58,8 @@ struct FoilContentView: View {
             : (appState.isPPTXDocument ? max(minimumLength, PPTXModeView.minimumWindowWidth) : minimumLength)
         // PDF 显示边框时，四周保留 12pt 的边框区域。
         let isMarkdownPreview = appState.isMarkdownPreview && appState.isMarkdownDocument
-        let contentPadding: CGFloat = isMarkdownPreview ? 0 : (appState.isPDFDocument && appState.effectiveShowBorder ? 12 : (shouldHideBorder ? 0 : 4))
+        // Markdown 也按代码箔的 4pt 边框留白；不再满铺窗口。
+        let contentPadding: CGFloat = isMarkdownPreview ? 4 : (appState.isPDFDocument && appState.effectiveShowBorder ? 12 : (shouldHideBorder ? 0 : 4))
         // 内容背景色：只作用于文档箔的内容，窗口毛玻璃不再随之着色。
         let contentBackgroundColor = appState.contentBackgroundColor
         // 与毛玻璃圆角同心的内缩圆角：内容越贴边，圆角越接近窗口的 12pt 圆角。
@@ -119,7 +121,8 @@ struct FoilContentView: View {
                     if url.pathExtension.lowercased() == "pptx" {
                         PPTXModeView(appState: appState, url: url)
                     } else {
-                        QuickLookModeView(url: url)
+                        QuickLookModeView(url: url, shouldHideBorder: shouldHideBorder)
+                            .clipShape(RoundedRectangle(cornerRadius: shouldHideBorder ? 0 : 8, style: .continuous))
                     }
                 } else if let videoURL = appState.imageURL, appState.isVideoDocument {
                     VideoModeView(appState: appState, url: videoURL, shouldHideBorder: shouldHideBorder)
@@ -285,7 +288,7 @@ struct FoilContentView: View {
             }
                 .configuredKeyboardShortcut("view.togglePin")
 
-            if !windowState.isFullScreen && (appState.usesImagePresentation || appState.webURL != nil || appState.isAudioDocument) {
+            if !windowState.isFullScreen && appState.supportsBorderToggle {
                 Toggle(isOn: $appState.showBorder) {
                     Label(NSLocalizedString("Border (ContextMenu)", comment: ""), systemImage: "rectangle")
                 }

@@ -45,6 +45,8 @@ struct ExtensionDocumentView: View {
     let documentParagraphSpacingMultiple: Double?
     let initialScrollFile: String?
     let initialScrollFraction: Double?
+    /// 与其它文档箔一致：允许隐藏视觉边框时内容满铺；固定边框时按代码箔的圆角裁切，避免背景无圆角。
+    var shouldHideBorder: Bool = false
     let onScroll: (_ file: String, _ fraction: Double) -> Void
 
     @State private var isLoading = true
@@ -86,6 +88,7 @@ struct ExtensionDocumentView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .cornerRadius(shouldHideBorder ? 0 : 8)
         .onChange(of: url) {
             isLoading = true
             loadFailed = false

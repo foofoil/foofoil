@@ -326,7 +326,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             // 音频也走通用视觉边框，包括无磁盘路径的资料库内容。
             guard let appState = activeReadingState,
                   !appState.isFullScreen,
-                  appState.isCamera || appState.imageURL != nil || appState.webURL != nil || appState.isAudioDocument else {
+                  appState.supportsBorderToggle else {
                 menuItem.state = .off
                 return false
             }

@@ -834,7 +834,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     /// 与 ContentView 的 `shouldHideBorder` 同源：全屏，或图片/网页/音频箔隐藏了视觉边框。
     private var shouldHideBorder: Bool {
         appState.isFullScreen
-            || ((appState.readingState.isCamera || appState.readingState.imageURL != nil || appState.readingState.webURL != nil || appState.readingState.isAudioDocument) && !appState.showBorder)
+            || ((appState.readingState.isCamera || appState.readingState.imageURL != nil || appState.readingState.webURL != nil || appState.readingState.isAudioDocument) && appState.readingState.supportsBorderToggle && !appState.showBorder)
     }
 
     /// 无边框（含全屏）时关闭系统窗口阴影：透明内容箔片上的阴影会沿内容轮廓描出一圈细黑线。

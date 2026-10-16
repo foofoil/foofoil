@@ -35,6 +35,8 @@ struct ImageModeView: View {
                         width: layoutSize.width * CGFloat(appState.imageScale),
                         height: layoutSize.height * CGFloat(appState.imageScale)
                     )
+                    // Office 快速预览固定边框：按代码箔的圆角裁切，避免文档内容以直角贴到玻璃边框内。
+                    .cornerRadius((appState.isQuickLookDocument && !appState.supportsBorderToggle) ? 8 : 0)
                     .transaction { $0.animation = nil }
                 }
                 .padding(8) // 移至 ScrollView 外部，确保在滚动时边框始终保持同样粗细（12 像素）。

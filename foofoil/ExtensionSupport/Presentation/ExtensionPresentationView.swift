@@ -34,6 +34,7 @@ struct ExtensionPresentationView: View {
                         documentParagraphSpacingMultiple: appState.documentParagraphSpacingMultiple,
                         initialScrollFile: appState.extensionDocumentScrollFile,
                         initialScrollFraction: appState.extensionDocumentScrollFraction,
+                        shouldHideBorder: shouldHideBorder,
                         onScroll: { file, fraction in
                             appState.noteExtensionDocumentScroll(file: file, fraction: fraction)
                         }

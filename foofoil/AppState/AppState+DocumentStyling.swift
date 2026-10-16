@@ -21,6 +21,27 @@ extension AppState {
         return !isBlank
     }
 
+    /// 文档箔是否允许切换视觉边框模式：图片、视频、音频、网页、摄像头、PDF 与 PPT 等内容可切换；
+    /// 代码、Markdown、EPUB、CSV、文本笔记与 Excel/Numbers/Word/Pages 等快速预览不切换，统一采用代码箔的固定边框样式。
+    public var supportsBorderToggle: Bool {
+        let ext = originalImageName?.lowercased().split(separator: ".").last.map(String.init) ?? ""
+        let nonToggleExtensions: Set<String> = [
+            "xlsx", "xls", "xlsm", "xlsb", "xltx", "xltm",
+            "numbers",
+            "docx", "doc", "docm", "dotx", "dotm",
+            "pages"
+        ]
+        if nonToggleExtensions.contains(ext) { return false }
+        if originalImageName?.lowercased().hasSuffix(".epub") == true { return false }
+        return isCamera || isVideoDocument || (imageURL != nil && webURL == nil) || webURL != nil || isAudioDocument
+    }
+
+    /// 兼容别名：不同命名习惯下指向同一判断结果。
+    public var supportsBorderMode: Bool { supportsBorderToggle }
+    public var canToggleBorder: Bool { supportsBorderToggle }
+    public var allowsBorderToggle: Bool { supportsBorderToggle }
+    public var isBorderToggleSupported: Bool { supportsBorderToggle }
+
     /// 无排版文档内容：纯文本/笔记、Markdown，以及电子书等扩展文档。
     /// 它们由宿主排版，可单独选择文字颜色与字体；PDF 自带版式，CSV 是表格，网页有站点自己的排版。
     /// 空白箔在用户输入内容前不是文档类型。

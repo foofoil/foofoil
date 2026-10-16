@@ -536,6 +536,11 @@ public class AppState: NSObject, ObservableObject, Identifiable {
 
     @Published public var showBorder: Bool {
         didSet {
+            // 本应固定边框的文档类型不允许进入无边框模式；切回有边框并放弃本次切换。
+            if !supportsBorderToggle, showBorder != true {
+                showBorder = true
+                return
+            }
             guard showBorder != oldValue else { return }
             if let owner = archiveWindowOwner, owner.showBorder != showBorder { owner.showBorder = showBorder }
             if let preview = archiveSession?.preview, preview.showBorder != showBorder { preview.showBorder = showBorder }
