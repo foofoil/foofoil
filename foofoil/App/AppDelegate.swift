@@ -36,14 +36,22 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(handleFileOpenFeedback(_:)), name: .fileOpenFeedback, object: nil)
     }
 
+    /// 活跃窗口解析入口：正常运行取系统 key window；测试可注入固定窗口，避免依赖应用激活状态。
+    var activeWindowProvider: () -> NSWindow? = { NSApplication.shared.keyWindow }
+
     // 获取当前活跃（Key）窗口对应的 AppState
     var activeWindowController: FloatingWindowController? {
-        guard let keyWindow = NSApplication.shared.keyWindow else { return nil }
+        guard let keyWindow = activeWindowProvider() else { return nil }
         return windowControllers.first { $0.owns(keyWindow) }
     }
 
     var activeAppState: AppState? {
         return activeWindowController?.appState
+    }
+
+    /// 当前活跃箔片是否为无痕箔；无活跃箔片（例如总览、搜索窗口或系统面板）时为 false。
+    var isActiveFoilIncognito: Bool {
+        activeWindowController?.appState.isIncognito == true
     }
 
     /// 自动接管仅限普通空箔；无痕空箔不是普通打开操作的候选目标。

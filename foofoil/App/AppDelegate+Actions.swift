@@ -439,7 +439,8 @@ extension AppDelegate {
     }
 
     @objc func openClipboardContentAction() {
-        _ = openClipboardContentInNewWindow()
+        // 无痕箔激活时沿用无痕属性：普通打开快捷键也不能把剪贴板内容写进历史。
+        _ = openClipboardContentInNewWindow(isIncognito: isActiveFoilIncognito)
     }
 
     /// 直接打开剪贴板内容：文件/文件夹/图片复用拖入箔片的处理管线，文本按 Markdown / 网址 / HTML / 笔记区分。

@@ -147,6 +147,59 @@ struct IncognitoFoilTests {
         #expect(HistoryRepository.shared.config(id: state.id) == nil)
     }
 
+    /// 无痕箔激活时，普通打开剪贴板内容（⌘⇧V）也应落到无痕箔，不能把私密内容写进历史。
+    @Test func clipboardOpenInheritsActiveIncognitoFoil() throws {
+        let delegate = AppDelegate()
+        let incognito = FloatingWindowController(appState: AppState(isIncognito: true))
+        delegate.windowControllers = [incognito]
+        delegate.activeWindowProvider = { incognito.window }
+        defer { for controller in delegate.windowControllers { controller.close() } }
+
+        let pasteboard = NSPasteboard.general
+        let savedItems = pasteboard.pasteboardItems
+        pasteboard.clearContents()
+        pasteboard.setString("Private clipboard note", forType: .string)
+        defer {
+            pasteboard.clearContents()
+            if let savedItems { pasteboard.writeObjects(savedItems) }
+        }
+
+        #expect(delegate.isActiveFoilIncognito)
+
+        delegate.openClipboardContentAction()
+
+        #expect(delegate.windowControllers.count == 2)
+        #expect(delegate.windowControllers.allSatisfy { $0.appState.isIncognito })
+        #expect(delegate.windowControllers.allSatisfy { HistoryRepository.shared.config(id: $0.appState.id) == nil })
+    }
+
+    /// 普通箔激活时不受影响：⌘⇧V 仍打开普通箔并进入历史。
+    @Test func clipboardOpenStaysNormalForActiveOrdinaryFoil() throws {
+        let delegate = AppDelegate()
+        let normal = FloatingWindowController(appState: AppState())
+        delegate.windowControllers = [normal]
+        delegate.activeWindowProvider = { normal.window }
+        defer { for controller in delegate.windowControllers { controller.close() } }
+
+        let pasteboard = NSPasteboard.general
+        let savedItems = pasteboard.pasteboardItems
+        pasteboard.clearContents()
+        pasteboard.setString("Ordinary clipboard note", forType: .string)
+        defer {
+            pasteboard.clearContents()
+            if let savedItems { pasteboard.writeObjects(savedItems) }
+        }
+
+        #expect(!delegate.isActiveFoilIncognito)
+        delegate.openClipboardContentAction()
+
+        // 普通打开会复用活跃空白箔，并照常写入历史。
+        #expect(delegate.windowControllers.count == 1)
+        #expect(normal.appState.text == "Ordinary clipboard note")
+        defer { HistoryManager.shared.removeFromHistory(normal.appState.toConfig()) }
+        #expect(HistoryRepository.shared.config(id: normal.appState.id) != nil)
+    }
+
     @Test func incognitoShortcutDefaults() throws {
         let newFoil = try #require(KeyboardShortcutCatalog.definition(withID: "file.newIncognito")?.defaultShortcut)
         let clipboard = try #require(KeyboardShortcutCatalog.definition(withID: "file.openClipboardIncognito")?.defaultShortcut)
