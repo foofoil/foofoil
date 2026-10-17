@@ -34,6 +34,12 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     /// 缓存当前解码图片，避免缩放重绘时反复从磁盘创建 NSImage。
     var loadedImageCache: (url: URL, image: NSImage)?
     var isBatchUpdating = false
+    var agentOwnership: AgentOwnership?
+    /// 只读展示策略可恢复；控制身份始终由上面的运行期归属单独决定。
+    @Published var agentReadOnly = false
+    var agentKind: AgentContentKind?
+    @Published var agentContentRevision: UInt64 = 0
+    var agentSVGData: Data?
     /// 递增的拖拽代次，用于丢弃过期异步回调，避免“打开以前的东西”或并发覆盖。
     var currentDropGeneration: UInt64 = 0
     /// 列表切项可能异步创建扩展会话；只允许最后一次路由结果接管播放器。

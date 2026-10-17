@@ -72,7 +72,7 @@ struct ImageModeView: View {
         let baseImage = Image(nsImage: nsImage).resizable()
 
         if appState.isSVG, let url = appState.imageURL {
-            SVGImageView(url: url, contentMode: contentMode, colorHex: appState.svgColor)
+            SVGImageView(url: url, contentMode: contentMode, colorHex: appState.svgColor, preparedData: appState.agentSVGData)
                 .frame(width: width, height: height)
         } else if appState.isSVG, let svgColorHex = appState.svgColor, let color = Color(hex: svgColorHex) {
             baseImage

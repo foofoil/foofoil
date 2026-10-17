@@ -59,6 +59,7 @@ extension AppState {
                 return false
             }
             stopVideoAccess()
+            relinquishAgentControl()
             archiveSession?.close()
             archiveSession = nil
             appleMusicItem = nil
@@ -79,6 +80,7 @@ extension AppState {
             // 载入历史项必须沿用原 UUID，否则随后的自动保存会创建一条重复历史。
             self.id = config.id
             self.sourceFingerprint = config.sourceFingerprint
+            self.agentReadOnly = config.readOnlyPresentation
             self.isPinned = config.isPinned
             self.opacity = config.opacity
             self.originalImageName = config.sourceFingerprint == SupportedContentOverview.sourceFingerprint
@@ -278,7 +280,7 @@ extension AppState {
                 actualWebURLString: actualWebURL?.absoluteString,
                 originalImageName: originalImageName,
                 imageSource: imageSource,
-                text: text,
+                text: agentReadOnly ? "" : text,
                 isPinned: isPinned,
                 opacity: opacity,
                 windowFrame: windowFrame,
@@ -328,7 +330,8 @@ extension AppState {
                 documentScrollFile: extensionDocumentScrollFile,
                 documentScrollFraction: extensionDocumentScrollFraction,
                 appleMusicReference: appleMusicReference,
-                showCodeLineNumbers: showCodeLineNumbers
+                showCodeLineNumbers: showCodeLineNumbers,
+                readOnlyPresentation: agentReadOnly
             )
         }
 

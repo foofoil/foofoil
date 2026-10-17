@@ -54,6 +54,8 @@ Navigation lists also support ⌃P / ⌃B for the previous item and ⌃N / ⌃F 
 
 ## Content Display
 
+Read-only presentations created through foil also support the border toggle for text and Markdown. Updates and ordinary-window recovery preserve this choice. Replacing content through the GUI returns to the usual rules for that content type.
+
 | Action | Default shortcut | Current shortcut | Notes |
 | --- | --- | --- | --- |
 {{view}}

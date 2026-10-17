@@ -70,7 +70,7 @@ extension AppState {
 
             // 内容换成另一篇文档（重新打开、⌘K 后换文件）时，先丢掉上一次的排版结果：
             // 预览视图拿到的仍是旧富文本，直到新渲染完成，会先显示上一篇文档。
-            let identity = sourceFingerprint ?? textURL?.path ?? "untitled:\(id.uuidString)"
+            let identity = agentReadOnly ? "agent:\(id.uuidString)" : sourceFingerprint ?? textURL?.path ?? "untitled:\(id.uuidString)"
             if identity != renderedMarkdownIdentity {
                 renderedMarkdownIdentity = identity
                 renderedMarkdown = NSAttributedString()
@@ -88,11 +88,15 @@ extension AppState {
             let customFontFamilyName = self.documentStylingFontName.flatMap { NSFont(name: $0, size: fontSize)?.familyName }
             let lineHeightMultiple = self.documentLineHeightMultiple
             let paragraphSpacingMultiple = self.documentParagraphSpacingMultiple
+            let blocksResources = agentReadOnly
+            let resourcePlaceholder = NSLocalizedString("Agent Resource Unavailable", comment: "")
 
             renderTask = Task.detached(priority: .userInitiated) {
                 if Task.isCancelled { return }
 
-                let htmlBody = Self.cmarkToHTML(textToRender)
+                let rendered = Self.cmarkToHTML(textToRender)
+                // 在 HTML 导入器接触资源前移除所有图片标记；原始 HTML 已由 cmark 安全模式丢弃。
+                let htmlBody = blocksResources ? Self.agentMarkdownHTML(rendered, placeholder: resourcePlaceholder) : rendered
                 if Task.isCancelled { return }
 
                 // 根据当前明暗外观显式生成对应配色的 CSS，避免依赖 @media 查询导致 NSAttributedString 在后台解析时颜色固化
@@ -1074,6 +1078,13 @@ extension AppState {
             let result = String(cString: cString)
             free(cString)
             return result
+        }
+
+        nonisolated static func agentMarkdownHTML(_ html: String, placeholder: String) -> String {
+            let escaped = placeholder.replacingOccurrences(of: "&", with: "&amp;")
+                .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
+            guard let regex = try? NSRegularExpression(pattern: "<img\\b[^>]*>", options: [.caseInsensitive]) else { return "" }
+            return regex.stringByReplacingMatches(in: html, range: NSRange(html.startIndex..., in: html), withTemplate: NSRegularExpression.escapedTemplate(for: escaped))
         }
 
         /// 将单元格内的 inline Markdown 转为 HTML 片段（去除外层 <p> 包裹）

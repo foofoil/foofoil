@@ -20,6 +20,7 @@ extension AppState {
         }
 
         public func handleDrop(providers: [NSItemProvider], completion: @escaping (Bool) -> Void = { _ in }) {
+            relinquishAgentControl(keepingPresentation: true)
             handleDrop(providers: providers, appendToFileList: false, completion: completion)
         }
 
@@ -30,6 +31,7 @@ extension AppState {
         /// 窗口从 Finder 粘贴板一次性取得完整文件批次后直接处理，避免 NSItemProvider 丢失多选项。
         @discardableResult
         func handleDroppedFileURLs(_ urls: [URL], feedbackBatchID: UUID = UUID()) -> Bool {
+            relinquishAgentControl(keepingPresentation: true)
             if isVideoDocument, urls.count == 1, let url = urls.first,
                SubtitleDocument.extensions.contains(url.pathExtension.lowercased()) {
                 subtitles.importFile(url)

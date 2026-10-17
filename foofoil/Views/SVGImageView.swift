@@ -7,11 +7,12 @@ struct SVGImageView: View {
     let url: URL
     let contentMode: ContentMode
     let colorHex: String?
+    var preparedData: Data? = nil
     @State private var data: Data?
 
     var body: some View {
         Group {
-            if let data {
+            if let data = preparedData ?? data {
                 SVGWebImage(data: data, contentMode: contentMode, colorHex: colorHex)
             } else {
                 Color.clear
@@ -22,6 +23,7 @@ struct SVGImageView: View {
         // 内容，不需要真的穿透到网页层。
         .overlay { Color.clear.contentShape(Rectangle()) }
         .task(id: url) {
+            if preparedData != nil { return }
             data = nil
             let loaded = await Task.detached(priority: .userInitiated) {
                 try? Data(contentsOf: url)

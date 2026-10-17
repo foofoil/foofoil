@@ -24,6 +24,7 @@ extension AppState {
     /// 文档箔是否允许切换视觉边框模式：图片、视频、音频、网页、摄像头、PDF 与 PPT 等内容可切换；
     /// 代码、Markdown、EPUB、CSV、文本笔记与 Excel/Numbers/Word/Pages 等快速预览不切换，统一采用代码箔的固定边框样式。
     public var supportsBorderToggle: Bool {
+        if agentReadOnly { return true }
         let ext = originalImageName?.lowercased().split(separator: ".").last.map(String.init) ?? ""
         let nonToggleExtensions: Set<String> = [
             "xlsx", "xls", "xlsm", "xlsb", "xltx", "xltm",

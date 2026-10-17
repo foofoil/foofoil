@@ -429,6 +429,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         contentPublisher(\.$imageURL)
             .sink { [weak self] imageURL in
                 guard let self = self, !self.appState.readingState.isCamera, let url = imageURL else { return }
+                guard !self.appState.agentReadOnly else { return }
                 let isFirst = self.isFirstImageURLChange
                 self.isFirstImageURLChange = false
 
@@ -495,6 +496,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             .filter { $0 }
             .sink { [weak self] _ in
                 guard let self else { return }
+                guard !self.appState.agentReadOnly else { return }
                 DispatchQueue.main.async {
                     guard !self.isRestoringFrame,
                           self.appState.readingState.webURL == nil,
@@ -843,6 +845,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     /// 与 ContentView 的 `shouldHideBorder` 同源：全屏，或图片/网页/音频箔隐藏了视觉边框。
     private var shouldHideBorder: Bool {
         appState.isFullScreen
+            || (appState.readingState.agentReadOnly && !appState.showBorder)
             || ((appState.readingState.isCamera || appState.readingState.imageURL != nil || appState.readingState.webURL != nil || appState.readingState.isAudioDocument) && appState.readingState.supportsBorderToggle && !appState.showBorder)
     }
 
@@ -2355,6 +2358,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func minimumWindowLength(showBorderOverride: Bool? = nil) -> CGFloat {
+        if appState.agentReadOnly { return 80 }
         let showBorder = showBorderOverride ?? appState.showBorder
         let usesCompactMinimum = (isImageMode && !showBorder) || appState.readingState.isAudioDocument
         return usesCompactMinimum ? 80 : 150

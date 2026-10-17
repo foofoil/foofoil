@@ -47,7 +47,7 @@ struct TextEditorModeView: View {
     var body: some View {
         let _ = shortcutRevision
         GeometryReader { geometry in
-            if geometry.size.width < 100 || geometry.size.height < 100 {
+            if !appState.agentReadOnly && (geometry.size.width < 100 || geometry.size.height < 100) {
                 Color.clear
             } else {
                 let isBlank = appState.isBlank
@@ -68,9 +68,9 @@ struct TextEditorModeView: View {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 // 整个滚动视图避开四边缩放热区，滚动条首尾也不会触发角部缩放。
                                 .padding(appState.isFullScreen ? 0 : FloatingWindow.resizeHitThickness + 1)
-                        } else if appState.isArchivePreview || (appState.isReadOnlyTextFile && !appState.isMarkdownDocument) {
+                        } else if appState.agentReadOnly || appState.isArchivePreview || (appState.isReadOnlyTextFile && !appState.isMarkdownDocument) {
                             // 已识别语言的代码优先用 WebKit 语法着色；超限、未识别或失败时回退原生只读视图。
-                            if let languageID = appState.webCodePreviewLanguageID, !codePreviewFailed {
+                            if let languageID = appState.webCodePreviewLanguageID, !codePreviewFailed, !appState.agentReadOnly {
                                 ReadOnlyCodeView(
                                     text: appState.text,
                                     languageID: languageID,

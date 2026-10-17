@@ -38,6 +38,7 @@ extension AppState {
 
         /// 便笺与剪贴板正文走同一托管路径；编辑防抖后才写入，不回写外部原文件。
         func persistManagedTextIfNeeded(createIfNeeded: Bool = false) {
+            guard !agentReadOnly else { return }
             guard (!text.isEmpty || textURL != nil), imageURL == nil, webURL == nil, extensionSession == nil,
                   sourceFingerprint != KeyboardShortcutsOverview.sourceFingerprint,
                   sourceFingerprint != SupportedContentOverview.sourceFingerprint else { return }

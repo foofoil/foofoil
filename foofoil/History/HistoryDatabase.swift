@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 nonisolated final class HistoryDatabase {
-    static let schemaVersion = 22
+    static let schemaVersion = 23
 
     private let queue = DispatchQueue(label: "com.foofoil.history.database", qos: .utility)
     private var connection: OpaquePointer?
@@ -110,8 +110,8 @@ nonisolated final class HistoryDatabase {
                         navigator_panel_visibility, navigator_panel_width, file_list,
                         document_zoom, document_scroll_file, document_scroll_fraction, text_fingerprint,
                         image_ocr_text, image_has_subject, image_subject_path, apple_music_reference, subtitle_associations, custom_title, archive_source,
-                        show_code_line_numbers
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        show_code_line_numbers, read_only_presentation
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -149,7 +149,8 @@ nonisolated final class HistoryDatabase {
                         image_subject_path=excluded.image_subject_path,
                         subtitle_associations=excluded.subtitle_associations,
                         apple_music_reference=excluded.apple_music_reference, custom_title=excluded.custom_title, archive_source=excluded.archive_source,
-                        show_code_line_numbers=excluded.show_code_line_numbers
+                        show_code_line_numbers=excluded.show_code_line_numbers,
+                        read_only_presentation=excluded.read_only_presentation
                     """, bindings: [
                         config.id.uuidString, kind.rawValue, title, config.originalImageName,
                         config.imagePath, config.textPath, config.webURLString, config.actualWebURLString,
@@ -177,7 +178,7 @@ nonisolated final class HistoryDatabase {
                         try config.subtitleAssociations.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
                         config.customTitle,
                         try config.archiveSource.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
-                        config.showCodeLineNumbers
+                        config.showCodeLineNumbers, config.readOnlyPresentation
                     ])
 
                 let metadata = (
@@ -486,6 +487,7 @@ nonisolated final class HistoryDatabase {
         try addColumnIfMissing("apple_music_reference", definition: "apple_music_reference TEXT")
         // v22 只读代码预览的行号显示；为空时按显示处理。
         try addColumnIfMissing("show_code_line_numbers", definition: "show_code_line_numbers INTEGER")
+        try addColumnIfMissing("read_only_presentation", definition: "read_only_presentation INTEGER NOT NULL DEFAULT 0")
         if previousVersion >= 1 && previousVersion < 9 {
             // v9：旧列表 video_looping=1 是单曲循环开关；迁成顺序循环，使列表能自动续播。
             try execute("""
@@ -762,7 +764,8 @@ nonisolated final class HistoryDatabase {
                     archiveSource: columns["archive_source"].flatMap { optionalText(statement, $0) }.flatMap {
                         try? JSONDecoder().decode(ArchiveSource.self, from: Data($0.utf8))
                     },
-                    showCodeLineNumbers: columns["show_code_line_numbers"].flatMap { optionalBool(statement, $0) }
+                    showCodeLineNumbers: columns["show_code_line_numbers"].flatMap { optionalBool(statement, $0) },
+                    readOnlyPresentation: columns["read_only_presentation"].flatMap { optionalBool(statement, $0) } ?? false
                 ))
             }
         }

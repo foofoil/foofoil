@@ -10,6 +10,7 @@ import ServiceManagement
 import MusicKit
 
 struct GeneralSettingsView: View {
+    @ObservedObject private var agentTerminal = (NSApp.delegate as? AppDelegate)?.agentTerminal ?? AgentTerminal()
     @AppStorage("automaticallyRemoveMissingHistory") private var automaticallyRemoveMissingHistory = true
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @State private var startupBehavior = SettingsStore.shared.startupBehavior
@@ -28,6 +29,13 @@ struct GeneralSettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                Toggle("Pause Agent Control", isOn: $agentTerminal.paused)
+                Text("Agent Control Note").font(.caption).foregroundStyle(.secondary)
+                Button("Revoke Agent Sessions") { agentTerminal.revokeAll() }
+            } header: {
+                Text("Agent Control")
+            }
             Section {
                 Toggle(isOn: Binding(
                     get: { launchAtLogin },

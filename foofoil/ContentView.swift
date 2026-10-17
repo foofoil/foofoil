@@ -47,11 +47,12 @@ struct FoilContentView: View {
         // 网页和图片都支持仅隐藏视觉边框；网页切换边框不应改变窗口的缩放规则。
         // 仅允许可切换边框的类型进入无边框模式；固定边框类型始终保留代码箔式的边框。
         let shouldHideBorder = windowState.isFullScreen
+            || (appState.agentReadOnly && !windowState.showBorder)
             || ((appState.isCamera || appState.imageURL != nil || appState.webURL != nil || appState.isAudioDocument) && appState.supportsBorderToggle && !appState.showBorder)
         // 网页即使同时保留了截图缓存，也不能套用图片无边框模式的最小尺寸规则。
         let isImageMode = appState.usesImagePresentation
         let usesCompactMinimumSize = isImageMode && !appState.effectiveShowBorder
-        let minimumLength: CGFloat = usesCompactMinimumSize ? 80 : 150
+        let minimumLength: CGFloat = (usesCompactMinimumSize || appState.agentReadOnly) ? 80 : 150
         // 音视频窗口再抬高最小宽度，保证底部播放条单行能放下。
         let minimumWidth = appState.isExternalMediaDocument
             ? max(minimumLength, MediaPlaybackBarMetrics.minimumWindowWidth)
@@ -59,7 +60,7 @@ struct FoilContentView: View {
         // PDF 显示边框时，四周保留 12pt 的边框区域。
         let isMarkdownPreview = appState.isMarkdownPreview && appState.isMarkdownDocument
         // Markdown 也按代码箔的 4pt 边框留白；不再满铺窗口。
-        let contentPadding: CGFloat = isMarkdownPreview ? 4 : (appState.isPDFDocument && appState.effectiveShowBorder ? 12 : (shouldHideBorder ? 0 : 4))
+        let contentPadding: CGFloat = appState.agentReadOnly && shouldHideBorder ? 0 : isMarkdownPreview ? 4 : (appState.isPDFDocument && appState.effectiveShowBorder ? 12 : (shouldHideBorder ? 0 : 4))
         // 内容背景色：只作用于文档箔的内容，窗口毛玻璃不再随之着色。
         let contentBackgroundColor = appState.contentBackgroundColor
         // 与毛玻璃圆角同心的内缩圆角：内容越贴边，圆角越接近窗口的 12pt 圆角。
@@ -146,7 +147,7 @@ struct FoilContentView: View {
                         .transition(.opacity)
                 } else if let imageURL = appState.imageURL, let nsImage = appState.loadImage(from: imageURL) {
                     ImageModeView(appState: appState, nsImage: nsImage, shouldHideBorder: shouldHideBorder)
-                        .id(appState.fileList?.currentID ?? imageURL.path)
+                        .id(appState.agentOwnership.map { $0.boardID + ":" + (appState.agentKind?.rawValue ?? "") } ?? appState.fileList?.currentID ?? imageURL.path)
                         .transition(.opacity)
                 } else if let imageURL = appState.imageURL {
                     // 文件可能在定位后、解码前消失；禁止退回透明且可编辑的空文本箔。

@@ -133,6 +133,8 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     public var opacity: Double
     public var windowFrame: String?
     public var showBorder: Bool
+    /// 文件的只读展示策略，不包含 Agent 控制身份或凭证。
+    public var readOnlyPresentation: Bool
     public var imageScale: Double
     public var textFontSize: Double
     public var isMarkdownPreview: Bool
@@ -252,7 +254,8 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         documentScrollFraction: Double? = nil,
         appleMusicReference: AppleMusicReference? = nil,
         archiveSource: ArchiveSource? = nil,
-        showCodeLineNumbers: Bool? = nil
+        showCodeLineNumbers: Bool? = nil,
+        readOnlyPresentation: Bool = false
     ) {
         self.id = id
         self.imagePath = imagePath
@@ -305,10 +308,11 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.appleMusicReference = appleMusicReference
         self.archiveSource = archiveSource
         self.showCodeLineNumbers = showCodeLineNumbers
+        self.readOnlyPresentation = readOnlyPresentation
     }
 
     private enum CodingKeys: String, CodingKey {
-        case isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource, showCodeLineNumbers
+        case isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource, showCodeLineNumbers, readOnlyPresentation
     }
 
     public init(from decoder: Decoder) throws {
@@ -324,6 +328,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         isPinned = try container.decode(Bool.self, forKey: .isPinned)
         opacity = try container.decode(Double.self, forKey: .opacity)
         windowFrame = try container.decodeIfPresent(String.self, forKey: .windowFrame)
+        readOnlyPresentation = try container.decodeIfPresent(Bool.self, forKey: .readOnlyPresentation) ?? false
         showBorder = try container.decodeIfPresent(Bool.self, forKey: .showBorder) ?? true
         imageScale = try container.decodeIfPresent(Double.self, forKey: .imageScale) ?? 1.0
         textFontSize = try container.decodeIfPresent(Double.self, forKey: .textFontSize) ?? 16.0

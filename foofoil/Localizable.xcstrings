@@ -1,6 +1,118 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Agent Resource Unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "[Image unavailable in Agent presentation]"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "[Agent 展示不加载图片资源]"
+          }
+        }
+      }
+    },
+    "Agent Control": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent Control"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent 控制"
+          }
+        }
+      }
+    },
+    "Pause Agent Control": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause Agent Control"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂停 Agent 控制"
+          }
+        }
+      }
+    },
+    "Agent Control Note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pause blocks new and pending changes until resumed. Sessions and pause state last until the app quits. Revocation removes control of existing boards."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂停会阻止新请求与在途修改，直至恢复。会话和暂停状态只在本次运行有效。撤销后现有箔片不再接受控制。"
+          }
+        }
+      }
+    },
+    "Revoke Agent Sessions": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revoke Agent Sessions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "撤销 Agent 会话"
+          }
+        }
+      }
+    },
+    "Agent Created By": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Created by Agent"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent 创建来源"
+          }
+        }
+      }
+    },
+    "Agent CLI Help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foil — read-only file presentation, protocol 1\nfoil show FILE [--title TITLE] [--incognito] [--json]\nfoil update BOARD FILE [--expected-revision N] [--json]\nfoil list [--json]\nfoil close BOARD [--expected-revision N] [--json]\nOptions: --request-id ID --caller NAME --session FILE --app APP\nA timeout may have committed. Retry with the same request ID and arguments within 600 seconds.\nKeep original files available. Markdown images are not loaded. User-closed boards must not be recreated automatically.\nfoil install [--directory DIR] | foil uninstall [--directory DIR]\nfoil --version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foil — 只读文件展示，协议 1\nfoil show FILE [--title TITLE] [--incognito] [--json]\nfoil update BOARD FILE [--expected-revision N] [--json]\nfoil list [--json]\nfoil close BOARD [--expected-revision N] [--json]\n选项： --request-id ID --caller NAME --session FILE --app APP\n超时可能已提交。请在 600 秒内以相同请求 ID 和参数重试。\n请保留原文件。Markdown 不加载图片资源。不得自动重建用户已关闭的箔片。\nfoil install [--directory DIR] | foil uninstall [--directory DIR]\nfoil --version"
+          }
+        }
+      }
+    },
     "From Clipboard": {
       "localizations": {
         "en": {
@@ -4039,13 +4151,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Images, web pages, camera, and audio outside full screen"
+            "value": "Images, web pages, camera, audio, and read-only file presentations outside full screen"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "适用于非全屏状态下的图片、网页、摄像头和音频"
+            "value": "适用于非全屏状态下的图片、网页、摄像头、音频及只读文件展示"
           }
         }
       }

@@ -70,6 +70,7 @@ extension AppState {
     }
 
     func clearArchiveForNewContent() {
+        relinquishAgentControl()
         guard !isArchivePreview, archiveSession != nil else { return }
         archiveSession?.close()
         archiveSession = nil

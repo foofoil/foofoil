@@ -207,6 +207,9 @@ if (( SIGN_ENABLED )); then
         codesign --force --options runtime "${TIMESTAMP_FLAG[@]}" \
             --sign "$CODESIGN_IDENTITY" "$APP_PATH/Contents/PlugIns/$bundle"
     done
+    print "Signing foil CLI..."
+    codesign --force --options runtime "${TIMESTAMP_FLAG[@]}" \
+        --sign "$CODESIGN_IDENTITY" "$APP_PATH/Contents/MacOS/foil"
     print "Signing app..."
     codesign --force --options runtime "${TIMESTAMP_FLAG[@]}" \
         --entitlements "$ENTITLEMENTS" --sign "$CODESIGN_IDENTITY" "$APP_PATH"

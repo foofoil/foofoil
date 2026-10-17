@@ -17,6 +17,7 @@ import FoofoilExtensionKit
 
 extension AppState {
         public func resetContent() {
+            relinquishAgentControl()
             ContentCache.shared.retire(ownedBodyPaths)
             stopVideoAccess()
             archiveSession?.close()

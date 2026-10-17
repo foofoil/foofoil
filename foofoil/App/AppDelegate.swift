@@ -13,6 +13,8 @@ import FoofoilExtensionKit
 
 
 public class AppDelegate: NSObject, NSApplicationDelegate {
+    lazy var agentTerminal = AgentTerminal(delegate: self)
+    var agentEnvelopeCount = 0
     public var windowControllers: [FloatingWindowController] = []
     var historyMenu: NSMenu?
     var editMenu: NSMenu?

@@ -88,6 +88,9 @@ extension AppDelegate {
         var rows = [FoilInformation.Row(key: "Foil Info Title", value: config.historyMenuDisplayName),
                     .init(key: "Foil Info Type", value: NSLocalizedString("Foil Info Type \(kind.rawValue)", comment: "")),
                     .init(key: "Foil Info Window Size", value: "\(Int(size.width.rounded())) × \(Int(size.height.rounded())) pt")]
+        if let ownership = state.agentOwnership {
+            rows.append(.init(key: "Agent Created By", value: ownership.caller))
+        }
         if config.isClipboardContent {
             rows.append(.init(key: "Foil Info Source", value: NSLocalizedString("From Clipboard", comment: "")))
         } else if let source {
@@ -106,8 +109,9 @@ extension AppDelegate {
             if let url = config.actualWebURLString ?? config.webURLString { rows.append(.init(key: "Foil Info Current URL", value: url)) }
         }
         if kind.storesIndexedText {
-            rows.append(.init(key: "Foil Info Characters", value: config.text.count.formatted()))
-            rows.append(.init(key: "Foil Info Lines", value: config.text.isEmpty ? "0" : (config.text.reduce(1) { $1 == "\n" ? $0 + 1 : $0 }).formatted()))
+            let text = state.agentReadOnly ? state.text : config.text
+            rows.append(.init(key: "Foil Info Characters", value: text.count.formatted()))
+            rows.append(.init(key: "Foil Info Lines", value: text.isEmpty ? "0" : (text.reduce(1) { $1 == "\n" ? $0 + 1 : $0 }).formatted()))
         }
         if let list = config.fileList, list.isPresentable {
             rows.append(.init(key: "Foil Info Items", value: list.items.count.formatted()))
