@@ -1,0 +1,29 @@
+#!/bin/zsh
+set -euo pipefail
+PROBE_ROOT="${0:A:h}"
+APP_ROOT="${PROBE_ROOT:h:h}"
+PROBE_OUTPUT="$APP_ROOT/build/agent-terminal-prototype"
+PROBE_APP="$PROBE_OUTPUT/AgentTerminalProbe.app"
+# 明确提供已有身份；不回退 ad-hoc、不申请证书、不改变产品签名。
+: "${PROBE_SIGN_IDENTITY:?Set PROBE_SIGN_IDENTITY to an existing signing identity hash}"
+mkdir -p "$PROBE_APP/Contents/MacOS"
+cat > "$PROBE_APP/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>com.markonce.foofoil.AgentTerminalProbe</string>
+<key>CFBundleName</key><string>AgentTerminalProbe</string>
+<key>CFBundleExecutable</key><string>AgentTerminalProbe</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>NSPrincipalClass</key><string>NSApplication</string>
+</dict></plist>
+PLIST
+xcrun swiftc -O -swift-version 6 -warnings-as-errors -parse-as-library "$PROBE_ROOT/Protocol.swift" "$PROBE_ROOT/Host.swift" \
+    -o "$PROBE_APP/Contents/MacOS/AgentTerminalProbe"
+xcrun swiftc -O -swift-version 6 -warnings-as-errors -parse-as-library "$PROBE_ROOT/Protocol.swift" "$PROBE_ROOT/Client.swift" \
+    -o "$PROBE_OUTPUT/probe-client"
+codesign --force --sign "$PROBE_SIGN_IDENTITY" --options runtime \
+    --entitlements "$APP_ROOT/foofoil/foofoil.entitlements" "$PROBE_APP"
+codesign --verify --strict --verbose=2 "$PROBE_APP"
+print -r -- "$PROBE_APP"
