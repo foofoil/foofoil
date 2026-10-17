@@ -144,3 +144,4 @@ The configurable Document / Subtitle Style command opens subtitle settings for v
 Subtitle and document styles can be saved as custom themes. Choose an existing theme in Save as Theme to overwrite it, or right-click a custom theme to overwrite or delete it. Subtitle themes save all settings; document themes save colors, fonts, size, and spacing.
 
 In archive foils, Save As exports the selected file, directory, or root. The archive navigator uses Up/Down to select, Left to collapse or select the parent, Right to expand or select the first child, and Return/Space to open the selection. When focus is in the content, EPUB chapter and PDF page commands target the preview. Navigator search expands all ancestors of a match. Right also lazily loads unopened nested archives in the same tree; Left cancels unfinished loads when collapsing. Search does not scan unopened archives.
+

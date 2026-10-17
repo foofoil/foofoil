@@ -15,7 +15,64 @@ private final class MarkdownCopyButton: NSButton {
     }
 }
 
+private final class MarkdownTaskCheckbox: NSButton {
+    // 保留原生 checkbox 的正常外观，但只展示源文档状态，不接受鼠标、键盘或辅助功能切换。
+    override var acceptsFirstResponder: Bool { false }
+    override func mouseDown(with event: NSEvent) {}
+    override func performClick(_ sender: Any?) {}
+    override func accessibilityPerformPress() -> Bool { false }
+    override func isAccessibilityEnabled() -> Bool { false }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        // 覆盖父文本视图的 I 形光标，复选框使用原生控件的箭头指针。
+        addCursorRect(bounds, cursor: .arrow)
+    }
+}
+
 final class MarkdownNSTextView: NSTextView {
+    var taskSource = ""
+    private var taskButtons: [(NSButton, NSRange)] = []
+
+    func rebuildTaskButtons() {
+        for (button, _) in taskButtons { button.removeFromSuperview() }
+        taskButtons.removeAll()
+        guard let textStorage else { return }
+        textStorage.enumerateAttribute(.markdownTaskLocation, in: NSRange(location: 0, length: textStorage.length)) { value, range, _ in
+            guard let location = value as? Int, location + 3 <= (taskSource as NSString).length else { return }
+            let button = MarkdownTaskCheckbox(checkboxWithTitle: "", target: nil, action: nil)
+            button.state = (taskSource as NSString).character(at: location + 1) == 32 ? .off : .on
+            // 使用任务正文作为辅助功能名称，避免无标题 checkbox 无法识别。
+            let line = (textStorage.string as NSString).paragraphRange(for: range)
+            let labelRange = NSRange(location: NSMaxRange(range), length: NSMaxRange(line) - NSMaxRange(range))
+            button.setAccessibilityLabel((textStorage.string as NSString).substring(with: labelRange).replacingOccurrences(of: "\u{FFFC}", with: "").trimmingCharacters(in: .whitespacesAndNewlines))
+            addSubview(button)
+            taskButtons.append((button, range))
+        }
+        positionTaskButtons()
+    }
+
+    override func accessibilityChildren() -> [Any]? {
+        (super.accessibilityChildren() ?? []) + taskButtons.map { $0.0 }
+    }
+
+    private func positionTaskButtons() {
+        guard let layoutManager, let textContainer else { return }
+        layoutManager.ensureLayout(for: textContainer)
+        for (button, range) in taskButtons {
+            let glyphs = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+            let rect = layoutManager.boundingRect(forGlyphRange: glyphs, in: textContainer)
+                .offsetBy(dx: textContainerOrigin.x, dy: textContainerOrigin.y)
+            // 附件的 glyph 基线含 attachment cell 偏移；取后面的正文字形作为对齐参照。
+            let bodyLocation = min(NSMaxRange(range), max(0, (textStorage?.length ?? 1) - 1))
+            let bodyGlyph = layoutManager.glyphIndexForCharacter(at: bodyLocation)
+            let line = layoutManager.lineFragmentRect(forGlyphAt: bodyGlyph, effectiveRange: nil)
+            let baseline = line.minY + layoutManager.location(forGlyphAt: bodyGlyph).y + textContainerOrigin.y
+            let font = textStorage?.attribute(.font, at: bodyLocation, effectiveRange: nil) as? NSFont ?? .systemFont(ofSize: 14)
+            button.frame = NSRect(x: rect.minX, y: baseline - font.capHeight / 2 - 9, width: 18, height: 18)
+        }
+    }
+
     private var codeBlockTrackingArea: NSTrackingArea?
     private var hoveredCodeBlockRange: NSRange?
     private var copyFeedbackReset: DispatchWorkItem?
@@ -43,6 +100,7 @@ final class MarkdownNSTextView: NSTextView {
         drawCodeBlockFrames(in: dirtyRect)
         super.draw(tableRedrawRect(intersecting: dirtyRect))
         updateCopyButtonFrame()
+        positionTaskButtons()
     }
 
     override func setFrameSize(_ newSize: NSSize) {
@@ -312,6 +370,7 @@ final class MarkdownNSTextView: NSTextView {
 struct MarkdownTextView: NSViewRepresentable {
     let attributedText: NSAttributedString
     @Binding var calculatedHeight: CGFloat
+    var taskSource: String = ""
     var scrollRequest: MarkdownScrollRequest?
     /// 滚动时回传两个字符位置：可视区顶部，以及再往上 `headingSettleDistance` 处的位置。
     /// 目录向下切换需要后者也越过标题，避免标题刚滚过顶部就频繁切换。
@@ -359,6 +418,8 @@ struct MarkdownTextView: NSViewRepresentable {
                 context.coordinator.appliedText = attributedText
                 // 颜色语义化已在 AppState 渲染阶段完成，这里直接替换文本存储，避免每次更新全量复制与枚举。
                 textView.layoutManager?.replaceTextStorage(NSTextStorage(attributedString: attributedText))
+                textView.taskSource = taskSource
+                textView.rebuildTaskButtons()
                 textView.collectTableCells()
                 textView.updateTableColumnWidths()
                 textView.resetCodeBlockHover()

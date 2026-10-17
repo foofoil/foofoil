@@ -435,6 +435,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     var saveTask: Task<Void, Never>?
     var imageListSlideshowWorkItem: DispatchWorkItem?
 
+    var renderedMarkdownSource = ""
+
     @Published public var text: String {
         didSet {
             if !text.isEmpty { appleMusicItem = nil }

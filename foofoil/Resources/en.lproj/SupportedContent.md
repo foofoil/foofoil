@@ -43,6 +43,8 @@ You can also type directly into a blank foil to write a note.
 
 Source files with a recognized extension or file name, such as .swift, .kt, .zig, .toml, Dockerfile, or Makefile, are highlighted offline. Highlighting is read-only: copying returns only the source text, and View → Show Line Numbers toggles line numbers for the current foil. Code larger than 512 KB, and files whose language is not recognized, are shown as plain text. Markdown, HTML, and SVG keep their own display.
 
+Markdown task lists display read-only checkboxes that reflect the source document. They cannot be toggled in the preview.
+
 ## Audio and Video
 
 | Type | Common formats | Notes |

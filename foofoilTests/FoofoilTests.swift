@@ -1839,8 +1839,8 @@ struct FoofoilTests {
         - 普通任务
         """
         let html = AppState.cmarkToHTML(md)
-        #expect(html.contains("<li>☐ 未完成任务</li>"))
-        #expect(html.contains("<li>☑ 已完成任务</li>"))
+        #expect(html.contains("<input type=\"checkbox\" data-source=\"2\" disabled> 未完成任务"))
+        #expect(html.contains(" checked disabled> 已完成任务"))
         #expect(!html.contains("[☐]"))
         #expect(!html.contains("[☑]"))
         #expect(html.contains("普通任务"))

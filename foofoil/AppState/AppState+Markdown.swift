@@ -15,6 +15,7 @@ import SwiftUI
 import FoofoilExtensionKit
 
 extension NSAttributedString.Key {
+    static let markdownTaskLocation = NSAttributedString.Key("foofoil.markdownTaskLocation")
     /// 由 MarkdownTextView 绘制无底色圆角代码框，并在框内显示语言标签。
     static let markdownCodeBlockLanguage = NSAttributedString.Key("foofoil.markdownCodeBlockLanguage")
     /// 精确绘制行内代码背景，避免 AppKit 把背景扩张到整行或列表项目符号。
@@ -96,7 +97,9 @@ extension AppState {
 
                 let rendered = Self.cmarkToHTML(textToRender)
                 // 在 HTML 导入器接触资源前移除所有图片标记；原始 HTML 已由 cmark 安全模式丢弃。
-                let htmlBody = blocksResources ? Self.agentMarkdownHTML(rendered, placeholder: resourcePlaceholder) : rendered
+                let safeHTML = blocksResources ? Self.agentMarkdownHTML(rendered, placeholder: resourcePlaceholder) : rendered
+                // AppKit 的 HTML 导入器不实现表单；用带来源位置的占位链接承载原生 checkbox。
+                let htmlBody = Self.taskInputsForTextKit(safeHTML)
                 if Task.isCancelled { return }
 
                 // 根据当前明暗外观显式生成对应配色的 CSS，避免依赖 @media 查询导致 NSAttributedString 在后台解析时颜色固化
@@ -380,6 +383,8 @@ extension AppState {
                                                 length: pair.end.location - NSMaxRange(pair.start))
                             mutableAttr.addAttribute(.foregroundColor, value: NSColor.systemRed, range: range)
                         }
+                        Self.prepareTaskAttachments(mutableAttr, source: textToRender, fontSize: fontSize)
+                        self.renderedMarkdownSource = textToRender
                         self.renderedMarkdown = mutableAttr
                         self.publishMarkdownOutline(from: mutableAttr)
                     } else {
@@ -1023,12 +1028,13 @@ extension AppState {
         }
 
         nonisolated public static func cmarkToHTML(_ text: String) -> String {
-            let text = preprocessTaskListItems(text)
+            let token = "FOOFOILTASK" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+            let text = preprocessTaskListItems(text, token: token)
             // 若不含表格特征，直接走 cmark 原路径以保持原有性能与行为
             let segments = parseMarkdownSegmentsWithTables(text)
             // 仅有一段普通文本时，保持单次 cmark 调用
             if segments.count == 1, case .text(let md) = segments[0] {
-                return cmarkHTML(md)
+                return taskInputHTML(cmarkHTML(md), token: token)
             }
             var html = ""
             for segment in segments {
@@ -1039,33 +1045,72 @@ extension AppState {
                     html += tableHTML
                 }
             }
-            return html
+            return taskInputHTML(html, token: token)
         }
 
-        /// 将 GFM 任务列表标记（`- [ ]` / `- [x]`）替换为 ☐ / ☑ 字符。
-        /// vendored cmark 不支持 tasklist 扩展，此处预处理后走普通列表路径。
-        nonisolated static func preprocessTaskListItems(_ text: String) -> String {
-            guard text.contains("[ ]") || text.contains("[x]") || text.contains("[X]") else {
-                return text
-            }
-            var result = text
-            // 仅匹配列表项开头的任务标记，避免误伤行内代码等普通文本
-            guard let regex = try? NSRegularExpression(
-                pattern: "^([ \\t]*(?:[-*+]|\\d+[.)])[ \\t]+)(\\[([ xX])\\])[ \\t]*",
-                options: [.anchorsMatchLines]
-            ) else { return text }
-            let ns = result as NSString
-            let matches = regex.matches(in: result, range: NSRange(location: 0, length: ns.length))
-            guard !matches.isEmpty else { return text }
-            // 从后往前替换，保证 range 不失效
-            for match in matches.reversed() {
-                // group 2 覆盖含方括号的完整标记 [x]，group 3 是其中的单字符
-                let markerRange = match.range(at: 2)
-                let inner = ns.substring(with: match.range(at: 3))
-                let box = inner == " " ? "☐" : "☑"
-                result = (result as NSString).replacingCharacters(in: markerRange, with: box)
+        nonisolated static func taskInputHTML(_ html: String, token: String) -> String {
+            let regex = try! NSRegularExpression(pattern: NSRegularExpression.escapedPattern(for: token) + "([0-9]+)([YN])END")
+            var result = html
+            for match in regex.matches(in: html, range: NSRange(location: 0, length: (html as NSString).length)).reversed() {
+                let source = html as NSString
+                let checked = source.substring(with: match.range(at: 2)) == "Y" ? " checked" : ""
+                let input = "<input type=\"checkbox\" data-source=\"\(source.substring(with: match.range(at: 1)))\"\(checked) disabled>"
+                result = (result as NSString).replacingCharacters(in: match.range, with: input)
             }
             return result
+        }
+
+        /// 只读取 cmark 列表项的首段位置，代码块、转义文字和普通段落不会成为任务。
+        nonisolated static func markdownTaskLocations(_ text: String) -> [Int] {
+            guard text.contains("[ ]") || text.contains("[x]") || text.contains("[X]") else { return [] }
+            guard let root = cmark_parse_document(text, text.utf8.count, 0) else { return [] }
+            defer { cmark_node_free(root) }
+            let lines = text.components(separatedBy: "\n")
+            var starts = [0]
+            for line in lines { starts.append(starts.last! + line.utf16.count + 1) }
+            var locations: [Int] = []
+            func visit(_ node: OpaquePointer) {
+                if cmark_node_get_type(node) == CMARK_NODE_ITEM,
+                   let paragraph = cmark_node_first_child(node),
+                   cmark_node_get_type(paragraph) == CMARK_NODE_PARAGRAPH {
+                    let row = Int(cmark_node_get_start_line(paragraph)) - 1
+                    let column = Int(cmark_node_get_start_column(paragraph)) - 1
+                    if lines.indices.contains(row), column >= 0, column <= lines[row].utf8.count {
+                        let prefix = String(decoding: lines[row].utf8.prefix(column), as: UTF8.self)
+                        let location = starts[row] + prefix.utf16.count
+                        let source = text as NSString
+                        if location + 3 <= source.length {
+                            let marker = source.substring(with: NSRange(location: location, length: 3))
+                            let end = location + 3
+                            if ["[ ]", "[x]", "[X]"].contains(marker),
+                               end == source.length || CharacterSet.whitespacesAndNewlines.contains((UnicodeScalar(source.character(at: end)) ?? UnicodeScalar(0))) {
+                                locations.append(location)
+                            }
+                        }
+                    }
+                }
+                var child = cmark_node_first_child(node)
+                while let current = child { visit(current); child = cmark_node_next(current) }
+            }
+            visit(root)
+            return locations.sorted()
+        }
+
+        nonisolated static func preprocessTaskListItems(_ text: String, token: String = "FOOFOILTASK") -> String {
+            var result = text
+            for location in markdownTaskLocations(text).reversed() {
+                let checked = (text as NSString).character(at: location + 1) != 32
+                // 原始 HTML 保持禁用；内部 token 在 cmark 完成后才生成可信 input。
+                let replacement = "\(token)\(location)\(checked ? "Y" : "N")END"
+                result = (result as NSString).replacingCharacters(in: NSRange(location: location, length: 3), with: replacement)
+            }
+            return result
+        }
+
+        nonisolated static func taskInputsForTextKit(_ html: String) -> String {
+            let regex = try! NSRegularExpression(pattern: #"<input type="checkbox" data-source="(\d+)"( checked)? disabled>"#)
+            return regex.stringByReplacingMatches(in: html, range: NSRange(location: 0, length: (html as NSString).length),
+                withTemplate: "<a href=\"foofoil-task://$1\">\u{FFFC}</a>")
         }
 
         /// 纯 cmark 调用（不含表格预处理），用于文本段与单元格 inline 渲染
@@ -1313,4 +1358,38 @@ extension AppState {
             return html
         }
 
+}
+
+extension AppState {
+    static func prepareTaskAttachments(_ attributed: NSMutableAttributedString, source: String, fontSize: CGFloat) {
+        let locations = Set(markdownTaskLocations(source))
+        var tasks: [(URL, NSRange)] = []
+        attributed.enumerateAttribute(.link, in: NSRange(location: 0, length: attributed.length)) { value, range, _ in
+            if let url = value as? URL { tasks.append((url, range)) }
+        }
+        // 从后向前移除 HTML 导入器插入的列表前缀，保留嵌套缩进和后续任务的位置。
+        for (url, range) in tasks.reversed() {
+            guard url.scheme == "foofoil-task", range.length == 1,
+                  (attributed.string as NSString).substring(with: range) == "\u{FFFC}",
+                  let location = Int(url.host ?? ""), locations.contains(location) else { continue }
+            let attachment = NSTextAttachment()
+            // TextKit 1 用 attachment cell 的图像尺寸预留位置；仅设置 bounds 会与正文重叠。
+            attachment.image = NSImage(size: NSSize(width: fontSize + 10, height: fontSize + 3), flipped: false) { _ in true }
+            attachment.bounds = NSRect(x: 0, y: -3, width: fontSize + 10, height: fontSize + 3)
+            attributed.addAttribute(.attachment, value: attachment, range: range)
+            attributed.addAttribute(.markdownTaskLocation, value: location, range: range)
+            attributed.removeAttribute(.link, range: range)
+            let paragraph = (attributed.string as NSString).paragraphRange(for: range)
+            if let style = attributed.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle,
+               !style.textLists.isEmpty {
+                let taskStyle = style.mutableCopy() as! NSMutableParagraphStyle
+                taskStyle.textLists = []
+                taskStyle.firstLineHeadIndent = max(0, style.headIndent - fontSize)
+                taskStyle.headIndent = taskStyle.firstLineHeadIndent + fontSize + 10 +
+                    NSAttributedString(string: " ", attributes: [.font: attributed.attribute(.font, at: range.location, effectiveRange: nil) as? NSFont ?? NSFont.systemFont(ofSize: fontSize)]).size().width
+                attributed.addAttribute(.paragraphStyle, value: taskStyle, range: paragraph)
+                attributed.deleteCharacters(in: NSRange(location: paragraph.location, length: range.location - paragraph.location))
+            }
+        }
+    }
 }

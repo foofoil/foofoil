@@ -62,6 +62,7 @@ struct TextEditorModeView: View {
                             MarkdownTextView(
                                 attributedText: appState.renderedMarkdown,
                                 calculatedHeight: $textHeight,
+                                taskSource: appState.renderedMarkdownSource,
                                 scrollRequest: appState.markdownScrollRequest,
                                 onVisibleLocationChange: { appState.markdownVisibleLocationDidChange($0, settledLocation: $1) }
                             )
