@@ -1,7 +1,7 @@
 # 浮箔（foofoil）：Agent 桌面呈现能力方案
 
 > 产品与技术方案修订稿 · 2026-10-16。
-> 基于当前工作区源码静态核对修订；未进行 IPC 原型、Release 签名环境或窗口交互验证。下文 CLI、协议及自动化能力均为设计提案，不代表已经实现。
+> 2026-10-17：本机 Agent 终端与原生 CLI 已实施；第二轮 IPC／授权原型修复隐藏副作用并通过检查。当前实现及限制见 [协议 v1](agent-terminal-protocol-v1.zh-CN.md)和[实施记录](foofoil-agent-desktop-terminal-implementation-plan.md)。Developer ID、公证、干净机器及未实测环境仍待 S13 验收；本文中的后续能力仍是提案。
 
 前置任务：[历史记录与文件处理](history-file-handling-implementation-plan.md)。
 

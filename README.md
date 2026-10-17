@@ -182,3 +182,7 @@ Browse nested archives in one tree, loading and caching inner directories only w
 Local files are referenced directly, with bookmarks tracking renames and moves when possible. History keeps no body copy of an original file, and deleting history never deletes that original. Clipboard text, Markdown, HTML, and image data are saved automatically and can be restored from history, marked “From Clipboard,” without Save As. Copied files still reference their originals; copied URLs and image addresses open as URLs without automatic downloading.
 
 Settings → General → Automatically remove history for missing files is on by default. Only confirmed missing sources are removed; offline volumes, authorization problems, and temporary errors are retained. Turn it off to keep unavailable entries and receive feedback when opening them. Deleting managed history leaves open windows usable; its body is removed after the last user releases it. Saved bodies are excluded from ordinary cache eviction. Incognito bodies last only for the session.
+
+## Agent terminal
+
+Use the bundled native `foil` CLI to present and explicitly update local text, Markdown, images, and SVG in read-only windows. Agent updates retain layout and focus; temporary references support incognito mode. Keep source files available. See the [CLI guide](docs/agent-terminal-usage.en.md) and [bundled Skill](skills/foofoil/SKILL.md). Developer ID distribution verification remains pending.
