@@ -14,11 +14,11 @@ struct ImageModeView: View {
 
     var body: some View {
         Group {
-            if shouldHideBorder {
-                // 窗口态无边框会按受约束的窗口比例铺满；全屏比例不可控，改为完整显示以避免裁切。
+            if shouldHideBorder && !appState.isFullScreen {
+                // 窗口态无边框按受约束的窗口比例铺满；全屏复用下方可滚动的内容缩放。
                 renderImage(
                     for: nsImage,
-                    contentMode: appState.isFullScreen ? .fit : .fill,
+                    contentMode: .fill,
                     width: nil,
                     height: nil
                 )
@@ -28,18 +28,34 @@ struct ImageModeView: View {
                     .gesture(WindowDragGesture())
             } else {
                 let layoutSize = AudioMetadataLoader.layoutSize(nsImage) ?? nsImage.size
-                ScrollView([.horizontal, .vertical], showsIndicators: true) {
-                    renderImage(
-                        for: nsImage,
-                        contentMode: .fit,
-                        width: layoutSize.width * CGFloat(appState.imageScale),
-                        height: layoutSize.height * CGFloat(appState.imageScale)
-                    )
-                    // Office 快速预览固定边框：按代码箔的圆角裁切，避免文档内容以直角贴到玻璃边框内。
-                    .cornerRadius((appState.isQuickLookDocument && !appState.supportsBorderToggle) ? 8 : 0)
-                    .transaction { $0.animation = nil }
+                GeometryReader { geometry in
+                    ScrollView([.horizontal, .vertical], showsIndicators: true) {
+                        renderImage(
+                            for: nsImage,
+                            contentMode: .fit,
+                            width: layoutSize.width * CGFloat(appState.imageScale),
+                            height: layoutSize.height * CGFloat(appState.imageScale)
+                        )
+                        // Office 快速预览固定边框：按代码箔的圆角裁切，避免文档内容以直角贴到玻璃边框内。
+                        .cornerRadius((appState.isQuickLookDocument && !appState.supportsBorderToggle) ? 8 : 0)
+                        // 图片小于视口时始终居中；超过视口后沿两轴滚动。
+                        .frame(
+                            minWidth: geometry.size.width,
+                            minHeight: geometry.size.height
+                        )
+                        .background {
+                            ImagePanGesture(
+                                imageSize: NSSize(
+                                    width: layoutSize.width * CGFloat(appState.imageScale),
+                                    height: layoutSize.height * CGFloat(appState.imageScale)
+                                ),
+                                allowsPanning: appState.isFullScreen
+                            )
+                        }
+                        .transaction { $0.animation = nil }
+                    }
                 }
-                .padding(8) // 移至 ScrollView 外部，确保在滚动时边框始终保持同样粗细（12 像素）。
+                .padding(appState.isFullScreen ? 0 : 8) // 移至 ScrollView 外部，确保在滚动时边框始终保持同样粗细（12 像素）。
             }
         }
         .onAppear {

@@ -522,6 +522,13 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
                 guard self.isImageMode else { return }
                 let showBorder = targetState.showBorder
+                // 无边框画面由窗口决定尺寸，切换前同步实际显示比例，避免跳回原图大小。
+                if showBorder, !self.usesFullScreenFrame,
+                   !targetState.isPDFDocument, !targetState.isExternalMediaDocument,
+                   let size = self.currentContentSize(), size.width > 0,
+                   let window = self.window {
+                    self.appState.readingState.imageScale = Double(window.contentLayoutRect.width / size.width)
+                }
                 if showBorder {
                     self.window?.resizeIncrements = NSSize(width: 1.0, height: 1.0)
                 }
@@ -1050,6 +1057,10 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     /// 指针是否落在导航面板（桌面态伴随窗口）或全屏覆盖层上。
     private func shouldResizeNavigatorWidthForPointer() -> Bool {
         let pointer = NSEvent.mouseLocation
+        // 按最上层实际命中的窗口判断，不能穿透覆盖在侧栏上的其他箔片。
+        let hitWindowNumber = NSWindow.windowNumber(at: pointer, belowWindowWithWindowNumber: 0)
+        guard hitWindowNumber == window?.windowNumber
+            || hitWindowNumber == navigatorPanelController.window?.windowNumber else { return false }
         if navigatorPanelController.isVisible,
            let panel = navigatorPanelController.window,
            panel.frame.contains(pointer) {
@@ -1874,6 +1885,13 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         }
         isTransitioningFullScreen = false
         appState.isFullScreen = true
+        if isScalableImage, let size = currentContentSize(), let window,
+           size.width > 0, size.height > 0 {
+            imageScaleBeforeFullScreen = appState.readingState.imageScale
+            let viewport = window.contentLayoutRect.size
+            let availableWidth = max(1, viewport.width - CGFloat(appState.fullScreenNavigatorContentInset))
+            appState.readingState.imageScale = Double(min(availableWidth / size.width, viewport.height / size.height))
+        }
         updateNavigatorPanelVisibility()
         (NSApplication.shared.delegate as? AppDelegate)?.syncFoilSpaceJoining()
     }
@@ -1891,6 +1909,10 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         guard let window else { return }
         isTransitioningFullScreen = false
         appState.isFullScreen = false
+        if let imageScaleBeforeFullScreen {
+            appState.readingState.imageScale = imageScaleBeforeFullScreen
+            self.imageScaleBeforeFullScreen = nil
+        }
         if insertedResizableForFullScreen { window.styleMask.remove(.resizable) }
         insertedResizableForFullScreen = false
         updateWindowShadow()
@@ -2104,6 +2126,14 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         pendingFrameSave = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2, execute: workItem)
     }
+
+    var isScalableImage: Bool {
+        let state = appState.readingState
+        return state.usesImagePresentation && state.imageURL != nil && !state.isQuickLookDocument
+            && !state.isPDFDocument && !state.isExternalMediaDocument && !state.isCamera
+    }
+
+    private var imageScaleBeforeFullScreen: Double?
 
     private var isImageMode: Bool {
         appState.readingState.usesImagePresentation

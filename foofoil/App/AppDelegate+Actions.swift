@@ -1081,7 +1081,7 @@ extension AppDelegate {
 
     @objc func zoomOutWindowAction() {
         guard let appState = activeReadingState, !appState.isFullScreen else { return }
-        let isImageMode = appState.imageURL != nil && appState.webURL == nil
+        let isImageMode = appState.usesImagePresentation && !appState.isQuickLookDocument
         if isImageMode {
             if appState.showBorder {
                 activeWindowController?.zoomOutWindow()
@@ -1095,7 +1095,7 @@ extension AppDelegate {
 
     @objc func zoomInWindowAction() {
         guard let appState = activeReadingState, !appState.isFullScreen else { return }
-        let isImageMode = appState.imageURL != nil && appState.webURL == nil
+        let isImageMode = appState.usesImagePresentation && !appState.isQuickLookDocument
         if isImageMode {
             if appState.showBorder {
                 activeWindowController?.zoomInWindow()

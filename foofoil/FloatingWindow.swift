@@ -298,6 +298,24 @@ public class FloatingWindow: NSWindow {
         if let controller = windowController as? FloatingWindowController,
            controller.appState.isFullScreen,
            event.type == .scrollWheel || event.type == .magnify {
+            // 全屏图片仍使用内容缩放，初始 fit 比例由进入全屏时确定。
+            if controller.isScalableImage {
+                if event.type == .scrollWheel, modifiers.contains(.command) {
+                    let delta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.deltaY
+                    controller.applyInteractiveImageZoom(factor: 1 + delta * (event.hasPreciseScrollingDeltas ? 0.003 : 0.03))
+                    return
+                }
+                if event.type == .magnify {
+                    if event.phase.contains(.began) { currentAccumulatedMagnification = 1 }
+                    currentAccumulatedMagnification += event.magnification
+                    controller.applyInteractiveImageMagnification(currentAccumulatedMagnification)
+                    if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
+                        controller.finishInteractiveImageMagnification()
+                        currentAccumulatedMagnification = 1
+                    }
+                    return
+                }
+            }
             super.sendEvent(event)
             return
         }
@@ -310,7 +328,7 @@ public class FloatingWindow: NSWindow {
                 let multiplier: CGFloat = event.hasPreciseScrollingDeltas ? 0.003 : 0.03
                 let factor = 1.0 + delta * multiplier
 
-                if appState.readingState.usesImagePresentation && !appState.readingState.isAudioDocument && !(appState.readingState.isVideoDocument && appState.showBorder) {
+                if appState.readingState.usesImagePresentation && !appState.readingState.isQuickLookDocument && !appState.readingState.isAudioDocument && !(appState.readingState.isVideoDocument && appState.showBorder) {
                     // 有边框 PDF 保留 PDFViewer 的原生缩放与滚动响应。
                     if appState.readingState.isPDFDocument && appState.showBorder {
                         super.sendEvent(event)

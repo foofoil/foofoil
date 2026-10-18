@@ -62,8 +62,9 @@ Navigation lists also support ⌃P / ⌃B for the previous item and ⌃N / ⌃F 
 | --- | --- |
 | ⌘ + mouse wheel | Zoom images; resize the window for web pages, text, Markdown, and similar content |
 | Two-finger pinch | Zoom images; resize the window for web pages, text, Markdown, audio, and video |
+| Drag a full-screen image | Pan the image when it extends beyond the viewport |
 
-These behaviors apply outside full screen. Borderless PDFs resize the window; bordered PDFs use native content zoom. In full screen, gestures are handled by the content view. Over the navigator, ⌘ + scroll adjusts the panel width.
+Unless noted, these behaviors apply outside full screen. Borderless PDFs resize the window; bordered PDFs use native content zoom. Full-screen images initially fit the screen and support content zoom with shortcuts, ⌘ + scroll, and pinch. Full-screen and bordered images zoom around the pointer; images smaller than the viewport are centered. Quick Look documents support window resizing outside full screen. Over a visible, unobscured navigator, ⌘ + scroll adjusts the panel width.
 
 
 ## Image Tools
