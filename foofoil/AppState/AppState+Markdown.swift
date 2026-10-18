@@ -99,7 +99,7 @@ extension AppState {
                 // 在 HTML 导入器接触资源前移除所有图片标记；原始 HTML 已由 cmark 安全模式丢弃。
                 let safeHTML = blocksResources ? Self.agentMarkdownHTML(rendered, placeholder: resourcePlaceholder) : rendered
                 // AppKit 的 HTML 导入器不实现表单；用带来源位置的占位链接承载原生 checkbox。
-                let htmlBody = Self.taskInputsForTextKit(safeHTML)
+                let htmlBody = Self.taskInputsForTextKit(MarkdownCodeHighlighter.highlightHTML(safeHTML, isDark: isDark))
                 if Task.isCancelled { return }
 
                 // 根据当前明暗外观显式生成对应配色的 CSS，避免依赖 @media 查询导致 NSAttributedString 在后台解析时颜色固化
@@ -859,9 +859,10 @@ extension AppState {
                     location: NSMaxRange(languageEndRange),
                     length: endRange.location - NSMaxRange(languageEndRange)
                 )
-                let importedCode = source.substring(with: importedCodeRange)
-                    .replacingOccurrences(of: "\u{2028}", with: "\n")
-                attributedString.replaceCharacters(in: importedCodeRange, with: importedCode)
+                // 只替换换行本身；整段重写会把所有语法颜色合并为首个 token 的属性。
+                attributedString.mutableString.replaceOccurrences(
+                    of: "\u{2028}", with: "\n", options: [], range: importedCodeRange
+                )
                 var closingRange = endRange
                 if NSMaxRange(endRange) < source.length {
                     let separator = source.character(at: NSMaxRange(endRange))
@@ -956,7 +957,7 @@ extension AppState {
                     }
 
                     // 底部间隔独立于边框，确保后续正文不被描边覆盖。
-                    let closingSpacerLocation = blockLocation + labelLineLength + importedCode.utf16.count
+                    let closingSpacerLocation = blockLocation + labelLineLength + importedCodeRange.length
                     let closingStyle = NSMutableParagraphStyle()
                     closingStyle.minimumLineHeight = 10
                     closingStyle.maximumLineHeight = 10
