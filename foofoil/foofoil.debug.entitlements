@@ -8,6 +8,8 @@
 	<true/>
 	<key>com.apple.security.files.user-selected.read-write</key>
 	<true/>
+	<key>com.apple.security.files.downloads.read-write</key>
+	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
 	<!-- 仅 Debug：允许单元测试在回环地址监听，用于文档视图的零网络出口计数验证。 -->

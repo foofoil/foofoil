@@ -2,6 +2,8 @@
 
 Local files are referenced directly, with bookmarks tracking renames and moves when possible. History keeps no body copy of an original file, and deleting history never deletes that original. Clipboard text, Markdown, HTML, and image data are saved automatically and can be restored from history, marked “From Clipboard,” without Save As. Copied files still reference their originals; copied URLs and image addresses open as URLs without automatic downloading.
 
+Web downloads are saved to `~/Downloads`. Duplicate names receive a numeric suffix without overwriting existing files. Downloads from incognito foils also remain on disk.
+
 Settings → General → Automatically remove history for missing files is on by default. Only confirmed missing sources are removed; offline volumes, authorization problems, and temporary errors are retained. Turn it off to keep unavailable entries and receive feedback when opening them. Deleting managed history leaves open windows usable; its body is removed after the last user releases it. Saved bodies are excluded from ordinary cache eviction. Incognito bodies last only for the session.
 
 Incognito foils never enter history and are not restored after quitting. Use File → New Incognito Foil{{newIncognitoShortcut}} or Open Clipboard Incognito{{openClipboardIncognitoShortcut}}; the system Share menu also offers Incognito Foil. Content dropped into an incognito foil stays out of history, including any additional foils created for separate file groups.

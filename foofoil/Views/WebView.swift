@@ -330,8 +330,8 @@ struct WebView: NSViewRepresentable {
             }
 
             let scheme = url.scheme?.lowercased() ?? ""
-            if scheme == "http" || scheme == "https" || scheme == "file" || scheme == "about" {
-                decisionHandler(.allow)
+            if ["http", "https", "file", "about", "blob", "data"].contains(scheme) {
+                decisionHandler(navigationAction.shouldPerformDownload ? .download : .allow)
             } else {
                 // 拦截非网页协议，防止在 App Sandbox 下因调用 launchservicesd 引起 WebContent 进程崩溃
                 decisionHandler(.cancel)
@@ -343,6 +343,19 @@ struct WebView: NSViewRepresentable {
                     }
                 }
             }
+        }
+
+        func webView(_ webView: WKWebView, decidePolicyFor navigationResponse: WKNavigationResponse,
+                     decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+            decisionHandler(navigationResponse.canShowMIMEType ? .allow : .download)
+        }
+
+        func webView(_ webView: WKWebView, navigationAction: WKNavigationAction, didBecome download: WKDownload) {
+            WebDownloadStore.shared.start(download)
+        }
+
+        func webView(_ webView: WKWebView, navigationResponse: WKNavigationResponse, didBecome download: WKDownload) {
+            WebDownloadStore.shared.start(download)
         }
 
         func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
