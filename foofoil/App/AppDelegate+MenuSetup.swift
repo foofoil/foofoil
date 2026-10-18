@@ -715,7 +715,7 @@ extension AppDelegate {
         menu.removeAllItems()
         defer { applyKeyboardShortcuts(to: menu) }
 
-        if activeReadingState?.imageURL != nil, activeReadingState?.webURL == nil {
+        if activeReadingState?.imageURL != nil, activeReadingState?.webURL == nil, activeReadingState?.isQuickLookDocument != true {
             // 视频/音频没有“拷贝图片”能力，不提供该菜单项。
             if activeReadingState?.isExternalMediaDocument != true {
                 // 不设 target，让 Cmd+C 经由 responder chain 到当前图片窗口；文本编辑器仍可优先处理复制。

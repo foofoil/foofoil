@@ -120,6 +120,9 @@ struct FoilContentView: View {
                 } else if let url = appState.imageURL, appState.isQuickLookDocument {
                     if url.pathExtension.lowercased() == "pptx" {
                         PPTXModeView(appState: appState, url: url)
+                    } else if SelectableDocumentPreview.supports(url) {
+                        SelectableDocumentPreview(url: url, shouldHideBorder: shouldHideBorder)
+                            .clipShape(RoundedRectangle(cornerRadius: shouldHideBorder ? 0 : 8, style: .continuous))
                     } else {
                         QuickLookModeView(url: url, shouldHideBorder: shouldHideBorder)
                             .clipShape(RoundedRectangle(cornerRadius: shouldHideBorder ? 0 : 8, style: .continuous))
@@ -246,7 +249,7 @@ struct FoilContentView: View {
         }
         // 图片模式下：有边框时鼠标双击作用改为和cmd.一样，无边框时双击作用改为和cmd=一样（放大）
         .onTapGesture(count: 2) {
-            if appState.usesImagePresentation {
+            if appState.usesImagePresentation && !appState.isQuickLookDocument {
                 if appState.effectiveShowBorder {
                     NotificationCenter.default.post(
                         name: .shouldFitImageToWindowWidth,
@@ -343,7 +346,7 @@ struct FoilContentView: View {
 
             if appState.usesImagePresentation {
                 // 视频/音频没有“拷贝图片”能力
-                if !appState.isExternalMediaDocument {
+                if !appState.isExternalMediaDocument && !appState.isQuickLookDocument {
                     Button(action: {
                         if appState.isCamera {
                             appState.cameraController?.capture { image in

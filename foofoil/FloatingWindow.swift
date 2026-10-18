@@ -617,7 +617,12 @@ public class FloatingWindow: NSWindow {
 
     @objc public func copy(_ sender: Any?) {
         guard let controller = windowController as? FloatingWindowController else { return }
-        if controller.appState.readingState.isPDFDocument,
+        if controller.appState.readingState.isQuickLookDocument {
+            // 文档复制只面向选择的文字，不落入图片快照路径。
+            if let textView = contentView?.findSubview(ofType: NSTextView.self), textView.selectedRange().length > 0 {
+                textView.copy(sender)
+            }
+        } else if controller.appState.readingState.isPDFDocument,
            let pdfView = contentView?.findSubview(ofType: PDFView.self) {
             if let selection = pdfView.currentSelection,
                let text = selection.string,
@@ -643,6 +648,9 @@ public class FloatingWindow: NSWindow {
     public override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(FloatingWindow.copy(_:)) {
             guard let controller = windowController as? FloatingWindowController else { return false }
+            if controller.appState.readingState.isQuickLookDocument {
+                return (contentView?.findSubview(ofType: NSTextView.self)?.selectedRange().length ?? 0) > 0
+            }
             if controller.appState.readingState.isAudioDocument {
                 return controller.appState.readingState.audioCoverImage != nil
             }

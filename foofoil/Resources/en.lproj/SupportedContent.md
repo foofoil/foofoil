@@ -56,7 +56,7 @@ Audio foils show the embedded or same-folder cover as a background. Copy Cover (
 
 ## Other Documents
 
-Preview Word, Excel, PowerPoint, rich text, and other documents with macOS Quick Look.
+Word and rich text documents use a selectable, read-only text preview when supported by macOS; pagination and complex layout may differ from the original. Other documents, and files that cannot be imported, use macOS Quick Look. Window resize shortcuts and ⌘ + scroll work for these previews.
 
 Choose File → Open Directory…{{openDirectoryShortcut}} to open a folder with the same handling as dragging it into a foil. You can also drag in several files to browse them as a list.
 
