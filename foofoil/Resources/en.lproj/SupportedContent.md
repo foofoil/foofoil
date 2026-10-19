@@ -4,6 +4,8 @@ Local files are referenced directly, with bookmarks tracking renames and moves w
 
 Web downloads are saved to `~/Downloads`. Duplicate names receive a numeric suffix without overwriting existing files. Downloads from incognito foils also remain on disk.
 
+Webpage fullscreen stays inside the foil without changing its size or entering macOS full screen. Players that depend on native fullscreen styling may display differently.
+
 Settings → General → Automatically remove history for missing files is on by default. Only confirmed missing sources are removed; offline volumes, authorization problems, and temporary errors are retained. Turn it off to keep unavailable entries and receive feedback when opening them. Deleting managed history leaves open windows usable; its body is removed after the last user releases it. Saved bodies are excluded from ordinary cache eviction. Incognito bodies last only for the session.
 
 Incognito foils never enter history and are not restored after quitting. Use File → New Incognito Foil{{newIncognitoShortcut}} or Open Clipboard Incognito{{openClipboardIncognitoShortcut}}; the system Share menu also offers Incognito Foil. Content dropped into an incognito foil stays out of history, including any additional foils created for separate file groups.

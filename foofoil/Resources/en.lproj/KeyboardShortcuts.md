@@ -76,6 +76,8 @@ Unless noted, these behaviors apply outside full screen. Borderless PDFs resize 
 
 ## Web Tools
 
+Webpage fullscreen fills the foil’s browser area. Press Esc while the webpage has focus, or click the exit button at the top right, to restore the page.
+
 | Action | Default shortcut | Current shortcut | Notes |
 | --- | --- | --- | --- |
 {{web}}
