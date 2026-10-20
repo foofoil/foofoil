@@ -90,7 +90,7 @@ nonisolated enum KeyboardShortcutCatalog {
 
     static let file: [KeyboardShortcutDefinition] = [
         definition("file.newIncognito", "New Incognito Foil", "n", [.command, .shift]),
-        definition("file.openClipboardIncognito", "Open Clipboard Incognito", "v", [.command, .shift, .option]),
+        definition("file.openClipboardIncognito", "Open Clipboard Incognito", "v", [.command, .option]),
         definition("file.openDirectory", "Open Directory...", "o", [.command, .shift]),
         definition("history.search", "Search History Menu Item", "p", [.command], "Shortcut Quick Open Purpose"),
         definition("file.addToList", "Add to List...", nil, []),

@@ -57,7 +57,7 @@ These default shortcuts cover distinctive features and everyday actions. Except 
 | Foil Overview (Exposé, global) | <kbd>⌃ ⇧ Esc</kbd> |
 | Open clipboard content | <kbd>⇧ ⌘ V</kbd> |
 | New incognito foil | <kbd>⇧ ⌘ N</kbd> |
-| Open clipboard incognito | <kbd>⇧ ⌥ ⌘ V</kbd> |
+| Open clipboard incognito | <kbd>⌥ ⌘ V</kbd> |
 | Quick Open | <kbd>⌘ P</kbd> |
 | Hide the active foil | <kbd>⌘ H</kbd> |
 | Hide all foils to clear your workspace temporarily | <kbd>⇧ ⌘ H</kbd> |

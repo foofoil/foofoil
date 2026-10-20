@@ -206,7 +206,7 @@ struct IncognitoFoilTests {
         #expect(newFoil.keyEquivalent == "n")
         #expect(newFoil.modifiers == [.command, .shift])
         #expect(clipboard.keyEquivalent == "v")
-        #expect(clipboard.modifiers == [.command, .shift, .option])
+        #expect(clipboard.modifiers == [.command, .option])
     }
 
     @Test func privateShareExtensionIsEmbeddedAndLocalized() throws {

@@ -1,6 +1,6 @@
 # Keyboard Shortcuts Overview
 
-Customize bindings in Settings → Keyboard Shortcuts. Except for global shortcuts, foofoil must be active; some actions apply only to specific content.
+Customize bindings in Settings → Keyboard Shortcuts. The table below shows the default and current bindings, including Open Clipboard Incognito. Except for global shortcuts, foofoil must be active; some actions apply only to specific content.
 
 ⌘ Command · ⇧ Shift · ⌥ Option · ⌃ Control · Esc Escape · Space · Tab
 
