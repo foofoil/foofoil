@@ -124,7 +124,7 @@ Editing shortcuts apply to text fields or selectable content, depending on focus
 
 ## Inside Foil Overview
 
-- Arrow keys select; Return activates the selected foil. Numbers or letters select visible items directly.
+- Arrow keys select; ↑ / ↓ move between visual rows using the cards’ left edges for alignment; Return activates the selected foil. Numbers or letters select visible items directly.
 - `/` starts search; while searching, Control + number or letter selects directly.
 - Esc leaves search; press Esc again to dismiss the overview.
 - {{clipboardShortcut}} opens clipboard content.

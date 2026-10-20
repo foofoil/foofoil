@@ -192,6 +192,31 @@ struct FoilExposeModelTests {
         #expect(model.selectedIndex == 0)
     }
 
+    @Test func verticalSelectionAlignsLeftAcrossPartialSectionRows() {
+        let model = makeModel(openCount: 6, historyCount: 2)
+        model.columnCount = 4
+        // 第一分区末行只有两项，下一分区从左侧重新排列。
+        model.selectedIndex = 4
+        model.moveSelection(.down)
+        #expect(model.selectedIndex == 6)
+        model.moveSelection(.up)
+        #expect(model.selectedIndex == 4)
+        model.selectedIndex = 5
+        model.moveSelection(.down)
+        #expect(model.selectedIndex == 7)
+        model.moveSelection(.up)
+        #expect(model.selectedIndex == 5)
+        model.selectedIndex = 3
+        model.moveSelection(.down)
+        #expect(model.selectedIndex == 5)
+        model.selectedIndex = 1
+        model.moveSelection(.up)
+        #expect(model.selectedIndex == 1)
+        model.selectedIndex = 6
+        model.moveSelection(.down)
+        #expect(model.selectedIndex == 6)
+    }
+
     @Test func rowEdgeJumpsFollowColumnCount() {
         let model = makeModel(historyCount: 0)
         model.columnCount = 4

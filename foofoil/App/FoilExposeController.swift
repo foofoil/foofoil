@@ -242,6 +242,7 @@ final class FoilExposeModel: ObservableObject {
     @Published private(set) var isMusicAuthorized = false
     /// 网格实际列数，由面板视图从卡片外框推导回填，供上下移动跨行使用。
     var columnCount: Int = 4
+    var musicColumnCount: Int = 3
     var onSelect: (FoilExposeItem) -> Void = { _ in }
     var onDismiss: () -> Void = {}
     var onClearHistory: (FoilExposeHistoryCategory) -> Void = { _ in }
@@ -584,6 +585,15 @@ final class FoilExposeModel: ObservableObject {
     /// 移动键盘高亮，左右逐项、上下跨一行，越界时夹紧。
     func moveSelection(_ direction: FoilExposeMoveDirection) {
         guard !currentItems.isEmpty else { return }
+        if direction == .up || direction == .down {
+            let rows = navigationRows
+            guard let row = rows.firstIndex(where: { $0.contains(selectedIndex) }),
+                  let column = rows[row].firstIndex(of: selectedIndex) else { return }
+            let targetRow = row + (direction == .up ? -1 : 1)
+            guard rows.indices.contains(targetRow) else { return }
+            selectedIndex = rows[targetRow][min(column, rows[targetRow].count - 1)]
+            return
+        }
         let columns = max(1, columnCount)
         let delta: Int
         switch direction {
@@ -593,6 +603,23 @@ final class FoilExposeModel: ObservableObject {
         case .down: delta = columns
         }
         selectedIndex = min(max(0, selectedIndex + delta), currentItems.count - 1)
+    }
+
+    /// 分区各自从左起排满一行；不使用受滚动和高亮动画影响的卡片坐标。
+    private var navigationRows: [[Int]] {
+        let items = currentItems
+        let groups: [([Int], Int)] = [
+            (items.indices.filter { !items[$0].isHistoryEntry && items[$0].musicItem == nil }, columnCount),
+            (items.indices.filter { items[$0].isHistoryEntry }, columnCount)
+        ] + AppleMusicSearchCategory.allCases.map { category in
+            (items.indices.filter { items[$0].musicItem?.searchCategory == category }, musicColumnCount)
+        }
+        return groups.flatMap { indices, columns in
+            let width = max(1, columns)
+            return stride(from: 0, to: indices.count, by: width).map {
+                Array(indices[$0..<min($0 + width, indices.count)])
+            }
+        }
     }
 
     /// Ctrl+A：高亮移到当前行首。行号 = 当前下标 / 列数，行首 = 行号 × 列数。

@@ -231,13 +231,6 @@ struct FoilExposeView: View {
             visibleIndices = indices
         }
         model.setVisibleIDs(visible.map(\.item.id))
-        // 实际列数从卡片外框推导：同一行的卡片 y 相同，数一数即可，不依赖布局估算公式。
-        if !frames.isEmpty {
-            let rows = Dictionary(grouping: frames.values) { $0.minY.rounded() }
-            if let columns = rows.values.map(\.count).max(), columns > 0 {
-                model.columnCount = columns
-            }
-        }
         if repositionAfterPageScroll {
             repositionToFirstVisible()
         }
@@ -381,6 +374,7 @@ struct FoilExposeView: View {
                 }
             }
         }
+        .onGeometryChange(for: Int.self, of: { max(1, Int(($0.size.width + 10) / 330)) }) { model.musicColumnCount = $0 }
     }
 
     /// Spotlight 文件结果区：输入关键字后才出现，出现与结果更新都带平滑过渡。
@@ -504,6 +498,7 @@ struct FoilExposeView: View {
 
             }
         }
+        .onGeometryChange(for: Int.self, of: { max(1, Int(($0.size.width + 18) / 230)) }) { model.columnCount = $0 }
     }
 
     private var historySectionHeader: some View {
