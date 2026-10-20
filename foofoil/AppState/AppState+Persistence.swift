@@ -43,13 +43,13 @@ extension AppState {
         }
 
         @discardableResult
-        public func loadConfig(_ inputConfig: WindowConfig) -> Bool {
+        public func loadConfig(_ inputConfig: WindowConfig, isRefreshing: Bool = false) -> Bool {
             if let path = inputConfig.textPath, Self.isManagedCacheURL(URL(fileURLWithPath: path)),
                ContentCache.shared.hasLease(for: path) { ContentCache.shared.flushBodyWrites() }
             let historyIsPinned = HistoryRepository.shared.config(id: inputConfig.id)?.historyIsPinned ?? inputConfig.historyIsPinned
-            let resolution = inputConfig.resolvingFileReferences(removeMissingItems: SettingsStore.shared.automaticallyRemoveMissingHistory && !historyIsPinned)
+            let resolution = inputConfig.resolvingFileReferences(removeMissingItems: !isRefreshing && SettingsStore.shared.automaticallyRemoveMissingHistory && !historyIsPinned)
             let config = resolution.config
-            if resolution.missing, SettingsStore.shared.automaticallyRemoveMissingHistory {
+            if resolution.missing, SettingsStore.shared.automaticallyRemoveMissingHistory, !isRefreshing {
                 HistoryManager.shared.removeFromHistory(inputConfig, preservingLegacyBody: true)
                 if let failure = config.historyRestoreFileFailure() { reportFileOpenFeedback([failure]) }
                 return false
@@ -60,7 +60,7 @@ extension AppState {
                 return false
             }
             stopVideoAccess()
-            relinquishAgentControl()
+            if !isRefreshing { relinquishAgentControl() }
             archiveSession?.close()
             archiveSession = nil
             appleMusicItem = nil
@@ -168,7 +168,7 @@ extension AppState {
             }
 
             // 重开历史时直接采用持久化的 OCR 与主体结论，不再重跑 Vision。
-            restoreImageDerivedContent(from: config)
+            if !isRefreshing { restoreImageDerivedContent(from: config) }
 
             // 扩展音频（DSF/DFF/SACD 经 Hi-Fi 播放，含目录列表）不占用 imageURL，
             // 同目录封面书签必须独立于 imagePath 恢复，否则每次重启都会重新弹出目录授权。

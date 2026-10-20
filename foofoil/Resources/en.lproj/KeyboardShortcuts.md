@@ -60,6 +60,8 @@ Read-only presentations created through foil also support the border toggle for 
 | --- | --- | --- | --- |
 {{view}}
 
+Use **View → Reload Content** (default ⌘R) to reread the current local file or reload a web page. The current foil and its window settings are retained.
+
 | Mouse / trackpad gesture | Effect |
 | --- | --- |
 | ⌘ + mouse wheel | Zoom images; resize the window for web pages, text, Markdown, and similar content |

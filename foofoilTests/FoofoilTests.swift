@@ -1647,7 +1647,7 @@ struct FoofoilTests {
         let noteResults = KeyboardShortcutCatalog.searchResults(nameQuery: NSLocalizedString("Shortcut Scope Web", comment: ""), shortcutQuery: nil)
         let noteIDs = noteResults.flatMap { $0.definitions.map(\.id) }
         #expect(noteIDs.contains("file.openInBrowser"))
-        #expect(noteIDs.contains("view.reloadPage"))
+        #expect(KeyboardShortcutCatalog.view.contains { $0.id == "view.reloadPage" })
 
         // 无命中时不保留空分组。
         #expect(KeyboardShortcutCatalog.searchResults(nameQuery: "no such command xyz", shortcutQuery: nil).isEmpty)
@@ -3508,5 +3508,49 @@ struct ClipboardContentDetectionTests {
         var renamed = state.toConfig()
         renamed.originalImageName = "自定义标题"
         #expect(renamed.historyMenuDisplayName == "自定义标题")
+    }
+}
+
+@MainActor
+@Suite(.sharedApplicationState, .serialized)
+struct LocalFileRefreshTests {
+    @Test func reloadTextPreservesIdentityAndPresentation() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("refresh-\(UUID()).txt")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try "before".write(to: url, atomically: true, encoding: .utf8)
+        let state = AppState(isIncognito: true)
+        state.openTextFile(url: url)
+        let id = state.id
+        state.textFontSize = 22
+        let border = state.showBorder
+        try "after".write(to: url, atomically: true, encoding: .utf8)
+        #expect(state.canReloadContent)
+        await state.reloadContent()
+        #expect(state.text == "after")
+        #expect(state.id == id)
+        #expect(state.textFontSize == 22)
+        #expect(state.showBorder == border)
+        #expect(state.contentReloadRevision == 1)
+    }
+
+    @Test func missingTextFileKeepsDisplayedContent() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("refresh-missing-\(UUID()).txt")
+        try "keep visible".write(to: url, atomically: true, encoding: .utf8)
+        let state = AppState(isIncognito: true)
+        state.openTextFile(url: url)
+        let id = state.id
+        try FileManager.default.removeItem(at: url)
+        await state.reloadContent()
+        #expect(state.text == "keep visible")
+        #expect(state.id == id)
+        #expect(!state.isLoading)
+        #expect(state.contentReloadRevision == 0)
+    }
+
+    @Test func blankAndPastedTextCannotReload() {
+        let state = AppState(isIncognito: true)
+        #expect(!state.canReloadContent)
+        state.text = "pasted"
+        #expect(!state.canReloadContent)
     }
 }

@@ -17,6 +17,54 @@ import FoofoilExtensionKit
 
 
 extension AppState {
+        var canReloadContent: Bool {
+            webURL != nil || (!isCamera && appleMusicReference == nil &&
+                (archiveSession != nil || extensionSession?.request.primaryFileURL != nil ||
+                 [textURL, imageURL].compactMap { $0 }.contains { $0.isFileURL }))
+        }
+
+        /// 沿用当前配置重新读取文件，避免刷新产生新箔或重复历史。
+        func reloadContent() async {
+            guard canReloadContent, !isLoading else { return }
+            if webURL != nil {
+                NotificationCenter.default.post(name: Notification.Name("reloadWebView_\(id.uuidString)"), object: nil)
+                return
+            }
+            if let url = textURL {
+                currentMediaRouteGeneration &+= 1
+                let generation = currentMediaRouteGeneration
+                let stateID = id
+                isLoading = true
+                // 读取大文本不阻塞窗口；切换内容后丢弃过期刷新结果。
+                let result: Result<String, Error> = await withCheckedContinuation { continuation in
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        let accessed = url.startAccessingSecurityScopedResource()
+                        defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+                        continuation.resume(returning: Result { try Self.readTextContent(from: url) })
+                    }
+                }
+                if currentMediaRouteGeneration == generation { isLoading = false }
+                guard currentMediaRouteGeneration == generation, id == stateID, textURL == url else { return }
+                switch result {
+                case .success(let content):
+                    text = content
+                    contentReloadRevision &+= 1
+                    saveState()
+                case .failure:
+                    reportFileOpenFeedback([.init(url: url, reason: .unreadable)])
+                }
+                return
+            }
+            let config = toConfig()
+            let expandedItems = expandedNavigatorItemIDs
+            let navigatorID = activeNavigatorContributionID
+            guard loadConfig(config, isRefreshing: true) else { return }
+            expandedNavigatorItemIDs = expandedItems
+            activeNavigatorContributionID = navigatorID
+            // 相同 URL 不会触发原生预览重新加载，显式更换正文视图身份。
+            contentReloadRevision &+= 1
+        }
+
         public func openImage(url: URL) {
             clearArchiveForNewContent()
             appleMusicItem = nil
@@ -527,7 +575,7 @@ extension AppState {
             self.actualWebURL = nil
         }
 
-        static func readTextContent(from url: URL) throws -> String {
+        nonisolated static func readTextContent(from url: URL) throws -> String {
             // 1. 尝试以系统的自动编码探测读取
             var usedEncoding: String.Encoding = .utf8
             if let content = try? String(contentsOf: url, usedEncoding: &usedEncoding) {

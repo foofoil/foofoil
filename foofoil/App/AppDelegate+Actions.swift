@@ -759,11 +759,8 @@ extension AppDelegate {
     }
 
     @objc func reloadPageAction() {
-        guard let appState = activeReadingState, appState.webURL != nil else { return }
-        NotificationCenter.default.post(
-            name: Notification.Name("reloadWebView_\(appState.id.uuidString)"),
-            object: nil
-        )
+        guard let appState = activeReadingState else { return }
+        Task { @MainActor in await appState.reloadContent() }
     }
 
     @objc func captureImageFoofoilAction() {

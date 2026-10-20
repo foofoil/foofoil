@@ -224,7 +224,7 @@ struct FoilExposeShortcutTests {
             "view.fitWindowToImage", "view.fitImageToWindowWidth"
         ])
         #expect(KeyboardShortcutCatalog.web.map(\.id) == [
-            "file.openInBrowser", "file.copyURL", "view.reloadPage", "view.captureImage"
+            "file.openInBrowser", "file.copyURL", "view.captureImage"
         ])
         #expect(KeyboardShortcutCatalog.go.suffix(2).map(\.id) == ["view.toggleNavigator", "view.moveNavigatorSide"])
         #expect(KeyboardShortcutCatalog.definition(withID: "view.toggleFullScreen")?.titleKey == "Shortcut Toggle Full Screen")

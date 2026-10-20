@@ -114,6 +114,7 @@ nonisolated enum KeyboardShortcutCatalog {
     ]
 
     static let view: [KeyboardShortcutDefinition] = [
+        definition("view.reloadPage", "Reload Content", "r", [.command], "Shortcut Scope Reloadable Content"),
         definition("view.zoomInContent", "Zoom In Content", "+", [.command]),
         definition("view.zoomOutContent", "Zoom Out Content", "-", [.command]),
         definition("view.actualSize", "Actual Size", "0", [.command]),
@@ -132,7 +133,6 @@ nonisolated enum KeyboardShortcutCatalog {
     static let web: [KeyboardShortcutDefinition] = [
         definition("file.openInBrowser", "Shortcut Open in Browser", nil, [], "Shortcut Scope Web"),
         definition("file.copyURL", "Copy URL", "c", [.command, .option], "Shortcut Scope Web"),
-        definition("view.reloadPage", "Reload Page", "r", [.command], "Shortcut Scope Web"),
         definition("view.captureImage", "Capture Image foofoil", nil, [], "Shortcut Scope Web")
     ]
 

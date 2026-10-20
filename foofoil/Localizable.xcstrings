@@ -9349,6 +9349,40 @@
         }
       }
     },
+    "Reload Content": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reload Content"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷新内容"
+          }
+        }
+      }
+    },
+    "Shortcut Scope Reloadable Content": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Web pages and local files"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网页与本地文件"
+          }
+        }
+      }
+    },
     "Reload Page": {
       "extractionState": "manual",
       "localizations": {

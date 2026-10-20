@@ -35,6 +35,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     var sourceFingerprint: String?
     public var isInteractiveZooming: Bool = false
     /// 缓存当前解码图片，避免缩放重绘时反复从磁盘创建 NSImage。
+    @Published var contentReloadRevision = 0
+
     var loadedImageCache: (url: URL, image: NSImage)?
     var isBatchUpdating = false
     var agentOwnership: AgentOwnership?

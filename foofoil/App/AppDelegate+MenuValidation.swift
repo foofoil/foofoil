@@ -190,8 +190,8 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             isHidden: !appState.canToggleImageListSlideshow
         )
 
-        // 1.5 Reload Page 菜单项
-        setMenuItem(withAction: #selector(reloadPageAction), in: menu, isHidden: !isWebMode)
+        // 1.5 网页与本地文件共用刷新命令
+        setMenuItem(withAction: #selector(reloadPageAction), in: menu, isHidden: !appState.canReloadContent)
 
         // 1.6 Capture Image Foofoil 菜单项
         setMenuItem(withAction: #selector(captureImageFoofoilAction), in: menu, isHidden: !(isWebMode || appState.isCamera))
@@ -401,7 +401,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         }
 
         if menuItem.action == #selector(reloadPageAction) {
-            return activeReadingState?.webURL != nil
+            return activeReadingState.map { $0.canReloadContent && !$0.isLoading } ?? false
         }
 
         if menuItem.action == #selector(previousChapterAction) || menuItem.action == #selector(nextChapterAction) {

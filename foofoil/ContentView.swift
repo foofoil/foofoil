@@ -125,18 +125,23 @@ struct FoilContentView: View {
                 } else if let url = appState.imageURL, appState.isQuickLookDocument {
                     if url.pathExtension.lowercased() == "pptx" {
                         PPTXModeView(appState: appState, url: url)
+                            .id(appState.contentReloadRevision)
                     } else if SelectableDocumentPreview.supports(url) {
                         SelectableDocumentPreview(url: url, shouldHideBorder: shouldHideBorder)
+                            .id(appState.contentReloadRevision)
                             .clipShape(RoundedRectangle(cornerRadius: shouldHideBorder ? 0 : 8, style: .continuous))
                     } else {
                         QuickLookModeView(url: url, shouldHideBorder: shouldHideBorder)
+                            .id(appState.contentReloadRevision)
                             .clipShape(RoundedRectangle(cornerRadius: shouldHideBorder ? 0 : 8, style: .continuous))
                     }
                 } else if let videoURL = appState.imageURL, appState.isVideoDocument {
                     VideoModeView(appState: appState, url: videoURL, shouldHideBorder: shouldHideBorder)
+                        .id(appState.contentReloadRevision)
                         .transition(.opacity)
                 } else if let audioURL = appState.imageURL, appState.isAudioDocument {
                     AudioModeView(appState: appState, url: audioURL, shouldHideBorder: shouldHideBorder)
+                        .id(appState.contentReloadRevision)
                         .transition(.opacity)
                 } else if appState.isAudioDocument, appState.fileList?.currentItem != nil {
                     // 扩展音频会话打开失败或授权失效时不再落入空文本模式，保持可辨识的箔片外观。
@@ -148,10 +153,12 @@ struct FoilContentView: View {
                     .transition(.opacity)
                 } else if let pdfURL = appState.imageURL, appState.isPDFDocument {
                     PDFModeView(appState: appState, url: pdfURL)
+                        .id(appState.contentReloadRevision)
                         .transition(.opacity)
                 } else if let imageURL = appState.imageURL, let nsImage = appState.loadImage(from: imageURL) {
                     ImageModeView(appState: appState, nsImage: nsImage, shouldHideBorder: shouldHideBorder)
                         .id(appState.agentOwnership.map { $0.boardID + ":" + (appState.agentKind?.rawValue ?? "") } ?? appState.fileList?.currentID ?? imageURL.path)
+                        .id(appState.contentReloadRevision)
                         .transition(.opacity)
                 } else if let imageURL = appState.imageURL {
                     // 文件可能在定位后、解码前消失；禁止退回透明且可编辑的空文本箔。

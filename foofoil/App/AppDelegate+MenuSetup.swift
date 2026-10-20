@@ -438,7 +438,7 @@ extension AppDelegate {
         moveNavigatorSideItem.target = self
         viewMenu.addItem(moveNavigatorSideItem)
 
-        let reloadPageItem = NSMenuItem(title: NSLocalizedString("Reload Page", comment: ""), action: #selector(reloadPageAction), keyEquivalent: "")
+        let reloadPageItem = NSMenuItem(title: NSLocalizedString("Reload Content", comment: ""), action: #selector(reloadPageAction), keyEquivalent: "")
         reloadPageItem.withSymbol("arrow.clockwise")
         reloadPageItem.representedObject = "view.reloadPage"
         reloadPageItem.target = self
