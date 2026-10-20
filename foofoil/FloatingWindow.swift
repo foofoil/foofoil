@@ -256,145 +256,103 @@ public class FloatingWindow: NSWindow {
 
         if event.type == .keyDown, handleMediaShortcut(event) { return }
 
-        // 无边框 PDF 的缩放只调整窗口；手势结束后再由 PDFKit 适配新的窗口尺寸。
-        if let controller = self.windowController as? FloatingWindowController,
-           controller.appState.readingState.isPDFDocument,
-           !controller.appState.isFullScreen,
-           !controller.appState.showBorder {
-            if event.type == .scrollWheel {
-                let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-                guard modifiers.contains(.command) else { return }
-
-                let delta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.deltaY
-                let multiplier: CGFloat = event.hasPreciseScrollingDeltas ? 0.003 : 0.03
-                controller.resizePDFWindowForScroll(factor: 1.0 + delta * multiplier)
-                return
-            }
-
-            if event.type == .magnify {
-                if event.phase.contains(.began) {
-                    currentAccumulatedMagnification = 1.0
-                } else if event.phase.contains(.changed) || event.phase.isEmpty {
-                    currentAccumulatedMagnification += event.magnification
-                    controller.resizePDFWindowForMagnification(currentAccumulatedMagnification)
-                } else if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
-                    controller.finishPDFWindowResize()
-                    currentAccumulatedMagnification = 1.0
-                }
-                return
-            }
-        }
-
-        // 指针在导航栏上时，⌘+滚轮调节导航栏宽度（全屏覆盖层也走这里）。
-        if event.type == .scrollWheel,
-           modifiers.contains(.command),
-           let controller = windowController as? FloatingWindowController,
-           controller.shouldCommandScrollResizeNavigator(at: event.locationInWindow) {
-            controller.handleNavigatorCommandScroll(event)
-            return
-        }
-
-        // 全屏时滚轮与捏合只交给内容视图；不能改变原窗口 frame。
-        if let controller = windowController as? FloatingWindowController,
-           controller.appState.isFullScreen,
-           event.type == .scrollWheel || event.type == .magnify {
-            // 全屏图片仍使用内容缩放，初始 fit 比例由进入全屏时确定。
-            if controller.isScalableImage {
-                if event.type == .scrollWheel, modifiers.contains(.command) {
-                    let delta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.deltaY
-                    controller.applyInteractiveImageZoom(factor: 1 + delta * (event.hasPreciseScrollingDeltas ? 0.003 : 0.03))
-                    return
-                }
-                if event.type == .magnify {
-                    if event.phase.contains(.began) { currentAccumulatedMagnification = 1 }
-                    currentAccumulatedMagnification += event.magnification
-                    controller.applyInteractiveImageMagnification(currentAccumulatedMagnification)
-                    if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
-                        controller.finishInteractiveImageMagnification()
-                        currentAccumulatedMagnification = 1
-                    }
-                    return
-                }
-            }
-            super.sendEvent(event)
-            return
-        }
-
-        // 处理 cmd + 鼠标滚轮
         if event.type == .scrollWheel, modifiers.contains(.command) {
-            if let controller = self.windowController as? FloatingWindowController {
-                let appState = controller.appState
-                let delta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.deltaY
-                let multiplier: CGFloat = event.hasPreciseScrollingDeltas ? 0.003 : 0.03
-                let factor = 1.0 + delta * multiplier
-
-                if appState.readingState.usesImagePresentation && !appState.readingState.isQuickLookDocument && !appState.readingState.isAudioDocument && !(appState.readingState.isVideoDocument && appState.showBorder) {
-                    // 有边框 PDF 保留 PDFViewer 的原生缩放与滚动响应。
-                    if appState.readingState.isPDFDocument && appState.showBorder {
-                        super.sendEvent(event)
-                        return
-                    }
-                    // 图片/无边框视频：只改缩放与窗口，结束后再写入历史（与音频窗口缩放一致）。
-                    controller.applyInteractiveImageZoom(factor: factor)
-                } else {
-                    // 非图片模式（网页、文本、Markdown、音频、有边框视频）：缩放窗口
-                    let currentSize = self.frame.size
-                    let targetSize = NSSize(
-                        width: currentSize.width * factor,
-                        height: currentSize.height * factor
-                    )
-                    controller.setWindowSize(targetSize, keepWidth: false, animated: false)
-                    controller.scheduleInteractiveZoomCommit()
-                }
+            if !handleCommandScroll(event, at: event.locationInWindow) {
+                super.sendEvent(event)
             }
             return
         }
 
-        // 触摸板捏合：图片改内容缩放（无边框时同步窗口）；其余模式只改窗口大小。过程中不写历史。
-        if event.type == .magnify, let controller = self.windowController as? FloatingWindowController {
-            let appState = controller.appState
-            let isImageMagnify = appState.readingState.usesImagePresentation
-                && !appState.readingState.isExternalMediaDocument
-                && !appState.readingState.isPDFDocument
-                && !appState.readingState.isQuickLookDocument
-            let isWindowMagnify = appState.readingState.imageURL == nil
-                || appState.readingState.isExternalMediaDocument
-                || appState.readingState.isQuickLookDocument
-                || appState.readingState.webURL != nil
-                || (appState.readingState.isPDFDocument && !appState.showBorder)
-
-            if isImageMagnify || isWindowMagnify {
-                let phase = event.phase
-                if phase.contains(.began) {
-                    currentAccumulatedMagnification = 1.0
-                } else if phase.contains(.changed) || phase.isEmpty {
-                    currentAccumulatedMagnification += event.magnification
-                    if isImageMagnify {
-                        controller.applyInteractiveImageMagnification(currentAccumulatedMagnification)
-                    } else {
-                        NotificationCenter.default.post(
-                            name: .shouldResizeWindowWithPinch,
-                            object: nil,
-                            userInfo: ["id": appState.id, "magnification": currentAccumulatedMagnification]
-                        )
-                    }
-                } else if phase.contains(.ended) || phase.contains(.cancelled) {
-                    if isImageMagnify {
-                        controller.finishInteractiveImageMagnification()
-                    } else {
-                        NotificationCenter.default.post(
-                            name: .shouldEndWindowPinchResize,
-                            object: nil,
-                            userInfo: ["id": appState.id]
-                        )
-                    }
-                    currentAccumulatedMagnification = 1.0
-                }
-                return
-            }
+        if event.type == .magnify {
+            if !handleMagnification(event) { super.sendEvent(event) }
+            return
         }
+
+        // 无边框 PDF 普通滚轮仍不滚动正文；缩放后的内容由 PDFKit 适配。
+        if event.type == .scrollWheel,
+           let controller = windowController as? FloatingWindowController,
+           controller.appState.readingState.isPDFDocument,
+           !controller.appState.isFullScreen, !controller.appState.showBorder { return }
 
         super.sendEvent(event)
+    }
+
+    /// 复用原有捏合行为处理本地与后台事件；Mac Mouse Fix 的合成事件可能不带 ⌘。
+    @discardableResult
+    func handleMagnification(_ event: NSEvent) -> Bool {
+        guard event.type == .magnify,
+              let controller = windowController as? FloatingWindowController else { return false }
+        let state = controller.appState
+        let isPDF = state.readingState.isPDFDocument && !state.showBorder && !state.isFullScreen
+        let isImage = state.isFullScreen ? controller.isScalableImage
+            : state.readingState.usesImagePresentation
+                && !state.readingState.isExternalMediaDocument
+                && !state.readingState.isPDFDocument
+                && !state.readingState.isQuickLookDocument
+        let isWindow = !state.isFullScreen && (state.readingState.imageURL == nil
+            || state.readingState.isExternalMediaDocument
+            || state.readingState.isQuickLookDocument
+            || state.readingState.webURL != nil)
+        guard isPDF || isImage || isWindow else { return false }
+        let phase = event.phase
+        if phase.contains(.began) {
+            currentAccumulatedMagnification = 1
+        }
+        if phase.contains(.ended) || phase.contains(.cancelled) {
+            if isPDF {
+                controller.finishPDFWindowResize()
+            } else if isImage {
+                controller.finishInteractiveImageMagnification()
+            } else {
+                NotificationCenter.default.post(name: .shouldEndWindowPinchResize, object: nil,
+                                                userInfo: ["id": state.id])
+            }
+            currentAccumulatedMagnification = 1
+        } else if phase.contains(.changed) || phase.isEmpty || (state.isFullScreen && phase.contains(.began)) {
+            currentAccumulatedMagnification += event.magnification
+            if isPDF {
+                controller.resizePDFWindowForMagnification(currentAccumulatedMagnification)
+            } else if isImage {
+                controller.applyInteractiveImageMagnification(currentAccumulatedMagnification)
+            } else {
+                NotificationCenter.default.post(name: .shouldResizeWindowWithPinch, object: nil,
+                                                userInfo: ["id": state.id, "magnification": currentAccumulatedMagnification])
+            }
+        }
+        return true
+    }
+
+    /// 本地派发与后台监听共用缩放入口；不激活窗口，也不改变键盘焦点。
+    /// PDF 原生缩放及非图片全屏交互仍由 AppKit 内容视图处理。
+    @discardableResult
+    func handleCommandScroll(_ event: NSEvent, at point: NSPoint) -> Bool {
+        guard event.type == .scrollWheel,
+              event.modifierFlags.contains(.command),
+              let controller = windowController as? FloatingWindowController else { return false }
+        if controller.shouldCommandScrollResizeNavigator(at: point) {
+            controller.handleNavigatorCommandScroll(event)
+            return true
+        }
+        let state = controller.appState
+        let delta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY : event.deltaY
+        let factor = 1 + delta * (event.hasPreciseScrollingDeltas ? 0.003 : 0.03)
+        if state.isFullScreen {
+            guard controller.isScalableImage else { return false }
+            controller.applyInteractiveImageZoom(factor: factor)
+        } else if state.readingState.isPDFDocument {
+            guard !state.showBorder else { return false }
+            controller.resizePDFWindowForScroll(factor: factor)
+        } else if state.readingState.usesImagePresentation
+                    && !state.readingState.isQuickLookDocument
+                    && !state.readingState.isAudioDocument
+                    && !(state.readingState.isVideoDocument && state.showBorder) {
+            controller.applyInteractiveImageZoom(factor: factor)
+        } else {
+            controller.setWindowSize(NSSize(width: frame.width * factor, height: frame.height * factor),
+                                     keepWidth: false, animated: false)
+            controller.scheduleInteractiveZoomCommit()
+        }
+        return true
     }
 
     /// 上下键每次滚动约一行正文。EPUB 页面脚本被禁用，但宿主求值仍可用于滚动。

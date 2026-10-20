@@ -217,7 +217,9 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     private var pendingMediaPlaybackControlsHide: DispatchWorkItem?
     private var navigatorHoverLocalMonitor: Any?
     private var navigatorHoverGlobalMonitor: Any?
-    private var navigatorScrollLocalMonitor: Any?
+    private var pointerScrollLocalMonitor: Any?
+    private var pointerScrollGlobalMonitor: Any?
+    private var backgroundMagnificationObserver: UUID?
     private var isTransitioningFullScreen = false
     var usesFullScreenFrame: Bool { appState.isFullScreen || isTransitioningFullScreen }
     private var insertedResizableForFullScreen = false
@@ -321,7 +323,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     public override func close() {
-        removeNavigatorScrollMonitor()
+        removePointerScrollMonitor()
         navigatorPanelController.detachAndClose()
         super.close()
     }
@@ -338,7 +340,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         pendingNavigatorPanelHide = nil
         removePinGlowPanel()
         removeNavigatorHoverMonitors()
-        removeNavigatorScrollMonitor()
+        removePointerScrollMonitor()
         navigatorPanelController.detachForApplicationHide()
     }
 
@@ -1026,52 +1028,80 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         appState.saveState()
     }
 
-    /// 本地事件监听先于窗口分发，按指针实际位置处理导航栏宽度：
-    /// 1. 不依赖事件归属窗口——Mac Mouse Fix 等会把滚轮投给键盘焦点窗口（箔片）；
-    /// 2. 同时覆盖 scrollWheel(⌘+滚轮) 与被转成的 magnify 手势。
-    private func updateNavigatorScrollMonitor() {
-        if NSApp.isHidden || window?.isVisible != true || appState.navigatorContributions.isEmpty {
-            removeNavigatorScrollMonitor()
+    /// 本地处理滚轮和捏合；后台普通滚轮由 AppKit 监听，MMF 手势由 Quartz tap 观察。
+    /// 全局监听只有观察权限，不阻断前台应用，也不需要监听键盘或主动抢焦点。
+    private func updatePointerScrollMonitor() {
+        if NSApp.isHidden || window?.isVisible != true {
+            removePointerScrollMonitor()
             return
         }
-        guard navigatorScrollLocalMonitor == nil else { return }
-        navigatorScrollLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .magnify]) { [weak self] event in
-            guard let self, self.shouldResizeNavigatorWidthForPointer() else { return event }
-            if event.type == .scrollWheel {
-                guard event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.command) else { return event }
-                self.handleNavigatorCommandScroll(event)
-            } else {
-                self.handleNavigatorWidthMagnification(event)
-            }
-            return nil
+        guard pointerScrollLocalMonitor == nil else { return }
+        pointerScrollLocalMonitor = NSEvent.addLocalMonitorForEvents(matching: [.scrollWheel, .magnify]) { [weak self] event in
+            self?.handlePointerCommandScroll(event) == true ? nil : event
+        }
+        pointerScrollGlobalMonitor = NSEvent.addGlobalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+            _ = self?.handlePointerCommandScroll(event)
+        }
+        backgroundMagnificationObserver = BackgroundMagnificationMonitor.shared.observe { [weak self] event in
+            _ = self?.handlePointerCommandScroll(event)
         }
     }
 
-    private func removeNavigatorScrollMonitor() {
-        if let navigatorScrollLocalMonitor {
-            NSEvent.removeMonitor(navigatorScrollLocalMonitor)
-            self.navigatorScrollLocalMonitor = nil
-        }
-    }
-
-    /// 指针是否落在导航面板（桌面态伴随窗口）或全屏覆盖层上。
-    private func shouldResizeNavigatorWidthForPointer() -> Bool {
+    /// 只处理鼠标下最上层可见窗口，避免后台缩放穿透其他应用或重复处理同一事件。
+    @discardableResult
+    func handlePointerCommandScroll(_ event: NSEvent) -> Bool {
+        guard (event.type == .scrollWheel && event.modifierFlags.contains(.command)) || event.type == .magnify,
+              !NSApp.isHidden, let window = window as? FloatingWindow,
+              window.isVisible, !window.isMiniaturized else { return false }
         let pointer = NSEvent.mouseLocation
-        // 按最上层实际命中的窗口判断，不能穿透覆盖在侧栏上的其他箔片。
-        let hitWindowNumber = NSWindow.windowNumber(at: pointer, belowWindowWithWindowNumber: 0)
-        guard hitWindowNumber == window?.windowNumber
-            || hitWindowNumber == navigatorPanelController.window?.windowNumber else { return false }
+        let hit = NSWindow.windowNumber(at: pointer, belowWindowWithWindowNumber: 0)
+        return handlePointerCommandScroll(event, at: pointer, hitWindowNumber: hit)
+    }
+
+    func handlePointerCommandScroll(_ event: NSEvent, at pointer: NSPoint, hitWindowNumber: Int) -> Bool {
+        guard (event.type == .scrollWheel && event.modifierFlags.contains(.command)) || event.type == .magnify,
+              !NSApp.isHidden, let window = window as? FloatingWindow,
+              window.isVisible, !window.isMiniaturized else { return false }
         if navigatorPanelController.isVisible,
            let panel = navigatorPanelController.window,
-           panel.frame.contains(pointer) {
+           hitWindowNumber == panel.windowNumber, panel.frame.contains(pointer) {
+            if event.type == .magnify {
+                handleNavigatorWidthMagnification(event)
+            } else {
+                handleNavigatorCommandScroll(event)
+            }
             return true
         }
-        guard let window else { return false }
-        return shouldCommandScrollResizeNavigator(at: window.convertPoint(fromScreen: pointer))
+        guard hitWindowNumber == window.windowNumber, window.frame.contains(pointer) else { return false }
+        let point = window.convertPoint(fromScreen: pointer)
+        handleMediaPointerActivity(at: point)
+        if event.type == .magnify {
+            if shouldCommandScrollResizeNavigator(at: point) {
+                handleNavigatorWidthMagnification(event)
+                return true
+            }
+            return window.handleMagnification(event)
+        }
+        return window.handleCommandScroll(event, at: point)
+    }
+
+    private func removePointerScrollMonitor() {
+        if let backgroundMagnificationObserver {
+            BackgroundMagnificationMonitor.shared.removeObserver(backgroundMagnificationObserver)
+            self.backgroundMagnificationObserver = nil
+        }
+        if let pointerScrollLocalMonitor {
+            NSEvent.removeMonitor(pointerScrollLocalMonitor)
+            self.pointerScrollLocalMonitor = nil
+        }
+        if let pointerScrollGlobalMonitor {
+            NSEvent.removeMonitor(pointerScrollGlobalMonitor)
+            self.pointerScrollGlobalMonitor = nil
+        }
     }
 
     private func updateNavigatorPanelVisibility() {
-        updateNavigatorScrollMonitor()
+        updatePointerScrollMonitor()
         guard let window, window.isVisible, !NSApp.isHidden else { return }
         if appState.isFullScreen || isTransitioningFullScreen {
             pendingNavigatorPanelHide?.cancel()
@@ -2075,6 +2105,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     public func windowWillClose(_ notification: Notification) {
+        removePointerScrollMonitor()
         pendingBlankCloseCancellable = nil
         appState.readingState.cameraController?.stop()
         pendingFrameSave?.cancel()

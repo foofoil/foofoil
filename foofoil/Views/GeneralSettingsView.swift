@@ -23,6 +23,7 @@ struct GeneralSettingsView: View {
     @State private var showsCacheConfirmation = false
     @State private var cacheError = false
     @State private var updatingCache = false
+    @ObservedObject private var backgroundMagnification = BackgroundMagnificationMonitor.shared
     @ObservedObject private var musicLibrary = AppleMusicLibrary.shared
 
     var body: some View {
@@ -54,6 +55,23 @@ struct GeneralSettingsView: View {
                 }
             } header: {
                 Text(NSLocalizedString("System Section", comment: ""))
+            }
+
+            Section {
+                HStack {
+                    SettingsRowLabel(
+                        title: NSLocalizedString("Background Gesture Zoom", comment: ""),
+                        note: NSLocalizedString("Background Gesture Zoom Note", comment: "")
+                    )
+                    Spacer()
+                    if backgroundMagnification.hasAccess {
+                        Text("Background Gesture Zoom Authorized").foregroundStyle(.secondary)
+                    } else {
+                        Button("Allow Background Gesture Zoom") { backgroundMagnification.requestAccess() }
+                    }
+                }
+            } header: {
+                Text("Window Gestures")
             }
 
             Section {
@@ -181,6 +199,7 @@ struct GeneralSettingsView: View {
         .formStyle(.grouped)
         .frame(width: SettingsWindowMetrics.width, alignment: .top)
         .onAppear {
+            backgroundMagnification.refresh()
             launchAtLogin = LaunchAtLogin.isEnabled
             startupBehavior = SettingsStore.shared.startupBehavior
             navigatorPanelSide = SettingsStore.shared.navigatorPanelSide
