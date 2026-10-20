@@ -12,7 +12,22 @@ struct FileOpenFeedback: Identifiable, Equatable {
     }
     let url: URL
     let reason: Reason
-    var id: String { url.path + reason.rawValue }
+    /// 历史恢复失败时携带原记录 ID，反馈箔自身拥有独立身份。
+    var historyID: UUID? = nil
+    var id: String { url.path + reason.rawValue + (historyID?.uuidString ?? "") }
+
+    @MainActor
+    var canRemoveFromHistory: Bool {
+        historyID.flatMap { HistoryRepository.shared.config(id: $0) } != nil
+    }
+
+    /// 用户在失效文件反馈中显式移出历史，无论是否收藏都不再确认。
+    @MainActor
+    func removeFromHistory() async -> Bool {
+        guard let historyID else { return false }
+        guard let config = HistoryRepository.shared.config(id: historyID) else { return true }
+        return await HistoryManager.shared.removeFromHistory([config])
+    }
 }
 
 extension AppState {

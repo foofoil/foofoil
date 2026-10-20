@@ -155,7 +155,7 @@ struct FoilContentView: View {
                         .transition(.opacity)
                 } else if let imageURL = appState.imageURL {
                     // 文件可能在定位后、解码前消失；禁止退回透明且可编辑的空文本箔。
-                    FileOpenFeedbackView(failures: [.init(url: imageURL, reason: .unreadable)]) {
+                    FileOpenFeedbackView(failures: [.init(url: imageURL, reason: .unreadable, historyID: appState.id)]) {
                         NotificationCenter.default.post(name: .shouldCloseWindow, object: nil, userInfo: ["id": windowState.id])
                     }
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))

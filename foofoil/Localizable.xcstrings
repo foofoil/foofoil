@@ -3000,6 +3000,40 @@
       }
     }
   },
+  "File Feedback Remove History": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Remove from History"
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "从历史记录中移除"
+        }
+      }
+    }
+  },
+  "File Feedback Remove History Failed": {
+    "extractionState": "manual",
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Unable to remove this history record. Try again."
+        }
+      },
+      "zh-Hans": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "无法移除此历史记录，请重试。"
+        }
+      }
+    }
+  },
   "File Feedback Missing": {
     "extractionState": "manual",
     "localizations": {

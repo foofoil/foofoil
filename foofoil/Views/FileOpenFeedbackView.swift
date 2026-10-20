@@ -5,6 +5,9 @@ struct FileOpenFeedbackView: View {
     let failures: [FileOpenFeedback]
     let onClose: () -> Void
 
+    @State private var removingIDs: Set<String> = []
+    @State private var failedIDs: Set<String> = []
+
     var body: some View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
@@ -20,6 +23,24 @@ struct FileOpenFeedbackView: View {
                                     .textSelection(.enabled).fixedSize(horizontal: false, vertical: true)
                                 Text(NSLocalizedString(failure.reason.rawValue, comment: ""))
                                     .foregroundStyle(.secondary).multilineTextAlignment(.center)
+                                if failure.canRemoveFromHistory {
+                                    Button("File Feedback Remove History") {
+                                        removingIDs.insert(failure.id)
+                                        failedIDs.remove(failure.id)
+                                        Task { @MainActor in
+                                            let removed = await failure.removeFromHistory()
+                                            removingIDs.remove(failure.id)
+                                            if removed { onClose() }
+                                            else { failedIDs.insert(failure.id) }
+                                        }
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .disabled(removingIDs.contains(failure.id))
+                                }
+                                if failedIDs.contains(failure.id) {
+                                    Text("File Feedback Remove History Failed")
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                             .frame(maxWidth: .infinity)
                         }

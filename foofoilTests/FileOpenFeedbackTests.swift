@@ -12,6 +12,30 @@ struct FileOpenFeedbackTests {
         return url
     }
 
+    @Test(arguments: [true, false])
+    func failedFileCanBeRemovedFromHistoryWithoutConfirmation(isFavorite: Bool) async throws {
+        let root = try directory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        var config = WindowConfig(id: UUID(), imagePath: root.appendingPathComponent("missing.png").path,
+                                  originalImageName: "missing.png", showBorder: true)
+        config.historyIsPinned = isFavorite
+        #expect(HistoryRepository.shared.upsert(config))
+        defer { HistoryRepository.shared.remove(id: config.id) }
+        let failure = try #require(config.historyRestoreFileFailure())
+        #expect(failure.historyID == config.id)
+        #expect(failure.canRemoveFromHistory)
+        #expect(await failure.removeFromHistory())
+        #expect(HistoryRepository.shared.config(id: config.id) == nil)
+        #expect(!failure.canRemoveFromHistory)
+        #expect(await failure.removeFromHistory())
+    }
+
+    @Test func newFileFailureCannotRemoveUnrelatedHistory() async {
+        let failure = FileOpenFeedback(url: URL(fileURLWithPath: "/tmp/missing.png"), reason: .missing)
+        #expect(!failure.canRemoveFromHistory)
+        #expect(await failure.removeFromHistory() == false)
+    }
+
     @Test func sourceFilesAreNotRejectedAsExecutables() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

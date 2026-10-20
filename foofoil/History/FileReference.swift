@@ -93,7 +93,7 @@ extension WindowConfig {
         for (url, bookmark) in references {
             let result = FileReference.resolve(url, bookmark: AppState.isManagedCacheURL(url) ? nil : bookmark)
             if result.status != .available {
-                return FileOpenFeedback(url: result.url, reason: result.status == .missing ? .missing : .unreadable)
+                return FileOpenFeedback(url: result.url, reason: result.status == .missing ? .missing : .unreadable, historyID: id)
             }
         }
         return nil
