@@ -9626,13 +9626,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Press ⌃ with an index to open, Esc exits search"
+            "value": "Press ⌃ with a number or letter to open, Esc closes overview"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "⌃ + 编号选择，Esc 退出搜索"
+            "value": "⌃ + 数字或字母选择，Esc 关闭总览"
           }
         }
       }

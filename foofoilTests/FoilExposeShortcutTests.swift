@@ -11,6 +11,70 @@ import Testing
 
 @Suite(.sharedApplicationState)
 struct FoilExposeShortcutTests {
+    @Test @MainActor func controlNavigationMovesHighlightBeforeLetterSelection() throws {
+        let controller = FoilExposeController.shared
+        let previousModel = controller.model
+        let items = (0..<35).map { index in
+            FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: false,
+                           title: "Match \(index)", symbolName: "doc", contentKind: .text, thumbnailPath: nil)
+        }
+        let model = FoilExposeModel(items: items, historyItems: [], fileSearch: { _, _ in }, cancelFiles: {}, musicEnabled: { false })
+        controller.model = model
+        defer { controller.model = previousModel }
+        model.searchText = "Match"
+        model.columnCount = 4
+        model.setVisibleIDs(items.map(\.id))
+        var activated = false
+        model.onSelect = { _ in activated = true }
+        for (key, index) in [("n", 4), ("f", 5), ("p", 1), ("b", 0), ("p", 0), ("b", 0)] {
+            let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .control,
+                                                    timestamp: 0, windowNumber: 0, context: nil,
+                                                    characters: key, charactersIgnoringModifiers: key,
+                                                    isARepeat: false, keyCode: 0))
+            #expect(controller.handleKeyEvent(event) == nil)
+            #expect(model.selectedIndex == index)
+            #expect(model.searchText == "Match")
+            #expect(controller.model === model)
+            #expect(!activated)
+        }
+    }
+
+    @Test @MainActor func overviewFavoriteFilterFollowsConfiguredShortcut() throws {
+        let store = KeyboardShortcutStore.shared
+        let definition = try #require(KeyboardShortcutCatalog.definition(withID: "history.toggleFavorite"))
+        let previous = store.shortcut(for: definition)
+        let customized = store.isCustomized(definition)
+        let controller = FoilExposeController.shared
+        let previousModel = controller.model
+        let model = FoilExposeModel(items: [], historyItems: [], fileSearch: { _, _ in }, cancelFiles: {}, musicEnabled: { false })
+        controller.model = model
+        defer {
+            controller.model = previousModel
+            if customized { store.setShortcut(previous, for: definition) }
+            else { store.reset(definition) }
+        }
+        func event(_ key: String, modifiers: NSEvent.ModifierFlags) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers,
+                                         timestamp: 0, windowNumber: 0, context: nil,
+                                         characters: key, charactersIgnoringModifiers: key,
+                                         isARepeat: false, keyCode: 0))
+        }
+        store.reset(definition)
+        #expect(controller.handleKeyEvent(try event("d", modifiers: .command)) == nil)
+        #expect(model.pinnedOnly)
+        #expect(controller.handleKeyEvent(try event("d", modifiers: .command)) == nil)
+        #expect(!model.pinnedOnly)
+
+        store.setShortcut(KeyboardShortcut(keyEquivalent: "j", modifiers: [.command, .option]), for: definition)
+        #expect(controller.handleKeyEvent(try event("d", modifiers: .command)) != nil)
+        #expect(!model.pinnedOnly)
+        #expect(controller.handleKeyEvent(try event("j", modifiers: [.command, .option])) == nil)
+        #expect(model.pinnedOnly)
+        store.setShortcut(nil, for: definition)
+        #expect(controller.handleKeyEvent(try event("j", modifiers: [.command, .option])) != nil)
+        #expect(model.pinnedOnly)
+    }
+
     @Test @MainActor func helpDocumentsReuseTheirOpenFoilsAndRefreshContent() throws {
         let delegate = AppDelegate()
         defer {

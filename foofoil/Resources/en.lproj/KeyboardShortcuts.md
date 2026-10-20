@@ -31,7 +31,7 @@ In the Apple Music library window, Esc closes the window, including while the se
 
 Open directories with File → Open Directory. The configurable shortcut is listed in this section; directories use the same handling as dragging them into a foil.
 
-Quick Open and the overview’s `/` search also search songs, albums, and playlists in your Apple Music library. Enable or disable Apple Music search in Settings → General → Search; music access authorization is required. Select a result and press Return to play it in a foil. Search results show user files first, then Apple Music groups for albums, playlists, and songs. In the overview search, user files and each Apple Music group initially show 18 results; More Files, More Albums, More Playlists, or More Songs adds 18 results at a time. Each group shows at most 60 results, with no combined limit across groups. A notice appears in the overview search when additional matches are known to exist.
+Quick Open and the overview’s search also search songs, albums, and playlists in your Apple Music library. Enable or disable Apple Music search in Settings → General → Search; music access authorization is required. Select a result and press Return to play it in a foil. Search results show user files first, then Apple Music groups for albums, playlists, and songs. In the overview search, user files and each Apple Music group initially show 18 results; More Files, More Albums, More Playlists, or More Songs adds 18 results at a time. Each group shows at most 60 results, with no combined limit across groups. A notice appears in the overview search when additional matches are known to exist.
 
 
 
@@ -128,9 +128,12 @@ Editing shortcuts apply to text fields or selectable content, depending on focus
 
 ## Inside Foil Overview
 
-- Arrow keys select; ↑ / ↓ move between visual rows using the cards’ left edges for alignment; Return activates the selected foil. Numbers or letters select visible items directly.
-- `/` starts search; while searching, Control + number or letter selects directly.
-- Esc leaves search; press Esc again to dismiss the overview.
+- Arrow keys select; ↑ / ↓ move between visual rows using the cards’ left edges for alignment; Return activates the selected foil. Control + number or letter selects visible items directly.
+- Tab switches the highlight between the first open foil and the first history result, keeping search focused. Empty sections are skipped; scope selection and input method composition keep their existing Tab behavior.
+- ⌃P / ⌃N / ⌃F / ⌃B move the highlight up / down / right / left, taking priority over letter selection while keeping search focused.
+- Search is shown and focused automatically and stays active; type `/` to choose a search scope.
+- Esc cancels scope selection, or dismisses the overview; composing text is handled by the input method first.
+- The Favorite Current Foil shortcut also toggles Favorited history in the overview. The toggle shows the current binding and follows changes in Settings → Keyboard Shortcuts.
 - {{clipboardShortcut}} opens clipboard content.
 
 Paste an Apple Music song, album, or public playlist sharing link into Quick Open to preview it and press Return to open a music foil. Open Clipboard Content also opens these links directly as music. Explicit links work when Apple Music library search is disabled; music access authorization and content availability in your region still apply. Shared content does not need to be added to your library and can be restored from history.

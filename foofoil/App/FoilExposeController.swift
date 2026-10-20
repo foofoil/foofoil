@@ -198,7 +198,7 @@ final class FoilExposeModel: ObservableObject {
         selectedIndex = 0
     }
 
-    /// 搜索关键字；输入时即时过滤，退出输入后关键字与过滤结果仍保留。
+    /// 搜索关键字；输入时即时过滤。
     @Published var searchText: String = "" {
         didSet {
             // 过滤结果变化后回到第一项，避免高亮落在已被过滤掉的条目上。
@@ -220,8 +220,8 @@ final class FoilExposeModel: ObservableObject {
             scheduleMusicSearch()
         }
     }
-    /// 是否处于搜索输入状态：Esc 只退出输入并保留关键字，不关闭覆盖层。
-    @Published var isSearching: Bool = false
+    /// 总览始终接收搜索输入，编号直选统一使用 Control 修饰键。
+    let isSearching = true
     /// 搜索输入框聚焦请求序号：面板稍后成为 key window 或 FocusState 落空时，视图据此重新聚焦。
     @Published var searchFieldFocusRequest: UInt64 = 0
     /// 最新的整页滚动请求；面板视图认领执行。
@@ -387,7 +387,10 @@ final class FoilExposeModel: ObservableObject {
     }
 
     private var matchedFoilItems: [FoilExposeItem] {
-        unfilteredMatchedFoilItems.filter { (!$0.isHistoryEntry || historyCategory.includes($0.contentKind)) && (!pinnedOnly || $0.historyIsPinned) }
+        // 历史分类与收藏筛选只作用于历史记录，已打开箔片不受影响。
+        unfilteredMatchedFoilItems.filter {
+            !$0.isHistoryEntry || (historyCategory.includes($0.contentKind) && (!pinnedOnly || $0.historyIsPinned))
+        }
     }
 
     /// 总览搜索中文件与各音乐分组各自独立展示，没有跨来源的总数上限；只有已打开与历史条目列表封顶 maximum。
@@ -411,9 +414,9 @@ final class FoilExposeModel: ObservableObject {
         return items.indices.contains(selectedIndex) ? items[selectedIndex] : items.first
     }
 
-    /// 按 / 进入关键字输入状态；已有结果时保留关键字继续编辑。
+    /// 保留关键字并重新聚焦搜索框。
     func beginSearch() {
-        isSearching = true
+        requestSearchFieldFocus()
     }
 
     /// 请求视图把第一响应者交给搜索输入框；面板刚成为 key window 时补一次聚焦。
@@ -421,17 +424,12 @@ final class FoilExposeModel: ObservableObject {
         searchFieldFocusRequest &+= 1
     }
 
-    /// Esc 退出搜索输入：保留关键字与过滤结果，编号直选恢复为无修饰键。
-    func endSearch() {
-        isSearching = false
-    }
-
-    /// 清除关键字并退出搜索输入，恢复完整列表。
+    /// 清除关键字并恢复完整列表，继续聚焦搜索框。
     func clearSearch() {
         searchText = ""
         activeScope = nil
         resultFilter = .all
-        isSearching = false
+        requestSearchFieldFocus()
         selectedIndex = 0
     }
 
@@ -594,6 +592,17 @@ final class FoilExposeModel: ObservableObject {
     }
 
     /// 移动键盘高亮，左右逐项、上下跨一行，越界时夹紧。
+    /// Tab 在已打开与历史分区间切换；目标分区为空时保留当前高亮。
+    func switchFoilSection() {
+        let items = currentItems
+        let isInHistory = highlightedItem?.isHistoryEntry == true
+        if let target = items.firstIndex(where: {
+            $0.musicItem == nil && $0.isHistoryEntry != isInHistory
+        }) {
+            selectedIndex = target
+        }
+    }
+
     func moveSelection(_ direction: FoilExposeMoveDirection) {
         guard !currentItems.isEmpty else { return }
         if direction == .up || direction == .down {
@@ -687,7 +696,7 @@ final class FoilExposePanel: NSPanel {
 
 /// 自建 App Exposé：为每个屏幕铺一块覆盖层，打开的箔片在前、历史记录另起一行在后（半透明区分）。
 /// 打开的箔片展示各窗口的历史缩略图，文档型箔片以截断正文当缩略图；历史记录展示全部历史配置，选中即恢复为新箔片。
-/// 支持 “/” 进入的关键字搜索，搜索输入时数字/字母直选改用 ⌃ 修饰。
+/// 搜索框始终聚焦，数字/字母直选统一使用 ⌃ 修饰。
 /// 只复用历史缩略图，不抓新截图；不使用屏幕录制、辅助功能、输入监控或私有 API。
 @MainActor
 final class FoilExposeController {
@@ -1088,13 +1097,13 @@ final class FoilExposeController {
         guard item.isHistoryEntry, !isPresentingSystemUI,
               let model, let panel = panels.first else { return }
         isPresentingSystemUI = true
-        panel.orderOut(nil)
         let historyID = item.id
         Task { [weak self] in
             guard let self else { return }
+            var didHidePanel = false
             defer {
                 self.isPresentingSystemUI = false
-                if self.model === model, self.panels.first === panel {
+                if didHidePanel, self.model === model, self.panels.first === panel {
                     panel.makeKeyAndOrderFront(nil)
                     if model.isSearching { model.requestSearchFieldFocus() }
                 }
@@ -1105,12 +1114,16 @@ final class FoilExposeController {
             // 历史卡片菜单打开期间该条目可能已恢复成活跃箔片，避免清除其恢复数据。
             guard (NSApp.delegate as? AppDelegate)?.windowControllers.contains(where: { $0.appState.id == item.id }) != true else { return }
             if config.historyIsPinned {
+                // 仅在实际弹出确认框时隐藏总览，普通删除直接更新列表。
+                panel.orderOut(nil)
+                didHidePanel = true
                 guard HistoryManager.pinnedDeletionAlert().runModal() == .alertSecondButtonReturn else { return }
             }
             if await HistoryManager.shared.removeFromHistory([config]) {
                 model.replaceHistoryItems(Self.collectHistoryItems())
             } else {
                 panel.orderOut(nil)
+                didHidePanel = true
                 let error = NSAlert()
                 error.messageText = NSLocalizedString("Expose Clear History Failed", comment: "")
                 error.runModal()
@@ -1205,6 +1218,12 @@ final class FoilExposeController {
             let hasControl = modifiers.contains(.control)
             // 输入法正在组合文字时，Esc / 回车 / Tab 留给输入法自己处理（取消候选、上屏）。
             let isComposing = (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true
+            // 总览复用当前收藏快捷键，切换历史收藏筛选并阻止菜单收藏当前箔片。
+            if KeyboardShortcutStore.shared.matches(event, identifier: "history.toggleFavorite") {
+                model.pinnedOnly.toggle()
+                model.requestSearchFieldFocus()
+                return nil
+            }
             if let delegate = NSApp.delegate as? AppDelegate,
                delegate.matchesShortcut(event, definition: KeyboardShortcutCatalog.openClipboardContent) {
                 self.openClipboard()
@@ -1227,14 +1246,10 @@ final class FoilExposeController {
             if hasOption {
                 return event
             }
-            if event.keyCode == 53 { // Esc：搜索状态下只退出搜索输入，否则关闭覆盖层
-                if model.isSearching {
-                    if isComposing { return event }
-                    if model.isPickingScope {
-                        model.searchText = ""
-                        return nil
-                    }
-                    model.endSearch()
+            if event.keyCode == 53 { // Esc：组合输入和范围选择优先处理，否则关闭总览。
+                if isComposing { return event }
+                if model.isPickingScope {
+                    model.searchText = ""
                     return nil
                 }
                 self.dismiss()
@@ -1244,38 +1259,31 @@ final class FoilExposeController {
                 model.clearActiveScope()
                 return nil
             }
-            // 搜索输入时 ⌃ 组合优先用于数字/字母直选；未命中条目的 ⌃ 组合交给输入框做文本编辑（如 ⌃A/E），
-            // 非搜索状态沿用行首/行尾与方向移动。
+            // ⌃P/N/F/B 优先移动高亮，其余 ⌃ + 编号/字母仍可直选。
             if hasControl {
-                if model.isSearching {
-                    if model.isPickingScope {
-                        if key == "n" || event.keyCode == 45 {
-                            model.moveScopeSelection(by: 1)
-                            return nil
-                        }
-                        if key == "p" || event.keyCode == 35 {
-                            model.moveScopeSelection(by: -1)
-                            return nil
-                        }
-                    }
-                    if let key = event.charactersIgnoringModifiers,
-                       let item = model.item(forKey: key) {
-                        self.select(item)
+                if model.isPickingScope {
+                    if key == "n" || event.keyCode == 45 {
+                        model.moveScopeSelection(by: 1)
                         return nil
                     }
-                    return event
+                    if key == "p" || event.keyCode == 35 {
+                        model.moveScopeSelection(by: -1)
+                        return nil
+                    }
                 }
-                guard let key = event.charactersIgnoringModifiers?.lowercased() else { return event }
                 switch key {
-                case "a": model.moveSelectionToRowStart()
-                case "e": model.moveSelectionToRowEnd()
-                case "p": model.moveSelection(.up)
-                case "n": model.moveSelection(.down)
-                case "b": model.moveSelection(.left)
-                case "f": model.moveSelection(.right)
-                default: return event
+                case "p": model.moveSelection(.up); return nil
+                case "n": model.moveSelection(.down); return nil
+                case "f": model.moveSelection(.right); return nil
+                case "b": model.moveSelection(.left); return nil
+                default: break
                 }
-                return nil
+                if let key = event.charactersIgnoringModifiers,
+                   let item = model.item(forKey: key) {
+                    self.select(item)
+                    return nil
+                }
+                return event
             }
             // ⇧↑/⇧↓ 与 PageUp/PageDown 等价：整页滚动，完成后高亮重定位到可见第一项。
             if modifiers.contains(.shift), event.keyCode == 125 || event.keyCode == 126 {
@@ -1283,12 +1291,13 @@ final class FoilExposeController {
                 return nil
             }
             switch event.keyCode {
-            case 48: // Tab：输入法组合时放行；选分类时选中当前高亮项；其余情况吞掉以免焦点移出覆盖层
+            case 48: // Tab：输入法和范围选择优先，其余情况切换箔片分区
                 if model.isSearching, isComposing { return event }
                 if model.isPickingScope {
                     model.selectHighlightedScope()
                     return nil
                 }
+                model.switchFoilSection()
                 return nil
             case 116, 121: // PageUp / PageDown：整页滚动
                 model.requestPageScroll(direction: event.keyCode == 116 ? .up : .down)
@@ -1315,17 +1324,8 @@ final class FoilExposeController {
                 }
                 model.moveSelection(.up)     // ↑
             default:
-                // 搜索输入状态：其余按键交给输入框，关键字实时过滤。
-                if model.isSearching { return event }
-                // 无修饰键的 / 进入搜索输入状态。
-                if event.characters == "/" {
-                    model.beginSearch()
-                    return nil
-                }
-                // 编号/字母直选只命中当前可见项；未命中的无修饰按键静默吞掉，不发出系统提示音。
-                guard let key = event.charactersIgnoringModifiers,
-                      let item = model.item(forKey: key) else { return nil }
-                self.select(item)
+                // 普通字符（包括 /）始终进入搜索框。
+                return event
             }
             return nil
         }

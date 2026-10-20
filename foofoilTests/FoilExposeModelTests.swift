@@ -141,6 +141,26 @@ struct FoilExposeModelTests {
         #expect(!model.showsHistorySection)
     }
 
+    @Test func favoritesFilterOnlyHistoryAndKeepsOpenFoils() {
+        let open = makeItem(title: "Match open")
+        let history = makeItem(title: "Match history", isHistoryEntry: true)
+        var favorite = makeItem(title: "Match favorite", isHistoryEntry: true)
+        favorite.historyIsPinned = true
+        let model = makeModel(items: [open], historyItems: [history, favorite])
+
+        model.pinnedOnly = true
+        #expect(model.currentItems.map(\.id) == [open.id, favorite.id])
+        #expect(model.historyCount(in: .all) == 1)
+        model.searchText = "Match"
+        #expect(model.currentItems.map(\.id) == [open.id, favorite.id])
+        model.historyCategory = .images
+        #expect(model.currentItems.map(\.id) == [open.id])
+        model.historyCategory = .all
+        model.pinnedOnly = false
+        #expect(model.currentItems.map(\.id) == [open.id, history.id, favorite.id])
+        #expect(model.historyCount(in: .all) == 2)
+    }
+
     @Test func historyCountsPrecedeSearchLimitAndCategoryFiltering() {
         let documents = (0..<70).map { _ in makeItem(title: "Match", isHistoryEntry: true) }
         let image = FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true,
@@ -154,6 +174,30 @@ struct FoilExposeModelTests {
         #expect(model.currentItems.map(\.id) == [image.id])
         #expect(model.historyCount(in: .documents) == 70)
         #expect(!model.showsResultLimitNotice)
+    }
+
+    @Test func tabSwitchesBetweenFirstItemsOfOpenAndHistorySections() {
+        let model = makeModel(openCount: 3, historyCount: 2)
+        model.selectedIndex = 1
+        model.switchFoilSection()
+        #expect(model.selectedIndex == 3)
+        model.selectedIndex = 4
+        model.switchFoilSection()
+        #expect(model.selectedIndex == 0)
+        model.searchText = "no matching foil"
+        model.switchFoilSection()
+        #expect(model.selectedIndex == 0)
+    }
+
+    @Test func sectionSwitchKeepsSelectionWhenOtherSectionIsEmpty() {
+        let openOnly = makeModel(openCount: 3, historyCount: 0)
+        openOnly.selectedIndex = 1
+        openOnly.switchFoilSection()
+        #expect(openOnly.selectedIndex == 1)
+        let historyOnly = makeModel(openCount: 0, historyCount: 2)
+        historyOnly.selectedIndex = 1
+        historyOnly.switchFoilSection()
+        #expect(historyOnly.selectedIndex == 1)
     }
 
     @Test func currentItemsCombineOpenFoilsBeforeHistory() {
@@ -259,12 +303,13 @@ struct FoilExposeModelTests {
         #expect(model.currentItems.count == 1)
     }
 
-    @Test func endSearchKeepsQueryAndFilteredResults() {
+    @Test func searchIsAlwaysActiveAndRefocusingKeepsResults() {
         let model = makeModel()
+        #expect(model.isSearching)
         model.beginSearch()
         model.searchText = "item"
-        model.endSearch()
-        #expect(model.isSearching == false)
+        model.requestSearchFieldFocus()
+        #expect(model.isSearching)
         #expect(model.searchQuery == "item")
         #expect(model.currentItems.count == 8)
     }
@@ -275,7 +320,7 @@ struct FoilExposeModelTests {
         model.searchText = "不存在的关键字"
         #expect(model.currentItems.isEmpty)
         model.clearSearch()
-        #expect(model.isSearching == false)
+        #expect(model.isSearching)
         #expect(model.searchQuery.isEmpty)
         #expect(model.currentItems.count == 8)
         #expect(model.selectedIndex == 0)

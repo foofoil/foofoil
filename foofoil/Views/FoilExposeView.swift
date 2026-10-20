@@ -127,6 +127,7 @@ struct FoilExposeView: View {
     @State private var scrollPosition = ScrollPosition()
     @State private var contentOffsetY: CGFloat = 0
     @State private var headerHeight: CGFloat = 0
+    @State private var favoriteShortcut = KeyboardShortcutStore.shared.shortcut(forID: "history.toggleFavorite")
     @FocusState private var isSearchFieldFocused: Bool
 
     var body: some View {
@@ -198,21 +199,18 @@ struct FoilExposeView: View {
                 }
             }
         }
-        // 卡片按钮在自己的命中区内优先生效；落在空白处的点击先退出搜索输入，否则关闭覆盖层。
-        .onTapGesture {
-            if model.isSearching {
-                model.endSearch()
-            } else {
-                model.onDismiss()
-            }
-        }
-        .onChange(of: model.isSearching) { _, searching in
-            // 条件插入的输入框需要显式取焦点；AppKit 第一响应者由聚焦探针兜底。
-            isSearchFieldFocused = searching
+        // 点击空白或操作筛选后，搜索框继续接收键盘输入。
+        .onTapGesture { model.requestSearchFieldFocus() }
+        .onAppear { isSearchFieldFocused = true }
+        .onChange(of: isSearchFieldFocused) { _, focused in
+            if !focused { model.requestSearchFieldFocus() }
         }
         .onChange(of: model.searchFieldFocusRequest) { _, _ in
             guard model.isSearching else { return }
             isSearchFieldFocused = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .keyboardShortcutsDidChange)) { _ in
+            favoriteShortcut = KeyboardShortcutStore.shared.shortcut(forID: "history.toggleFavorite")
         }
         .ignoresSafeArea()
         .foilToast(model.toast)
@@ -530,11 +528,6 @@ struct FoilExposeView: View {
 
     private var historyCategoryLabels: some View {
         HStack(spacing: 6) {
-            Toggle(isOn: $model.pinnedOnly) {
-                Label("Favorited History", systemImage: "bookmark.fill")
-            }
-            .toggleStyle(.button)
-            .help(Text("Favorited History"))
             ForEach(model.visibleHistoryCategories) { category in
                 let selected = model.historyCategory == category
                 let title = NSLocalizedString(category.localizationKey, comment: "")
@@ -565,6 +558,19 @@ struct FoilExposeView: View {
                     }
                 }
             }
+            Toggle(isOn: $model.pinnedOnly) {
+                HStack(spacing: 5) {
+                    Label("Favorited History", systemImage: "bookmark.fill")
+                        .foregroundStyle(.white)
+                    if let favoriteShortcut {
+                        Text(favoriteShortcut.displayString)
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .toggleStyle(.button)
+            .help(Text("Favorited History"))
         }
     }
 
@@ -605,9 +611,7 @@ struct FoilExposeView: View {
             }
             .frame(height: 32)
             HStack(spacing: 16) {
-                Text(model.isSearching
-                     ? NSLocalizedString("Search Foils Hint", comment: "")
-                     : NSLocalizedString("Show All Foils Hint", comment: ""))
+                Text(NSLocalizedString("Search Foils Hint", comment: ""))
             }
             .font(.system(size: 13))
             .foregroundStyle(.white.opacity(0.62))
@@ -621,110 +625,57 @@ struct FoilExposeView: View {
         .zIndex(10)
     }
 
-    /// 标题后的搜索入口：默认是“/ 搜索”键帽提示，按 / 或点击后变成输入框；
-    /// 退出输入后保留结果，提示位置显示 “xxx”的搜索结果 与清除按钮。
-    @ViewBuilder
+    /// 搜索框始终显示；/ 用于选择搜索范围。
     private var searchControl: some View {
-        if model.isSearching {
-            HStack(spacing: 7) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.55))
-                if let scope = model.activeScope {
-                    HStack(spacing: 4) {
-                        Image(systemName: scope.symbolName)
+        HStack(spacing: 7) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.55))
+            if let scope = model.activeScope {
+                HStack(spacing: 4) {
+                    Image(systemName: scope.symbolName)
+                        .font(.system(size: 11))
+                    Text(scope.displayName)
+                        .font(.system(size: 12, weight: .medium))
+                    Button {
+                        model.clearActiveScope()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
                             .font(.system(size: 11))
-                        Text(scope.displayName)
-                            .font(.system(size: 12, weight: .medium))
-                        Button {
-                            model.clearActiveScope()
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.system(size: 11))
-                        }
-                        .buttonStyle(.plain)
                     }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(Color.white.opacity(0.22)))
-                    .foregroundStyle(.white)
+                    .buttonStyle(.plain)
                 }
-                TextField(exposeSearchPlaceholder, text: $model.searchText)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white)
-                    // 不设置 tint：白色 tint 会把选区高亮一并染白，导致选中文字不可见。
-                    .frame(width: model.activeScope == nil ? 220 : 160)
-                    .focused($isSearchFieldFocused)
-                    .background(
-                        SearchFieldFocusProbe(
-                            isActive: model.isSearching,
-                            focusRequest: model.searchFieldFocusRequest
-                        )
-                        .frame(width: 0, height: 0)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Capsule().fill(Color.white.opacity(0.22)))
+                .foregroundStyle(.white)
+            }
+            TextField(exposeSearchPlaceholder, text: $model.searchText)
+                .textFieldStyle(.plain)
+                .font(.system(size: 14))
+                .foregroundStyle(.white)
+                // 不设置 tint：白色 tint 会把选区高亮一并染白，导致选中文字不可见。
+                .frame(width: model.activeScope == nil ? 220 : 160)
+                .focused($isSearchFieldFocused)
+                .background(
+                    SearchFieldFocusProbe(
+                        isActive: model.isSearching,
+                        focusRequest: model.searchFieldFocusRequest
                     )
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Capsule().fill(Color.white.opacity(0.14)))
-            .overlay(Capsule().stroke(Color.white.opacity(0.32), lineWidth: 1))
-            .overlay(alignment: .top) {
-                if model.isPickingScope {
-                    scopeHintsMenu
-                        .offset(y: 40)
-                }
-            }
-            .environment(\.colorScheme, .dark)
-        } else if model.searchQuery.isEmpty && model.activeScope == nil {
-            Button {
-                model.beginSearch()
-            } label: {
-                HStack(spacing: 7) {
-                    Text("/")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(minWidth: 20)
-                        .padding(.vertical, 3)
-                        .background(RoundedRectangle(cornerRadius: 5).fill(Color.white.opacity(0.16)))
-                        .overlay(RoundedRectangle(cornerRadius: 5).stroke(Color.white.opacity(0.35), lineWidth: 1))
-                    Text(NSLocalizedString("Search Foils", comment: ""))
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.75))
-                }
-            }
-            .buttonStyle(.plain)
-            .help(NSLocalizedString("Search Foils", comment: ""))
-            .accessibilityLabel(NSLocalizedString("Search Foils Placeholder", comment: ""))
-        } else {
-            HStack(spacing: 8) {
-                if let scope = model.activeScope {
-                    HStack(spacing: 4) {
-                        Image(systemName: scope.symbolName)
-                            .font(.system(size: 11))
-                        Text(scope.displayName)
-                            .font(.system(size: 12, weight: .medium))
-                    }
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(Capsule().fill(Color.white.opacity(0.22)))
-                    .foregroundStyle(.white)
-                }
-                Text(String(format: NSLocalizedString("Search Foils Results Format", comment: ""), model.searchQuery))
-                    .font(.system(size: 14))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .lineLimit(1)
-                Button {
-                    model.clearSearch()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.white.opacity(0.6))
-                }
-                .buttonStyle(.plain)
-                .help(NSLocalizedString("Clear", comment: ""))
-                .accessibilityLabel(NSLocalizedString("Clear", comment: ""))
+                    .frame(width: 0, height: 0)
+                )
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Capsule().fill(Color.white.opacity(0.14)))
+        .overlay(Capsule().stroke(Color.white.opacity(0.32), lineWidth: 1))
+        .overlay(alignment: .top) {
+            if model.isPickingScope {
+                scopeHintsMenu
+                    .offset(y: 40)
             }
         }
+        .environment(\.colorScheme, .dark)
     }
 
     private var exposeSearchPlaceholder: String {
