@@ -15,13 +15,24 @@ extension AppDelegate {
     // MARK: - Menu Bar Setup
 
     @objc func restoreMenuItemImages(_ notification: Notification) {
-        (notification.object as? NSMenu)?.restoreItemImageVisibility()
+        guard let menu = notification.object as? NSMenu else { return }
+        if notification.name == NSMenu.didBeginTrackingNotification {
+            menu.restoreItemImageVisibility()
+        } else if let index = notification.userInfo?["NSMenuItemIndex"] as? Int {
+            menu.restoreItemImageVisibility(at: index)
+        }
+    }
+
+    func installMenuImageVisibilityObservers() {
+        // 除首次展开外，也覆盖 SwiftUI 在跟踪期间插入、替换或延迟设置图标的菜单项。
+        for name in [NSMenu.didBeginTrackingNotification, NSMenu.didAddItemNotification, NSMenu.didChangeItemNotification] {
+            NotificationCenter.default.removeObserver(self, name: name, object: nil)
+            NotificationCenter.default.addObserver(self, selector: #selector(restoreMenuItemImages(_:)), name: name, object: nil)
+        }
     }
 
     func setupMainMenu() {
-        // 跟踪开始时菜单已生成，统一恢复 SwiftUI 和 AppKit 菜单中的已有图标。
-        NotificationCenter.default.removeObserver(self, name: NSMenu.didBeginTrackingNotification, object: nil)
-        NotificationCenter.default.addObserver(self, selector: #selector(restoreMenuItemImages(_:)), name: NSMenu.didBeginTrackingNotification, object: nil)
+        installMenuImageVisibilityObservers()
         let mainMenu = NSMenu()
 
         // 1. App 菜单

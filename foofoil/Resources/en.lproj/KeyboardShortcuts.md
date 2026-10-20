@@ -109,6 +109,8 @@ Default window positioning keys (see the table for custom bindings): Control–O
 | --- | --- | --- | --- |
 {{history}}
 
+History → Favorite Current Foil toggles the current foil’s favorite status using the current shortcut shown above. A brief toast confirms the result inside the foil; history searches and Exposé show it in their own panel. Clear History keeps favorited records and their managed content. Add or remove a favorite from its context menu in history, Quick Open, or Exposé. Exposé’s Favorites filter preserves history order; Quick Open favors favorited records among similarly relevant matches. Deleting a favorited record requires confirmation and does not delete its original file.
+
 
 ## System and Editing
 

@@ -46,7 +46,8 @@ extension AppState {
         public func loadConfig(_ inputConfig: WindowConfig) -> Bool {
             if let path = inputConfig.textPath, Self.isManagedCacheURL(URL(fileURLWithPath: path)),
                ContentCache.shared.hasLease(for: path) { ContentCache.shared.flushBodyWrites() }
-            let resolution = inputConfig.resolvingFileReferences(removeMissingItems: SettingsStore.shared.automaticallyRemoveMissingHistory)
+            let historyIsPinned = HistoryRepository.shared.config(id: inputConfig.id)?.historyIsPinned ?? inputConfig.historyIsPinned
+            let resolution = inputConfig.resolvingFileReferences(removeMissingItems: SettingsStore.shared.automaticallyRemoveMissingHistory && !historyIsPinned)
             let config = resolution.config
             if resolution.missing, SettingsStore.shared.automaticallyRemoveMissingHistory {
                 HistoryManager.shared.removeFromHistory(inputConfig, preservingLegacyBody: true)

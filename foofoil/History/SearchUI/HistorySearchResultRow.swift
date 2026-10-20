@@ -14,7 +14,8 @@ struct HistorySearchResultRow: View {
             pageNumber: result.matchedPageNumber,
             thumbnailPath: result.thumbnailPath,
             showsInlineIcon: true,
-            isSelected: isSelected
+            isSelected: isSelected,
+            historyIsPinned: result.historyIsPinned
         )
     }
 }
@@ -44,6 +45,7 @@ private struct SearchResultRow: View {
     let thumbnailPath: String?
     let showsInlineIcon: Bool
     let isSelected: Bool
+    var historyIsPinned = false
     @StateObject private var thumbnail = HistorySearchThumbnailLoader()
 
     var body: some View {
@@ -59,6 +61,18 @@ private struct SearchResultRow: View {
                 }
             }
             .frame(width: 52, height: 52).clipShape(RoundedRectangle(cornerRadius: 7))
+            .overlay(alignment: .topTrailing) {
+                if historyIsPinned {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.accentColor)
+                        .padding(3)
+                        .background(.regularMaterial, in: Circle())
+                        .padding(2)
+                        .help(Text("Favorited History"))
+                        .accessibilityLabel(Text("Favorited History"))
+                }
+            }
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
                     if showsInlineIcon {

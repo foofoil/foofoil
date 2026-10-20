@@ -215,6 +215,7 @@ struct FoilExposeView: View {
             isSearchFieldFocused = true
         }
         .ignoresSafeArea()
+        .foilToast(model.toast)
     }
 
     private func updateVisibleEntries(
@@ -479,11 +480,20 @@ struct FoilExposeView: View {
                 }
                 .background(ItemFrameReporter(id: entry.item.id))
                 .contextMenu {
+                    if entry.item.hasHistoryRecord {
+                        Button {
+                            model.onTogglePinned(entry.item)
+                        } label: {
+                            Label(NSLocalizedString(entry.item.historyIsPinned ? "Unfavorite History" : "Favorite History", comment: ""), systemImage: entry.item.historyIsPinned ? "bookmark.slash.fill" : "bookmark.fill")
+                                .labelStyle(.titleAndIcon)
+                        }
+                    }
                     if entry.item.canRenameTitle {
                         Button {
                             model.onRenameItem(entry.item)
                         } label: {
                             Label("Change Title", systemImage: "pencil")
+                                .labelStyle(.titleAndIcon)
                         }
                     }
                     if entry.item.isHistoryEntry {
@@ -520,6 +530,11 @@ struct FoilExposeView: View {
 
     private var historyCategoryLabels: some View {
         HStack(spacing: 6) {
+            Toggle(isOn: $model.pinnedOnly) {
+                Label("Favorited History", systemImage: "bookmark.fill")
+            }
+            .toggleStyle(.button)
+            .help(Text("Favorited History"))
             ForEach(model.visibleHistoryCategories) { category in
                 let selected = model.historyCategory == category
                 let title = NSLocalizedString(category.localizationKey, comment: "")
@@ -937,8 +952,9 @@ struct FoilExposeItemView: View {
     private var accessibilityLabel: String {
         let title = item.controller?.appState.isIncognito == true
             ? "\(NSLocalizedString("Incognito Foil", comment: "")) \(item.title)" : item.title
-        guard let shortcut else { return title }
-        return "\(showsSearchModifier ? "⌃" : "")\(shortcut) \(title)"
+        let annotatedTitle = item.historyIsPinned ? "\(NSLocalizedString("Favorited History", comment: "")) \(title)" : title
+        guard let shortcut else { return annotatedTitle }
+        return "\(showsSearchModifier ? "⌃" : "")\(shortcut) \(annotatedTitle)"
     }
 
     private var thumbnail: some View {
@@ -1006,6 +1022,17 @@ struct FoilExposeItemView: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(alignment: .topTrailing) {
+                if item.historyIsPinned {
+                    Image(systemName: "bookmark.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 26, height: 26)
+                        .background(Circle().fill(Color.black.opacity(0.65)))
+                        .padding(7)
+                        .help(Text("Favorited History"))
+                }
+            }
             .overlay(strokeOverlay)
             .contentShape(RoundedRectangle(cornerRadius: 10))
     }

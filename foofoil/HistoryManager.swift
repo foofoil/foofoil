@@ -9,15 +9,21 @@ public final class HistoryManager: ObservableObject {
     @Published public private(set) var historyConfigs: [WindowConfig] = []
     private var checkingFiles = false
     private let fileCheckQueue = DispatchQueue(label: "com.foofoil.history.file-check", qos: .utility)
-    private let repository = HistoryRepository.shared
+    private let repository: HistoryRepository
+    private let contentCache: ContentCache
+    private let cacheDirectories: () -> [URL]
     private let listSaveQueue = DispatchQueue(label: "com.foofoil.history.large-list", qos: .utility)
     private var pendingListConfigs: [UUID: WindowConfig] = [:]
     private var listSaveWorkItem: DispatchWorkItem?
     private var historyMutationGeneration: UInt64 = 0
 
-    private init() {
+    init(repository: HistoryRepository = .shared, contentCache: ContentCache = .shared,
+         cacheDirectories: @escaping () -> [URL] = { AppState.cacheDirectoryURLs() }) {
+        self.repository = repository
+        self.contentCache = contentCache
+        self.cacheDirectories = cacheDirectories
         refresh()
-        ContentCache.shared.recoverOrphanBodies()
+        contentCache.recoverOrphanBodies()
     }
 
     public func refresh() {
@@ -45,7 +51,43 @@ public final class HistoryManager: ObservableObject {
         ContentIndexCoordinator.shared.schedule(config: config)
     }
 
+    @discardableResult
+    public func setPinned(id: UUID, pinned: Bool) -> Bool {
+        flushPendingListSaves()
+        guard repository.setPinned(id: id, pinned: pinned) else { return false }
+        historyMutationGeneration &+= 1
+        refreshUI()
+        return true
+    }
+
+    @discardableResult
+    func setFavorite(id: UUID, pinned: Bool, toast: FoilToastCenter) -> Bool {
+        let succeeded = setPinned(id: id, pinned: pinned)
+        toast.showFavoriteResult(pinned: pinned, succeeded: succeeded)
+        return succeeded
+    }
+
+    /// 显式删除与自动清理分开；只对已钉住的记录要求确认。
+    @discardableResult
+    func requestRemoveFromHistory(_ config: WindowConfig) -> Bool {
+        guard let current = repository.config(id: config.id) else { return false }
+        if current.historyIsPinned, Self.pinnedDeletionAlert().runModal() != .alertSecondButtonReturn { return false }
+        removeFromHistory(current)
+        return true
+    }
+
+    static func pinnedDeletionAlert() -> NSAlert {
+        let alert = NSAlert()
+        alert.messageText = NSLocalizedString("Delete Favorited History Confirmation", comment: "")
+        alert.informativeText = NSLocalizedString("Delete Favorited History Explanation", comment: "")
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Delete History Record", comment: "")).hasDestructiveAction = true
+        return alert
+    }
+
     public func removeFromHistory(_ config: WindowConfig, preservingLegacyBody: Bool = false) {
+        if preservingLegacyBody, repository.config(id: config.id)?.historyIsPinned == true { return }
         historyMutationGeneration &+= 1
         pendingListConfigs.removeValue(forKey: config.id)
         // 排空已提交写入，防止后台任务在删除之后重新创建历史项。
@@ -56,7 +98,7 @@ public final class HistoryManager: ObservableObject {
         let referencedPaths = Set(repository.recent(limit: Int.max).flatMap(cachePaths(for:)))
         let legacyPaths = preservingLegacyBody ? config.legacyExternalBodyPaths : []
         removeCacheFiles(for: config, preserving: referencedPaths.union(legacyPaths))
-        ContentCache.shared.retire(Set(cachePaths(for: config)).subtracting(legacyPaths))
+        contentCache.retire(Set(cachePaths(for: config)).subtracting(legacyPaths))
         refreshUI()
     }
 
@@ -81,14 +123,14 @@ public final class HistoryManager: ObservableObject {
                 let preservedPaths = activePaths.union(referencedPaths)
                 for path in candidatePaths where !preservedPaths.contains(path) {
                     let url = URL(fileURLWithPath: path)
-                    if AppState.isManagedCacheURL(url) { ContentCache.shared.retire([path]) }
+                    if AppState.isManagedCacheURL(url) { self.contentCache.retire([path]) }
                 }
                 continuation.resume(returning: true)
             }
         }
         if success {
             forgetRestoration(ids: ids)
-            ContentCache.shared.retire(candidatePaths)
+            contentCache.retire(candidatePaths)
         }
         refreshUI()
         return success
@@ -96,33 +138,31 @@ public final class HistoryManager: ObservableObject {
 
     public func clearHistory(preserving activeConfigs: [WindowConfig]? = nil) {
         historyMutationGeneration &+= 1
-        listSaveWorkItem?.cancel()
-        pendingListConfigs.removeAll()
-        listSaveQueue.sync {}
+        flushPendingListSaves()
         let configs = activeConfigs ?? (NSApplication.shared.delegate as? AppDelegate)?.windowControllers.filter { !$0.appState.isIncognito }.map { $0.appState.toConfig() } ?? []
         let incognitoIDs = Set((NSApplication.shared.delegate as? AppDelegate)?.windowControllers.filter { $0.appState.isIncognito }.map { $0.appState.id } ?? [])
         let active = configs.filter { !incognitoIDs.contains($0.id) && hasPersistableContent($0) }
         let activeIDs = Set(active.map(\.id))
-        ContentIndexCoordinator.shared.cancelAll(excluding: activeIDs)
+        let pinned = repository.recent(limit: Int.max).filter(\.historyIsPinned)
+        let retainedIDs = activeIDs.union(pinned.map(\.id))
+        ContentIndexCoordinator.shared.cancelAll(excluding: retainedIDs)
         repository.removeAll(excluding: activeIDs)
         active.forEach { _ = repository.upsert($0) }
 
-        let activePaths = Set(active.flatMap(cachePaths(for:))).union(activeCachePaths())
-        for directoryURL in AppState.cacheDirectoryURLs() {
+        let activePaths = Set((active + pinned).flatMap(cachePaths(for:))).union(activeCachePaths())
+        for directoryURL in cacheDirectories() {
             guard let enumerator = FileManager.default.enumerator(at: directoryURL, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else { continue }
             for case let fileURL as URL in enumerator where AppState.isManagedCacheURL(fileURL) && !activePaths.contains(fileURL.path) {
-                ContentCache.shared.retire([fileURL.path])
+                contentCache.retire([fileURL.path])
             }
         }
-        clearThumbnailFiles(preserving: activeIDs)
+        clearThumbnailFiles(preserving: retainedIDs)
         refreshUI()
     }
 
     /// 清理所有不在活跃列表中的历史项的缩略图文件，兼容旧 Flofoil/Flamina 目录
     private func clearThumbnailFiles(preserving activeIDs: Set<UUID>) {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        for name in ["foofoil", "Flamina", "Flofoil"] {
-            let root = appSupport.appendingPathComponent(name, isDirectory: true)
+        for root in cacheDirectories() {
             let thumbnailsDir = root.appendingPathComponent("Thumbnails")
             guard let enumerator = FileManager.default.enumerator(at: thumbnailsDir, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else { continue }
             for case let fileURL as URL in enumerator {
@@ -148,7 +188,7 @@ public final class HistoryManager: ObservableObject {
         SettingsStore.shared.lastOpenWindowConfigs.removeAll { ids.contains($0.id) }
         SettingsStore.shared.windowConfigs.removeAll { ids.contains($0.id) }
         for id in ids {
-            for root in AppState.cacheDirectoryURLs() {
+            for root in cacheDirectories() {
                 try? FileManager.default.removeItem(at: root.appendingPathComponent("Thumbnails/\(id).heic"))
             }
         }
@@ -182,10 +222,10 @@ public final class HistoryManager: ObservableObject {
         guard let current = repository.config(id: old.id),
               (try? Self.snapshotData(current)) == (try? Self.snapshotData(old)) else { return }
         if result.missing {
-            if SettingsStore.shared.automaticallyRemoveMissingHistory { removeFromHistory(current, preservingLegacyBody: true) }
+            if SettingsStore.shared.automaticallyRemoveMissingHistory && !current.historyIsPinned { removeFromHistory(current, preservingLegacyBody: true) }
         } else if (try? Self.snapshotData(result.config)) != (try? Self.snapshotData(old)) {
             // 关闭清理时也不能静默裁剪文件列表。
-            if SettingsStore.shared.automaticallyRemoveMissingHistory || result.config.fileList?.items.count == old.fileList?.items.count {
+            if (SettingsStore.shared.automaticallyRemoveMissingHistory && !current.historyIsPinned) || result.config.fileList?.items.count == old.fileList?.items.count {
                 _ = repository.upsert(result.config)
                 if let state = (NSApplication.shared.delegate as? AppDelegate)?.windowControllers.first(where: { $0.appState.id == old.id })?.appState,
                    let list = result.config.fileList, list.items.count != old.fileList?.items.count {
@@ -264,12 +304,22 @@ public final class HistoryManager: ObservableObject {
     private func removeCacheFiles(for config: WindowConfig, preserving paths: Set<String>) {
         for path in cachePaths(for: config) where !paths.contains(path) {
             let url = URL(fileURLWithPath: path)
-            if AppState.isManagedCacheURL(url) { ContentCache.shared.retire([path]) }
+            if AppState.isManagedCacheURL(url) { contentCache.retire([path]) }
         }
     }
 
-    private func hasPersistableContent(_ config: WindowConfig) -> Bool {
+    func hasPersistableContent(_ config: WindowConfig) -> Bool {
         guard config.sourceFingerprint?.hasPrefix("archive-entry:") != true else { return false }
         return config.appleMusicReference != nil || config.extensionID != nil || config.imagePath != nil || config.webURLString != nil || config.textPath != nil || !config.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+/// 收藏反馈文案留在历史领域，通用 toast 不依赖业务状态。
+extension FoilToastCenter {
+    func showFavoriteResult(pinned: Bool, succeeded: Bool) {
+        let key = succeeded ? (pinned ? "Favorite Added Toast" : "Favorite Removed Toast") : "Favorite Update Failed"
+        show(NSLocalizedString(key, comment: ""),
+             symbolName: succeeded ? (pinned ? "bookmark.fill" : "bookmark.slash.fill") : "exclamationmark.triangle.fill",
+             duration: succeeded ? .seconds(1.5) : .seconds(3))
     }
 }

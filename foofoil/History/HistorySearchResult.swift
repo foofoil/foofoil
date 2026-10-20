@@ -11,6 +11,7 @@ nonisolated public struct HistorySearchResult: Identifiable, Sendable, Equatable
     public var sourcePath: String? = nil
     public var isAppleMusic: Bool = false
     public var isClipboardContent: Bool = false
+    public var historyIsPinned: Bool = false
     public var symbolName: String { isAppleMusic ? AppleMusicReference.symbolName : contentKind.symbolName }
 }
 
@@ -25,4 +26,5 @@ nonisolated struct HistorySearchCandidate: Sendable {
     let lastOpenedAt: Date
     var sourceFingerprint: String? = nil
     var isAppleMusic: Bool = false
+    var historyIsPinned: Bool = false
 }

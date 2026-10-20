@@ -32,10 +32,10 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
         (try? database?.fileCheckBatch(after: id, limit: limit)) ?? []
     }
 
-    public func recent(limit: Int = 30) -> [WindowConfig] {
+    public func recent(limit: Int = 30, includingPinned: Bool = false) -> [WindowConfig] {
         guard let database else { return [] }
         do {
-            return try database.recent(limit: limit)
+            return try database.recent(limit: limit, includingPinned: includingPinned)
         }
         catch { NSLog("最近历史读取失败：%@", error.localizedDescription); return [] }
     }
@@ -69,9 +69,18 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
     public func removeAll(excluding ids: Set<UUID>) {
         mutationLock.lock()
         defer { mutationLock.unlock() }
-        let removed = Set(recent(limit: Int.max).map(\.id)).subtracting(ids)
+        let removed = Set(recent(limit: Int.max).filter { !$0.historyIsPinned }.map(\.id)).subtracting(ids)
         do { try database?.removeAll(excluding: ids); deletedIDs.formUnion(removed) }
         catch { NSLog("历史清除失败：%@", error.localizedDescription) }
+    }
+
+    @discardableResult
+    public func setPinned(id: UUID, pinned: Bool) -> Bool {
+        mutationLock.lock()
+        defer { mutationLock.unlock() }
+        guard let database, !deletedIDs.contains(id), config(id: id) != nil else { return false }
+        do { try database.setPinned(id: id, pinned: pinned); return true }
+        catch { NSLog("历史钉住失败：%@", error.localizedDescription); return false }
     }
 
     public func wasDeleted(_ id: UUID) -> Bool {
@@ -123,7 +132,8 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                         score: self.score(best, query: normalizedQuery),
                         sourcePath: best.sourceFingerprint.flatMap { $0.hasPrefix("file:") ? String($0.dropFirst(5)) : nil },
                         isAppleMusic: best.isAppleMusic,
-                        isClipboardContent: best.sourceFingerprint?.hasPrefix("clipboard:") == true
+                        isClipboardContent: best.sourceFingerprint?.hasPrefix("clipboard:") == true,
+                        historyIsPinned: best.historyIsPinned
                     ))
                 }
                 return results.sorted { lhs, rhs in
@@ -145,7 +155,8 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
         else if title.contains(query) { base = 600 }
         else if candidate.normalizedText.contains(query) { base = 400 }
         else { base = 200 }
-        return base + min(candidate.lastOpenedAt.timeIntervalSince1970 / 1_000_000_000, 10)
+        // 加权小于相邻文本相关性档位的差值，同档优先钉住，强匹配仍优先。
+        return base + (candidate.historyIsPinned ? 20 : 0) + min(candidate.lastOpenedAt.timeIntervalSince1970 / 1_000_000_000, 10)
     }
 
     private func snippet(from text: String, keywords: [String]) -> String? {

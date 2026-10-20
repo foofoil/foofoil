@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 nonisolated final class HistoryDatabase {
-    static let schemaVersion = 23
+    static let schemaVersion = 24
 
     private let queue = DispatchQueue(label: "com.foofoil.history.database", qos: .utility)
     private var connection: OpaquePointer?
@@ -68,6 +68,7 @@ nonisolated final class HistoryDatabase {
                 var duplicateCreatedAt: Date?
 
                 // 同一本地来源在同一打开方式内去重；包浏览与普通预览各保留自己的历史。
+                // 自动去重不淘汰钉住记录；新 ID 不继承另一条记录的保留标记。
                 // 列表会话没有单文件 fingerprint，避免打开其中某一项时吞掉整份列表。
                 if kind != .note, config.fileList?.isPresentable != true, let fingerprint = config.sourceFingerprint,
                    let duplicate = try findSourceDuplicate(fingerprint: fingerprint, isArchive: kind == .archive, excluding: config.id) {
@@ -110,8 +111,8 @@ nonisolated final class HistoryDatabase {
                         navigator_panel_visibility, navigator_panel_width, file_list,
                         document_zoom, document_scroll_file, document_scroll_fraction, text_fingerprint,
                         image_ocr_text, image_has_subject, image_subject_path, apple_music_reference, subtitle_associations, custom_title, archive_source,
-                        show_code_line_numbers, read_only_presentation
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        show_code_line_numbers, read_only_presentation, history_is_pinned
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -178,7 +179,7 @@ nonisolated final class HistoryDatabase {
                         try config.subtitleAssociations.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
                         config.customTitle,
                         try config.archiveSource.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
-                        config.showCodeLineNumbers, config.readOnlyPresentation
+                        config.showCodeLineNumbers, config.readOnlyPresentation, config.historyIsPinned
                     ])
 
                 let metadata = (
@@ -223,9 +224,17 @@ nonisolated final class HistoryDatabase {
         }
     }
 
-    func recent(limit: Int) throws -> [WindowConfig] {
+    func recent(limit: Int, includingPinned: Bool = false) throws -> [WindowConfig] {
         try queue.sync {
-            try queryConfigs("SELECT * FROM history_items ORDER BY last_opened_at DESC LIMIT ?", bindings: [limit])
+            if includingPinned {
+                // 总览保留最近记录的加载上限，但长期保留的旧记录始终可筛选，顺序仍按访问时间。
+                return try queryConfigs("""
+                    SELECT * FROM history_items WHERE history_is_pinned = 1 OR id IN
+                    (SELECT id FROM history_items ORDER BY last_opened_at DESC LIMIT ?)
+                    ORDER BY last_opened_at DESC
+                    """, bindings: [limit])
+            }
+            return try queryConfigs("SELECT * FROM history_items ORDER BY last_opened_at DESC LIMIT ?", bindings: [limit])
         }
     }
 
@@ -244,6 +253,13 @@ nonisolated final class HistoryDatabase {
                 }
             }
             return dates
+        }
+    }
+
+    /// 只更新保留标记，不触碰访问时间、内容索引或窗口置顶状态。
+    func setPinned(id: UUID, pinned: Bool) throws {
+        try queue.sync {
+            try executePrepared("UPDATE history_items SET history_is_pinned = ? WHERE id = ?", bindings: [pinned, id.uuidString])
         }
     }
 
@@ -302,7 +318,7 @@ nonisolated final class HistoryDatabase {
     func removeAll(excluding ids: Set<UUID>) throws {
         try queue.sync {
             try transaction {
-                let all = try queryUUIDs("SELECT id FROM history_items")
+                let all = try queryUUIDs("SELECT id FROM history_items WHERE history_is_pinned = 0")
                 for id in all where !ids.contains(id) { try deleteItem(id: id) }
             }
         }
@@ -314,7 +330,7 @@ nonisolated final class HistoryDatabase {
             var values: [HistorySearchCandidate] = []
             try withStatement("""
                 SELECT h.id, h.display_title, h.content_kind, COALESCE(h.thumbnail_path, h.image_path),
-                       c.original_text, c.normalized_text, c.page_number, h.last_opened_at, h.source_fingerprint, h.apple_music_reference IS NOT NULL
+                       c.original_text, c.normalized_text, c.page_number, h.last_opened_at, h.source_fingerprint, h.apple_music_reference IS NOT NULL, h.history_is_pinned
                 FROM search_fts f
                 JOIN search_chunks c ON c.id = f.rowid
                 JOIN history_items h ON h.id = c.history_id
@@ -334,7 +350,8 @@ nonisolated final class HistoryDatabase {
                         pageNumber: sqlite3_column_type(statement, 6) == SQLITE_NULL ? nil : Int(sqlite3_column_int(statement, 6)),
                         lastOpenedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 7)),
                         sourceFingerprint: optionalText(statement, 8),
-                        isAppleMusic: sqlite3_column_int(statement, 9) != 0
+                        isAppleMusic: sqlite3_column_int(statement, 9) != 0,
+                        historyIsPinned: sqlite3_column_int(statement, 10) != 0
                     ))
                 }
             }
@@ -495,6 +512,7 @@ nonisolated final class HistoryDatabase {
                 WHERE video_looping = 1 AND file_list IS NOT NULL AND length(file_list) > 0
                 """)
         }
+        try addColumnIfMissing("history_is_pinned", definition: "history_is_pinned INTEGER NOT NULL DEFAULT 0")
         try execute("PRAGMA user_version = \(Self.schemaVersion)")
         // 新库明确不读取旧历史；初始化成功后移除旧键，避免旧路径复活。
         UserDefaults.standard.removeObject(forKey: "historyConfigs")
@@ -667,7 +685,7 @@ nonisolated final class HistoryDatabase {
 
     private func findWebDuplicate(inputURL: String, actualURL: String, excluding id: UUID) throws -> WindowConfig? {
         try queryConfigs("""
-            SELECT * FROM history_items WHERE id != ? AND web_url IS NOT NULL AND
+            SELECT * FROM history_items WHERE id != ? AND history_is_pinned = 0 AND web_url IS NOT NULL AND
             (web_url IN (?, ?) OR COALESCE(actual_web_url, web_url) IN (?, ?))
             ORDER BY created_at ASC LIMIT 1
             """, bindings: [id.uuidString, inputURL, actualURL, inputURL, actualURL]).first
@@ -675,7 +693,7 @@ nonisolated final class HistoryDatabase {
 
     private func findSourceDuplicate(fingerprint: String, isArchive: Bool, excluding id: UUID) throws -> WindowConfig? {
         try queryConfigs(
-            "SELECT * FROM history_items WHERE id != ? AND source_fingerprint = ? AND (content_kind = ?) = ? ORDER BY created_at ASC LIMIT 1",
+            "SELECT * FROM history_items WHERE id != ? AND history_is_pinned = 0 AND source_fingerprint = ? AND (content_kind = ?) = ? ORDER BY created_at ASC LIMIT 1",
             bindings: [id.uuidString, fingerprint, HistoryContentKind.archive.rawValue, isArchive ? 1 : 0]
         ).first
     }
@@ -705,6 +723,7 @@ nonisolated final class HistoryDatabase {
                     imageSource: optionalText(statement, columns["image_source"]!).flatMap(ImageSource.init(rawValue:)),
                     text: text(statement, columns["inline_text"]!),
                     isPinned: sqlite3_column_int(statement, columns["is_pinned"]!) != 0,
+                    historyIsPinned: sqlite3_column_int(statement, columns["history_is_pinned"]!) != 0,
                     opacity: sqlite3_column_double(statement, columns["opacity"]!),
                     windowFrame: optionalText(statement, columns["window_frame"]!),
                     showBorder: sqlite3_column_int(statement, columns["show_border"]!) != 0,

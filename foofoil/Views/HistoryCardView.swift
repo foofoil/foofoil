@@ -26,6 +26,17 @@ struct HistoryCardView: View {
                     .opacity(isPressed ? 0.7 : (isHovered ? 1.0 : 0.95))
             )
             .cornerRadius(8)
+            .overlay(alignment: .topTrailing) {
+                if config.historyIsPinned {
+                    Image(systemName: "bookmark.fill")
+                        .foregroundStyle(Color.accentColor)
+                        .padding(4)
+                        .background(.regularMaterial, in: Circle())
+                        .padding(3)
+                        .help(Text("Favorited History"))
+                        .accessibilityLabel(Text("Favorited History"))
+                }
+            }
             .overlay(alignment: .bottomTrailing) {
                 if config.isClipboardContent {
                     Image(systemName: "doc.on.clipboard")

@@ -24,6 +24,7 @@ Built with SwiftUI and AppKit, foofoil favors native macOS capabilities, fast in
 - Zoom images and web content, fit images to a window, and customize SVG colors or the document look: background, text color, font, line spacing and paragraph spacing for plain text, Markdown and EPUB foils, following light/dark appearance changes.
 - Save, copy, share, or capture displayed content using native macOS workflows.
 - Restore window state and keep a local content history.
+- Favorite history records for long-term access, preserve them when clearing history, and filter them in Exposé. Toggle the current foil’s favorite status with ⌘D by default; a brief toast confirms the result.
 - Search history by title and content, including on-device OCR for images and extracted text from PDFs and web pages.
 - Use ⌘P for Quick Open: find and open history content or local files from authorized folders, or enter a URL.
 - Customize keyboard shortcuts in Settings and use English or Simplified Chinese throughout the interface.
@@ -181,7 +182,7 @@ Browse nested archives in one tree, loading and caching inner directories only w
 
 Local files are referenced directly, with bookmarks tracking renames and moves when possible. History keeps no body copy of an original file, and deleting history never deletes that original. Clipboard text, Markdown, HTML, and image data are saved automatically and can be restored from history, marked “From Clipboard,” without Save As. Copied files still reference their originals; copied URLs and image addresses open as URLs without automatic downloading.
 
-Settings → General → Automatically remove history for missing files is on by default. Only confirmed missing sources are removed; offline volumes, authorization problems, and temporary errors are retained. Turn it off to keep unavailable entries and receive feedback when opening them. Deleting managed history leaves open windows usable; its body is removed after the last user releases it. Saved bodies are excluded from ordinary cache eviction. Incognito bodies last only for the session.
+Settings → General → Automatically remove history for missing files is on by default. Only unfavorited records with confirmed missing sources are removed; offline volumes, authorization problems, and temporary errors are retained. Turn it off to keep unavailable entries and receive feedback when opening them. Deleting managed history leaves open windows usable; its body is removed after the last user releases it. Saved bodies are excluded from ordinary cache eviction. Incognito bodies last only for the session.
 
 ## Agent terminal
 

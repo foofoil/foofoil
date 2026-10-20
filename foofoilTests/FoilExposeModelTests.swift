@@ -60,12 +60,15 @@ struct FoilExposeModelTests {
         #expect(model.currentItems.map(\.id) == [open.id, history.id])
     }
 
-    @Test func onlyHistoryNotesRequireSingleItemClearConfirmation() {
+    @Test func onlyPinnedHistoryRequiresSingleItemClearConfirmation() {
         for kind in [HistoryContentKind.note, .text, .markdown, .csv, .image, .web, .pdf,
                      .video, .audio, .extensionContent, .ebook, .quickLook, .camera] {
             let history = FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true,
                                         title: "History", symbolName: kind.symbolName, contentKind: kind, thumbnailPath: nil)
-            #expect(history.requiresHistoryClearConfirmation == (kind == .note))
+            #expect(!history.requiresHistoryClearConfirmation)
+            var pinned = history
+            pinned.historyIsPinned = true
+            #expect(pinned.requiresHistoryClearConfirmation)
         }
         #expect(!makeItem().requiresHistoryClearConfirmation)
     }

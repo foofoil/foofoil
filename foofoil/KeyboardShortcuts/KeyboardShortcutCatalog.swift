@@ -163,6 +163,7 @@ nonisolated enum KeyboardShortcutCatalog {
     ]
 
     static let history: [KeyboardShortcutDefinition] = [
+        definition("history.toggleFavorite", "Favorite Current Foil", "d", [.command]),
         definition("history.clear", "Clear History Menu Item", nil, [])
     ]
 

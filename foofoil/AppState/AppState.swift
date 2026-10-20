@@ -26,9 +26,12 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     public static let maxDocumentZoom: Double = 3.0
 
     let subtitles = VideoSubtitleController()
+    let toast = FoilToastCenter()
     /// 无痕属性属于窗口，内容替换或重置时仍保留；不写入持久配置。
     public let isIncognito: Bool
-    public var id: UUID
+    public var id: UUID {
+        didSet { if id != oldValue { toast.dismiss() } }
+    }
     var sourceFingerprint: String?
     public var isInteractiveZooming: Bool = false
     /// 缓存当前解码图片，避免缩放重绘时反复从磁盘创建 NSImage。

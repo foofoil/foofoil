@@ -105,6 +105,39 @@ struct FoilExposeShortcutTests {
         #expect(parent.preferredImageVisibility == .automatic)
     }
 
+    @Test @MainActor func menuImagesAddedOrUpdatedAfterTrackingRemainVisible() {
+        guard #available(macOS 27.0, *) else { return }
+        let delegate = AppDelegate()
+        delegate.installMenuImageVisibilityObservers()
+        defer { NotificationCenter.default.removeObserver(delegate) }
+        let menu = NSMenu()
+        let favorite = NSMenuItem(title: "Favorite", action: nil, keyEquivalent: "")
+        menu.addItem(favorite)
+        NotificationCenter.default.post(name: NSMenu.didBeginTrackingNotification, object: menu)
+        #expect(favorite.preferredImageVisibility == .automatic)
+        // 菜单开始跟踪时没有 image，随后由 SwiftUI 的更新过程补齐。
+        favorite.image = NSImage(systemSymbolName: "bookmark.fill", accessibilityDescription: nil)
+        #expect(favorite.preferredImageVisibility == .visible)
+        let rename = NSMenuItem(title: "Rename", action: nil, keyEquivalent: "")
+        rename.image = NSImage(systemSymbolName: "pencil", accessibilityDescription: nil)
+        menu.addItem(rename)
+        #expect(rename.preferredImageVisibility == .visible)
+        // 同一菜单重用时图标和可见性可能被重新配置。
+        favorite.preferredImageVisibility = .automatic
+        favorite.image = NSImage(systemSymbolName: "bookmark.slash.fill", accessibilityDescription: nil)
+        #expect(favorite.preferredImageVisibility == .visible)
+        // 动态子菜单中的延迟图标也走同一修正入口。
+        let submenu = NSMenu()
+        rename.submenu = submenu
+        let child = NSMenuItem(title: "Child", action: nil, keyEquivalent: "")
+        submenu.addItem(child)
+        child.image = NSImage(systemSymbolName: "pencil", accessibilityDescription: nil)
+        #expect(child.preferredImageVisibility == .visible)
+        delegate.restoreMenuItemImages(Notification(name: NSMenu.didChangeItemNotification, object: menu,
+                                                    userInfo: ["NSMenuItemIndex": -1]))
+        #expect(favorite.preferredImageVisibility == .visible)
+    }
+
     @Test func globalAndFileShortcutGroups() throws {
         #expect(KeyboardShortcutCatalog.sections.prefix(2) == [.global, .file])
         #expect(KeyboardShortcutCatalog.global.map(\.id) == ["window.showAllFoils", "global.openClipboardContent"])

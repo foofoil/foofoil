@@ -142,6 +142,12 @@ struct TextEditorModeView: View {
                                                 }
                                             )
                                             .contextMenu {
+                                                Button {
+                                                    historyManager.setFavorite(id: config.id, pinned: !config.historyIsPinned, toast: appState.toast)
+                                                } label: {
+                                                    Label(NSLocalizedString(config.historyIsPinned ? "Unfavorite History" : "Favorite History", comment: ""), systemImage: config.historyIsPinned ? "bookmark.slash.fill" : "bookmark.fill")
+                                                }
+
                                                 Button(action: {
                                                     targetRenameConfig = config
                                                     newTitleText = config.historyMenuDisplayName
@@ -152,7 +158,7 @@ struct TextEditorModeView: View {
                                                 }
 
                                                 Button(action: {
-                                                    historyManager.removeFromHistory(config)
+                                                    historyManager.requestRemoveFromHistory(config)
                                                 }) {
                                                     Label(NSLocalizedString("Delete History Record", comment: ""), systemImage: "trash")
                                                         .labelStyle(.titleAndIcon)

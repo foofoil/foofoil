@@ -1,6 +1,166 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Favorite Update Failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t update favorites. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法更新收藏，请重试。"
+          }
+        }
+      }
+    },
+    "Favorite Removed Toast": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removed from Favorites"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已取消收藏"
+          }
+        }
+      }
+    },
+    "Favorite Added Toast": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Added to Favorites"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已收藏"
+          }
+        }
+      }
+    },
+    "Unfavorite Current Foil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Current Foil from Favorites"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消收藏当前箔"
+          }
+        }
+      }
+    },
+    "Favorite Current Foil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favorite Current Foil"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收藏当前箔"
+          }
+        }
+      }
+    },
+    "Delete Favorited History Explanation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This removes the access record, not the original file."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只删除访问记录，不删除原始文件。"
+          }
+        }
+      }
+    },
+    "Delete Favorited History Confirmation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this favorited history record?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确定删除这条已收藏的历史记录吗？"
+          }
+        }
+      }
+    },
+    "Favorited History": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Favorites"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已收藏"
+          }
+        }
+      }
+    },
+    "Unfavorite History": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove from Favorites"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消收藏"
+          }
+        }
+      }
+    },
+    "Favorite History": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add to Favorites"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收藏"
+          }
+        }
+      }
+    },
     "Agent Resource Unavailable": {
       "localizations": {
         "en": {
@@ -2447,13 +2607,13 @@
       "en": {
         "stringUnit": {
           "state": "translated",
-          "value": "Clear All History"
+          "value": "Clear Unfavorited History…"
         }
       },
       "zh-Hans": {
         "stringUnit": {
           "state": "translated",
-          "value": "清除所有历史记录"
+          "value": "清除未收藏的历史记录…"
         }
       }
     }
@@ -2464,13 +2624,13 @@
       "en": {
         "stringUnit": {
           "state": "translated",
-          "value": "Clear All %@ History"
+          "value": "Clear Unfavorited %@ History…"
         }
       },
       "zh-Hans": {
         "stringUnit": {
           "state": "translated",
-          "value": "清除所有%@历史记录"
+          "value": "清除未收藏的%@历史记录…"
         }
       }
     }
@@ -2481,13 +2641,13 @@
       "en": {
         "stringUnit": {
           "state": "translated",
-          "value": "Clear %ld history records and their cached content? This includes all closed items in this category, beyond the current search results. Open foils and original files will be preserved."
+          "value": "Clear %ld unfavorited history records and their cached content? This includes all closed items in this category, beyond the current search results. Favorited records, open foils, and original files will be kept."
         }
       },
       "zh-Hans": {
         "stringUnit": {
           "state": "translated",
-          "value": "确定清除 %ld 条历史记录及其缓存内容吗？将清除该分类中所有未打开的记录，不限于当前搜索结果。保留已打开的箔片和原始文件。"
+          "value": "清除 %ld 条未收藏历史记录及其缓存内容？将清除该分类中所有已关闭的未收藏记录，不限于当前搜索结果。已收藏记录、已打开箔片和原始文件将保留。"
         }
       }
     }
@@ -6095,13 +6255,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Clear History..."
+            "value": "Clear Unfavorited History…"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "清空历史记录..."
+            "value": "清除未收藏的历史记录…"
           }
         }
       }
@@ -6350,13 +6510,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Clear History?"
+            "value": "Clear unfavorited history?"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "确定要清空历史记录吗？"
+            "value": "清除未收藏的历史记录？"
           }
         }
       }
@@ -10205,13 +10365,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This will clear history and cached content for closed windows, plus WebKit website cache, cookies, and stored website data."
+            "value": "This clears unfavorited history and cached content for closed windows, plus WebKit website cache, cookies, and stored website data. Favorited records and their content are kept."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "这将清除已关闭窗口的历史记录和缓存内容，以及网页缓存、Cookie 和网站本地数据。"
+            "value": "将清除已关闭窗口中未收藏的历史记录和缓存内容，以及 WebKit 网站缓存、Cookie 和存储的网站数据。已收藏记录及其内容会保留。"
           }
         }
       }

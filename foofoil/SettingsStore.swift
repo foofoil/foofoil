@@ -130,6 +130,8 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     public var imageSource: ImageSource?
     public var text: String
     public var isPinned: Bool
+    /// 历史记录的保留标记，与窗口置顶互不影响。
+    public var historyIsPinned: Bool = false
     public var opacity: Double
     public var windowFrame: String?
     public var showBorder: Bool
@@ -213,6 +215,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         imageSource: ImageSource? = nil,
         text: String = "",
         isPinned: Bool = false,
+        historyIsPinned: Bool = false,
         opacity: Double = 1.0,
         windowFrame: String? = nil,
         showBorder: Bool = true,
@@ -266,6 +269,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.imageSource = imageSource
         self.text = text
         self.isPinned = isPinned
+        self.historyIsPinned = historyIsPinned
         self.opacity = opacity
         self.windowFrame = windowFrame
         self.showBorder = showBorder
@@ -312,7 +316,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource, showCodeLineNumbers, readOnlyPresentation
+        case historyIsPinned, isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource, showCodeLineNumbers, readOnlyPresentation
     }
 
     public init(from decoder: Decoder) throws {
@@ -325,6 +329,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         originalImageName = try container.decodeIfPresent(String.self, forKey: .originalImageName)
         imageSource = try container.decodeIfPresent(ImageSource.self, forKey: .imageSource)
         text = try container.decode(String.self, forKey: .text)
+        historyIsPinned = try container.decodeIfPresent(Bool.self, forKey: .historyIsPinned) ?? false
         isPinned = try container.decode(Bool.self, forKey: .isPinned)
         opacity = try container.decode(Double.self, forKey: .opacity)
         windowFrame = try container.decodeIfPresent(String.self, forKey: .windowFrame)

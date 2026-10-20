@@ -27,6 +27,7 @@ enum FileSearchStatus: Equatable {
 
 @MainActor
 final class HistorySearchViewModel: ObservableObject {
+    let toast = FoilToastCenter()
     @Published var activeScope: SearchScope? = nil {
         didSet {
             if oldValue != activeScope && !isResetting {
@@ -285,7 +286,8 @@ final class HistorySearchViewModel: ObservableObject {
         performSearch()
     }
 
-    func stop() {
+    func stop(clearToast: Bool = true) {
+        if clearToast { toast.dismiss() }
         isActive = false
         musicTask?.cancel()
         musicTask = nil
@@ -325,9 +327,18 @@ final class HistorySearchViewModel: ObservableObject {
     func open(_ result: HistorySearchResult) { openResult?(result.id) }
     func openURLResult() { if let openURL { openWebURL?(openURL) } }
 
+    func togglePinned(_ result: HistorySearchResult) {
+        guard let config = HistoryRepository.shared.config(id: result.id) else {
+            toast.showFavoriteResult(pinned: true, succeeded: false)
+            return
+        }
+        HistoryManager.shared.setFavorite(id: result.id, pinned: !config.historyIsPinned, toast: toast)
+        performSearch()
+    }
+
     func delete(_ result: HistorySearchResult) {
         if let config = HistoryRepository.shared.config(id: result.id) {
-            HistoryManager.shared.removeFromHistory(config)
+            HistoryManager.shared.requestRemoveFromHistory(config)
         }
         performSearch()
     }
@@ -345,7 +356,8 @@ final class HistorySearchViewModel: ObservableObject {
     }
 
     private func performSearch() {
-        stop()
+        // 刷新排序会重启搜索任务，但收藏结果提示应继续显示到自己的截止时间。
+        stop(clearToast: false)
         isActive = true
         let currentGeneration = generation
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)

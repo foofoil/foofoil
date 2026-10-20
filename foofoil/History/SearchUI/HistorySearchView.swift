@@ -111,6 +111,10 @@ struct HistorySearchView: View {
                                         .id("history:\(result.id)")
                                         .onTapGesture { model.open(result) }
                                         .contextMenu {
+                                            Button { model.togglePinned(result) } label: {
+                                                Label(NSLocalizedString(result.historyIsPinned ? "Unfavorite History" : "Favorite History", comment: ""), systemImage: result.historyIsPinned ? "bookmark.slash.fill" : "bookmark.fill")
+                                            }
+
                                             Button(role: .destructive) { model.delete(result) } label: {
                                                 Label(NSLocalizedString("Delete", comment: ""), systemImage: "trash")
                                             }
@@ -213,6 +217,7 @@ struct HistorySearchView: View {
         .fixedSize(horizontal: false, vertical: true)
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .foilToast(model.toast)
         .onAppear {
             focused = true
             triggerSelectAllIfNeeded()

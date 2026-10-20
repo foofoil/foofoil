@@ -59,6 +59,15 @@ extension AppDelegate {
         guard let historyMenu = historyMenu else { return }
         historyMenu.removeAllItems()
 
+        let favoriteItem = NSMenuItem(title: "", action: #selector(toggleCurrentFoilFavoriteAction), keyEquivalent: "")
+        favoriteItem.target = self
+        let favoriteShortcut = KeyboardShortcutStore.shared.shortcut(forID: "history.toggleFavorite")
+        favoriteItem.keyEquivalent = favoriteShortcut?.keyEquivalent ?? ""
+        favoriteItem.keyEquivalentModifierMask = favoriteShortcut?.modifiers ?? []
+        updateCurrentFoilFavoriteMenuItem(favoriteItem)
+        historyMenu.addItem(favoriteItem)
+        historyMenu.addItem(NSMenuItem.separator())
+
         let searchItem = NSMenuItem(title: NSLocalizedString("Search History Records Menu Item", comment: ""), action: #selector(showHistorySearchAction), keyEquivalent: "")
         searchItem.withSymbol("magnifyingglass")
         searchItem.target = self
@@ -99,6 +108,41 @@ extension AppDelegate {
         clearHistoryItem.keyEquivalentModifierMask = clearShortcut?.modifiers ?? []
         clearHistoryItem.target = self
         historyMenu.addItem(clearHistoryItem)
+    }
+
+    /// 收藏属于历史记录；无痕、临时预览和未形成可保存内容的箔片不提供该操作。
+    var currentFoilForFavorite: AppState? {
+        guard let state = activeAppState, !state.isIncognito, !state.isArchivePreview,
+              !state.isFileOpenFeedback, state.archiveSession?.hasTemporarySource != true,
+              !HistoryRepository.shared.wasDeleted(state.id),
+              HistoryManager.shared.hasPersistableContent(state.toConfig()) else { return nil }
+        return state
+    }
+
+    @discardableResult
+    func updateCurrentFoilFavoriteMenuItem(_ item: NSMenuItem) -> Bool {
+        let state = currentFoilForFavorite
+        let isFavorite = state.flatMap { HistoryRepository.shared.config(id: $0.id) }?.historyIsPinned == true
+        item.title = NSLocalizedString(isFavorite ? "Unfavorite Current Foil" : "Favorite Current Foil", comment: "")
+        item.withSymbol(isFavorite ? "bookmark.slash.fill" : "bookmark.fill")
+        item.isEnabled = state != nil
+        return state != nil
+    }
+
+    @objc func toggleCurrentFoilFavoriteAction() {
+        guard let state = currentFoilForFavorite else { return }
+        HistoryManager.shared.flushPendingListSaves()
+        // 新内容先建立历史；已有记录只改收藏状态，避免保存窗口时顺带重排访问顺序。
+        if HistoryRepository.shared.config(id: state.id) == nil {
+            state.saveState()
+            HistoryManager.shared.flushPendingListSaves()
+        }
+        guard let config = HistoryRepository.shared.config(id: state.id) else {
+            state.toast.showFavoriteResult(pinned: true, succeeded: false)
+            return
+        }
+        HistoryManager.shared.setFavorite(id: config.id, pinned: !config.historyIsPinned, toast: state.toast)
+        updateHistoryMenu()
     }
 
     @objc func showHistorySearchAction() {

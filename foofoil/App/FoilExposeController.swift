@@ -81,12 +81,14 @@ struct FoilExposeItem: Identifiable {
     var bodyPreview: String? = nil
     var musicItem: AppleMusicLibraryItem? = nil
     var allowsTitleEditing: Bool = true
+    var historyIsPinned: Bool = false
+    var hasHistoryRecord: Bool = false
 
     var canRenameTitle: Bool {
         allowsTitleEditing && contentKind != .camera && !isNewFoil && musicItem == nil
     }
 
-    var requiresHistoryClearConfirmation: Bool { isHistoryEntry && contentKind == .note }
+    var requiresHistoryClearConfirmation: Bool { isHistoryEntry && historyIsPinned }
 
     var window: NSWindow? { controller?.window }
     var isNewFoil: Bool { controller == nil && !isHistoryEntry && musicItem == nil && id != Self.cameraCommandID }
@@ -116,6 +118,7 @@ struct FoilExposePageScrollRequest: Equatable {
 /// 打开的箔片在前、历史记录在后的统一列表；关键字搜索即时过滤，输入状态与结果展示分离。
 @MainActor
 final class FoilExposeModel: ObservableObject {
+    let toast = FoilToastCenter()
     /// 打开的箔片条目。
     @Published private(set) var items: [FoilExposeItem]
     /// 历史记录条目。
@@ -124,6 +127,13 @@ final class FoilExposeModel: ObservableObject {
         didSet {
             guard oldValue != historyCategory else { return }
             // 分类切换后的可见集由视图重新回传，避免编号直选命中旧卡片。
+            visibleIDs = []
+            selectedIndex = currentItems.firstIndex(where: \.isHistoryEntry) ?? 0
+        }
+    }
+
+    @Published var pinnedOnly = false {
+        didSet {
             visibleIDs = []
             selectedIndex = currentItems.firstIndex(where: \.isHistoryEntry) ?? 0
         }
@@ -247,6 +257,7 @@ final class FoilExposeModel: ObservableObject {
     var onDismiss: () -> Void = {}
     var onClearHistory: (FoilExposeHistoryCategory) -> Void = { _ in }
     var onClearHistoryItem: (FoilExposeItem) -> Void = { _ in }
+    var onTogglePinned: (FoilExposeItem) -> Void = { _ in }
     var onRenameItem: (FoilExposeItem) -> Void = { _ in }
     /// 打开文件结果：由控制器检查可用性并在浮箔中打开。
     var onOpenFile: (URL) -> Void = { _ in }
@@ -336,7 +347,7 @@ final class FoilExposeModel: ObservableObject {
     }
     /// 分类数量在展示截断之前统计，并与历史分区的去重、设置和关键词规则保持一致。
     func historyCount(in category: FoilExposeHistoryCategory) -> Int {
-        unfilteredMatchedFoilItems.filter { $0.isHistoryEntry && category.includes($0.contentKind) }.count
+        unfilteredMatchedFoilItems.filter { $0.isHistoryEntry && category.includes($0.contentKind) && (!pinnedOnly || $0.historyIsPinned) }.count
     }
 
     var visibleHistoryCategories: [FoilExposeHistoryCategory] {
@@ -368,7 +379,7 @@ final class FoilExposeModel: ObservableObject {
     /// 清除按完整分类处理，不受搜索词、设置隐藏或总览加载上限影响；活跃箔片保留。
     static func historyToClear(_ configs: [WindowConfig], category: FoilExposeHistoryCategory,
                                openIDs: Set<UUID>) -> [WindowConfig] {
-        configs.filter { !openIDs.contains($0.id) && category.includes($0.contentKind ?? HistoryContentKind.infer(from: $0)) }
+        configs.filter { !$0.historyIsPinned && !openIDs.contains($0.id) && category.includes($0.contentKind ?? HistoryContentKind.infer(from: $0)) }
     }
 
     var showsHistorySection: Bool {
@@ -376,7 +387,7 @@ final class FoilExposeModel: ObservableObject {
     }
 
     private var matchedFoilItems: [FoilExposeItem] {
-        unfilteredMatchedFoilItems.filter { !$0.isHistoryEntry || historyCategory.includes($0.contentKind) }
+        unfilteredMatchedFoilItems.filter { (!$0.isHistoryEntry || historyCategory.includes($0.contentKind)) && (!pinnedOnly || $0.historyIsPinned) }
     }
 
     /// 总览搜索中文件与各音乐分组各自独立展示，没有跨来源的总数上限；只有已打开与历史条目列表封顶 maximum。
@@ -819,6 +830,16 @@ final class FoilExposeController {
         model.onOpenClipboard = { [weak self] in self?.openClipboard() }
         model.onClearHistory = { [weak self] category in self?.confirmClearHistory(category) }
         model.onClearHistoryItem = { [weak self] item in self?.clearHistoryItem(item) }
+        model.onTogglePinned = { [weak self] item in
+            guard let self, let model = self.model else { return }
+            guard let config = HistoryRepository.shared.config(id: item.id) else {
+                model.toast.showFavoriteResult(pinned: true, succeeded: false)
+                return
+            }
+            HistoryManager.shared.setFavorite(id: item.id, pinned: !config.historyIsPinned, toast: model.toast)
+            let controllers = (NSApp.delegate as? AppDelegate)?.windowControllers ?? []
+            model.refreshItems(open: Self.collectItems(from: controllers), history: Self.collectHistoryItems())
+        }
         model.onRenameItem = { [weak self] item in self?.renameItem(item) }
         self.model = model
 
@@ -891,6 +912,7 @@ final class FoilExposeController {
                 text: controller.appState.text
             )
 
+            let historyConfig = controller.appState.isIncognito ? nil : HistoryRepository.shared.config(id: config.id)
             return FoilExposeItem(
                 id: controller.appState.id,
                 controller: controller,
@@ -902,7 +924,9 @@ final class FoilExposeController {
                 isClipboardContent: config.isClipboardContent,
                 sourcePath: Self.sourcePath(from: config),
                 bodyPreview: bodyPreview,
-                allowsTitleEditing: controller.appState.toConfig().canRenameTitle
+                allowsTitleEditing: controller.appState.toConfig().canRenameTitle,
+                historyIsPinned: historyConfig?.historyIsPinned ?? false,
+                hasHistoryRecord: historyConfig != nil
             )
         }
     }
@@ -910,7 +934,7 @@ final class FoilExposeController {
     /// 历史记录条目：最近的历史配置，附在打开的箔片之后，点击/回车恢复为新箔片窗口。
     private static func collectHistoryItems() -> [FoilExposeItem] {
         HistoryManager.shared.checkFileReferences()
-        return HistoryRepository.shared.recent(limit: 500).map { config in
+        return HistoryRepository.shared.recent(limit: 500, includingPinned: true).map { config in
             let contentKind = config.contentKind ?? HistoryContentKind.infer(from: config)
             // 与 HistoryCardView 的缩略图兜底一致：网页整页截图、PDF 与图片原文件都在 imagePath；
             // 音视频原文件不是图片，摄像头箔的 imagePath 只是保存的截图，均不回退。
@@ -933,7 +957,9 @@ final class FoilExposeController {
                 isClipboardContent: config.isClipboardContent,
                 sourcePath: Self.sourcePath(from: config),
                 bodyPreview: FoilExposeItem.makeBodyPreview(kind: contentKind, text: config.text),
-                allowsTitleEditing: config.canRenameTitle
+                allowsTitleEditing: config.canRenameTitle,
+                historyIsPinned: config.historyIsPinned,
+                hasHistoryRecord: true
             )
         }
     }
@@ -1057,12 +1083,12 @@ final class FoilExposeController {
         model.refreshItems(open: Self.collectItems(from: controllers), history: Self.collectHistoryItems())
     }
 
-    /// 便签的正文由应用保存，单条清除也需确认；其它类型直接清除历史，保留原始文件。
+    /// 已钉住记录的显式删除需确认，普通记录直接清除。
     private func clearHistoryItem(_ item: FoilExposeItem) {
         guard item.isHistoryEntry, !isPresentingSystemUI,
               let model, let panel = panels.first else { return }
         isPresentingSystemUI = true
-        if item.requiresHistoryClearConfirmation { panel.orderOut(nil) }
+        panel.orderOut(nil)
         let historyID = item.id
         Task { [weak self] in
             guard let self else { return }
@@ -1078,15 +1104,8 @@ final class FoilExposeController {
             }).value, self.model === model else { return }
             // 历史卡片菜单打开期间该条目可能已恢复成活跃箔片，避免清除其恢复数据。
             guard (NSApp.delegate as? AppDelegate)?.windowControllers.contains(where: { $0.appState.id == item.id }) != true else { return }
-            if item.requiresHistoryClearConfirmation {
-                let alert = NSAlert()
-                alert.messageText = NSLocalizedString("Expose Clear Note Confirmation", comment: "")
-                alert.informativeText = String(format: NSLocalizedString("Expose Clear Note Confirmation Format", comment: ""), item.title)
-                alert.alertStyle = .warning
-                alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
-                let clearButton = alert.addButton(withTitle: NSLocalizedString("Delete History Record", comment: ""))
-                clearButton.hasDestructiveAction = true
-                guard alert.runModal() == .alertSecondButtonReturn else { return }
+            if config.historyIsPinned {
+                guard HistoryManager.pinnedDeletionAlert().runModal() == .alertSecondButtonReturn else { return }
             }
             if await HistoryManager.shared.removeFromHistory([config]) {
                 model.replaceHistoryItems(Self.collectHistoryItems())

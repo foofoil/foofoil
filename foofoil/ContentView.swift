@@ -28,6 +28,7 @@ public struct ContentView: View {
             FullScreenNavigatorOverlay(appState: appState)
                 .opacity(appState.isCapturingContentImage ? 0 : 1)
         }
+        .foilToast(appState.toast, isSuppressed: appState.isCapturingContentImage)
     }
 }
 
