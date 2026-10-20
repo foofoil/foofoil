@@ -29,6 +29,9 @@ public struct ContentView: View {
                 .opacity(appState.isCapturingContentImage ? 0 : 1)
         }
         .foilToast(appState.toast, isSuppressed: appState.isCapturingContentImage)
+        .onChange(of: appState.isBlank, initial: true) { _, isBlank in
+            if !isBlank { appState.showIncognitoModeToastIfNeeded() }
+        }
     }
 }
 
@@ -351,12 +354,7 @@ struct FoilContentView: View {
                 if !appState.isExternalMediaDocument && !appState.isQuickLookDocument {
                     Button(action: {
                         if appState.isCamera {
-                            appState.cameraController?.capture { image in
-                                guard let image else { return }
-                                let pasteboard = NSPasteboard.general
-                                pasteboard.clearContents()
-                                pasteboard.writeObjects([image])
-                            }
+                            appState.copyCameraFrameToPasteboard()
                         } else {
                             appState.copyCurrentImageToPasteboard()
                         }

@@ -9,15 +9,16 @@ final class FoilToastCenter: ObservableObject {
         let id = UUID()
         let text: String
         let symbolName: String?
+        let usesIncognitoIcon: Bool
     }
 
     @Published private(set) var message: Message?
     private var dismissTask: Task<Void, Never>?
 
     /// 调用者传入已本地化的完整文案；连续通知替换当前提示并重新计时。
-    func show(_ text: String, symbolName: String? = nil, duration: Duration = .seconds(1.5)) {
+    func show(_ text: String, symbolName: String? = nil, usesIncognitoIcon: Bool = false, duration: Duration = .seconds(1.5)) {
         dismissTask?.cancel()
-        let message = Message(text: text, symbolName: symbolName)
+        let message = Message(text: text, symbolName: symbolName, usesIncognitoIcon: usesIncognitoIcon)
         self.message = message
         dismissTask = Task { [weak self] in
             do { try await Task.sleep(for: duration) }
@@ -53,7 +54,13 @@ private struct FoilToastModifier: ViewModifier {
             .overlay(alignment: .top) {
                 if let message = center.message, !isSuppressed {
                     HStack(spacing: 6) {
-                        if let symbolName = message.symbolName {
+                        if message.usesIncognitoIcon {
+                            Image(nsImage: IncognitoFoilIcon.image)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 16, height: 16)
+                                .accessibilityHidden(true)
+                        } else if let symbolName = message.symbolName {
                             Image(systemName: symbolName).accessibilityHidden(true)
                         }
                         Text(message.text)

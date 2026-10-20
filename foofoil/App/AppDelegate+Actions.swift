@@ -220,7 +220,9 @@ extension AppDelegate {
               let url = appState.actualWebURL ?? appState.webURL else { return }
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
-        pasteboard.setString(url.absoluteString, forType: .string)
+        if pasteboard.setString(url.absoluteString, forType: .string) {
+            appState.toast.show(NSLocalizedString("Link Copied Toast", comment: ""), symbolName: "checkmark")
+        }
     }
 
     @objc func openFileAction() {
@@ -877,11 +879,18 @@ extension AppDelegate {
         let isIncognito = appState.isIncognito
         appState.isExtractingText = true
         DispatchQueue.global(qos: .userInitiated).async { [weak self, weak appState] in
-            let recognized = ((try? ImageOCRIndexer.recognize(url: imageURL)) ?? "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let result = Result { try ImageOCRIndexer.recognize(url: imageURL) }
+            let recognized = ((try? result.get()) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
             DispatchQueue.main.async {
                 appState?.isExtractingText = false
-                guard let self, !recognized.isEmpty else { return }
+                guard !recognized.isEmpty else {
+                    let key: String
+                    if case .failure = result { key = "Text Extraction Failed Toast" }
+                    else { key = "No Text Found Toast" }
+                    appState?.toast.show(NSLocalizedString(key, comment: ""), duration: .seconds(3))
+                    return
+                }
+                guard let self else { return }
                 // 回填缓存，后续提取与重开历史都无需再跑 OCR。
                 appState?.imageOCRText = recognized
                 appState?.hasExtractableImageText = true
@@ -912,7 +921,10 @@ extension AppDelegate {
               !appState.isExtractingImageSubject else { return }
         let isIncognito = appState.isIncognito
         let newID = UUID()
-        guard let destURL = appState.getCachedImageURL(for: newID, extension: "png") else { return }
+        guard let destURL = appState.getCachedImageURL(for: newID, extension: "png") else {
+            appState.toast.show(NSLocalizedString("Subject Extraction Failed Toast", comment: ""), duration: .seconds(3))
+            return
+        }
         let originalName = appState.originalImageName ?? sourceURL.lastPathComponent
 
         if let cachedCutout = appState.imageSubjectCutoutURL,
@@ -922,7 +934,11 @@ extension AppDelegate {
                 let copied = Self.copyCacheFile(from: cachedCutout, to: destURL)
                 DispatchQueue.main.async {
                     appState?.isExtractingImageSubject = false
-                    guard let self, copied else { return }
+                    guard copied else {
+                        appState?.toast.show(NSLocalizedString("Subject Extraction Failed Toast", comment: ""), duration: .seconds(3))
+                        return
+                    }
+                    guard let self else { return }
                     self.postExtractedSubjectFoofoil(id: newID, imageURL: destURL, originalName: originalName, isIncognito: isIncognito)
                 }
             }
@@ -934,7 +950,11 @@ extension AppDelegate {
             let extracted = ImageSubjectExtractor.writeSubjectPNG(from: sourceURL, to: destURL)
             DispatchQueue.main.async {
                 appState?.isExtractingImageSubject = false
-                guard let self, extracted else { return }
+                guard extracted else {
+                    appState?.toast.show(NSLocalizedString("Subject Extraction Failed Toast", comment: ""), duration: .seconds(3))
+                    return
+                }
+                guard let self else { return }
                 self.postExtractedSubjectFoofoil(id: newID, imageURL: destURL, originalName: originalName, isIncognito: isIncognito)
             }
         }

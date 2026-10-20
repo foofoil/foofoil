@@ -608,12 +608,7 @@ public class FloatingWindow: NSWindow {
                 pdfView.copyCurrentPageToPasteboard()
             }
         } else if controller.appState.readingState.isCamera {
-            controller.appState.readingState.cameraController?.capture { image in
-                guard let image else { return }
-                let pasteboard = NSPasteboard.general
-                pasteboard.clearContents()
-                pasteboard.writeObjects([image])
-            }
+            controller.appState.readingState.copyCameraFrameToPasteboard()
         } else if controller.appState.readingState.isAudioDocument {
             controller.appState.readingState.copyAudioCoverToPasteboard()
         } else if !controller.appState.readingState.isExternalMediaDocument {

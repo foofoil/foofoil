@@ -1,6 +1,184 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Incognito Mode Toast": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Incognito Mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无痕模式"
+          }
+        }
+      }
+    },
+    "Image Copied Toast": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Image copied"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图片已复制"
+          }
+        }
+      }
+    },
+    "Cover Copied Toast": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cover copied"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "封面已复制"
+          }
+        }
+      }
+    },
+    "Link Copied Toast": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Link copied"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "链接已复制"
+          }
+        }
+      }
+    },
+    "Slideshow Started Toast": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slideshow started. Advancing every %@ seconds."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "幻灯片已开启，每 %@ 秒切换。"
+          }
+        }
+      }
+    },
+    "Slideshow Stopped Toast": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slideshow stopped"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "幻灯片已停止"
+          }
+        }
+      }
+    },
+    "No Text Found Toast": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No text found in this image."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未识别到文字。"
+          }
+        }
+      }
+    },
+    "Text Extraction Failed Toast": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t extract text. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字提取失败，请重试。"
+          }
+        }
+      }
+    },
+    "Subject Extraction Failed Toast": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t extract the image subject. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未能提取图片主体，请重试。"
+          }
+        }
+      }
+    },
+    "Navigator Hidden Shortcut Toast": {
+      "comment": "Feedback after hiding the navigator. %@ is the currently configured keyboard shortcut.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Navigator hidden. Press %@ to show it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导航栏已隐藏，按 %@ 可显示。"
+          }
+        }
+      }
+    },
+    "Navigator Hidden Menu Toast": {
+      "comment": "Feedback after hiding the navigator when its keyboard shortcut is disabled.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Navigator hidden. Show it from the View menu."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导航栏已隐藏，可从“显示”菜单恢复。"
+          }
+        }
+      }
+    },
     "Favorite Update Failed": {
       "localizations": {
         "en": {

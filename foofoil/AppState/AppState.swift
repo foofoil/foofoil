@@ -511,6 +511,12 @@ public class AppState: NSObject, ObservableObject, Identifiable {
             && text.isEmpty
     }
 
+    /// 空箔保持安静，首次载入内容后由窗口正文提示其无痕属性。
+    func showIncognitoModeToastIfNeeded() {
+        guard isIncognito, !isBlank else { return }
+        toast.show(NSLocalizedString("Incognito Mode Toast", comment: ""), usesIncognitoIcon: true)
+    }
+
     /// 历史卡片和编号快捷键只属于普通空箔，避免将历史内容带入无痕窗口。
     var canOpenRecentHistory: Bool { isBlank && !isIncognito }
 

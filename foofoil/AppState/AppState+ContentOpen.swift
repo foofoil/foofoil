@@ -1401,7 +1401,9 @@ extension AppState {
 
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
-            return pasteboard.writeObjects([image])
+            let succeeded = pasteboard.writeObjects([image])
+            if succeeded { toast.show(NSLocalizedString("Image Copied Toast", comment: ""), symbolName: "checkmark") }
+            return succeeded
         }
 
         /// 音频箔展示的封面：音乐箔取播放器封面，本地与扩展音频取视图已读出的封面；视频不提供。
@@ -1418,7 +1420,21 @@ extension AppState {
             guard let image = audioCoverImage else { return false }
             let pasteboard = NSPasteboard.general
             pasteboard.clearContents()
-            return pasteboard.writeObjects([image])
+            let succeeded = pasteboard.writeObjects([image])
+            if succeeded { toast.show(NSLocalizedString("Cover Copied Toast", comment: ""), symbolName: "checkmark") }
+            return succeeded
+        }
+
+        /// 菜单与快捷键共用摄像头复制入口，只在剪贴板写入成功后反馈。
+        func copyCameraFrameToPasteboard() {
+            cameraController?.capture { [weak self] image in
+                guard let self, let image else { return }
+                let pasteboard = NSPasteboard.general
+                pasteboard.clearContents()
+                if pasteboard.writeObjects([image]) {
+                    self.toast.show(NSLocalizedString("Image Copied Toast", comment: ""), symbolName: "checkmark")
+                }
+            }
         }
 
         public func saveWebScreenshot(_ image: NSImage) {

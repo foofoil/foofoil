@@ -610,11 +610,16 @@ extension AppState {
 
     func setImageListSlideshowEnabled(_ enabled: Bool) {
         guard var list = fileList, list.kind == .image, list.isPresentable else { return }
+        guard list.isSlideshowEnabled != enabled else { return }
         list.isSlideshowEnabled = enabled
         list.slideshowInterval = SettingsStore.shared.imageListSlideshowInterval
         fileList = list
         saveState()
         scheduleImageListSlideshowAdvance()
+        let message = enabled
+            ? String(format: NSLocalizedString("Slideshow Started Toast", comment: ""), list.slideshowInterval.formatted())
+            : NSLocalizedString("Slideshow Stopped Toast", comment: "")
+        toast.show(message, symbolName: enabled ? "play.fill" : "pause.fill")
     }
 
     func toggleImageListSlideshow() {

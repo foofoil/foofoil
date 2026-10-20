@@ -30,8 +30,15 @@ extension AppState {
 
         switch mode {
         case .hidden:
-            // 不显示无需反馈：面板消失本身就是提示；搜索也随之结束。
+            // 隐藏后提供恢复入口，使用当前配置的快捷键。
             endNavigatorSearch()
+            let message: String
+            if let shortcut = KeyboardShortcutStore.shared.shortcut(forID: "view.toggleNavigator") {
+                message = String(format: NSLocalizedString("Navigator Hidden Shortcut Toast", comment: ""), shortcut.displayString)
+            } else {
+                message = NSLocalizedString("Navigator Hidden Menu Toast", comment: "")
+            }
+            toast.show(message, symbolName: "sidebar.squares.leading", duration: .seconds(3))
         case .always:
             navigatorModeFeedback = NavigatorModeFeedback(tone: .active)
         case .onHover:

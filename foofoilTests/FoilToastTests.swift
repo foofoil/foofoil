@@ -32,6 +32,64 @@ struct FoilToastTests {
         #expect(second.message == nil)
     }
 
+    @Test func navigatorHideExplainsHowToRestoreAndOnlyHidingShowsToast() throws {
+        let state = AppState()
+        state.setNavigatorPanelVisibilityMode(.always)
+        #expect(state.toast.message == nil)
+        state.setNavigatorPanelVisibilityMode(.onHover)
+        #expect(state.toast.message == nil)
+        state.setNavigatorPanelVisibilityMode(.hidden)
+        let message = try #require(state.toast.message)
+        if let shortcut = KeyboardShortcutStore.shared.shortcut(forID: "view.toggleNavigator") {
+            #expect(message.text == String(format: NSLocalizedString("Navigator Hidden Shortcut Toast", comment: ""), shortcut.displayString))
+        } else {
+            #expect(message.text == NSLocalizedString("Navigator Hidden Menu Toast", comment: ""))
+        }
+        state.toast.dismiss()
+        state.setNavigatorPanelVisibilityMode(.hidden)
+        #expect(state.toast.message == nil)
+        state.setNavigatorPanelVisibilityMode(.always)
+        #expect(state.toast.message == nil)
+    }
+
+    @Test func slideshowFeedbackOnlyAppearsWhenItsStateChanges() {
+        let state = AppState(isIncognito: true)
+        let items = [
+            FileListItem(id: "a", path: "/tmp/a.png", displayName: "a.png"),
+            FileListItem(id: "b", path: "/tmp/b.png", displayName: "b.png")
+        ]
+        state.fileList = FileListState(kind: .image, items: items, currentID: "a")
+        defer { state.stopImageListSlideshow() }
+        state.setImageListSlideshowEnabled(true)
+        #expect(state.toast.message?.text == String(format: NSLocalizedString("Slideshow Started Toast", comment: ""), SettingsStore.shared.imageListSlideshowInterval.formatted()))
+        let firstID = state.toast.message?.id
+        state.setImageListSlideshowEnabled(true)
+        #expect(state.toast.message?.id == firstID)
+        state.setImageListSlideshowEnabled(false)
+        #expect(state.toast.message?.text == NSLocalizedString("Slideshow Stopped Toast", comment: ""))
+    }
+
+    @Test func unsuccessfulImageAndCoverCopyDoNotReportSuccess() {
+        let state = AppState(isIncognito: true)
+        #expect(!state.copyCurrentImageToPasteboard())
+        #expect(!state.copyAudioCoverToPasteboard())
+        #expect(state.toast.message == nil)
+    }
+
+    @Test func incognitoModeFeedbackRequiresNonblankPrivateContentAndUsesItsIcon() {
+        let state = AppState(isIncognito: true)
+        state.showIncognitoModeToastIfNeeded()
+        #expect(state.toast.message == nil)
+        state.text = "Private content"
+        state.showIncognitoModeToastIfNeeded()
+        #expect(state.toast.message?.text == NSLocalizedString("Incognito Mode Toast", comment: ""))
+        #expect(state.toast.message?.usesIncognitoIcon == true)
+        let normal = AppState()
+        normal.text = "Normal content"
+        normal.showIncognitoModeToastIfNeeded()
+        #expect(normal.toast.message == nil)
+    }
+
     @Test func windowContentReplacementClearsToastAndNeverPersistsIt() throws {
         let state = AppState()
         state.toast.show("ephemeral_toast_marker", duration: .seconds(5))
