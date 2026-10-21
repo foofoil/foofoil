@@ -30,11 +30,9 @@ struct TerminalFoilView: View {
             case .running: EmptyView()
             case .closing: Text("Terminal Closing").font(.caption).padding(6)
             case .exited(let code):
-                HStack {
-                    Text(String(format: NSLocalizedString("Terminal Exit Format", comment: ""), code.map(String.init) ?? "—"))
-                    Spacer()
-                    Button("Restart Terminal") { appState.prepareTerminal(appState.terminalConfiguration ?? session.configuration, start: true) }
-                }.font(.caption).padding(8)
+                // 会话结束后箔片会被宿主关闭，这里只保留退出信息作为兜底显示。
+                Text(String(format: NSLocalizedString("Terminal Exit Format", comment: ""), code.map(String.init) ?? "—"))
+                    .font(.caption).padding(8)
             case .failed(let code): Text(code).font(.caption).foregroundStyle(.red).padding(8)
             }
         }

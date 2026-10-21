@@ -794,6 +794,18 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                 self.appState.readingState.advanceFileListAfterPlayback()
             }
             .store(in: &cancellables)
+
+        // 终端 Shell 自行结束（例如 Ctrl+D 退出最后一层）后直接关闭箔片，不再显示已结束界面。
+        appState.$terminalSession
+            .compactMap { $0 }
+            .sink { [weak self] session in
+                session.onSessionEnded = { [weak self, weak session] in
+                    guard let self, let session, self.appState.terminalSession === session else { return }
+                    // 会话已经结束，没有活动任务，无需再次确认。
+                    self.closeWithoutTerminalPrompt()
+                }
+            }
+            .store(in: &cancellables)
     }
 
     /// 置顶切换的瞬时反馈：在箔窗外缘闪一圈光晕（开启红色，关闭灰色），动画结束后自动移除。

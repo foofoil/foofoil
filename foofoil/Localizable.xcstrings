@@ -12024,22 +12024,6 @@
         }
       }
     },
-    "Restart Terminal": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Start New Session"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "启动新会话"
-          }
-        }
-      }
-    },
     "Terminal Closing": {
       "localizations": {
         "en": {

@@ -190,7 +190,7 @@ Use the bundled native `foil` CLI to present and explicitly update local text, M
 
 ## Interactive terminal foils
 
-Choose File → Open Terminal… to create an interactive zsh/bash terminal with a working directory, explicit environment and trusted startup script. Hiding keeps tasks running; closing active tasks requires confirmation. Reopening history creates a new session; automatic app recovery waits for user startup. SSH, Vim and terminal programs use the user's environment and remain subject to macOS privacy controls.
+Choose File → Open Terminal… to create an interactive zsh/bash terminal with a working directory, explicit environment and trusted startup script. Hiding keeps tasks running; closing active tasks requires confirmation. Reopening history creates a new session; automatic app recovery waits for user startup. When the shell itself ends (for example Ctrl+D at the last prompt), the foil closes instead of offering to start a new session. SSH, Vim and terminal programs use the user's environment and remain subject to macOS privacy controls.
 
 Use `foil list --scope all`, `reveal`, `hide`, `inspect`, `set` and `close --scope all` for general windows, and `foil terminal create` for terminals. Existing `show FILE`, `update` and default `list/close` retain their owned read-only Agent presentation scope.
 

@@ -167,6 +167,70 @@ struct TerminalFoilTests {
         #expect(session.stateName == "exited")
     }
 
+    @Test func shellExitClosesFoilInsteadOfOfferingNewSession() async throws {
+        let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let previousDelegate = NSApp.delegate
+        let delegate = AppDelegate()
+        NSApp.delegate = delegate
+        let state = AppState(isIncognito: true)
+        let controller = FloatingWindowController(appState: state)
+        delegate.windowControllers = [controller]
+        defer {
+            if delegate.windowControllers.contains(where: { $0 === controller }) { controller.closeWithoutTerminalPrompt() }
+            NSApp.delegate = previousDelegate
+        }
+        // 初始化脚本直接结束 Shell：会话自行结束，箔片应随之关闭，而不是停在已结束界面。
+        state.prepareTerminal(TerminalLaunchConfiguration(shellPath: "/bin/zsh", workingDirectory: root.path,
+            environment: ["ZDOTDIR": root.path, "HISTFILE": "/dev/null"], startupCommands: "exit 0"), start: true)
+        #expect(state.terminalSession?.stateName == "running")
+        try await waitFor { !delegate.windowControllers.contains(where: { $0 === controller }) }
+        #expect(state.terminalSession?.stateName == "exited")
+    }
+
+    @Test(arguments: ["/bin/zsh", "/bin/bash"])
+    func controlDOnlyClosesFoilAfterOutermostShellExits(shell: String) async throws {
+        let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let ready = root.appendingPathComponent("nested-ready")
+        let returned = root.appendingPathComponent("parent-resumed")
+        let previousDelegate = NSApp.delegate
+        let delegate = AppDelegate()
+        NSApp.delegate = delegate
+        let state = AppState(isIncognito: true)
+        let controller = FloatingWindowController(appState: state)
+        delegate.windowControllers = [controller]
+        defer {
+            if delegate.windowControllers.contains(where: { $0 === controller }) { controller.closeWithoutTerminalPrompt() }
+            NSApp.delegate = previousDelegate
+        }
+        state.prepareTerminal(.init(shellPath: shell, workingDirectory: root.path,
+            environment: ["ZDOTDIR": root.path, "HOME": root.path, "HISTFILE": "/dev/null"],
+            startupCommands: "/bin/zsh -f\nprintf resumed > \(TerminalBootstrap.quote(returned.path))"), start: true)
+        let session = try #require(state.terminalSession)
+        // 等内层 Shell 真正处理完输入，再发送 EOF，避免依赖提示符或启动耗时。
+        session.view.process.send(data: Array("printf ready > \(TerminalBootstrap.quote(ready.path))\r".utf8)[...])
+        try await waitFor { FileManager.default.fileExists(atPath: ready.path) }
+        session.view.process.send(data: [4])
+        try await waitFor { FileManager.default.fileExists(atPath: returned.path) }
+        #expect(session.state == .running)
+        #expect(delegate.windowControllers.contains(where: { $0 === controller }))
+        session.view.process.send(data: [4])
+        try await waitFor { delegate.windowControllers.isEmpty }
+        #expect(session.state == .exited(0))
+    }
+
+    @Test func explicitStopDoesNotReportShellInitiatedExit() async throws {
+        let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let session = TerminalSession(configuration: .init(shellPath: "/bin/zsh", workingDirectory: root.path,
+            environment: ["ZDOTDIR": root.path, "HISTFILE": "/dev/null"]))
+        var endedCount = 0
+        session.onSessionEnded = { endedCount += 1 }
+        session.start()
+        await session.stop().value
+        await session.stop().value
+        #expect(session.stateName == "exited")
+        #expect(endedCount == 0)
+    }
+
     @Test func vimFullScreenUnicodeResizeAndReturnToShell() async throws {
         let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let text = root.appendingPathComponent("sample.txt")

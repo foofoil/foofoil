@@ -11,8 +11,12 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
     let configuration: TerminalLaunchConfiguration
     @Published private(set) var previousOutput: String?
     var onOutputSnapshotChanged: (() -> Void)?
+    /// Shell 自行结束后通知宿主；宿主据此关闭箔片，不再停留在已结束界面。
+    var onSessionEnded: (() -> Void)?
     private var snapshotSave: Task<Void, Never>?
     private var hasStarted = false
+    /// 标记本次结束来自 Shell 自身退出，而不是宿主主动停止。
+    private var endedByShell = false
     let view = FoilTerminalView(frame: NSRect(x: 0, y: 0, width: 720, height: 460))
     @Published private(set) var state: State = .waiting
     private var bootstrap: TerminalBootstrap?
@@ -111,6 +115,8 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
     @discardableResult
     func stop() -> Task<Void, Never> {
         if let closing { return closing }
+        // 会话已结束：没有残留进程需要清理，不重复走一遍挂断流程。
+        if case .exited = state { return Task<Void, Never> {} }
         snapshotSave?.cancel(); snapshotSave = nil
         let pid = managedPID ?? 0
         state = .closing
@@ -119,10 +125,12 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
                 // 以 pid + 启动时间校验身份；先请求挂断，再 TERM，最后 KILL。
                 var members = Self.sessionMembers(pid) ?? []
                 Self.signal(members, session: pid, signal: SIGHUP)
-                try? await Task.sleep(for: .milliseconds(800))
+                // Shell 已退出且没有残留任务时立即继续，避免空等清理宽限期。
+                if !members.isEmpty { try? await Task.sleep(for: .milliseconds(800)) }
                 members = Self.sessionMembers(pid) ?? members.filter(Self.stillSameProcess)
                 Self.signal(members, session: pid, signal: SIGTERM)
-                try? await Task.sleep(for: .milliseconds(800))
+                // Shell 已退出且没有残留任务时立即继续，避免空等清理宽限期。
+                if !members.isEmpty { try? await Task.sleep(for: .milliseconds(800)) }
                 members = Self.sessionMembers(pid) ?? members.filter(Self.stillSameProcess)
                 Self.signal(members, session: pid, signal: SIGKILL)
                 if view.process.running { view.terminate() }
@@ -131,6 +139,11 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
             managedPID = nil
             state = .exited(finalExitCode)
             onOutputSnapshotChanged?()
+            if endedByShell {
+                endedByShell = false
+                // Shell 自行结束：通知宿主关闭箔片，不再显示启动新会话的入口。
+                onSessionEnded?()
+            }
             closing = nil
         }
         closing = task
@@ -175,7 +188,11 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
             let signal = status & 0x7f
             return signal == 0 ? (status >> 8) & 0xff : 128 + signal
         }
-        if state != .closing { stop() }
+        if state != .closing {
+            // PTY 进程自行结束（Ctrl+D 退出最后一层、脚本跑完等）：会话到此为止。
+            endedByShell = true
+            stop()
+        }
     }
 }
 
