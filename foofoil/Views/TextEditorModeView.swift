@@ -14,6 +14,13 @@ struct TextEditorModeView: View {
     @State private var textHeight: CGFloat = 68 // 动态高度，初始为单行行高加上下文档内边距
     @State private var hoveredHistoryID: UUID? = nil
     @State private var isSearchCardHovered = false
+    @State private var historyCardLeading: [UUID: CGFloat] = [:]
+    @State private var searchCardLeading: CGFloat = 0
+
+    private var historyHintLeading: CGFloat {
+        let leading = hoveredHistoryID.flatMap { historyCardLeading[$0] } ?? searchCardLeading
+        return leading - 16
+    }
     @State private var showRenameAlert = false
     @State private var newTitleText = ""
     @State private var targetRenameConfig: WindowConfig? = nil
@@ -123,7 +130,7 @@ struct TextEditorModeView: View {
                     if isBlank && geometry.size.height >= 140 {
                         BlankOpenButtons(appState: appState)
                             .padding(.horizontal, 16)
-                            .padding(.bottom, appState.isIncognito ? 16 : 4)
+                            .padding(.bottom, appState.isIncognito ? 16 : 18)
                     }
 
                     if isBlank && showTipsAndHistory {
@@ -132,7 +139,7 @@ struct TextEditorModeView: View {
                                 HStack(alignment: .top, spacing: 12) {
                                     let configs = Array(historyManager.historyConfigs.filter({ SettingsStore.shared.appleMusicLibraryEnabled || $0.appleMusicReference == nil }).prefix(30))
                                     ForEach(Array(configs.enumerated()), id: \.element.id) { index, config in
-                                        VStack(spacing: 4) {
+                                        ZStack(alignment: .top) {
                                             HistoryCardView(
                                                 config: config,
                                                 shortcutText: appState.isCommandKeyPressed && index < 9 ? "⌘\(index + 1)" : nil,
@@ -174,16 +181,20 @@ struct TextEditorModeView: View {
                                                 }
                                             }
 
-                                            // 预留标题高度，按住 ⌘ 时仅切换透明度，避免布局跳动；复用现有底部 padding 的空间。
+                                            // ⌘ 标题与悬停提示共用缩略图下方的提示带，避免额外留白。
                                             Text(config.historyMenuDisplayName)
                                                 .font(.system(size: 9, design: .rounded))
                                                 .foregroundStyle(.secondary)
                                                 .lineLimit(1)
                                                 .truncationMode(.tail)
-                                                .frame(width: 60)
+                                                .frame(width: 60, height: 22)
+                                                .offset(y: 66)
                                                 .opacity(appState.isCommandKeyPressed ? 1 : 0)
                                                 .animation(.easeInOut(duration: 0.15), value: appState.isCommandKeyPressed)
                                         }
+                                        .onGeometryChange(for: CGFloat.self) {
+                                            $0.frame(in: .named("blankHistoryViewport")).minX
+                                        } action: { historyCardLeading[config.id] = $0 }
                                         .contentShape(Rectangle())
                                         .background {
                                             HoverTrackingView { hovering in
@@ -196,7 +207,7 @@ struct TextEditorModeView: View {
                                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                                         }
                                     }
-                                    VStack(spacing: 4) {
+                                    ZStack(alignment: .top) {
                                         SearchHistoryCard(
                                             shortcutText: appState.isCommandKeyPressed ? KeyboardShortcutStore.shared.shortcut(forID: "history.search")?.displayString : nil,
                                             isHovered: isSearchCardHovered
@@ -207,10 +218,14 @@ struct TextEditorModeView: View {
                                             .font(.system(size: 9, design: .rounded))
                                             .foregroundStyle(.secondary)
                                             .lineLimit(1)
-                                            .frame(width: 60)
+                                            .frame(width: 60, height: 22)
+                                            .offset(y: 66)
                                             .opacity(appState.isCommandKeyPressed ? 1 : 0)
                                             .animation(.easeInOut(duration: 0.15), value: appState.isCommandKeyPressed)
                                     }
+                                    .onGeometryChange(for: CGFloat.self) {
+                                        $0.frame(in: .named("blankHistoryViewport")).minX
+                                    } action: { searchCardLeading = $0 }
                                     .contentShape(Rectangle())
                                     .background {
                                         HoverTrackingView { hovering in
@@ -220,37 +235,44 @@ struct TextEditorModeView: View {
                                     }
                                 }
                                 .padding(.horizontal, 16)
-                                .padding(.top, 8)
-                                .padding(.bottom, 8)
+                                .padding(.bottom, 28)
                             }
-
-                            Group {
-                                if let config = historyManager.historyConfigs.filter({ SettingsStore.shared.appleMusicLibraryEnabled || $0.appleMusicReference == nil }).prefix(30).first(where: { $0.id == hoveredHistoryID }) {
-                                    let title = config.historyMenuDisplayName
-                                    let url = config.historyWebURLDisplayString
-                                    HStack(spacing: 4) {
-                                        Image(systemName: config.historyMenuSymbolName)
-                                        if let url = url {
-                                            Text("\(title) (\(url))")
+                            .frame(height: 88)
+                            .coordinateSpace(name: "blankHistoryViewport")
+                            .overlay(alignment: .bottom) {
+                                BlankFoilHintLayout(sourceLeading: historyHintLeading) {
+                                    Group {
+                                        if let config = historyManager.historyConfigs.filter({ SettingsStore.shared.appleMusicLibraryEnabled || $0.appleMusicReference == nil }).prefix(30).first(where: { $0.id == hoveredHistoryID }) {
+                                            let title = config.historyMenuDisplayName
+                                            let url = config.historyWebURLDisplayString
+                                            HStack(spacing: 4) {
+                                                Image(systemName: config.historyMenuSymbolName)
+                                                if let url = url {
+                                                    Text("\(title) (\(url))")
+                                                } else {
+                                                    Text(title)
+                                                }
+                                            }
+                                        } else if isSearchCardHovered {
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "magnifyingglass")
+                                                Text(NSLocalizedString("Search History", comment: ""))
+                                            }
                                         } else {
-                                            Text(title)
+                                            Text(" ")
                                         }
                                     }
-                                } else if isSearchCardHovered {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "magnifyingglass")
-                                        Text(NSLocalizedString("Search History", comment: ""))
-                                    }
-                                } else {
-                                    Text(" ")
+                                    .font(.system(size: 11))
+                                    .foregroundColor(.secondary)
+                                    .lineLimit(1)
                                 }
+                                .frame(height: 22)
+                                .clipped()
+                                .padding(.horizontal, 16)
+                                .opacity(appState.isCommandKeyPressed ? 0 : 1)
+                                .allowsHitTesting(false)
                             }
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary)
-                            .lineLimit(1)
-                            .padding(.horizontal, 16)
                             .padding(.bottom, 8)
-                            .frame(height: 14)
                         }
                         .background(NonMovableBackground())
                     }

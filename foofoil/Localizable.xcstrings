@@ -12773,6 +12773,23 @@
           }
         }
       }
+    },
+    "Clipboard Has No Openable Content": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No openable content in the clipboard"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "剪贴板中没有可打开的内容"
+          }
+        }
+      }
     }
   },
   "version": "1.0"
