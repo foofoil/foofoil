@@ -65,7 +65,14 @@ final class HistorySearchViewModel: ObservableObject {
         selectScope(filteredScopes[index])
     }
 
+    var openCommand: ((SearchScope) -> Void)?
+
     func selectScope(_ scope: SearchScope) {
+        // 打开命令直接执行，不切换为搜索范围。
+        if scope.isOpeningCommand {
+            openCommand?(scope)
+            return
+        }
         activeScope = scope
         query = ""
         highlightedScopeIndex = 0

@@ -1,5 +1,7 @@
 # Keyboard Shortcuts Overview
 
+In Quick Open and Exposé, the `/` list ends with Terminal and Camera. Selecting Terminal opens its configuration dialog; selecting Camera opens the camera immediately.
+
 Customize bindings in Settings → Keyboard Shortcuts. The table below shows the default and current bindings, including automatically derived incognito opening shortcuts. Except for global shortcuts, foofoil must be active; some actions apply only to specific content.
 
 ⌘ Command · ⇧ Shift · ⌥ Option · ⌃ Control · Esc Escape · Space · Tab

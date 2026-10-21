@@ -8,6 +8,8 @@ enum SearchScope: String, CaseIterable, Identifiable, Sendable {
     case album = "album"
     case playlist = "playlist"
     case song = "song"
+    case terminal = "terminal"
+    case camera = "camera"
 
     var id: String { rawValue }
 
@@ -19,6 +21,8 @@ enum SearchScope: String, CaseIterable, Identifiable, Sendable {
         case .album: return "Apple Music 专辑"
         case .playlist: return "Apple Music 歌单"
         case .song: return "Apple Music 歌曲"
+        case .terminal: return NSLocalizedString("Terminal", comment: "")
+        case .camera: return NSLocalizedString("Foil Info Camera", comment: "")
         }
     }
 
@@ -30,6 +34,8 @@ enum SearchScope: String, CaseIterable, Identifiable, Sendable {
         case .album: return "album"
         case .playlist: return "playlist"
         case .song: return "song"
+        case .terminal: return "terminal"
+        case .camera: return "camera"
         }
     }
 
@@ -41,6 +47,8 @@ enum SearchScope: String, CaseIterable, Identifiable, Sendable {
         case .album: return "square.stack"
         case .playlist: return "music.note.list"
         case .song: return "music.note"
+        case .terminal: return "terminal"
+        case .camera: return "web.camera.fill"
         }
     }
 
@@ -52,14 +60,17 @@ enum SearchScope: String, CaseIterable, Identifiable, Sendable {
         case .album: return .albums
         case .playlist: return .playlists
         case .song: return .songs
+        case .terminal, .camera: return .all
         }
     }
 
+    var isOpeningCommand: Bool { self == .terminal || self == .camera }
+
     static func availableScopes(musicLibraryEnabled: Bool) -> [SearchScope] {
         if musicLibraryEnabled {
-            return [.history, .file, .folder, .album, .playlist, .song]
+            return [.history, .file, .folder, .album, .playlist, .song, .terminal, .camera]
         } else {
-            return [.history, .file, .folder]
+            return [.history, .file, .folder, .terminal, .camera]
         }
     }
 
@@ -84,6 +95,10 @@ enum SearchScope: String, CaseIterable, Identifiable, Sendable {
             return ["Apple Music 歌单", "歌单", "playlist", "gedan", "gd"]
         case .song:
             return ["Apple Music 歌曲", "歌曲", "song", "gequ", "gq"]
+        case .terminal:
+            return ["终端", "terminal", "zhongduan", "zd"]
+        case .camera:
+            return ["摄像头", "camera", "shexiangtou", "sxt"]
         }
     }
 }

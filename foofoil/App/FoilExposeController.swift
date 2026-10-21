@@ -183,7 +183,14 @@ final class FoilExposeModel: ObservableObject {
         selectScope(filteredScopes[index])
     }
 
+    var onOpenCommand: ((SearchScope) -> Void)?
+
     func selectScope(_ scope: SearchScope) {
+        // 打开命令直接执行，不切换为搜索范围。
+        if scope.isOpeningCommand {
+            onOpenCommand?(scope)
+            return
+        }
         activeScope = scope
         searchText = ""
         highlightedScopeIndex = 0
@@ -831,6 +838,13 @@ final class FoilExposeController {
             historyItems: Self.collectHistoryItems(),
             clipboardContent: appDelegate.clipboardOpenableContent()
         )
+        model.onOpenCommand = { [weak self] scope in
+            self?.dismiss()
+            NSApp.activate(ignoringOtherApps: true)
+            let delegate = NSApp.delegate as? AppDelegate
+            if scope == .terminal { delegate?.openTerminal(isIncognito: false) }
+            else if scope == .camera { delegate?.openCameraAction() }
+        }
         model.onSelect = { [weak self] item in self?.select(item) }
         model.onDismiss = { [weak self] in self?.dismiss() }
         model.onOpenFile = { [weak self] url in self?.openFile(url) }

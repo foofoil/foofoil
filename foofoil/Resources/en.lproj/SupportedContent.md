@@ -1,5 +1,7 @@
 # Supported Content
 
+In Quick Open and Exposé, the `/` list ends with Terminal and Camera. Selecting Terminal opens its configuration dialog; selecting Camera opens the camera immediately.
+
 Local files are referenced directly, with bookmarks tracking renames and moves when possible. History keeps no body copy of an original file, and deleting history never deletes that original. Clipboard text, Markdown, HTML, and image data are saved automatically and can be restored from history, marked “From Clipboard,” without Save As. Copied files still reference their originals; copied URLs and image addresses open as URLs without automatic downloading.
 
 Web downloads are saved to `~/Downloads`. Duplicate names receive a numeric suffix without overwriting existing files. Downloads from incognito foils also remain on disk.

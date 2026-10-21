@@ -96,6 +96,16 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
         model.openResult = { [weak self] id in
             (NSApp.delegate as? AppDelegate)?.openSearchResultInNewWindow(id: id, isIncognito: self?.openingIsIncognito == true, target: self?.openingTarget)
         }
+        model.openCommand = { [weak self] scope in
+            guard let self, let delegate = NSApp.delegate as? AppDelegate else { return }
+            let isIncognito = self.openingIsIncognito
+            self.dismiss()
+            if scope == .terminal {
+                delegate.openTerminal(isIncognito: isIncognito)
+            } else if scope == .camera {
+                delegate.openCamera(isIncognito: isIncognito)
+            }
+        }
         model.openCamera = { [weak self] in
             (NSApp.delegate as? AppDelegate)?.openCamera(isIncognito: self?.openingIsIncognito == true)
         }

@@ -15,10 +15,10 @@ struct SearchScopeTests {
 
     @Test func scopeAvailabilityFollowsMusicLibrarySetting() {
         let disabledScopes = SearchScope.availableScopes(musicLibraryEnabled: false)
-        #expect(disabledScopes == [.history, .file, .folder])
+        #expect(disabledScopes == [.history, .file, .folder, .terminal, .camera])
 
         let enabledScopes = SearchScope.availableScopes(musicLibraryEnabled: true)
-        #expect(enabledScopes == [.history, .file, .folder, .album, .playlist, .song])
+        #expect(enabledScopes == [.history, .file, .folder, .album, .playlist, .song, .terminal, .camera])
 
         #expect(SearchScope.history.displayName == "历史")
         #expect(SearchScope.file.displayName == "文件")
@@ -26,6 +26,27 @@ struct SearchScopeTests {
         #expect(SearchScope.album.displayName == "Apple Music 专辑")
         #expect(SearchScope.playlist.displayName == "Apple Music 歌单")
         #expect(SearchScope.song.displayName == "Apple Music 歌曲")
+    }
+
+    @Test func openingCommandsExecuteWithoutActivatingScope() {
+        for scope in [SearchScope.terminal, .camera] {
+            let quickOpen = HistorySearchViewModel()
+            var quickCommand: SearchScope?
+            quickOpen.openCommand = { quickCommand = $0 }
+            quickOpen.query = "/" + scope.englishName
+            quickOpen.selectHighlightedScope()
+            #expect(quickCommand == scope)
+            #expect(quickOpen.activeScope == nil)
+
+            let expose = FoilExposeModel(items: [], historyItems: [])
+            var exposeCommand: SearchScope?
+            expose.onOpenCommand = { exposeCommand = $0 }
+            expose.searchText = "/" + scope.englishName
+            expose.selectHighlightedScope()
+            #expect(exposeCommand == scope)
+            #expect(expose.activeScope == nil)
+            #expect(scope.matches(filter: scope == .terminal ? "终端" : "摄像头"))
+        }
     }
 
     @Test func scopeMatchingSupportsChineseEnglishAndPinyin() {
@@ -55,7 +76,7 @@ struct SearchScopeTests {
         #expect(allScopes.filter { $0.matches(filter: "wj") } == [.file])
         #expect(allScopes.filter { $0.matches(filter: "ml") } == [.folder])
         #expect(allScopes.filter { $0.matches(filter: "zj") } == [.album])
-        #expect(allScopes.filter { $0.matches(filter: "gd") } == [.playlist])
+        #expect(allScopes.filter { $0.matches(filter: "gd") } == [.playlist, .terminal])
         #expect(allScopes.filter { $0.matches(filter: "gq") } == [.song])
 
         // 前缀缩小范围包含多项时保留顺序

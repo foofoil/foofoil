@@ -1,5 +1,7 @@
 # 快捷键一览
 
+快速打开和 Exposé 搜索的 `/` 列表末尾依次为终端（terminal）和摄像头（camera），选择终端后显示打开终端对话框，选择摄像头后直接打开。
+
 可在“设置 → 快捷键”中调整键位。除全局快捷键外，需浮箔处于前台；部分操作仅适用于特定内容。
 
 ⌘ Command · ⇧ Shift · ⌥ Option · ⌃ Control · Esc Escape · Space 空格 · Tab 制表键
