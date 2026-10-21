@@ -187,3 +187,11 @@ Settings → General → Automatically remove history for missing files is on by
 ## Agent terminal
 
 Use the bundled native `foil` CLI to present and explicitly update local text, Markdown, images, and SVG in read-only windows. Agent updates retain layout and focus; temporary references support incognito mode. Keep source files available. See the [CLI guide](docs/agent-terminal-usage.en.md) and [bundled Skill](skills/foofoil/SKILL.md). Developer ID distribution verification remains pending.
+
+## Interactive terminal foils
+
+Choose File → Open Terminal… to create an interactive zsh/bash terminal with a working directory, explicit environment and trusted startup script. Hiding keeps tasks running; closing active tasks requires confirmation. Reopening history creates a new session; automatic app recovery waits for user startup. SSH, Vim and terminal programs use the user's environment and remain subject to macOS privacy controls.
+
+Use `foil list --scope all`, `reveal`, `hide`, `inspect`, `set` and `close --scope all` for general windows, and `foil terminal create` for terminals. Existing `show FILE`, `update` and default `list/close` retain their owned read-only Agent presentation scope.
+
+Terminal creation and reopening a closed terminal start immediately with its saved optional environment and startup script. Revealing a running terminal keeps its session. Automatic app restoration waits for user activation. Ordinary terminals retain up to 500 lines / 128 KiB of read-only previous output; incognito terminals do not persist output.

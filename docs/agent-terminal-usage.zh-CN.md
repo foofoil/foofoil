@@ -1,5 +1,7 @@
 # Agent 只读终端
 
+> 2026-10-20 更新：主应用已取消沙盒；旧 Agent 命令保持作用域，新增通用窗口控制与交互式终端。当前行为以 [终端箔与通用控制](terminal-foil-usage.zh-CN.md) 为准。下文中的沙盒实验为历史记录。
+
 随应用交付的原生命令位于 `foofoil.app/Contents/MacOS/foil`。本机开发功能已接入；Developer ID、公证和干净机器分发验证尚未完成。
 
 安装至默认 `~/.local/bin`（应用安装在其他位置时替换路径）：

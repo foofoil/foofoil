@@ -129,3 +129,9 @@ macOS 27.0.1 系统 libarchive 3.7.4 的已测范围：ZIP Store/Deflate/BZip2/L
 ## Agent 只读终端
 
 原生 `foil` CLI 支持只读本地 UTF-8 文本／代码／Markdown、光栅图片（首帧）和 SVG。调用方须保留原文件，变更后显式更新。Markdown 不加载关联图片，显示资源不可用提示；图片请单独展示。Agent 接口暂不支持 PDF、HTML、网页、媒体、目录或压缩包。普通箔在历史中保存文件引用；`--incognito` 无痕箔不进历史或重启恢复。
+
+## 交互式终端箔
+
+通过“文件 → 打开终端…”创建 zsh/bash 交互式终端，支持工作目录、显式环境和可信初始化脚本。隐藏保留任务；关闭活动任务前确认。新建和历史主动重开直接执行保存的可选初始化脚本；运行中的窗口继续原会话。应用自动恢复停在待启动，不执行脚本。普通箔保留最近最多 500 行、128 KiB 的只读输出记录，无痕箔不保存输出。支持 SSH、Vim 和终端程序；实际连接及外部工具仍受 macOS 隐私权限和用户环境影响。
+
+`foil list --scope all`、`reveal`、`hide`、`inspect`、`set` 和 `close --scope all` 控制普通窗口，`foil terminal create` 创建终端。原有 `show FILE`、`update`、默认 `list/close` 继续用于所属 Agent 只读展示窗口。

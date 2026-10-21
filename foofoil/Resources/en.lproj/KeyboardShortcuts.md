@@ -150,3 +150,5 @@ Subtitle and document styles can be saved as custom themes. Choose an existing t
 
 In archive foils, Save As exports the selected file, directory, or root. The archive navigator uses Up/Down to select, Left to collapse or select the parent, Right to expand or select the first child, and Return/Space to open the selection. When focus is in the content, EPUB chapter and PDF page commands target the preview. Navigator search expands all ancestors of a match. Right also lazily loads unopened nested archives in the same tree; Left cancels unfinished loads when collapsing. Search does not scan unopened archives.
 
+
+When a terminal has focus, Ctrl+A/E/P/N and other control keys go to the Shell/TUI. ⌘C/⌘V copy and paste; content zoom adjusts terminal font size. Hold ⌘ and drag to move the terminal window without selecting text. Document Style adjusts terminal themes, background and text colors, fonts, and size, using the same monospaced font filter as code foils.

@@ -1,4 +1,6 @@
-# Agent read-only terminal
+# Agent presentation and application control
+
+> The current non-sandboxed app also supports ordinary content opening, window control, and native interactive terminal foils. The `show` / `update` input restrictions below apply to the original presentation interface. See the [terminal guide](terminal-foil-usage.zh-CN.md) for the new commands.
 
 The app ships a native command at `foofoil.app/Contents/MacOS/foil`. Local development support is implemented; Developer ID, notarization, and clean-machine distribution checks remain pending.
 

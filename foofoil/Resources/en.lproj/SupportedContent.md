@@ -127,3 +127,11 @@ Files inside archives use the same file opening, themes, controls, and border op
 ## Agent terminal
 
 The native `foil` CLI supports read-only local UTF-8 text/code/Markdown, raster images (first frame), and SVG. Keep originals available and explicitly update after changes. Markdown images are blocked with a visible unavailable marker; present images separately. PDF, HTML, websites, media, directories, and archives are not supported by the Agent interface. Ordinary boards retain file references in history; `--incognito` boards do not enter history or restart recovery.
+
+## Interactive terminal foils
+
+Choose File → Open Terminal… to create an interactive zsh/bash terminal with a working directory, explicit environment and trusted startup script. Hiding keeps tasks running; closing active tasks requires confirmation. Reopening history creates a new session; automatic app recovery waits for user startup. SSH, Vim and terminal programs use the user's environment and remain subject to macOS privacy controls.
+
+Use `foil list --scope all`, `reveal`, `hide`, `inspect`, `set` and `close --scope all` for general windows, and `foil terminal create` for terminals. Existing `show FILE`, `update` and default `list/close` retain their owned read-only Agent presentation scope.
+
+Terminal creation and reopening a closed terminal start immediately with its saved optional environment and startup script. Revealing a running terminal keeps its session. Automatic app restoration waits for user activation. Ordinary terminals retain up to 500 lines / 128 KiB of read-only previous output; incognito terminals do not persist output.

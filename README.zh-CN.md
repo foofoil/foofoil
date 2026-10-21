@@ -28,7 +28,7 @@
 - 恢复窗口状态，并在本地保存内容历史。
 - 收藏历史记录以长期访问，清理时保留，并可在 Exposé 中筛选；默认 ⌘D 切换当前箔的收藏状态，箔片内短暂提示操作结果。
 - 按标题和内容搜索历史记录，包括使用设备端 OCR 识别图片，以及提取 PDF 和网页文本。
-- 通过 ⌘P 快速打开：查找并打开历史内容、已授权文件夹中的本机文件，或输入网址打开。
+- 通过 ⌘P 快速打开：查找并打开历史内容、主目录中的本机文件，或输入网址打开。
 - 在设置中自定义快捷键；支持英文与简体中文界面。
 
 Hi-Fi 当前支持 DSF、raw DFF、未压缩立体声 SACD ISO 和 APE/CUE。DSD 播放要求支持 DoP 的输出设备，不提供 DSD 转 PCM 回退；DST 与 SACD 多声道尚不支持。EPUB 支持目录导航和阅读位置恢复，不支持 DRM 加密书籍。
@@ -189,3 +189,9 @@ xcodebuild test \
 ## Agent 只读终端
 
 随应用交付的原生 `foil` CLI 可只读展示和显式更新本地文本、Markdown、图片与 SVG，更新保留布局且不抢焦点；临时资料可用无痕模式。原文件仍由调用方保管。见 [CLI 使用说明](docs/agent-terminal-usage.zh-CN.md)及[随附 Skill](skills/foofoil/SKILL.md)。Developer ID 分发验收仍待完成。
+
+## 交互式终端箔
+
+通过“文件 → 打开终端…”创建 zsh/bash 交互式终端，支持工作目录、显式环境和可信初始化脚本。隐藏保留任务；关闭活动任务前确认。新建和历史主动重开直接执行保存的可选初始化脚本；运行中的窗口继续原会话。应用自动恢复停在待启动，不执行脚本。普通箔保留最近最多 500 行、128 KiB 的只读输出记录，无痕箔不保存输出。支持 SSH、Vim 和终端程序；实际连接及外部工具仍受 macOS 隐私权限和用户环境影响。
+
+`foil list --scope all`、`reveal`、`hide`、`inspect`、`set` 和 `close --scope all` 控制普通窗口，`foil terminal create` 创建终端。原有 `show FILE`、`update`、默认 `list/close` 继续用于所属 Agent 只读展示窗口。
