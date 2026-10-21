@@ -103,9 +103,6 @@ private struct TerminalConfigurationEditor: View {
 // 使用普通面板避免 NSAlert 的应用图标和说明区域；关闭窗口也要结束模态循环。
 @MainActor
 private final class TerminalConfigurationPanel: NSPanel {
-    @objc func cancelOpening() { NSApp.stopModal(withCode: .cancel) }
-    @objc func confirmOpening() { NSApp.stopModal(withCode: .OK) }
-
     override func close() {
         NSApp.stopModal(withCode: .cancel)
         super.close()
@@ -118,42 +115,29 @@ extension AppDelegate {
     }
 
     func openTerminal(isIncognito: Bool) {
+        // 先退出 SwiftUI 的按钮/搜索提交回调，再进入 AppKit 模态循环。
+        DispatchQueue.main.async { [weak self] in
+            self?.presentTerminalConfiguration(isIncognito: isIncognito)
+        }
+    }
+
+    private func presentTerminalConfiguration(isIncognito: Bool) {
         let model = TerminalEditorModel()
         let panel = TerminalConfigurationPanel(contentRect: NSRect(x: 0, y: 0, width: 512, height: 430),
                                                styleMask: [.titled, .closable], backing: .buffered, defer: false)
         panel.title = NSLocalizedString("Open Terminal Title", comment: "")
         panel.isReleasedWhenClosed = false
-        // 模态循环中的结束按钮使用 AppKit target/action，避免 SwiftUI 动作调度滞留。
-        let editor = NSHostingView(rootView: TerminalConfigurationEditor(model: model))
-        let cancel = NSButton(title: NSLocalizedString("Cancel", comment: ""), target: panel, action: #selector(TerminalConfigurationPanel.cancelOpening))
-        cancel.bezelStyle = .rounded
-        cancel.keyEquivalent = "\u{1b}"
-        let confirm = NSButton(title: NSLocalizedString("Open", comment: ""), target: panel, action: #selector(TerminalConfigurationPanel.confirmOpening))
-        confirm.bezelStyle = .rounded
-        confirm.keyEquivalent = "\r"
-        let content = NSView()
-        let divider = NSBox()
-        divider.boxType = .separator
-        for view in [editor, divider, cancel, confirm] {
-            view.translatesAutoresizingMaskIntoConstraints = false
-            content.addSubview(view)
-        }
-        NSLayoutConstraint.activate([
-            editor.topAnchor.constraint(equalTo: content.topAnchor),
-            editor.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            editor.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            divider.topAnchor.constraint(equalTo: editor.bottomAnchor),
-            divider.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            divider.trailingAnchor.constraint(equalTo: content.trailingAnchor),
-            confirm.topAnchor.constraint(equalTo: divider.bottomAnchor, constant: 16),
-            confirm.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -16),
-            confirm.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
-            cancel.centerYAnchor.constraint(equalTo: confirm.centerYAnchor),
-            cancel.trailingAnchor.constraint(equalTo: confirm.leadingAnchor, constant: -8)
-        ])
-        panel.contentView = content
-        panel.setContentSize(NSSize(width: 512, height: 450))
-        panel.defaultButtonCell = confirm.cell as? NSButtonCell
+        panel.contentView = NSHostingView(rootView: VStack(spacing: 0) {
+            TerminalConfigurationEditor(model: model)
+            Divider()
+            HStack {
+                Spacer()
+                Button("Cancel") { NSApp.stopModal(withCode: .cancel) }
+                    .keyboardShortcut(.cancelAction)
+                Button("Open") { NSApp.stopModal(withCode: .OK) }
+                    .keyboardShortcut(.defaultAction)
+            }.padding(16)
+        }.frame(width: 512))
         panel.center()
         panel.makeKeyAndOrderFront(nil)
         let response = NSApp.runModal(for: panel)
