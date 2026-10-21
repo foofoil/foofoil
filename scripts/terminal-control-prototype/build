@@ -1,0 +1,35 @@
+#!/bin/zsh
+set -euo pipefail
+PROBE_ROOT="${0:A:h}"
+APP_ROOT="${PROBE_ROOT:h:h}"
+PROBE_OUTPUT="$APP_ROOT/build/terminal-control-prototype"
+PROBE_APP="$PROBE_OUTPUT/TerminalControlProbe.app"
+# 明确提供已有身份；不回退 ad-hoc、不申请证书、不改变产品签名。
+: "${PROBE_SIGN_IDENTITY:?Set PROBE_SIGN_IDENTITY to an existing signing identity hash}"
+mkdir -p "$PROBE_APP/Contents/MacOS"
+cat > "$PROBE_APP/Contents/Info.plist" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleIdentifier</key><string>com.markonce.foofoil.TerminalControlProbe</string>
+<key>CFBundleName</key><string>TerminalControlProbe</string>
+<key>CFBundleExecutable</key><string>TerminalControlProbe</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>NSPrincipalClass</key><string>NSApplication</string>
+</dict></plist>
+PLIST
+xcrun swiftc -O -swift-version 6 -warnings-as-errors -parse-as-library "$PROBE_ROOT/Protocol.swift" "$PROBE_ROOT/Host.swift" "$PROBE_ROOT/Capabilities.swift" \
+    -o "$PROBE_APP/Contents/MacOS/TerminalControlProbe"
+xcrun swiftc -O -swift-version 6 -warnings-as-errors -parse-as-library "$PROBE_ROOT/Protocol.swift" "$PROBE_ROOT/Client.swift" \
+    -o "$PROBE_OUTPUT/probe-client"
+xcrun clang -O2 -Wall -Wextra -Werror "$PROBE_ROOT/pty-probe.c" -o "$PROBE_APP/Contents/MacOS/pty-probe"
+xcrun clang -O2 -Wall -Wextra -Werror "$PROBE_ROOT/pty-probe.c" -o "$PROBE_OUTPUT/pty-baseline"
+codesign --force --sign "$PROBE_SIGN_IDENTITY" --options runtime "$PROBE_OUTPUT/pty-baseline"
+codesign --force --sign "$PROBE_SIGN_IDENTITY" --options runtime --entitlements "$PROBE_ROOT/helper.entitlements" "$PROBE_APP/Contents/MacOS/pty-probe"
+xcrun clang -O2 -Wall -Wextra -Werror "$PROBE_ROOT/fixture-tool.c" -o "$PROBE_OUTPUT/fixture-tool"
+codesign --force --sign "$PROBE_SIGN_IDENTITY" --options runtime "$PROBE_OUTPUT/fixture-tool"
+codesign --force --sign "$PROBE_SIGN_IDENTITY" --options runtime \
+    --entitlements "$PROBE_ROOT/host.entitlements" "$PROBE_APP"
+codesign --verify --strict --verbose=2 "$PROBE_APP"
+print -r -- "$PROBE_APP"

@@ -24,6 +24,6 @@ xcrun swiftc -O -swift-version 6 -warnings-as-errors -parse-as-library "$PROBE_R
 xcrun swiftc -O -swift-version 6 -warnings-as-errors -parse-as-library "$PROBE_ROOT/Protocol.swift" "$PROBE_ROOT/Client.swift" \
     -o "$PROBE_OUTPUT/probe-client"
 codesign --force --sign "$PROBE_SIGN_IDENTITY" --options runtime \
-    --entitlements "$APP_ROOT/foofoil/foofoil.entitlements" "$PROBE_APP"
+    --entitlements "$PROBE_ROOT/host.entitlements" "$PROBE_APP"
 codesign --verify --strict --verbose=2 "$PROBE_APP"
 print -r -- "$PROBE_APP"
