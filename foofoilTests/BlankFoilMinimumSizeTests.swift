@@ -1,0 +1,32 @@
+import AppKit
+import Testing
+@testable import foofoil
+
+@MainActor
+@Suite(.sharedApplicationState, .serialized)
+struct BlankFoilMinimumSizeTests {
+    @Test(arguments: [false, true])
+    func blankMinimumFitsFourHistoryCardsAndTracksContent(isIncognito: Bool) async throws {
+        let state = AppState(isIncognito: isIncognito)
+        let controller = FloatingWindowController(appState: state)
+        let window = try #require(controller.window)
+        defer {
+            controller.close()
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        #expect(window.minSize == NSSize(width: 308, height: 308))
+        state.text = "A note"
+        for _ in 0..<100 {
+            if window.minSize.width == 150 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(window.minSize == NSSize(width: 150, height: 150))
+        state.resetContent()
+        #expect(state.isBlank)
+        for _ in 0..<100 {
+            if window.minSize.width == 308 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(window.minSize == NSSize(width: 308, height: 308))
+    }
+}

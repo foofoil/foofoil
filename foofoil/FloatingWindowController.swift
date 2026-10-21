@@ -366,6 +366,14 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     private func setupBindings() {
         guard let window = window else { return }
 
+        // 空箔与内容箔切换时同步最小尺寸；延后读取，避开 @Published 写入前的通知时机。
+        appState.objectWillChange
+            .receive(on: DispatchQueue.main)
+            .map { [weak self] _ in self?.appState.isBlank ?? false }
+            .removeDuplicates()
+            .sink { [weak self] _ in self?.applyWindowSizeLimits() }
+            .store(in: &cancellables)
+
         // 监听图片变化以实时缓存图片/媒体原始尺寸
         contentPublisher(\.$imageURL)
             .sink { [weak self] imageURL in
@@ -761,6 +769,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                 if let targetState = notification.object as? AppState,
                    targetState === self.appState {
                     DispatchQueue.main.async {
+                        self.applyWindowSizeLimits()
                         let defaultSize = Self.initialWindowSize(for: self.appState)
                         self.setWindowSize(defaultSize, keepWidth: false, animated: true)
                     }
@@ -2387,6 +2396,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     private func minimumWindowLength(showBorderOverride: Bool? = nil) -> CGFloat {
         if appState.agentReadOnly { return 80 }
+        // 四张 60 点历史缩略图、三处 12 点间距及两侧 16 点留白。
+        if appState.isBlank { return 4 * 60 + 3 * 12 + 2 * 16 }
         let showBorder = showBorderOverride ?? appState.showBorder
         let usesCompactMinimum = (isImageMode && !showBorder) || appState.readingState.isAudioDocument
         return usesCompactMinimum ? 80 : 150
