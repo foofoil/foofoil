@@ -259,32 +259,18 @@ struct FoofoilTests {
         #expect(FileManager.default.fileExists(atPath: sourceURL.path))
     }
 
-    @Test func testOpenedVideoCreatesSecurityScopedBookmark() throws {
-        // 打开视频时创建安全范围书签并随配置持久化，供 app 重启后恢复沙盒访问
-        let sourceURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("foofoil-video-bookmark-\(UUID().uuidString).mp4")
-        try Data("fake video".utf8).write(to: sourceURL)
+    @Test func testOriginalFileBookmarkPersistsWithoutSandboxAuthorization() throws {
+        let sourceURL = FileManager.default.temporaryDirectory.appendingPathComponent("foofoil-bookmark-\(UUID()).txt")
+        try Data("ordinary file reference".utf8).write(to: sourceURL)
         defer { try? FileManager.default.removeItem(at: sourceURL) }
-
-        let state = AppState()
-        state.openVideo(url: sourceURL)
-
+        let state = AppState(isIncognito: true)
+        state.retainFileAccess(to: sourceURL)
         let bookmark = try #require(state.videoBookmarkData)
-        let resolvedURL = try #require(AppState.resolveVideoBookmark(bookmark))
-        #expect(resolvedURL.path == sourceURL.path)
-
-        let config = state.toConfig()
-        #expect(config.videoBookmark == bookmark)
-
-        // 经配置恢复窗口状态时同样能访问到文件
-        let restored = AppState(config: config)
-        #expect(restored.imageURL == sourceURL)
-        #expect(restored.videoBookmarkData != nil)
-
-        // 清理历史记录
-        if let saved = SettingsStore.shared.historyConfigs.first(where: { $0.id == state.id }) {
-            HistoryManager.shared.removeFromHistory(saved)
-        }
+        #expect(AppState.resolveVideoBookmark(bookmark)?.resolvingSymlinksInPath() == sourceURL.resolvingSymlinksInPath())
+        let config = WindowConfig(id: state.id, textPath: sourceURL.path, videoBookmark: bookmark)
+        let restored = try JSONDecoder().decode(WindowConfig.self, from: JSONEncoder().encode(config))
+        #expect(restored.videoBookmark == bookmark)
+        #expect(AppState.resolveVideoBookmark(try #require(restored.videoBookmark))?.resolvingSymlinksInPath() == sourceURL.resolvingSymlinksInPath())
     }
 
     @Test func testOpenedAudioKeepsOriginalFileWithoutCaching() throws {
@@ -320,14 +306,14 @@ struct FoofoilTests {
 
         let bookmark = try #require(state.videoBookmarkData)
         let resolvedURL = try #require(AppState.resolveVideoBookmark(bookmark))
-        #expect(resolvedURL.path == sourceURL.path)
+        #expect(resolvedURL.resolvingSymlinksInPath() == sourceURL.resolvingSymlinksInPath())
 
         let config = state.toConfig()
         #expect(config.contentKind == .audio)
         #expect(config.videoBookmark == bookmark)
 
         let restored = AppState(config: config)
-        #expect(restored.imageURL == sourceURL)
+        #expect(restored.imageURL?.resolvingSymlinksInPath() == sourceURL.resolvingSymlinksInPath())
         #expect(restored.isAudioDocument)
         #expect(restored.videoBookmarkData != nil)
 
@@ -336,8 +322,8 @@ struct FoofoilTests {
         }
     }
 
-    @Test func testAudioSidecarCoverBookmarkPersistsAndRestores() throws {
-        // 会话内读取到同目录封面后保存文件夹书签，经配置重启后仍能读取封面
+    @Test func testAudioSidecarCoverReadsAfterHistoryRestore() throws {
+        // 同目录封面直接读取，重开历史无需目录授权。
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("foofoil-audio-sidecar-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -360,77 +346,16 @@ struct FoofoilTests {
         #expect(try #require(AudioMetadataLoader.sidecarCoverImageAndURL(for: audioURL)).url
             == directory.appendingPathComponent("cover.jpg"))
 
-        state.recordSidecarCoverAccess(for: audioURL)
-        let sidecarBookmark = try #require(state.mediaSidecarBookmarkData)
-
         let config = state.toConfig()
-        #expect(config.mediaSidecarBookmark == sidecarBookmark)
 
-        // 模拟重启：书签解析恢复目录访问后，封面仍可读取
+        // 模拟重启后仍可直接读取同目录封面。
         let restored = AppState(config: config)
-        #expect(restored.imageURL == audioURL)
-        #expect(restored.mediaSidecarBookmarkData != nil)
+        #expect(restored.imageURL?.resolvingSymlinksInPath() == audioURL.resolvingSymlinksInPath())
         #expect(AudioMetadataLoader.sidecarCoverImage(for: audioURL) != nil)
 
         if let saved = SettingsStore.shared.historyConfigs.first(where: { $0.id == state.id }) {
             HistoryManager.shared.removeFromHistory(saved)
         }
-    }
-
-    @Test func testSidecarCoverDeclineIsRememberedPerDirectory() throws {
-        let firstDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("foofoil-decline-a-\(UUID().uuidString)", isDirectory: true)
-        let secondDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("foofoil-decline-b-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: firstDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(at: secondDirectory, withIntermediateDirectories: true)
-        defer {
-            try? FileManager.default.removeItem(at: firstDirectory)
-            try? FileManager.default.removeItem(at: secondDirectory)
-        }
-
-        #expect(!AppState.hasDeclinedSidecarCoverAccess(for: firstDirectory))
-        AppState.recordSidecarCoverAccessDecline(for: firstDirectory)
-        #expect(AppState.hasDeclinedSidecarCoverAccess(for: firstDirectory))
-        // 拒绝只针对单个目录，不影响其他文件夹
-        #expect(!AppState.hasDeclinedSidecarCoverAccess(for: secondDirectory))
-    }
-
-    @Test func testSidecarBookmarkRoundTripsThroughHistoryDatabase() throws {
-        let databaseDirectory = FileManager.default.temporaryDirectory
-            .appendingPathComponent("foofoil-sidecar-db-\(UUID().uuidString)", isDirectory: true)
-        try FileManager.default.createDirectory(at: databaseDirectory, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: databaseDirectory) }
-        let repository = HistoryRepository(databaseURL: databaseDirectory.appendingPathComponent("history.sqlite3"))
-
-        let folderURL = databaseDirectory.appendingPathComponent("album", isDirectory: true)
-        try FileManager.default.createDirectory(at: folderURL, withIntermediateDirectories: true)
-        let sidecarBookmark = try #require(AppState.makeSecurityScopedBookmark(for: folderURL))
-
-        let id = UUID()
-        #expect(repository.upsert(WindowConfig(
-            id: id,
-            imagePath: folderURL.appendingPathComponent("song.mp3").path,
-            originalImageName: "song.mp3",
-            contentKind: .audio,
-            mediaSidecarBookmark: sidecarBookmark
-        )))
-
-        let stored = try #require(repository.config(id: id))
-        #expect(stored.mediaSidecarBookmark == sidecarBookmark)
-    }
-
-    @Test func testWindowConfigDecodesLegacySidecarBookmarkField() throws {
-        // 旧数据没有 mediaSidecarBookmark 字段时解码为 nil，不影响加载
-        let legacy = WindowConfig(id: UUID(), originalImageName: "song.mp3")
-        let data = try JSONEncoder().encode(legacy)
-        #expect(try JSONDecoder().decode(WindowConfig.self, from: data).mediaSidecarBookmark == nil)
-
-        // 新字段正常往返
-        let bookmark = Data([0x01, 0x02, 0x03])
-        let current = WindowConfig(id: UUID(), originalImageName: "song.mp3", mediaSidecarBookmark: bookmark)
-        let decoded = try JSONDecoder().decode(WindowConfig.self, from: JSONEncoder().encode(current))
-        #expect(decoded.mediaSidecarBookmark == bookmark)
     }
 
     @Test func droppedImageBecomesAudioCoverAndRestoresFromHistory() throws {
@@ -544,7 +469,7 @@ struct FoofoilTests {
         let secondID = try #require(state.fileList?.items.last?.id)
         state.presentFileListItem(id: secondID, rotatesIdentity: false)
         #expect(state.customCoverURL == coverURL)
-        #expect(state.imageURL == secondAudio)
+        #expect(state.imageURL?.resolvingSymlinksInPath() == secondAudio.resolvingSymlinksInPath())
     }
 
     @Test func blankDropStillOpensImageInsteadOfAudioCover() throws {
@@ -2196,7 +2121,7 @@ struct FoofoilTests {
             )
             #expect(state.fileList?.currentID == otherID)
             #expect(state.originalImageName == second.lastPathComponent || state.originalImageName == third.lastPathComponent)
-            #expect(state.imageURL == state.fileList?.currentItem?.url)
+            #expect(state.imageURL?.resolvingSymlinksInPath() == state.fileList?.currentItem?.url.resolvingSymlinksInPath())
         }
         #expect(state.fileList?.items.count == 3)
         #expect(state.id == originalID)
@@ -3130,13 +3055,13 @@ struct FoofoilTests {
         state.advanceFileListAfterPlayback()
         #expect(state.fileList?.currentID == secondID)
         let peeked = try #require(state.peekNextPlaybackItem())
-        #expect(peeked.url.path == third.path)
+        #expect(peeked.url.resolvingSymlinksInPath() == third.resolvingSymlinksInPath())
         #expect(peeked.range == nil)
 
         state.mediaPlaybackMode = .sequentialLoop
         state.presentFileListItem(id: thirdID, rotatesIdentity: false)
         let wrapped = try #require(state.peekNextPlaybackItem())
-        #expect(wrapped.url.path == first.path)
+        #expect(wrapped.url.resolvingSymlinksInPath() == first.resolvingSymlinksInPath())
 
         state.presentFileListItem(id: secondID, rotatesIdentity: false)
         state.mediaPlaybackMode = .singleLoop

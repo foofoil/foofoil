@@ -92,6 +92,9 @@ struct FoilContentView: View {
             Group {
                 if let archive, archive.preview == nil || appState.isFileOpenFeedback {
                     ArchiveContentView(session: archive)
+                } else if let session = appState.terminalSession {
+                    TerminalFoilView(session: session, appState: appState)
+                        .clipShape(RoundedRectangle(cornerRadius: contentBackgroundCornerRadius, style: .continuous))
                 } else if appState.isFileOpenFeedback {
                     FileOpenFeedbackView(failures: appState.fileOpenFeedback) {
                         NotificationCenter.default.post(

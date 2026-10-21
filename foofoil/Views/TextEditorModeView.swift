@@ -136,9 +136,11 @@ struct TextEditorModeView: View {
                                                     if isCurrentlyBlank {
                                                         withAnimation(.easeInOut(duration: 0.35)) {
                                                             _ = appState.loadConfig(config)
+                                                            appState.startTerminalForExplicitOpen()
                                                         }
                                                     } else {
                                                         appState.loadConfig(config)
+                                                            appState.startTerminalForExplicitOpen()
                                                     }
                                                 }
                                             )

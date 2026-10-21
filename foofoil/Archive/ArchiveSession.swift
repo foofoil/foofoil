@@ -77,7 +77,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
         var refreshed: [ArchiveSource.Volume] = []
         for volume in source.volumes {
             var stale = false
-            let url = volume.bookmark.flatMap { try? URL(resolvingBookmarkData: $0, options: .withSecurityScope, bookmarkDataIsStale: &stale) } ?? URL(fileURLWithPath: volume.path)
+            let url = volume.bookmark.flatMap { try? URL(resolvingBookmarkData: $0, options: .withoutUI, bookmarkDataIsStale: &stale) } ?? URL(fileURLWithPath: volume.path)
             if url.startAccessingSecurityScopedResource() { accessed.append(url) }
             urls.append(url)
             refreshed.append(.init(path: url.path, bookmark: AppState.makeSecurityScopedBookmark(for: url)))

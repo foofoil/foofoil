@@ -39,6 +39,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
 
     var loadedImageCache: (url: URL, image: NSImage)?
     var isBatchUpdating = false
+    @Published var terminalConfiguration: TerminalLaunchConfiguration?
+    @Published var terminalSession: TerminalSession?
     var agentOwnership: AgentOwnership?
     /// 只读展示策略可恢复；控制身份始终由上面的运行期归属单独决定。
     @Published var agentReadOnly = false
@@ -508,7 +510,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     /// 空白箔：尚未加载任何图像、网页、扩展会话或关联文件，且用户尚未输入任何文本内容。
     /// 在用户输入内容前空白箔不是文档类型，不显示文档背景，也不允许配置样式和主题。
     public var isBlank: Bool {
-        archiveSession == nil && appleMusicReference == nil && !isCamera && imageURL == nil
+        terminalConfiguration == nil && archiveSession == nil && appleMusicReference == nil && !isCamera && imageURL == nil
             && webURL == nil
             && textURL == nil
             && extensionSession == nil
@@ -657,19 +659,10 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         mediaPlaybackMode = mediaPlaybackMode.cycled
     }
 
-    /// 视频/音频原始文件的安全范围书签；沙盒授权仅随进程有效，靠它在 app 重启后恢复访问。
+    /// 原始媒体文件的普通书签，用于重启后定位文件。
     public var videoBookmarkData: Data?
     /// 当前已通过书签持有访问授权的媒体 URL，切换内容或销毁时需停止访问。
     var accessingVideoURL: URL?
-    /// 播放 CUE 曲目时保持对 CUE 文件的安全范围访问，以便读取同目录音频。
-    var accessingCueURL: URL?
-    var cueRelatedPresenter: CueRelatedFilePresenter?
-    /// 音频同目录封面所在文件夹的安全范围书签；重启后恢复访问，保证封面无需再次授权即可显示。
-    var mediaSidecarBookmarkData: Data?
-    /// 当前持有访问授权的封面所在文件夹 URL，切换内容或销毁时需停止访问。
-    var accessingSidecarDirectoryURL: URL?
-    /// 同一目录的授权请求（封面读取、CUE 关联音频与音乐列表检测共用）；按目录合并并发请求，避免重复弹面板。
-    var pendingDirectoryAccessRequests: [String: Task<Bool, Never>] = [:]
     /// 用户拖入替换的音频封面缓存文件；重开历史时优先使用。
     @Published var customCoverURL: URL?
     /// 当前箔片正在展示的封面，用于拖入图片时判断是否需要询问替换。

@@ -179,26 +179,9 @@ struct AudioModeView: View {
         // 元数据由 .task(id:) 唯一持有，切歌时自动取消上一首。
     }
 
-    /// 读取曲目元数据；无内嵌封面且所在目录未获沙盒授权时向用户请求访问权限后重试，
-    /// 成功读取同目录封面则保存文件夹书签，保证重启后仍能显示。
-    /// 该次授权同时服务同目录音乐列表检测（与封面并行，不阻塞起播）。
+    /// 直接读取曲目元数据与同目录封面，不在后台扫描时弹出目录授权面板。
     private func loadTrackInfo() async -> AudioTrackInfo {
         var loaded = await AudioMetadataLoader.load(from: url)
-        guard !Task.isCancelled else { return loaded }
-        if appState.customCoverImage == nil {
-            if loaded.artwork == nil, await appState.ensureAudioDirectoryAccess(for: url) {
-                guard !Task.isCancelled else { return loaded }
-                loaded = await AudioMetadataLoader.load(from: url)
-                guard !Task.isCancelled else { return loaded }
-                // 授权后封面才可读：补做窗口尺寸适配与历史缩略图重建
-                if loaded.artwork != nil {
-                    appState.sidecarCoverDidBecomeAvailable()
-                }
-            }
-            if loaded.sidecarCoverURL != nil {
-                appState.recordSidecarCoverAccess(for: url)
-            }
-        }
         guard !Task.isCancelled else { return loaded }
         loaded = appState.overlayCustomCover(loaded)
         appState.persistDisplayedArtworkForHistory(loaded.artwork)

@@ -182,7 +182,8 @@ struct SearchScopeTests {
         model.clearSearch()
         #expect(model.activeScope == nil)
         #expect(model.resultFilter == .all)
-        #expect(!model.isSearching)
+        #expect(model.searchText.isEmpty)
+        #expect(model.isSearching) // 总览始终提供搜索，清除只重置查询与范围。
     }
 
     @Test func spotlightFolderPredicateAndResultMetadata() {
@@ -206,7 +207,7 @@ struct SearchScopeTests {
         let allPredicate = SpotlightFileSearch.predicate(for: "project swift", target: .all)
         #expect(!allPredicate.predicateFormat.contains("kMDItemContentType"))
 
-        let home = SpotlightSearchAccess.userHome.path
+        let home = LocalFileSearchSettings.userHome.path
         #expect(allPredicate.evaluate(with: [
             "kMDItemFSName": "project swift folder",
             "kMDItemContentType": "public.folder",

@@ -29,7 +29,7 @@ nonisolated struct AudioTrackInfo {
     var bitRate: Double?
     var channelCount: Int?
     var artwork: NSImage?
-    /// 封面来自音频同目录文件时记录其位置，供保存沙盒书签使用；不参与持久化。
+    /// 封面来自音频同目录文件时记录其位置；不参与持久化。
     var sidecarCoverURL: URL?
 
     static func fallback(fileName: String) -> AudioTrackInfo {
@@ -256,7 +256,7 @@ nonisolated enum AudioMetadataLoader {
 
     static func sidecarCoverURL(for audioURL: URL) -> URL? {
         sidecarCoverCandidates(for: audioURL).first { candidate in
-            loadSidecarImage(primary: audioURL, related: candidate) != nil
+            loadSidecarImage(at: candidate) != nil
         }
     }
 
@@ -266,39 +266,20 @@ nonisolated enum AudioMetadataLoader {
 
     static func sidecarCoverImageAndURL(for audioURL: URL) -> (image: NSImage, url: URL)? {
         for candidate in sidecarCoverCandidates(for: audioURL) {
-            if let image = loadSidecarImage(primary: audioURL, related: candidate) {
+            if let image = loadSidecarImage(at: candidate) {
                 return (image, candidate)
             }
         }
         return nil
     }
 
-    /// 沙盒未获授权时音频所在目录不可读，此时无法自行发现同目录封面，需要向用户请求授权。
+    /// 检查目录是否可读，供同目录音频扫描使用。
     static func isCoverDirectoryAccessible(for audioURL: URL) -> Bool {
         FileManager.default.isReadableFile(atPath: audioURL.deletingLastPathComponent().path)
     }
 
-    /// 沙盒只授权用户选中的音频文件；同目录封面需以 NSFilePresenter 关联项方式读取。
-    private static func loadSidecarImage(primary: URL, related: URL) -> NSImage? {
-        if let image = NSImage(contentsOf: related), image.size.width > 0, image.size.height > 0 {
-            return image
-        }
-        return readRelatedItemImage(primary: primary, related: related)
-    }
-
-    private static func readRelatedItemImage(primary: URL, related: URL) -> NSImage? {
-        let presenter = SidecarFilePresenter(primary: primary, related: related)
-        NSFileCoordinator.addFilePresenter(presenter)
-        defer { NSFileCoordinator.removeFilePresenter(presenter) }
-
-        var image: NSImage?
-        let coordinator = NSFileCoordinator(filePresenter: presenter)
-        var coordinationError: NSError?
-        coordinator.coordinate(readingItemAt: related, options: [], error: &coordinationError) { url in
-            guard let data = try? Data(contentsOf: url), let loaded = NSImage(data: data),
-                  loaded.size.width > 0, loaded.size.height > 0 else { return }
-            image = loaded
-        }
+    private static func loadSidecarImage(at url: URL) -> NSImage? {
+        guard let image = NSImage(contentsOf: url), image.size.width > 0, image.size.height > 0 else { return nil }
         return image
     }
 
@@ -534,22 +515,3 @@ nonisolated enum AudioMetadataLoader {
     }
 }
 
-/// 将同目录封面声明为用户所选音频的关联项，以便沙盒允许读取。
-nonisolated private final class SidecarFilePresenter: NSObject, NSFilePresenter {
-    let primaryPresentedItemURL: URL?
-    let presentedItemURL: URL?
-    let presentedItemOperationQueue: OperationQueue
-
-    init(primary: URL, related: URL) {
-        self.primaryPresentedItemURL = primary
-        self.presentedItemURL = related
-        self.presentedItemOperationQueue = SidecarFilePresenter.queue
-    }
-
-    private static let queue: OperationQueue = {
-        let queue = OperationQueue()
-        queue.name = "com.foofoil.audio-sidecar"
-        queue.maxConcurrentOperationCount = 1
-        return queue
-    }()
-}

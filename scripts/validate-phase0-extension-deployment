@@ -29,8 +29,10 @@ fi
 
 app_entitlements="$(codesign -d --entitlements :- "$app_path" 2>/dev/null)"
 service_entitlements="$(codesign -d --entitlements :- "$service_path" 2>/dev/null)"
-if [[ "$app_entitlements" != *"com.apple.security.app-sandbox"* || "$service_entitlements" != *"com.apple.security.app-sandbox"* ]]; then
-    print -u2 "Host and XPC service must both enable App Sandbox."
+app_sandbox="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.app-sandbox' /dev/stdin <<< "$app_entitlements" 2>/dev/null || true)"
+service_sandbox="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.app-sandbox' /dev/stdin <<< "$service_entitlements" 2>/dev/null || true)"
+if [[ "$app_sandbox" == "true" || "$service_sandbox" != "true" ]]; then
+    print -u2 "The host must be non-sandboxed; the Test Extension XPC service must remain sandboxed."
     exit 65
 fi
 if [[ "$app_entitlements" == *"com.apple.security.cs.disable-library-validation"* ]]; then

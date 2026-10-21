@@ -16,10 +16,10 @@ nonisolated enum FileReference {
         if let bookmark {
             var stale = false
             do {
-                url = try URL(resolvingBookmarkData: bookmark, options: [.withSecurityScope, .withoutUI], bookmarkDataIsStale: &stale)
+                url = try URL(resolvingBookmarkData: bookmark, options: [.withoutUI], bookmarkDataIsStale: &stale)
                 let accessing = url.startAccessingSecurityScopedResource()
                 defer { if accessing { url.stopAccessingSecurityScopedResource() } }
-                if stale { refreshed = try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) }
+                if stale { refreshed = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil) }
                 return Resolution(url: url, bookmark: refreshed ?? bookmark, status: status(of: url))
             } catch {
                 let error = error as NSError

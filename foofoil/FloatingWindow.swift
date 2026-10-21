@@ -21,6 +21,7 @@ public class FloatingWindow: NSWindow {
     }
 
     private var isCommandDragCursorVisible = false
+    private var isCommandWindowDragInProgress = false
     private var isEdgeResizeCursorVisible = false
     private weak var resizeCursorTrackingView: NSView?
     private var resizeCursorTrackingArea: NSTrackingArea?
@@ -138,6 +139,15 @@ public class FloatingWindow: NSWindow {
     public override func sendEvent(_ event: NSEvent) {
         let modifiers = KeyboardShortcut.effectiveModifiers(for: event)
 
+        // ⌘ 拖窗的整段鼠标序列归窗口所有；否则残余 dragged 会让终端凭空建立文字选区。
+        // performDrag 可能已消费 mouseUp，下一次 mouseDown 也要清除状态。
+        if event.type == .leftMouseDown { isCommandWindowDragInProgress = false }
+        if isCommandWindowDragInProgress,
+           event.type == .leftMouseDragged || event.type == .leftMouseUp {
+            if event.type == .leftMouseUp { isCommandWindowDragInProgress = false }
+            return
+        }
+
         // 内容视图可能在 mouseMoved/Entered 中设置文本光标；派发结束后再恢复边缘光标。
         // 子视图的 mouseExited 不代表离开窗口，始终按当前指针位置重新判断。
         defer {
@@ -200,7 +210,15 @@ public class FloatingWindow: NSWindow {
            modifiers.contains(.command),
            (windowController as? FloatingWindowController)?.appState.isFullScreen != true {
             updateCommandDragCursor(isCommandPressed: true)
+            isCommandWindowDragInProgress = true
             performDrag(with: event)
+            return
+        }
+
+        if event.type == .keyDown,
+           (windowController as? FloatingWindowController)?.appState.terminalConfiguration != nil,
+           !modifiers.contains(.command) {
+            super.sendEvent(event)
             return
         }
 
@@ -634,6 +652,12 @@ public class FloatingWindow: NSWindow {
 
     // 重写 performKeyEquivalent(with:)：默认键位下保留既有的窗口直属处理；改键后的可配置命令统一走主菜单。
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if event.modifierFlags.contains(.control), !event.modifierFlags.contains(.command),
+           let session = (windowController as? FloatingWindowController)?.appState.terminalSession,
+           firstResponder === session.view {
+            session.view.keyDown(with: event)
+            return true
+        }
         // 列表切项必须赶在主菜单匹配 PDF 翻页方向键之前处理。
         if let controller = windowController as? FloatingWindowController,
            (controller.appState.handleNavigatorKeyDown(event) || controller.appState.handleChapterKeyDown(event) || controller.appState.handleFileListKeyDown(event)) {
@@ -650,6 +674,7 @@ public class FloatingWindow: NSWindow {
            let config = HistoryManager.shared.historyConfigs.filter({ SettingsStore.shared.appleMusicLibraryEnabled || $0.appleMusicReference == nil }).dropFirst(index - 1).first {
             withAnimation(.easeInOut(duration: 0.35)) {
                 _ = controller.appState.loadConfig(config)
+                controller.appState.startTerminalForExplicitOpen()
             }
             return true
         }

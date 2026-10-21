@@ -27,6 +27,11 @@ nonisolated struct AgentRequest: Codable, Sendable {
     var title: String?
     var incognito: Bool?
     var expected_revision: UInt64?
+    var scope: String?
+    var force: Bool?
+    var terminal: TerminalLaunchConfiguration?
+    var property: String?
+    var value: Double?
 }
 
 nonisolated struct AgentBoard: Codable, Sendable {
@@ -46,4 +51,33 @@ nonisolated struct AgentResponse: Codable, Sendable {
     var boards: [AgentBoard]?
     var warnings: [String] = []
     var error: String?
+    var capabilities: [String]?
+    var socket_path: String?
+    var windows: [ControlWindow]?
+    var window: ControlWindow?
+}
+
+/// 只持久化用户配置；不保存继承环境、终端输出、PID 或会话身份。
+nonisolated public struct TerminalLaunchConfiguration: Codable, Sendable, Equatable {
+    public var shellPath: String?
+    public var workingDirectory: String?
+    public var environment: [String: String]
+    public var startupCommands: String
+    public init(shellPath: String? = nil, workingDirectory: String? = nil,
+                environment: [String: String] = [:], startupCommands: String = "") {
+        self.shellPath = shellPath; self.workingDirectory = workingDirectory
+        self.environment = environment; self.startupCommands = startupCommands
+    }
+}
+
+nonisolated struct ControlWindow: Codable, Sendable {
+    var id: String
+    var content_id: String
+    var title: String
+    var type: String
+    var visible: Bool
+    var opacity: Double
+    var terminal_state: String?
+    var terminal_id: String?
+    var board_id: String?
 }

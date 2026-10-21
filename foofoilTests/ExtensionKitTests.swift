@@ -1574,7 +1574,7 @@ struct ExtensionKitTests {
         let realURL = directory.appendingPathComponent("disc.isotest")
         try Data("SACDMTOC".utf8).write(to: realURL)
         let bookmark = try realURL.bookmarkData(
-            options: .withSecurityScope,
+            options: [],
             includingResourceValuesForKeys: nil,
             relativeTo: nil
         )
@@ -1653,43 +1653,6 @@ struct ExtensionKitTests {
         HistoryManager.shared.removeFromHistory(state.toConfig())
     }
 
-    /// 扩展音频（DSF 目录列表）不占用 imageURL，同目录封面书签必须独立恢复，
-    /// 否则每次重启都会重新弹出目录授权。
-    @Test func extensionAudioRestoresSidecarBookmarkWithoutImagePath() throws {
-        let directory = try temporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let first = directory.appendingPathComponent("one.dsf")
-        let second = directory.appendingPathComponent("two.dsf")
-        try Data("DSD1".utf8).write(to: first)
-        try Data("DSD2".utf8).write(to: second)
-        let bookmark = try directory.bookmarkData(
-            options: .withSecurityScope,
-            includingResourceValuesForKeys: nil,
-            relativeTo: nil
-        )
-        let list = FileListState(kind: .audio, items: [
-            FileListItem(id: "one", path: first.path, displayName: "one.dsf"),
-            FileListItem(id: "two", path: second.path, displayName: "two.dsf")
-        ], currentID: "one", title: "DSF directory")
-        let config = WindowConfig(
-            id: UUID(),
-            originalImageName: "one.dsf",
-            contentKind: .extensionContent,
-            mediaSidecarBookmark: bookmark,
-            fileList: list
-        )
-        // 扩展音频不占用 imageURL：这正是旧逻辑跳过书签恢复的条件。
-        #expect(config.imagePath == nil)
-
-        let state = AppState(config: config)
-        #expect(state.mediaSidecarBookmarkData == bookmark)
-        // 目录已可读，loadTrackInfo 会直接返回而不再弹授权面板。
-        #expect(AudioMetadataLoader.isCoverDirectoryAccessible(for: first))
-        state.stopVideoAccess()
-        state.extensionSession = nil
-        HistoryManager.shared.removeFromHistory(state.toConfig())
-    }
-
     /// 扩展音频不占用 imageURL，视图读元数据/内嵌封面靠建会话时接管的文件授权；
     /// 重建后必须持有，否则重开历史只有声音没有封面。
     @Test func extensionAudioFileAccessHeldAfterHistoryRebuild() async throws {
@@ -1702,7 +1665,7 @@ struct ExtensionKitTests {
         let sourceURL = directory.appendingPathComponent("track.historydsd")
         try Data("DSD".utf8).write(to: sourceURL)
         let bookmark = try sourceURL.bookmarkData(
-            options: .withSecurityScope,
+            options: [],
             includingResourceValuesForKeys: nil,
             relativeTo: nil
         )
@@ -1739,7 +1702,7 @@ struct ExtensionKitTests {
         }
 
         #expect(!state.isLoading)
-        #expect(state.accessingVideoURL?.path == sourceURL.path)
+        #expect(state.accessingVideoURL?.resolvingSymlinksInPath() == sourceURL.resolvingSymlinksInPath())
         #expect(FileManager.default.isReadableFile(atPath: sourceURL.path))
         state.stopVideoAccess()
         state.extensionSession = nil
@@ -1909,18 +1872,6 @@ struct ExtensionKitTests {
                 viewBounds: viewBounds
             )
         )
-    }
-
-    /// 目录本来就可读时不弹面板也不要求重读（首次读取已带授权）。
-    @Test @MainActor func sidecarRequestSkipsReloadWhenAccessible() async throws {
-        let directory = try temporaryDirectory()
-        defer { try? FileManager.default.removeItem(at: directory) }
-        let track = directory.appendingPathComponent("track.dsf")
-        try Data("DSD".utf8).write(to: track)
-        let state = AppState()
-        #expect(await state.ensureAudioDirectoryAccess(for: track) == false)
-        state.stopVideoAccess()
-        HistoryManager.shared.removeFromHistory(state.toConfig())
     }
 
     /// 无 imagePath 的扩展音频走不到后台索引，展示中的封面是唯一的缩略图来源。

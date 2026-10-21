@@ -261,8 +261,8 @@ final class FoilExposeModel: ObservableObject {
     var onRenameItem: (FoilExposeItem) -> Void = { _ in }
     /// 打开文件结果：由控制器检查可用性并在浮箔中打开。
     var onOpenFile: (URL) -> Void = { _ in }
-    /// 请求开启文件搜索：由控制器弹出系统面板确认用户主目录。
-    var onRequestFileSearchAuthorization: () -> Void = {}
+    /// 开启文件搜索偏好，不弹出目录授权面板。
+    var onEnableFileSearch: () -> Void = {}
     /// 点击剪贴板提示：由控制器关闭覆盖层并打开剪贴板内容（等价于 ⌘⇧V）。
     var onOpenClipboard: () -> Void = {}
     /// 面板视图当前可见条目的 id（按显示顺序），随滚动实时回填；编号直选只命中可见项。
@@ -544,8 +544,7 @@ final class FoilExposeModel: ObservableObject {
                     self.mergeFiles()
                     return
                 case .results(let files): self.rawFiles = Array(files.prefix(SearchResultLimits.probe))
-                case .needsAuthorization: self.fileStatus = .needsAuthorization
-                case .authorizationUnavailable: self.fileStatus = .authorizationUnavailable
+                case .disabled: self.fileStatus = .disabled
                 case .unavailable: self.fileStatus = .unavailable
                 case .timedOut: self.fileStatus = .timedOut
                 }
@@ -586,9 +585,9 @@ final class FoilExposeModel: ObservableObject {
         files = SpotlightFileResult.ranked(rawFiles, query: searchQuery, excluding: excluded, limit: SearchResultLimits.probe)
     }
 
-    /// 请求开启文件搜索：交给控制器弹出系统面板确认用户主目录。
-    func requestFileSearchAuthorization() {
-        onRequestFileSearchAuthorization()
+    /// 开启文件搜索并重新查询。
+    func enableFileSearch() {
+        onEnableFileSearch()
     }
 
     /// 移动键盘高亮，左右逐项、上下跨一行，越界时夹紧。
@@ -835,7 +834,7 @@ final class FoilExposeController {
         model.onSelect = { [weak self] item in self?.select(item) }
         model.onDismiss = { [weak self] in self?.dismiss() }
         model.onOpenFile = { [weak self] url in self?.openFile(url) }
-        model.onRequestFileSearchAuthorization = { [weak self] in self?.requestFileSearchAuthorization() }
+        model.onEnableFileSearch = { [weak self] in self?.enableFileSearch() }
         model.onOpenClipboard = { [weak self] in self?.openClipboard() }
         model.onClearHistory = { [weak self] category in self?.confirmClearHistory(category) }
         model.onClearHistoryItem = { [weak self] item in self?.clearHistoryItem(item) }
@@ -1030,33 +1029,28 @@ final class FoilExposeController {
         window.orderFrontRegardless()
     }
 
-    /// 打开 Spotlight 文件结果：先检查可读性，可读则保持主目录授权直到目标箔片装载结束；
+    /// 打开 Spotlight 文件结果：先检查可读性；
     /// 文件不可读时留在覆盖层内说明原因，不关闭覆盖层。
     private func openFile(_ url: URL) {
         guard !isOpeningFile, let model else { return }
         isOpeningFile = true
-        let access = (try? SpotlightSearchAccess.shared.beginAccess()) ?? []
         Task { [weak self] in
             guard let self else { return }
             let result = await SpotlightFileOpener.fileAccess(url)
             guard self.model === model else {
-                SpotlightFileOpener.releaseAccess(access)
                 self.isOpeningFile = false
                 return
             }
             switch result {
             case .readable:
-                if SpotlightFileOpener.openInFoil(url, access: access) {
+                if SpotlightFileOpener.openInFoil(url) {
                     self.dismiss()
                 } else {
-                    SpotlightFileOpener.releaseAccess(access)
                     model.fileSearchNotice = NSLocalizedString("Search File Open Failed", comment: "")
                 }
             case .notDownloaded:
-                SpotlightFileOpener.releaseAccess(access)
                 model.fileSearchNotice = NSLocalizedString("Search File Not Downloaded", comment: "")
             case .needsPermission, .unavailable:
-                SpotlightFileOpener.releaseAccess(access)
                 model.fileSearchNotice = NSLocalizedString("Search File Open Failed", comment: "")
             }
             self.isOpeningFile = false
@@ -1171,32 +1165,9 @@ final class FoilExposeController {
         }
     }
 
-    /// 开启文件搜索：系统面板会盖住覆盖层，先让出面板，选择结束后恢复并重新查询。
-    private func requestFileSearchAuthorization() {
-        guard !isPresentingSystemUI, let model, let panel = panels.first else { return }
-        isPresentingSystemUI = true
-        panel.orderOut(nil)
-        SpotlightSearchAuthorization.request { [weak self] outcome in
-            guard let self else { return }
-            self.isPresentingSystemUI = false
-            // 面板可能已被关闭或覆盖层已退场，此时不再恢复。
-            guard self.model === model, self.panels.first === panel else { return }
-            NSApp.activate(ignoringOtherApps: true)
-            panel.makeKeyAndOrderFront(nil)
-            if model.isSearching {
-                model.requestSearchFieldFocus()
-            }
-            switch outcome {
-            case .authorized:
-                model.restartFileSearch()
-            case .needsHomeFolder:
-                model.fileSearchNotice = NSLocalizedString("File Search Needs Home Folder", comment: "")
-            case .failed:
-                model.fileSearchNotice = NSLocalizedString("File Search Authorization Failed", comment: "")
-            case .cancelled:
-                break
-            }
-        }
+    private func enableFileSearch() {
+        LocalFileSearchSettings.shared.isEnabled = true
+        model?.restartFileSearch()
     }
 
     private func installKeyMonitor() {

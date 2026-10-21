@@ -37,7 +37,7 @@ extension AppState {
             }
             let config = toConfig()
             let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            if archiveSession != nil || appleMusicReference != nil || isCamera || imageURL != nil || webURL != nil || textURL != nil || extensionSession != nil || !trimmedText.isEmpty {
+            if terminalConfiguration != nil || archiveSession != nil || appleMusicReference != nil || isCamera || imageURL != nil || webURL != nil || textURL != nil || extensionSession != nil || !trimmedText.isEmpty {
                 HistoryManager.shared.addToHistory(config)
             }
         }
@@ -88,6 +88,10 @@ extension AppState {
                 ? NSLocalizedString("Supported Content Overview", comment: "") + ".md"
                 : config.originalImageName
             self.customTitle = config.customTitle
+            terminalSession?.stop()
+            terminalConfiguration = config.terminalConfiguration
+            terminalSession = config.terminalConfiguration.map { TerminalSession(configuration: $0, previousOutput: isIncognito ? nil : config.terminalScrollback) }
+            configureTerminalSnapshotSaving()
             self.imageSource = config.imageSource
             self.showBorder = config.showBorder
             self.showCodeLineNumbers = config.showCodeLineNumbers ?? true
@@ -136,7 +140,7 @@ extension AppState {
 
             if let path = config.imagePath, config.contentKind != .archive {
                 let url = URL(fileURLWithPath: path)
-                // 视频/音频经安全范围书签恢复沙盒访问（重启后路径直接不可达）
+                // 通过普通书签定位媒体文件，兼顾文件移动。
                 if !Self.isManagedCacheURL(url) {
                     // 加载新配置前先释放旧的媒体授权
                     stopVideoAccess()
@@ -145,15 +149,7 @@ extension AppState {
                         self.videoBookmarkData = restored.bookmark
                         self.quickLookSourceURL = config.contentKind == .quickLook ? restored.url : nil
                         self.imageURL = restored.url
-                        // 音频再恢复同目录封面文件夹的访问，保证封面在重启后仍可读取
-                        if Self.isAudioFileName(config.originalImageName ?? path),
-                           let sidecarBookmark = config.mediaSidecarBookmark,
-                           let sidecar = Self.restoreSidecarCoverAccess(bookmark: sidecarBookmark) {
-                            if sidecar.accessed { accessingSidecarDirectoryURL = sidecar.directory }
-                            mediaSidecarBookmarkData = sidecar.refreshedBookmark ?? sidecarBookmark
-                        }
                     } else {
-                        self.mediaSidecarBookmarkData = nil
                         self.imageURL = url
                         self.videoBookmarkData = config.videoBookmark
                         reportFileOpenFeedback([.init(url: url, reason: .unreadable)])
@@ -169,18 +165,6 @@ extension AppState {
 
             // 重开历史时直接采用持久化的 OCR 与主体结论，不再重跑 Vision。
             if !isRefreshing { restoreImageDerivedContent(from: config) }
-
-            // 扩展音频（DSF/DFF/SACD 经 Hi-Fi 播放，含目录列表）不占用 imageURL，
-            // 同目录封面书签必须独立于 imagePath 恢复，否则每次重启都会重新弹出目录授权。
-            if config.imagePath == nil, accessingSidecarDirectoryURL == nil {
-                if let bookmark = config.mediaSidecarBookmark,
-                   let sidecar = Self.restoreSidecarCoverAccess(bookmark: bookmark) {
-                    if sidecar.accessed { accessingSidecarDirectoryURL = sidecar.directory }
-                    mediaSidecarBookmarkData = sidecar.refreshedBookmark ?? bookmark
-                } else if config.mediaSidecarBookmark == nil {
-                    mediaSidecarBookmarkData = nil
-                }
-            }
 
             stopCamera()
             if config.isCamera { openCamera() }
@@ -298,7 +282,7 @@ extension AppState {
                 documentParagraphSpacing: documentParagraphSpacing,
                 documentThemeId: documentThemeId,
                 textPath: textURL?.path,
-                contentKind: appleMusicReference != nil ? .audio : isVideoDocument ? .video : isQuickLookDocument ? .quickLook : HistoryContentKind.infer(from: WindowConfig(
+                contentKind: terminalConfiguration != nil ? .terminal : appleMusicReference != nil ? .audio : isVideoDocument ? .video : isQuickLookDocument ? .quickLook : HistoryContentKind.infer(from: WindowConfig(
                     id: id,
                     imagePath: imageURL?.path,
                     isCamera: isCamera,
@@ -320,7 +304,6 @@ extension AppState {
                 mediaPlaybackMode: mediaPlaybackMode,
                 subtitleAssociations: subtitles.history.isEmpty ? nil : subtitles.history,
                 videoBookmark: videoResource?.securityScopedBookmark ?? videoBookmarkData,
-                mediaSidecarBookmark: mediaSidecarBookmarkData,
                 customCoverPath: customCoverURL?.path,
                 extensionID: extensionSession?.extensionID,
                 extensionStateReference: extensionStateReference,
@@ -332,7 +315,9 @@ extension AppState {
                 documentScrollFraction: extensionDocumentScrollFraction,
                 appleMusicReference: appleMusicReference,
                 showCodeLineNumbers: showCodeLineNumbers,
-                readOnlyPresentation: agentReadOnly
+                readOnlyPresentation: agentReadOnly,
+                terminalConfiguration: terminalConfiguration,
+                terminalScrollback: isIncognito ? nil : terminalSession?.outputSnapshot
             )
         }
 

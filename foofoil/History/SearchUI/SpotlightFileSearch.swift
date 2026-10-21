@@ -67,10 +67,8 @@ nonisolated enum SpotlightSearchOutcome: Sendable {
     case results([SpotlightFileResult])
     /// 初次收集尚未结束，先展示当前可用的候选。
     case progress([SpotlightFileResult])
-    /// 尚未授权搜索用户主目录。
-    case needsAuthorization
-    /// 已保存的主目录书签无法恢复，需要用户重新开启。
-    case authorizationUnavailable
+    /// 用户尚未启用本地文件搜索。
+    case disabled
     case unavailable
     case timedOut
 }
@@ -78,7 +76,6 @@ nonisolated enum SpotlightSearchOutcome: Sendable {
 /// 查询对象和观察者始终留在主运行循环，只提取有限数量的元数据，不读取文件正文。
 @MainActor
 final class SpotlightFileSearch {
-    private var accessedScopes: [URL] = []
     private var generation = 0
     private var query: NSMetadataQuery?
     private var observers: [NSObjectProtocol] = []
@@ -113,7 +110,7 @@ final class SpotlightFileSearch {
         var subpredicates: [NSPredicate] = [
             // 主目录范围包含 ~/Library：在谓词里先排除，减少无关候选并加快收集。
             NSPredicate(format: "NOT (%K BEGINSWITH %@)", "kMDItemPath",
-                        SpotlightSearchAccess.userHome.appendingPathComponent("Library", isDirectory: true).path + "/"),
+                        LocalFileSearchSettings.userHome.appendingPathComponent("Library", isDirectory: true).path + "/"),
         ]
         switch target {
         case .folders:
@@ -140,9 +137,7 @@ final class SpotlightFileSearch {
 
     func start(text: String, scopes: [URL], extensions: Set<String>, target: SpotlightSearchTarget = .all, completion: @escaping (SpotlightSearchOutcome) -> Void) {
         cancel()
-        guard !scopes.isEmpty else { completion(.needsAuthorization); return }
-        // 调用方已启动安全范围访问，服务接管到查询完成或取消。
-        accessedScopes = scopes
+        guard !scopes.isEmpty else { completion(.disabled); return }
         let requestGeneration = generation
         let query = makeQuery()
         query.searchScopes = scopes.map(\.path)
@@ -201,7 +196,6 @@ final class SpotlightFileSearch {
                   let path = item.value(forAttribute: "kMDItemPath") as? String else { continue }
             let url = URL(fileURLWithPath: path)
             guard url.isFileURL,
-                  Self.isWithinScopes(url, scopes: accessedScopes),
                   // 再做逐词字面匹配，避免 Spotlight 的查询语法把输入中的通配符扩展为结果。
                   Self.matches(url: url, keywords: keywords),
                   (item.value(forAttribute: "kMDItemFSInvisible") as? NSNumber)?.boolValue != true,
@@ -244,7 +238,7 @@ final class SpotlightFileSearch {
 
     /// 主目录范围下排除 ~/Library：应用数据与缓存数量庞大，不属于用户要找的文件。
     nonisolated static func isHomeLibrary(_ url: URL) -> Bool {
-        let library = SpotlightSearchAccess.userHome.appendingPathComponent("Library", isDirectory: true).standardizedFileURL.path
+        let library = LocalFileSearchSettings.userHome.appendingPathComponent("Library", isDirectory: true).standardizedFileURL.path
         return url.standardizedFileURL.path.hasPrefix(library + "/")
     }
 
@@ -271,23 +265,17 @@ final class SpotlightFileSearch {
         timeout?.cancel()
         timeout = nil
         completion = nil
-        accessedScopes.forEach { $0.stopAccessingSecurityScopedResource() }
-        accessedScopes = []
     }
 }
 
 extension SpotlightFileSearch {
-    /// 用宿主与可用扩展声明的候选类型，在已授权的主目录范围内查询；未授权时直接报告状态。
+    /// 用宿主与可用扩展声明的候选类型，在用户主目录范围内查询；功能关闭时直接报告状态。
     func start(text: String, target: SpotlightSearchTarget = .all, completion: @escaping (SpotlightSearchOutcome) -> Void) {
         let extensions = Set(ExtensionHost.shared.resolver.allDescriptors()
             .filter { $0.isEnabled && $0.isRuntimeAvailable }
             .flatMap(\.filenameExtensions).map { $0.lowercased() })
-        do {
-            let scopes = try SpotlightSearchAccess.shared.beginAccess()
-            start(text: text, scopes: scopes, extensions: extensions, target: target, completion: completion)
-        } catch {
-            completion(.authorizationUnavailable)
-        }
+        guard LocalFileSearchSettings.shared.isEnabled else { completion(.disabled); return }
+        start(text: text, scopes: [LocalFileSearchSettings.userHome], extensions: extensions, target: target, completion: completion)
     }
 
     func start(text: String, completion: @escaping (SpotlightSearchOutcome) -> Void) {

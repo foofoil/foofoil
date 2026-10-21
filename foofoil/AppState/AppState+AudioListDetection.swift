@@ -23,7 +23,6 @@ extension AppState {
         audioListDetectionTask = Task { @MainActor [weak self] in
             guard let self else { return }
             // 目录授权与封面读取共用：需要时弹一次面板，用户拒绝则不再打扰。
-            _ = await self.ensureAudioDirectoryAccess(for: url)
             guard !Task.isCancelled,
                   self.audioListDetectionGeneration == generation,
                   AudioMetadataLoader.isCoverDirectoryAccessible(for: url),

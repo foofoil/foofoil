@@ -68,7 +68,7 @@ extension SubtitleTests {
         let controller = VideoSubtitleController()
         await controller.prepare(video: video)
         #expect(controller.association.files.count == 2)
-        #expect(controller.association.selectedPath == exact.path)
+        #expect(controller.association.selectedPath.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() } == exact.resolvingSymlinksInPath())
         #expect(controller.document?.text(at: 2) == "中文")
         let historyBeforeHide = controller.history
         var saves = 0
@@ -86,10 +86,10 @@ extension SubtitleTests {
         restored.restore(saved)
         await restored.prepare(video: video)
         #expect(!restored.isHidden)
-        #expect(restored.association.selectedPath == exact.path)
-        restored.selectFile(try #require(restored.association.files.first(where: { $0.path == alternate.path })))
+        #expect(restored.association.selectedPath.map { URL(fileURLWithPath: $0).resolvingSymlinksInPath() } == exact.resolvingSymlinksInPath())
+        restored.selectFile(try #require(restored.association.files.first(where: { URL(fileURLWithPath: $0.path).resolvingSymlinksInPath() == alternate.resolvingSymlinksInPath() })))
         for _ in 0..<100 {
-            if restored.association.selectedPath == alternate.path { break }
+            if restored.document?.text(at: 2) == "English" { break }
             try await Task.sleep(for: .milliseconds(10))
         }
         #expect(!restored.isHidden)

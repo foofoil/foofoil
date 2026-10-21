@@ -644,6 +644,7 @@ extension AppDelegate {
     }
 
     @objc func resetContentAction() {
+        if activeAppState?.terminalSession?.needsCloseConfirmation == true, !TerminalSession.confirmTermination() { return }
         activeAppState?.resetContent()
     }
 

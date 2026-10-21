@@ -179,11 +179,9 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     public var mediaPlaybackMode: MediaPlaybackMode
     /// 旧字段：仅表示是否单曲循环，随 `mediaPlaybackMode` 写入以兼容旧解码。
     public var isVideoLooping: Bool
-    /// 外部原文件的安全范围书签（保留原字段名）；图片、文本、网页与媒体共用，重启后恢复访问。
+    /// 外部原文件的普通书签（保留原字段名）；图片、文本、网页与媒体共用，用于定位移动后的文件。
     public var subtitleAssociations: [String: SubtitleAssociation]?
     public var videoBookmark: Data?
-    /// 音频同目录封面所在文件夹的安全范围书签；重启后恢复访问以保证封面可再次读取。
-    public var mediaSidecarBookmark: Data?
     /// 用户拖入替换的音频封面缓存路径；重开历史时优先使用这份封面。
     public var customCoverPath: String?
     /// 扩展状态仅保存 namespace 与引用；实际 payload 由 ExtensionStateStore 原子管理。
@@ -203,6 +201,9 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     var archiveSource: ArchiveSource?
     /// 只读代码预览是否显示行号；为空时按显示处理。
     public var showCodeLineNumbers: Bool?
+    public var terminalConfiguration: TerminalLaunchConfiguration?
+    /// 最近终端画面的只读纯文本快照；不是 Shell 输入或进程恢复数据。
+    public var terminalScrollback: String?
 
 
     public init(
@@ -245,7 +246,6 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         isVideoLooping: Bool? = nil,
         subtitleAssociations: [String: SubtitleAssociation]? = nil,
         videoBookmark: Data? = nil,
-        mediaSidecarBookmark: Data? = nil,
         customCoverPath: String? = nil,
         extensionID: String? = nil,
         extensionStateReference: String? = nil,
@@ -258,7 +258,9 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         appleMusicReference: AppleMusicReference? = nil,
         archiveSource: ArchiveSource? = nil,
         showCodeLineNumbers: Bool? = nil,
-        readOnlyPresentation: Bool = false
+        readOnlyPresentation: Bool = false,
+        terminalConfiguration: TerminalLaunchConfiguration? = nil,
+        terminalScrollback: String? = nil
     ) {
         self.id = id
         self.imagePath = imagePath
@@ -299,7 +301,6 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.isVideoLooping = isVideoLooping ?? (mediaPlaybackMode == .singleLoop)
         self.subtitleAssociations = subtitleAssociations
         self.videoBookmark = videoBookmark
-        self.mediaSidecarBookmark = mediaSidecarBookmark
         self.customCoverPath = customCoverPath
         self.extensionID = extensionID
         self.extensionStateReference = extensionStateReference
@@ -313,10 +314,13 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.archiveSource = archiveSource
         self.showCodeLineNumbers = showCodeLineNumbers
         self.readOnlyPresentation = readOnlyPresentation
+        self.terminalConfiguration = terminalConfiguration
+        self.terminalScrollback = terminalScrollback
     }
 
     private enum CodingKeys: String, CodingKey {
-        case historyIsPinned, isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, mediaSidecarBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource, showCodeLineNumbers, readOnlyPresentation
+        case terminalConfiguration, terminalScrollback
+        case historyIsPinned, isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource, showCodeLineNumbers, readOnlyPresentation
     }
 
     public init(from decoder: Decoder) throws {
@@ -359,7 +363,6 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         documentZoom = try container.decodeIfPresent(Double.self, forKey: .documentZoom) ?? 1.0
         subtitleAssociations = try container.decodeIfPresent([String: SubtitleAssociation].self, forKey: .subtitleAssociations)
         videoBookmark = try container.decodeIfPresent(Data.self, forKey: .videoBookmark)
-        mediaSidecarBookmark = try container.decodeIfPresent(Data.self, forKey: .mediaSidecarBookmark)
         customCoverPath = try container.decodeIfPresent(String.self, forKey: .customCoverPath)
         extensionID = try container.decodeIfPresent(String.self, forKey: .extensionID)
         extensionStateReference = try container.decodeIfPresent(String.self, forKey: .extensionStateReference)
@@ -377,6 +380,8 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         documentScrollFraction = try container.decodeIfPresent(Double.self, forKey: .documentScrollFraction)
         appleMusicReference = try container.decodeIfPresent(AppleMusicReference.self, forKey: .appleMusicReference)
         archiveSource = try container.decodeIfPresent(ArchiveSource.self, forKey: .archiveSource)
+        terminalConfiguration = try container.decodeIfPresent(TerminalLaunchConfiguration.self, forKey: .terminalConfiguration)
+        terminalScrollback = try container.decodeIfPresent(String.self, forKey: .terminalScrollback)
         showCodeLineNumbers = try container.decodeIfPresent(Bool.self, forKey: .showCodeLineNumbers)
         if let mode = try container.decodeIfPresent(MediaPlaybackMode.self, forKey: .mediaPlaybackMode) {
             mediaPlaybackMode = mode
@@ -399,6 +404,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     }
 
     public var historyMenuSymbolName: String {
+        if terminalConfiguration != nil { return "terminal" }
         if appleMusicReference != nil { return AppleMusicReference.symbolName }
         if let fileList, fileList.isPresentable {
             return fileList.kind.historySymbolName
@@ -527,6 +533,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     }
 
     public var historyMenuDisplayName: String {
+        if terminalConfiguration != nil { return customTitle ?? NSLocalizedString("Terminal", comment: "") }
         if let fileList, fileList.isPresentable {
             return fileList.historyDisplayTitle
         }

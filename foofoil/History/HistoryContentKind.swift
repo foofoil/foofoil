@@ -16,9 +16,11 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
     case quickLook = 11
     case camera = 12
     case archive = 13
+    case terminal = 14
 
     public var symbolName: String {
         switch self {
+        case .terminal: return "terminal"
         case .archive: return "archivebox"
         case .camera: return "web.camera"
         case .quickLook: return "doc"
@@ -39,11 +41,12 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
     public var storesIndexedText: Bool {
         switch self {
         case .note, .text, .markdown, .csv: return true
-        case .archive, .camera, .image, .web, .pdf, .video, .audio, .extensionContent, .ebook, .quickLook: return false
+        case .terminal, .archive, .camera, .image, .web, .pdf, .video, .audio, .extensionContent, .ebook, .quickLook: return false
         }
     }
 
     public static func infer(from config: WindowConfig) -> Self {
+        if config.terminalConfiguration != nil { return .terminal }
         if config.archiveSource != nil || config.contentKind == .archive { return .archive }
         if config.appleMusicReference != nil { return .audio }
         // 宿主统一音频列表（含经扩展播放的 DSF/DFF/SACD）按列表类型归类，

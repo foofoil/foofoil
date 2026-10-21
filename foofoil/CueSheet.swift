@@ -408,20 +408,14 @@ nonisolated enum CueSheetLoader {
     }
 
     static func audioExists(primary: URL, related: URL) -> Bool {
-        if FileManager.default.fileExists(atPath: related.path) {
-            return true
-        }
-        return CueRelatedFilePresenter.exists(primary: primary, related: related)
+        FileManager.default.fileExists(atPath: related.path)
     }
 
-    /// 读取 CUE 关联音频的采样时钟；沙盒下先走直接打开，失败再用关联项协调读。
+    /// 直接读取 CUE 关联音频的采样时钟。
     static func playbackTiming(audioURL: URL, cueURL: URL) -> AudioPlaybackTiming? {
         let accessed = audioURL.startAccessingSecurityScopedResource()
         defer { if accessed { audioURL.stopAccessingSecurityScopedResource() } }
-        if let timing = AudioMetadataLoader.playbackTiming(for: audioURL) {
-            return timing
-        }
-        return CueRelatedFilePresenter.playbackTiming(primary: cueURL, related: audioURL)
+        return AudioMetadataLoader.playbackTiming(for: audioURL)
     }
 
     private static var fallbackEncodings: [String.Encoding] {
@@ -436,47 +430,3 @@ nonisolated enum CueSheetLoader {
     }
 }
 
-/// 将同目录音频声明为用户所选 CUE 的关联项，以便沙盒允许读取。
-nonisolated final class CueRelatedFilePresenter: NSObject, NSFilePresenter {
-    let primaryPresentedItemURL: URL?
-    let presentedItemURL: URL?
-    let presentedItemOperationQueue: OperationQueue
-
-    init(primary: URL, related: URL) {
-        self.primaryPresentedItemURL = primary
-        self.presentedItemURL = related
-        self.presentedItemOperationQueue = CueRelatedFilePresenter.queue
-    }
-
-    static func exists(primary: URL, related: URL) -> Bool {
-        coordinate(primary: primary, related: related) { url in
-            FileManager.default.fileExists(atPath: url.path)
-        } ?? false
-    }
-
-    static func playbackTiming(primary: URL, related: URL) -> AudioPlaybackTiming? {
-        coordinate(primary: primary, related: related) { url in
-            AudioMetadataLoader.playbackTiming(for: url)
-        } ?? nil
-    }
-
-    private static func coordinate<T>(primary: URL, related: URL, read: (URL) -> T) -> T? {
-        let presenter = CueRelatedFilePresenter(primary: primary, related: related)
-        NSFileCoordinator.addFilePresenter(presenter)
-        defer { NSFileCoordinator.removeFilePresenter(presenter) }
-        var value: T?
-        let coordinator = NSFileCoordinator(filePresenter: presenter)
-        var coordinationError: NSError?
-        coordinator.coordinate(readingItemAt: related, options: [], error: &coordinationError) { url in
-            value = read(url)
-        }
-        return value
-    }
-
-    private static let queue: OperationQueue = {
-        let queue = OperationQueue()
-        queue.name = "com.foofoil.cue-related-audio"
-        queue.maxConcurrentOperationCount = 1
-        return queue
-    }()
-}

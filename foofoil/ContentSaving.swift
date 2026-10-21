@@ -128,8 +128,7 @@ nonisolated enum ContentSavePayload: Sendable {
                 try FileManager.default.copyItem(at: source, to: destination)
                 return
             }
-            // NSSavePanel 只授权选定目标，不能在其父目录随意建暂存项。
-            // 使用系统替换目录，既支持沙盒外覆盖，也不把大视频读进内存。
+            // 使用系统替换目录原子覆盖，避免把大视频读进内存。
             let replacementDirectory = try FileManager.default.url(
                 for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: destination, create: true)
             defer { try? FileManager.default.removeItem(at: replacementDirectory) }
@@ -187,7 +186,7 @@ extension AppState {
     nonisolated private static func saveSourceURL(_ resource: ExtensionResource) -> URL {
         guard let bookmark = resource.securityScopedBookmark else { return resource.url }
         var stale = false
-        return (try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope,
+        return (try? URL(resolvingBookmarkData: bookmark, options: .withoutUI,
                          bookmarkDataIsStale: &stale)) ?? resource.url
     }
 }

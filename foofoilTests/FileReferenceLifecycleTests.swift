@@ -22,7 +22,7 @@ struct FileReferenceLifecycleTests {
         try FileManager.default.moveItem(at: original, to: moved)
         let result = FileReference.resolve(original, bookmark: bookmark)
         #expect(result.status == .available)
-        #expect(result.url.path == moved.path)
+        #expect(result.url.resolvingSymlinksInPath() == moved.resolvingSymlinksInPath())
         #expect(FileReference.resolve(original, bookmark: nil).status == .missing)
         #expect(FileReference.resolve(original, bookmark: Data("invalid".utf8)).status == .temporaryFailure)
         #expect(FileReference.resolve(URL(fileURLWithPath: "/Volumes/offline-\(UUID())/file.txt"), bookmark: nil).status == .offline)

@@ -145,7 +145,6 @@ extension AppState {
         }
         stopVideoAccess()
         videoBookmarkData = nil
-        mediaSidecarBookmarkData = nil
         self.sourceFingerprint = isClipboard ? "clipboard:\(id)" : nil
         // Markdown 依赖文件名后缀进入预览，无来源文件时给出稳定的未命名名称。
         self.originalImageName = isMarkdown ? "\(NSLocalizedString("Untitled Markdown", comment: "")).md" : nil

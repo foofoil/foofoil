@@ -17,6 +17,10 @@ import FoofoilExtensionKit
 
 extension AppState {
         public func resetContent() {
+            terminalSession?.onOutputSnapshotChanged = nil
+            terminalSession?.stop()
+            terminalSession = nil
+            terminalConfiguration = nil
             relinquishAgentControl()
             ContentCache.shared.retire(ownedBodyPaths)
             stopVideoAccess()
@@ -63,7 +67,6 @@ extension AppState {
             self.documentParagraphSpacing = nil
             self.mediaPlaybackMode = .sequentialLoop
             self.videoBookmarkData = nil
-            self.mediaSidecarBookmarkData = nil
             self.clearCustomCover()
             self.extensionSession = nil
             self.extensionFallbackProviderID = nil

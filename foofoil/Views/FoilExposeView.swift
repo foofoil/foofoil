@@ -417,7 +417,7 @@ struct FoilExposeView: View {
         .animation(.smooth(duration: 0.3), value: model.showsFileResults)
     }
 
-    /// 文件来源的状态行：加载、需要授权、失败与空结果各自给出下一步动作；打开失败另起一行说明。
+    /// 文件来源的状态行：加载、未启用、失败与空结果各自给出下一步动作；打开失败另起一行说明。
     @ViewBuilder
     private var fileStatusLine: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -429,8 +429,8 @@ struct FoilExposeView: View {
                         .font(.system(size: 12))
                         .foregroundStyle(.white.opacity(0.62))
                     switch status {
-                    case .needsAuthorization, .authorizationUnavailable:
-                        fileActionButton("Enable File Search") { model.requestFileSearchAuthorization() }
+                    case .disabled:
+                        fileActionButton("Enable File Search") { model.enableFileSearch() }
                     case .unavailable, .timedOut:
                         fileActionButton("Retry File Search") { model.restartFileSearch() }
                     }

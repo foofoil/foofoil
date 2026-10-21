@@ -279,7 +279,7 @@ enum ProviderContentMatcher {
             var stale = false
             if let resolved = try? URL(
                 resolvingBookmarkData: bookmark,
-                options: .withSecurityScope,
+                options: .withoutUI,
                 bookmarkDataIsStale: &stale
             ) {
                 return resolved

@@ -182,18 +182,15 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
         isOpeningFile = true
         model.stop()
         openingTask = Task { [self] in
-            let access = (try? SpotlightSearchAccess.shared.beginAccess()) ?? []
             let result = await SpotlightFileOpener.fileAccess(url)
-            guard !Task.isCancelled else { SpotlightFileOpener.releaseAccess(access); isOpeningFile = false; return }
+            guard !Task.isCancelled else { isOpeningFile = false; return }
             switch result {
             case .readable:
-                acceptFile(url, access: access)
+                acceptFile(url)
                 isOpeningFile = false
             case .needsPermission:
-                SpotlightFileOpener.releaseAccess(access)
                 requestFileAccess(for: url)
             case .notDownloaded, .unavailable:
-                SpotlightFileOpener.releaseAccess(access)
                 restoreSearch()
                 model.openError = NSLocalizedString(result == .notDownloaded ? "Search File Not Downloaded" : "Search File Open Failed", comment: "")
                 isOpeningFile = false
@@ -213,7 +210,7 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
         picker.begin { [weak self] response in
             guard let self else { return }
             if response == .OK, let selected = picker.url {
-                self.acceptFile(selected, access: [])
+                self.acceptFile(selected)
             } else {
                 self.restoreSearch()
             }
@@ -221,8 +218,8 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
         }
     }
 
-    private func acceptFile(_ url: URL, access: [URL]) {
-        guard SpotlightFileOpener.openInFoil(url, access: access) else {
+    private func acceptFile(_ url: URL) {
+        guard SpotlightFileOpener.openInFoil(url) else {
             restoreSearch()
             model.openError = NSLocalizedString("Search File Open Failed", comment: "")
             return
@@ -230,24 +227,10 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
         dismiss()
     }
 
-    /// 开启文件搜索：系统文件面板确认用户主目录，成功后重新查询。
+    /// 开启后立即查询；受保护文件的访问仍由系统隐私控制决定。
     private func enableFileSearch() {
-        guard !isOpeningFile else { return }
-        isOpeningFile = true
-        model.stop()
-        SpotlightSearchAuthorization.request { [weak self] outcome in
-            guard let self else { return }
-            self.restoreSearch()
-            switch outcome {
-            case .authorized, .cancelled:
-                break
-            case .needsHomeFolder:
-                self.model.openError = NSLocalizedString("File Search Needs Home Folder", comment: "")
-            case .failed:
-                self.model.openError = NSLocalizedString("File Search Authorization Failed", comment: "")
-            }
-            self.isOpeningFile = false
-        }
+        LocalFileSearchSettings.shared.isEnabled = true
+        model.resume()
     }
 
     private func restoreSearch() {

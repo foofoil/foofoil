@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 nonisolated final class HistoryDatabase {
-    static let schemaVersion = 24
+    static let schemaVersion = 26
 
     private let queue = DispatchQueue(label: "com.foofoil.history.database", qos: .utility)
     private var connection: OpaquePointer?
@@ -106,13 +106,13 @@ nonisolated final class HistoryDatabase {
                         document_font_name, document_line_spacing, document_paragraph_spacing, document_theme_id,
                         created_at, updated_at, last_opened_at,
                         source_fingerprint, index_status, index_version, video_looping, video_bookmark,
-                        media_sidecar_bookmark, custom_cover_path,
+                        custom_cover_path,
                         extension_id, extension_state_reference, navigator_panel_side,
                         navigator_panel_visibility, navigator_panel_width, file_list,
                         document_zoom, document_scroll_file, document_scroll_fraction, text_fingerprint,
                         image_ocr_text, image_has_subject, image_subject_path, apple_music_reference, subtitle_associations, custom_title, archive_source,
-                        show_code_line_numbers, read_only_presentation, history_is_pinned
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        show_code_line_numbers, read_only_presentation, history_is_pinned, terminal_configuration, terminal_scrollback
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -133,7 +133,6 @@ nonisolated final class HistoryDatabase {
                         last_opened_at=excluded.last_opened_at,
                         source_fingerprint=excluded.source_fingerprint,
                         video_looping=excluded.video_looping, video_bookmark=excluded.video_bookmark,
-                        media_sidecar_bookmark=excluded.media_sidecar_bookmark,
                         custom_cover_path=excluded.custom_cover_path,
                         extension_id=excluded.extension_id,
                         extension_state_reference=excluded.extension_state_reference,
@@ -151,7 +150,9 @@ nonisolated final class HistoryDatabase {
                         subtitle_associations=excluded.subtitle_associations,
                         apple_music_reference=excluded.apple_music_reference, custom_title=excluded.custom_title, archive_source=excluded.archive_source,
                         show_code_line_numbers=excluded.show_code_line_numbers,
-                        read_only_presentation=excluded.read_only_presentation
+                        read_only_presentation=excluded.read_only_presentation,
+                        terminal_configuration=excluded.terminal_configuration,
+                        terminal_scrollback=excluded.terminal_scrollback
                     """, bindings: [
                         config.id.uuidString, kind.rawValue, title, config.originalImageName,
                         config.imagePath, config.textPath, config.webURLString, config.actualWebURLString,
@@ -162,7 +163,7 @@ nonisolated final class HistoryDatabase {
                         config.documentFontName, config.documentLineSpacing, config.documentParagraphSpacing,
                         config.documentThemeId,
                         createdAt, now, now, config.sourceFingerprint, 0, 1, config.mediaPlaybackMode.sqliteValue,
-                        config.videoBookmark?.base64EncodedString(), config.mediaSidecarBookmark?.base64EncodedString(),
+                        config.videoBookmark?.base64EncodedString(),
                         config.customCoverPath,
                         config.extensionID,
                         config.extensionStateReference, config.navigatorPanelSide.rawValue,
@@ -179,7 +180,9 @@ nonisolated final class HistoryDatabase {
                         try config.subtitleAssociations.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
                         config.customTitle,
                         try config.archiveSource.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
-                        config.showCodeLineNumbers, config.readOnlyPresentation, config.historyIsPinned
+                        config.showCodeLineNumbers, config.readOnlyPresentation, config.historyIsPinned,
+                        try config.terminalConfiguration.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
+                        config.terminalScrollback
                     ])
 
                 let metadata = (
@@ -412,7 +415,7 @@ nonisolated final class HistoryDatabase {
                 source_fingerprint TEXT, index_status INTEGER NOT NULL DEFAULT 0,
                 index_version INTEGER NOT NULL DEFAULT 0, index_error TEXT, thumbnail_path TEXT,
                 video_looping INTEGER NOT NULL DEFAULT 1, video_bookmark TEXT,
-                media_sidecar_bookmark TEXT, custom_cover_path TEXT,
+                custom_cover_path TEXT,
                 extension_id TEXT, extension_state_reference TEXT,
                 navigator_panel_side TEXT NOT NULL DEFAULT 'right',
                 navigator_panel_visibility TEXT NOT NULL DEFAULT 'onHover',
@@ -474,8 +477,6 @@ nonisolated final class HistoryDatabase {
         // v20 箔片改名不再覆盖原始文件名，保存与恢复使用独立标题。
         try addColumnIfMissing("custom_title", definition: "custom_title TEXT")
         try addColumnIfMissing("archive_source", definition: "archive_source TEXT")
-        // v10 新增音频同目录封面文件夹的安全范围书签（Base64 文本）；重启后靠它恢复封面访问。
-        try addColumnIfMissing("media_sidecar_bookmark", definition: "media_sidecar_bookmark TEXT")
         // v11 用户拖入替换的音频封面缓存路径；重开历史时优先使用这份封面。
         try addColumnIfMissing("custom_cover_path", definition: "custom_cover_path TEXT")
         // v12 扩展文档的正文缩放与阅读位置（章节文件名 + 滚动比例）；此前只存扩展状态引用，
@@ -513,6 +514,8 @@ nonisolated final class HistoryDatabase {
                 """)
         }
         try addColumnIfMissing("history_is_pinned", definition: "history_is_pinned INTEGER NOT NULL DEFAULT 0")
+        try addColumnIfMissing("terminal_configuration", definition: "terminal_configuration TEXT")
+        try addColumnIfMissing("terminal_scrollback", definition: "terminal_scrollback TEXT")
         try execute("PRAGMA user_version = \(Self.schemaVersion)")
         // 新库明确不读取旧历史；初始化成功后移除旧键，避免旧路径复活。
         UserDefaults.standard.removeObject(forKey: "historyConfigs")
@@ -753,7 +756,6 @@ nonisolated final class HistoryDatabase {
                         try? JSONDecoder().decode([String: SubtitleAssociation].self, from: Data($0.utf8))
                     },
                     videoBookmark: optionalText(statement, columns["video_bookmark"]!).flatMap { Data(base64Encoded: $0) },
-                    mediaSidecarBookmark: optionalText(statement, columns["media_sidecar_bookmark"]!).flatMap { Data(base64Encoded: $0) },
                     customCoverPath: columns["custom_cover_path"].flatMap { optionalText(statement, $0) },
                     extensionID: optionalText(statement, columns["extension_id"]!),
                     extensionStateReference: optionalText(statement, columns["extension_state_reference"]!),
@@ -784,7 +786,11 @@ nonisolated final class HistoryDatabase {
                         try? JSONDecoder().decode(ArchiveSource.self, from: Data($0.utf8))
                     },
                     showCodeLineNumbers: columns["show_code_line_numbers"].flatMap { optionalBool(statement, $0) },
-                    readOnlyPresentation: columns["read_only_presentation"].flatMap { optionalBool(statement, $0) } ?? false
+                    readOnlyPresentation: columns["read_only_presentation"].flatMap { optionalBool(statement, $0) } ?? false,
+                    terminalConfiguration: columns["terminal_configuration"].flatMap { optionalText(statement, $0) }.flatMap {
+                        try? JSONDecoder().decode(TerminalLaunchConfiguration.self, from: Data($0.utf8))
+                    },
+                    terminalScrollback: columns["terminal_scrollback"].flatMap { optionalText(statement, $0) }
                 ))
             }
         }

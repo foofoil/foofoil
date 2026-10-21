@@ -197,7 +197,7 @@ struct HistorySearchView: View {
                 }
             }
             // ⌘P 面板只提供开启文件搜索的入口；关闭文件搜索在设置中完成。
-            if model.musicLink == nil, model.mode == .history, model.resultFilter.includesFiles, !model.isFileSearchAuthorized {
+            if model.musicLink == nil, model.mode == .history, model.resultFilter.includesFiles, !model.isFileSearchEnabled {
                 HStack {
                     Button(NSLocalizedString("Enable File Search", comment: "")) { model.enableFileSearch?() }
                     Spacer()

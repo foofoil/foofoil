@@ -42,7 +42,7 @@ struct SpotlightSearchTests {
     }
 
     @Test func predicateTreatsUserInputLiterally() {
-        let home = SpotlightSearchAccess.userHome.path
+        let home = LocalFileSearchSettings.userHome.path
         for text in ["中文", "a*b", "a?b", "quote'\"", "a\\b"] {
             let predicate = SpotlightFileSearch.predicate(for: text)
             #expect(predicate.evaluate(with: [
@@ -66,7 +66,7 @@ struct SpotlightSearchTests {
     }
 
     @Test func multiKeywordPredicateMatchesNonContiguousNames() {
-        let home = SpotlightSearchAccess.userHome.path
+        let home = LocalFileSearchSettings.userHome.path
         let name = "Mahler Symphony No. 7 ''Song Of The Night''.flac"
         func evaluate(_ text: String, _ fileName: String) -> Bool {
             SpotlightFileSearch.predicate(for: text).evaluate(with: [
@@ -184,11 +184,11 @@ struct SpotlightSearchTests {
         try await eventually { !model.isHistorySearching }
         #expect(model.showsOverallEmptyState)
         // 文件来源给出明确状态时展示具体说明而不是笼统空态。
-        callback?(.authorizationUnavailable)
+        callback?(.disabled)
         #expect(!model.showsOverallEmptyState)
-        #expect(model.fileStatus == .authorizationUnavailable)
+        #expect(model.fileStatus == .disabled)
         #expect(model.fileStatus?.isRetryable == false)
-        #expect(model.fileStatus?.localizationKey == "File Search Authorization Unavailable")
+        #expect(model.fileStatus?.localizationKey == "File Search Disabled")
         model.stop()
     }
     @Test func fileAccessDistinguishesReadableAndMissingFiles() async throws {
@@ -223,51 +223,23 @@ struct SpotlightSearchTests {
         let service = SpotlightFileSearch()
         var needsAuthorization = false
         service.start(text: "report", scopes: [], extensions: []) { outcome in
-            if case .needsAuthorization = outcome { needsAuthorization = true }
+            if case .disabled = outcome { needsAuthorization = true }
         }
         #expect(needsAuthorization)
         service.cancel()
     }
 
-    @Test func homeAuthorizationRoundTripThroughDefaults() throws {
-        let suiteName = "SpotlightSearchTests.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: suiteName)!
-        defer { defaults.removePersistentDomain(forName: suiteName) }
-
-        let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: home) }
-        let other = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: other) }
-
-        let access = SpotlightSearchAccess(defaults: defaults, homeDirectory: home)
-        #expect(!access.isAuthorized)
-        #expect(try access.beginAccess().isEmpty)
-
-        // 固定主目录：选择其他目录不保存授权。
-        #expect(throws: SpotlightSearchAccessError.self) { try access.authorizeHome(other) }
-        #expect(!access.isAuthorized)
-
-        try access.authorizeHome(home)
-        #expect(access.isAuthorized)
-        let restored = try access.beginAccess()
-        defer { restored.forEach { $0.stopAccessingSecurityScopedResource() } }
-        #expect(restored.map { $0.resolvingSymlinksInPath().standardizedFileURL.path }
-            == [home.resolvingSymlinksInPath().standardizedFileURL.path])
-
-        access.clear()
-        #expect(!access.isAuthorized)
-        #expect(try access.beginAccess().isEmpty)
-    }
-
-    @Test func authorizationPanelOpensAtTheHomeFolder() {
-        let panel = SpotlightSearchAuthorization.makePanel()
-        #expect(panel.canChooseDirectories)
-        #expect(!panel.canChooseFiles)
-        #expect(!panel.allowsMultipleSelection)
-        #expect(panel.directoryURL?.standardizedFileURL.path
-            == SpotlightSearchAccess.shared.homeDirectory.standardizedFileURL.path)
+    @Test func localSearchPreferenceDoesNotRequireFolderAuthorization() throws {
+        let suite = "search-\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let settings = LocalFileSearchSettings(defaults: defaults)
+        #expect(!settings.isEnabled)
+        settings.isEnabled = true
+        #expect(LocalFileSearchSettings(defaults: defaults).isEnabled)
+        #expect(defaults.data(forKey: "spotlightSearchHomeBookmark") == nil)
+        settings.isEnabled = false
+        #expect(!settings.isEnabled)
     }
 
 }

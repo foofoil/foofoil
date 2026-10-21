@@ -14,6 +14,17 @@ import FoofoilExtensionKit
 
 public class AppDelegate: NSObject, NSApplicationDelegate {
     lazy var agentTerminal = AgentTerminal(delegate: self)
+    lazy var applicationControl = ApplicationControlService(delegate: self)
+    var controlSocket: AgentSocketServer?
+    func startControlSocketIfNeeded() {
+        guard controlSocket == nil else { return }
+        controlSocket = try? AgentSocketServer { [weak self] request, reply in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.agentTerminal.receive(request, delivered: []) { reply($0) }
+            }
+        }
+    }
     var agentEnvelopeCount = 0
     public var windowControllers: [FloatingWindowController] = []
     var historyMenu: NSMenu?
@@ -29,6 +40,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     var appleMusicLinkTask: Task<Void, Never>?
     var didOpenFiles = false
     private var isTerminating = false
+    var isShuttingDown: Bool { isTerminating }
     /// hide: 漏掉的箔窗，在 didHide 里补 orderOut，unhide 时再还原。
     private var windowsLeftVisibleAfterHide: [NSWindow] = []
 
@@ -70,7 +82,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func isBlank(_ appState: AppState) -> Bool {
-        appState.archiveSession == nil && !appState.isFileOpenFeedback && appState.appleMusicReference == nil && !appState.isCamera && appState.imageURL == nil
+        appState.terminalConfiguration == nil && appState.archiveSession == nil && !appState.isFileOpenFeedback && appState.appleMusicReference == nil && !appState.isCamera && appState.imageURL == nil
             && appState.webURL == nil
             && appState.textURL == nil
             && appState.extensionSession == nil
@@ -150,6 +162,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        startControlSocketIfNeeded()
         // 活跃窗口切换时立即同步 PDF 专用菜单，避免等待用户打开任意菜单后才更新。
         NotificationCenter.default.addObserver(
             self,
@@ -200,7 +213,12 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
             case .restoreWindows:
                 let savedConfigs = SettingsStore.shared.lastOpenWindowConfigs.filter { SettingsStore.shared.appleMusicLibraryEnabled || $0.appleMusicReference == nil }
                 if !savedConfigs.isEmpty {
-                    for config in savedConfigs {
+                    for var config in savedConfigs {
+                        // 崩溃前的周期输出快照可能比上次退出保存的窗口配置更新。
+                        if config.terminalConfiguration != nil,
+                           let latest = HistoryRepository.shared.config(id: config.id) {
+                            config.terminalScrollback = latest.terminalScrollback
+                        }
                         if SettingsStore.shared.automaticallyRemoveMissingHistory, config.resolvingFileReferences().missing {
                             HistoryManager.shared.removeFromHistory(config, preservingLegacyBody: true)
                             continue
@@ -244,6 +262,8 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
 
     public func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard !isTerminating else { return .terminateLater }
+        if windowControllers.contains(where: { $0.appState.terminalSession?.needsCloseConfirmation == true }),
+           !TerminalSession.confirmTermination() { return .terminateCancel }
         isTerminating = true
         // 保存当前活跃窗口配置，用于下次启动恢复
         for controller in windowControllers { controller.appState.persistManagedTextIfNeeded(createIfNeeded: true) }
@@ -256,12 +276,16 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
         // 进程退出只会自动归还 hog，不会恢复采样率；先停 PCM 引擎，再等待扩展恢复设备。
         AppleMusicPlaybackController.stopIfActive()
         AudioPlaybackController.stopAllOutputsForTermination()
+        let terminalClosures = windowControllers.compactMap { $0.appState.terminalSession?.stop() }
         Task { @MainActor in
+            for task in terminalClosures { await task.value }
             await ExtensionHost.shared.shutdownAndWait()
             sender.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
     }
+
+    public func applicationWillTerminate(_ notification: Notification) { controlSocket?.stop() }
 
     public func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         // 最后一个窗口关闭后，不要退出应用，保持无窗口活动状态

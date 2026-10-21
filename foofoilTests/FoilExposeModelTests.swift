@@ -447,8 +447,8 @@ struct FoilExposeModelTests {
                                     fileSearch: { _, value in callback = value }, cancelFiles: {}, musicEnabled: { false })
         model.searchText = "report"
         try await eventually { callback != nil }
-        callback?(.needsAuthorization)
-        #expect(model.fileStatus == .needsAuthorization)
+        callback?(.disabled)
+        #expect(model.fileStatus == .disabled)
         #expect(!model.isFileSearching)
         // 重新开启后重新查询并清掉旧状态。
         model.restartFileSearch()

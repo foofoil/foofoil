@@ -165,6 +165,7 @@ extension AppDelegate {
                 HistorySearchWindowController.shared.dismiss()
                 return
             }
+            controller.appState.startTerminalForExplicitOpen()
             activateWindow(controller)
         } else {
             let state = AppState()
@@ -175,6 +176,7 @@ extension AppDelegate {
             let controller = FloatingWindowController(appState: state)
             if config.windowFrame == nil { controller.window?.center() }
             addWindowController(controller)
+            state.startTerminalForExplicitOpen()
             controller.showWindow(nil)
         }
         HistoryRepository.shared.touch(id: id)

@@ -15,7 +15,7 @@ struct GeneralSettingsView: View {
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
     @State private var startupBehavior = SettingsStore.shared.startupBehavior
     @State private var navigatorPanelSide = SettingsStore.shared.navigatorPanelSide
-    @State private var isFileSearchAuthorized = SpotlightSearchAccess.shared.isAuthorized
+    @State private var isFileSearchEnabled = LocalFileSearchSettings.shared.isEnabled
     @State private var appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
     @State private var appleMusicSearchEnabled = SettingsStore.shared.appleMusicSearchEnabled
     @State private var cacheLimitGB = Double(SettingsStore.shared.contentCacheLimitBytes) / 1_073_741_824
@@ -142,26 +142,10 @@ struct GeneralSettingsView: View {
 
             Section {
                 Toggle(isOn: Binding(
-                    get: { isFileSearchAuthorized },
-                    set: { newValue in
-                        if newValue {
-                            SpotlightSearchAuthorization.request { outcome in
-                                DispatchQueue.main.async {
-                                    isFileSearchAuthorized = SpotlightSearchAccess.shared.isAuthorized
-                                    NotificationCenter.default.post(
-                                        name: .spotlightSearchAuthorizationDidChange,
-                                        object: nil
-                                    )
-                                }
-                            }
-                        } else {
-                            SpotlightSearchAccess.shared.clear()
-                            isFileSearchAuthorized = false
-                            NotificationCenter.default.post(
-                                name: .spotlightSearchAuthorizationDidChange,
-                                object: nil
-                            )
-                        }
+                    get: { isFileSearchEnabled },
+                    set: { value in
+                        LocalFileSearchSettings.shared.isEnabled = value
+                        isFileSearchEnabled = value
                     }
                 )) {
                     SettingsRowLabel(
@@ -211,7 +195,7 @@ struct GeneralSettingsView: View {
             launchAtLogin = LaunchAtLogin.isEnabled
             startupBehavior = SettingsStore.shared.startupBehavior
             navigatorPanelSide = SettingsStore.shared.navigatorPanelSide
-            isFileSearchAuthorized = SpotlightSearchAccess.shared.isAuthorized
+            isFileSearchEnabled = LocalFileSearchSettings.shared.isEnabled
             appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
             appleMusicSearchEnabled = SettingsStore.shared.appleMusicSearchEnabled
             if appleMusicLibraryEnabled { musicLibrary.refreshAuthorization() }
@@ -230,8 +214,8 @@ struct GeneralSettingsView: View {
             appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
             appleMusicSearchEnabled = SettingsStore.shared.appleMusicSearchEnabled
         }
-        .onReceive(NotificationCenter.default.publisher(for: .spotlightSearchAuthorizationDidChange)) { _ in
-            isFileSearchAuthorized = SpotlightSearchAccess.shared.isAuthorized
+        .onReceive(NotificationCenter.default.publisher(for: .localFileSearchDidChange)) { _ in
+            isFileSearchEnabled = LocalFileSearchSettings.shared.isEnabled
         }
     }
     private func restoreCacheLimit() {

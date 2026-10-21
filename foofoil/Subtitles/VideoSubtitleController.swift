@@ -59,27 +59,8 @@ import UniformTypeIdentifiers
             return
         }
         let directory = video.deletingLastPathComponent()
-        if let bookmark = (UserDefaults.standard.dictionary(forKey: "video.subtitle.directoryBookmarks") as? [String: Data])?[directory.path] {
-            var stale = false
-            if let resolved = try? URL(resolvingBookmarkData: bookmark, options: .withSecurityScope, bookmarkDataIsStale: &stale),
-               resolved.startAccessingSecurityScopedResource() { accessedDirectory = resolved }
-        }
-        // 没有父目录授权时，按需取得一次授权，避免把自动查找变成每次播放的提示。
-        let urls: [URL]
-        do { urls = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) }
-        catch {
-            guard token == generation else { return }
-            let panel = NSOpenPanel(); panel.canChooseDirectories = true; panel.canChooseFiles = false
-            panel.directoryURL = directory; panel.message = NSLocalizedString("Subtitle Directory Access", comment: "")
-            guard panel.runModal() == .OK, let granted = panel.url,
-                  granted.standardizedFileURL == directory.standardizedFileURL else { return }
-            if granted.startAccessingSecurityScopedResource() { accessedDirectory = granted }
-            if let bookmark = try? granted.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil) {
-                var values = UserDefaults.standard.dictionary(forKey: "video.subtitle.directoryBookmarks") as? [String: Data] ?? [:]
-                values[directory.path] = bookmark; UserDefaults.standard.set(values, forKey: "video.subtitle.directoryBookmarks")
-            }
-            urls = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
-        }
+        // 系统隐私限制仍可能拒绝枚举；不再要求用户为沙盒补选父目录。
+        let urls = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         let basename = video.deletingPathExtension().lastPathComponent.lowercased()
         let matching = urls.filter { url in
             let name = url.deletingPathExtension().lastPathComponent.lowercased()
@@ -117,7 +98,7 @@ import UniformTypeIdentifiers
     }
     private func load(_ file: SubtitleFileReference, token: Int, selectOnSuccess: Bool = false) async {
         var stale = false
-        let resolved = file.bookmark.flatMap { try? URL(resolvingBookmarkData: $0, options: .withSecurityScope, bookmarkDataIsStale: &stale) } ?? URL(fileURLWithPath: file.path)
+        let resolved = file.bookmark.flatMap { try? URL(resolvingBookmarkData: $0, options: .withoutUI, bookmarkDataIsStale: &stale) } ?? URL(fileURLWithPath: file.path)
         let accessed = resolved.startAccessingSecurityScopedResource()
         do {
             let doc = try await Task.detached(priority: .userInitiated) {
@@ -138,7 +119,7 @@ import UniformTypeIdentifiers
         }
     }
     private func reference(_ url: URL) -> SubtitleFileReference {
-        .init(path: url.path, bookmark: try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil))
+        .init(path: url.path, bookmark: try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil))
     }
     func hide() { isHidden = true }
     func setVisible(_ visible: Bool) { isHidden = !visible }

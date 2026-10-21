@@ -123,6 +123,10 @@ extension AppDelegate {
         openWebURLItem.representedObject = "file.openURL"
         openWebURLItem.target = self
         fileMenu.addItem(openWebURLItem)
+        let terminalItem = NSMenuItem(title: NSLocalizedString("Open Terminal Menu Item", comment: ""), action: #selector(openTerminalAction), keyEquivalent: "")
+        terminalItem.target = self
+        terminalItem.withSymbol("terminal")
+        fileMenu.addItem(terminalItem)
         let cameraItem = NSMenuItem(title: NSLocalizedString("Open Camera", comment: ""), action: #selector(openCameraAction), keyEquivalent: "")
         cameraItem.withSymbol("camera")
         cameraItem.representedObject = "file.openCamera"

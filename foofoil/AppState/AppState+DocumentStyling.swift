@@ -7,6 +7,12 @@
 import AppKit
 
 extension AppState {
+    /// 终端和代码共用等宽字体默认值及字体面板筛选偏好。
+    var prefersMonospacedDocumentFonts: Bool { terminalConfiguration != nil || presentsAsCode }
+
+    /// 终端使用固定字符网格，不提供文档式行距或段距。
+    var supportsDocumentSpacing: Bool { supportsDocumentTextStyling && terminalConfiguration == nil }
+
     /// 文档箔：内容是一份可读文档，可为其选择内容背景色
     /// （纯文本/笔记、Markdown、CSV、PDF、网页，以及电子书等扩展文档）。
     /// 图片、视频、音频以自身画面为内容，窗口只作画框，不提供背景色设置。
@@ -82,7 +88,7 @@ extension AppState {
 
     /// 文本通道（AppKit）使用的字体；未自选时代码用等宽字体，其余内容回退通道默认字体。
     func documentFont(size: CGFloat) -> NSFont {
-        if documentStylingFontName == nil, presentsAsCode {
+        if documentStylingFontName == nil, prefersMonospacedDocumentFonts {
             return DocumentFontCatalog.defaultCodeFont(size: size)
         }
         return DocumentFontCatalog.font(named: documentStylingFontName, size: size)

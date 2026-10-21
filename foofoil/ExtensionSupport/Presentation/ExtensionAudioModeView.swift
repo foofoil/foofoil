@@ -169,13 +169,6 @@ struct ExtensionAudioModeView: View {
             return AudioTrackInfo.fallback(fileName: "")
         }
         var loaded = await AudioMetadataLoader.load(from: url)
-        if appState.customCoverImage == nil {
-            if loaded.artwork == nil, await appState.ensureAudioDirectoryAccess(for: url) {
-                loaded = await AudioMetadataLoader.load(from: url)
-                if loaded.artwork != nil { appState.sidecarCoverDidBecomeAvailable() }
-            }
-            if loaded.sidecarCoverURL != nil { appState.recordSidecarCoverAccess(for: url) }
-        }
         loaded = appState.overlayCustomCover(loaded)
         appState.persistDisplayedArtworkForHistory(loaded.artwork)
         return AudioModeView.overlay(loaded, with: appState.fileList?.currentItem?.cue)

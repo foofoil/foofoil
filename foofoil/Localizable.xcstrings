@@ -435,22 +435,6 @@
         }
       }
     },
-    "Agent CLI Help": {
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "foil — read-only file presentation, protocol 1\nfoil show FILE [--title TITLE] [--incognito] [--json]\nfoil update BOARD FILE [--expected-revision N] [--json]\nfoil list [--json]\nfoil close BOARD [--expected-revision N] [--json]\nOptions: --request-id ID --caller NAME --session FILE --app APP\nA timeout may have committed. Retry with the same request ID and arguments within 600 seconds.\nKeep original files available. Markdown images are not loaded. User-closed boards must not be recreated automatically.\nfoil install [--directory DIR] | foil uninstall [--directory DIR]\nfoil --version"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "foil — 只读文件展示，协议 1\nfoil show FILE [--title TITLE] [--incognito] [--json]\nfoil update BOARD FILE [--expected-revision N] [--json]\nfoil list [--json]\nfoil close BOARD [--expected-revision N] [--json]\n选项： --request-id ID --caller NAME --session FILE --app APP\n超时可能已提交。请在 600 秒内以相同请求 ID 和参数重试。\n请保留原文件。Markdown 不加载图片资源。不得自动重建用户已关闭的箔片。\nfoil install [--directory DIR] | foil uninstall [--directory DIR]\nfoil --version"
-          }
-        }
-      }
-    },
     "From Clipboard": {
       "localizations": {
         "en": {
@@ -501,528 +485,548 @@
     },
     "Open Package Contents": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Open Package Contents" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "打开包内容" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Package Contents"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开包内容"
+          }
+        }
       }
     },
-      "Archive Loading Contents": {
-        "localizations": {
-          "en": { "stringUnit": { "state": "translated", "value": "Loading contents…" } },
-          "zh-Hans": { "stringUnit": { "state": "translated", "value": "正在读取内容…" } }
-        }
-      },
-      "Archive Original Destination": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Choose a destination different from the original archive and its volumes."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "请选择与原压缩包及其分卷不同的保存位置。"
-            }
+    "Archive Loading Contents": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading contents…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在读取内容…"
           }
         }
-      },
-      "Archive Original Size Format": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Original size: %@"
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "原始大小：%@"
-            }
+      }
+    },
+    "Archive Original Destination": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a destination different from the original archive and its volumes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择与原压缩包及其分卷不同的保存位置。"
           }
         }
-      },
-      "Archive Compressed Size Unknown": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Compressed size per entry is unavailable."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "无法获取单个条目的压缩后大小。"
-            }
+      }
+    },
+    "Archive Original Size Format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original size: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原始大小：%@"
           }
         }
-      },
-      "Archive Unsupported Encryption": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "This encryption method is not supported by the system archive reader. Use a dedicated archive app."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "系统压缩包读取器不支持此加密方式，请使用专用解压工具。"
-            }
+      }
+    },
+    "Archive Compressed Size Unknown": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compressed size per entry is unavailable."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法获取单个条目的压缩后大小。"
           }
         }
-      },
-      "Archive Unsupported Volumes": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Split ZIP archives are not supported by the system archive reader. Use a dedicated archive app."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "系统压缩包读取器不支持 ZIP 分卷，请使用专用解压工具。"
-            }
+      }
+    },
+    "Archive Unsupported Encryption": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This encryption method is not supported by the system archive reader. Use a dedicated archive app."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统压缩包读取器不支持此加密方式，请使用专用解压工具。"
           }
         }
-      },
-      "Archive Locate Volumes": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Locate Volumes…"
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "定位分卷…"
-            }
+      }
+    },
+    "Archive Unsupported Volumes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Split ZIP archives are not supported by the system archive reader. Use a dedicated archive app."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统压缩包读取器不支持 ZIP 分卷，请使用专用解压工具。"
           }
         }
-      },
-      "Archive Contents": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Archive Contents"
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "压缩包内容"
-            }
+      }
+    },
+    "Archive Locate Volumes": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locate Volumes…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "定位分卷…"
           }
         }
-      },
-      "Archive Select File": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Please select a file to open"
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "请选择要打开的文件"
-            }
+      }
+    },
+    "Archive Contents": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archive Contents"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩包内容"
           }
         }
-      },
-      "Archive Directory": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Directory"
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "目录"
-            }
+      }
+    },
+    "Archive Select File": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Please select a file to open"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择要打开的文件"
           }
         }
-      },
-      "Archive File": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "File"
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "文件"
-            }
+      }
+    },
+    "Archive Directory": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Directory"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目录"
           }
         }
-      },
-      "Archive Unsafe Path": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "The archive contains an unsafe or excessively deep path."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "压缩包包含不安全或层级过深的路径。"
-            }
+      }
+    },
+    "Archive File": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件"
           }
         }
-      },
-      "Archive Resource Limit": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "The operation exceeded the archive resource limit. Save the content separately or use a dedicated archive app."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "操作超过压缩包资源限额，请另存内容或使用专用解压工具。"
-            }
+      }
+    },
+    "Archive Unsafe Path": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The archive contains an unsafe or excessively deep path."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩包包含不安全或层级过深的路径。"
           }
         }
-      },
-      "Archive Source Changed": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "The source archive or a volume changed. Reload the archive before continuing."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "原压缩包或分卷已变化，请重新加载压缩包。"
-            }
+      }
+    },
+    "Archive Resource Limit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The operation exceeded the archive resource limit. Save the content separately or use a dedicated archive app."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作超过压缩包资源限额，请另存内容或使用专用解压工具。"
           }
         }
-      },
-      "Archive Password Required": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "A password is required, incorrect, or unsupported by this system. Damaged encrypted data may produce the same error."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "需要密码、密码错误或当前系统不支持此加密方式；加密数据损坏也可能导致此错误。"
-            }
+      }
+    },
+    "Archive Source Changed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The source archive or a volume changed. Reload the archive before continuing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原压缩包或分卷已变化，请重新加载压缩包。"
           }
         }
-      },
-      "Archive Export Conflict": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Names conflict, or the destination directory already exists. Choose a new name or save conflicting files individually."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "存在重名冲突或目标目录已存在，请选择新名称，或逐个另存冲突文件。"
-            }
+      }
+    },
+    "Archive Password Required": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A password is required, incorrect, or unsupported by this system. Damaged encrypted data may produce the same error."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要密码、密码错误或当前系统不支持此加密方式；加密数据损坏也可能导致此错误。"
           }
         }
-      },
-      "Archive Unsupported Entry": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "This entry or archive combination is not supported. Links and special files are not restored."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "不支持此条目或压缩包组合；不会恢复链接和特殊文件。"
-            }
+      }
+    },
+    "Archive Export Conflict": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Names conflict, or the destination directory already exists. Choose a new name or save conflicting files individually."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "存在重名冲突或目标目录已存在，请选择新名称，或逐个另存冲突文件。"
           }
         }
-      },
-      "Archive Read Failed": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "The archive could not be read. It may be damaged, inaccessible, missing a volume, or use an unsupported algorithm."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "无法读取压缩包：可能已损坏、无访问权限、缺少分卷或使用了不支持的算法。"
-            }
+      }
+    },
+    "Archive Unsupported Entry": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This entry or archive combination is not supported. Links and special files are not restored."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不支持此条目或压缩包组合；不会恢复链接和特殊文件。"
           }
         }
-      },
-      "Archive Save Before Opening": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Save this file before opening it. For CUE, save its directory to keep the associated audio files."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "请先另存此文件后再打开。CUE 请另存所在目录，以保留配套音频。"
-            }
+      }
+    },
+    "Archive Read Failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The archive could not be read. It may be damaged, inaccessible, missing a volume, or use an unsupported algorithm."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取压缩包：可能已损坏、无访问权限、缺少分卷或使用了不支持的算法。"
           }
         }
-      },
-      "Archive Preview Limit": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "This file exceeds the preview limit. You can still save it separately."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "此文件超过预览限额，仍可另存为。"
-            }
+      }
+    },
+    "Archive Save Before Opening": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save this file before opening it. For CUE, save its directory to keep the associated audio files."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先另存此文件后再打开。CUE 请另存所在目录，以保留配套音频。"
           }
         }
-      },
-      "Archive Export Complete Format": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Saved. Skipped %ld links or special entries."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "保存完成，跳过 %ld 个链接或特殊条目。"
-            }
+      }
+    },
+    "Archive Preview Limit": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This file exceeds the preview limit. You can still save it separately."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此文件超过预览限额，仍可另存为。"
           }
         }
-      },
-      "Archive Export Cancelled": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Saving was cancelled. No incomplete output was committed."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "已取消保存，未提交不完整输出。"
-            }
+      }
+    },
+    "Archive Export Complete Format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saved. Skipped %ld links or special entries."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存完成，跳过 %ld 个链接或特殊条目。"
           }
         }
-      },
-      "Archive Reload": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Reload Archive"
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "重新加载压缩包"
-            }
+      }
+    },
+    "Archive Export Cancelled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saving was cancelled. No incomplete output was committed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已取消保存，未提交不完整输出。"
           }
         }
-      },
-      "Archive Exporting": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Saving archive content…"
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "正在保存压缩包内容…"
-            }
+      }
+    },
+    "Archive Reload": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reload Archive"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新加载压缩包"
           }
         }
-      },
-      "Archive Related Resources": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Preview is read-only. Related resources are not extracted; save the directory if they are needed."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "预览为只读，不提取关联资源；如需配套资源，请另存所在目录。"
-            }
+      }
+    },
+    "Archive Exporting": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saving archive content…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在保存压缩包内容…"
           }
         }
-      },
-      "Archive Password Title": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Unlock Archive"
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "解锁压缩包"
-            }
+      }
+    },
+    "Archive Related Resources": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview is read-only. Related resources are not extracted; save the directory if they are needed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "预览为只读，不提取关联资源；如需配套资源，请另存所在目录。"
           }
         }
-      },
-      "Archive Password": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Password"
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "密码"
-            }
+      }
+    },
+    "Archive Password Title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlock Archive"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解锁压缩包"
           }
         }
-      },
-      "Archive Unlock": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Unlock"
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "解锁"
-            }
+      }
+    },
+    "Archive Password": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Password"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "密码"
           }
         }
-      },
-      "Archive Volume Access": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Select the folder containing all archive volumes. Missing or conflicting volumes cannot be opened."
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "请选择包含全部分卷的文件夹，缺卷或冲突的卷组无法打开。"
-            }
+      }
+    },
+    "Archive Unlock": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unlock"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解锁"
           }
         }
-      },
-      "Foil Info Type 13": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Archive"
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "压缩包"
-            }
+      }
+    },
+    "Archive Volume Access": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select the folder containing all archive volumes. Missing or conflicting volumes cannot be opened."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请选择包含全部分卷的文件夹，缺卷或冲突的卷组无法打开。"
           }
         }
-      },
-      "Previous Chapter": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Previous Chapter"
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "上一章"
-            }
+      }
+    },
+    "Foil Info Type 13": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Archive"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩包"
           }
         }
-      },
-      "Next Chapter": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "Next Chapter"
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "下一章"
-            }
+      }
+    },
+    "Previous Chapter": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous Chapter"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一章"
           }
         }
-      },
-      "Shortcut Scope EPUB": {
-        "localizations": {
-          "en": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "EPUB documents"
-            }
-          },
-          "zh-Hans": {
-            "stringUnit": {
-              "state": "translated",
-              "value": "EPUB 文档"
-            }
+      }
+    },
+    "Next Chapter": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next Chapter"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一章"
           }
         }
-      },
+      }
+    },
+    "Shortcut Scope EPUB": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "EPUB documents"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "EPUB 文档"
+          }
+        }
+      }
+    },
     "Cache Limit": {
       "localizations": {
         "en": {
@@ -1295,2238 +1299,2221 @@
         }
       }
     },
-  "Video Frame: %@": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Screenshot: %@"
+    "Video Frame: %@": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Screenshot: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "截图：%@"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "截图：%@"
-      }
-    }
-  }
-},
-  "Video Frame Capture Failed": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Unable to Capture Image"
+    "Video Frame Capture Failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to Capture Image"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法截取图片"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "无法截取图片"
-      }
-    }
-  }
-},
-  "Capture Video Frame": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Capture Image"
+    "Capture Video Frame": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Capture Image"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "截取图片"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "截取图片"
-      }
-    }
-  }
-},
-  "Theme Management Help": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Right-click a custom theme to overwrite or delete it."
+    "Theme Management Help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Right-click a custom theme to overwrite or delete it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "右键点击自定义主题，可用当前配置覆盖或删除。"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "右键点击自定义主题，可用当前配置覆盖或删除。"
-      }
-    }
-  }
-},
-  "Save current style as a theme": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Save current style as a theme"
+    "Save current style as a theme": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save current style as a theme"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把当前配置保存为主题"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "把当前配置保存为主题"
-      }
-    }
-  }
-},
-  "Replace with Current Style": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Replace with Current Style"
+    "Replace with Current Style": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replace with Current Style"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用当前样式覆盖"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "用当前样式覆盖"
-      }
-    }
-  }
-},
-  "Overwrite Theme": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Overwrite"
+    "Overwrite Theme": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Overwrite"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "覆盖"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "覆盖"
-      }
-    }
-  }
-},
-  "New Theme": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "New theme"
+    "New Theme": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New theme"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新主题"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "新主题"
-      }
-    }
-  }
-},
-  "Save Theme Destination": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Save to"
+    "Save Theme Destination": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save to"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存到"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "保存到"
-      }
-    }
-  }
-},
-  "Subtitle Preview Text": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "A beautiful moment"
+    "Subtitle Preview Text": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A beautiful moment"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此刻，光影正好"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "此刻，光影正好"
-      }
-    }
-  }
-},
-  "Subtitle Cool Description": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Cool mint with a delicate blue tint"
+    "Subtitle Cool Description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cool mint with a delicate blue tint"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "薄荷文字、淡青底、深蓝影，清爽柔和"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "薄荷文字、淡青底、深蓝影，清爽柔和"
-      }
-    }
-  }
-},
-  "Subtitle Light Description": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Dark text on a soft ivory backdrop"
+    "Subtitle Light Description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dark text on a soft ivory backdrop"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "深色文字、柔白底，无阴影，温润清楚"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "深色文字、柔白底，无阴影，温润清楚"
-      }
-    }
-  }
-},
-  "Subtitle Balanced Description": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "A subtle dark backdrop for clarity"
+    "Subtitle Balanced Description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A subtle dark backdrop for clarity"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "银白文字、半透明墨底，清晰稳重"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "银白文字、半透明墨底，清晰稳重"
-      }
-    }
-  }
-},
-  "Subtitle Clear Description": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Large, bright text for busy scenes"
+    "Subtitle Clear Description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Large, bright text for busy scenes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "大号白字、深色底，无阴影，醒目易读"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "大号白字、深色底，无阴影，醒目易读"
-      }
-    }
-  }
-},
-  "Subtitle Warm Description": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Warm gold for comfortable viewing"
+    "Subtitle Warm Description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Warm gold for comfortable viewing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暖金文字、棕色阴影，柔和耐看"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "暖金文字、棕色阴影，柔和耐看"
-      }
-    }
-  }
-},
-  "Subtitle Elegant Description": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Elegant white with a soft shadow"
+    "Subtitle Elegant Description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elegant white with a soft shadow"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "经典白字、柔和暗影，轻盈优雅"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "经典白字、柔和暗影，轻盈优雅"
-      }
-    }
-  }
-},
-  "Subtitle Mist": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Sea Mist"
+    "Subtitle Mist": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sea Mist"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "青岚"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "青岚"
-      }
-    }
-  }
-},
-  "Subtitle Spotlight": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Spotlight"
+    "Subtitle Spotlight": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Spotlight"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "聚光"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "聚光"
-      }
-    }
-  }
-},
-  "Subtitle Style": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Subtitle Style"
+    "Subtitle Style": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subtitle Style"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕样式"
+          }
         }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "字幕样式"
-        }
-      }
-    }
-  },
-  "Load Subtitle File": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Load Subtitle File…"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "载入字幕文件…"
-        }
-      }
-    }
-  },
-  "Locate Subtitle File": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Locate Subtitle File…"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "重新选择字幕文件…"
-        }
-      }
-    }
-  },
-  "Subtitle Directory Access": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Allow access to this video folder to find matching subtitle files automatically."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "允许访问此视频所在文件夹，以自动查找同名字幕文件。"
-        }
-      }
-    }
-  },
-  "Subtitle Global Settings Notice": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "These settings apply to all video foils and are saved automatically."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "这些设置应用于所有视频箔，并自动保存。"
-        }
-      }
-    }
-  },
-  "Subtitle Theme": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Theme"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "主题"
-        }
-      }
-    }
-  },
-  "Subtitle White Shadow": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Silver Screen"
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "银幕"
-      }
-    }
-  }
-},
-  "Subtitle Black Background": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Obsidian"
+    "Load Subtitle File": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Load Subtitle File…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "载入字幕文件…"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "墨晶"
-      }
-    }
-  }
-},
-  "Subtitle Warm Yellow": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Golden Hour"
+    "Locate Subtitle File": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Locate Subtitle File…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新选择字幕文件…"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "流金"
-      }
-    }
-  }
-},
-  "Subtitle Light Background": {
-  "localizations": {
-    "en": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "Moonlight"
+    "Subtitle Global Settings Notice": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These settings apply to all video foils and are saved automatically."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这些设置应用于所有视频箔，并自动保存。"
+          }
+        }
       }
     },
-    "zh-Hans": {
-      "stringUnit": {
-        "state": "translated",
-        "value": "月白"
-      }
-    }
-  }
-},
-  "Subtitle Font Size": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Font size (at 1080p)"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "字号（以 1080p 为基准）"
-        }
-      }
-    }
-  },
-  "Subtitle Shadow Color": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Shadow color"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "阴影色"
-        }
-      }
-    }
-  },
-  "Subtitle Bottom Position": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Distance from bottom"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "距底边位置"
-        }
-      }
-    }
-  },
-  "Subtitle Delay": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Delay"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "延迟"
-        }
-      }
-    }
-  },
-  "Subtitle Positive Delay Notice": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Positive values show subtitles later; negative values show them earlier."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "正值使字幕晚出现，负值使字幕提前出现。"
-        }
-      }
-    }
-  },
-  "Subtitle Bitmap Styling Notice": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Font and colors apply to text subtitles. Bitmap subtitles support position, delay, and visibility."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "字体和颜色应用于文字字幕。图形字幕支持位置、延迟和显示开关。"
-        }
-      }
-    }
-  },
-  "Show Line Numbers": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Show Line Numbers"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "显示行号"
-        }
-      }
-    }
-  },
-  "Show Subtitles": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Show subtitles"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "显示字幕"
-        }
-      }
-    }
-  },
-  "Subtitle File Too Large": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Subtitle file exceeds 16 MB."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "字幕文件超过 16 MB。"
-        }
-      }
-    }
-  },
-  "Subtitle Encoding Unsupported": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Cannot read the subtitle text encoding."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "无法读取字幕的文字编码。"
-        }
-      }
-    }
-  },
-  "Subtitle File Has No Cues": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "No valid subtitle cues were found."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "未找到有效字幕条目。"
-        }
-      }
-    }
-  },
-  "Document or Subtitle Style": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Document / Subtitle Style"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "文档 / 字幕样式"
-        }
-      }
-    }
-  },
-  "Shortcut Scope Document or Subtitle Style": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Documents and videos"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "文档和视频"
-        }
-      }
-    }
-  },
-  "Seconds": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "seconds"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "秒"
-        }
-      }
-    }
-  },
-  "System Font": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "System font"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "系统字体"
-        }
-      }
-    }
-  },
-  "Audio and Subtitles": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Audio and Subtitles"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "音轨和字幕"
-        }
-      }
-    }
-  },
-  "Subtitles Off": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Subtitles Off"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "关闭字幕"
-        }
-      }
-    }
-  },
-  "Audio Track": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Audio Track"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "音轨"
-        }
-      }
-    }
-  },
-  "Subtitle Track": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Subtitle Track"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "字幕"
-        }
-      }
-    }
-  },
-  "Foil Information Menu": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Foil Information…"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "箔信息…"
-        }
-      }
-    }
-  },
-  "Foil Information": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Foil Information"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "箔信息"
-        }
-      }
-    }
-  },
-  "Foil Info Title": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Title"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "标题"
-        }
-      }
-    }
-  },
-  "Foil Info Type": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Content type"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "内容类型"
-        }
-      }
-    }
-  },
-  "Foil Info Window Size": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Window size"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "当前窗口大小"
-        }
-      }
-    }
-  },
-  "Foil Info File Path": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Original file path"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "原文件路径"
-        }
-      }
-    }
-  },
-  "Foil Info File Size": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "File size"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "文件大小"
-        }
-      }
-    }
-  },
-  "Foil Info File Status": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Original file status"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "原文件状态"
-        }
-      }
-    }
-  },
-  "Foil Info Source Missing": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "The original file no longer exists at this path."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "原文件已不在此路径，可能已移动或删除。"
-        }
-      }
-    }
-  },
-  "Foil Info Source Unavailable": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "The original file cannot be accessed."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "无法访问原文件。"
-        }
-      }
-    }
-  },
-  "Foil Info Path Unknown": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "No original file path was recorded, or this content has no local source file."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "未记录原文件路径，或此内容没有本地源文件。"
-        }
-      }
-    }
-  },
-  "Foil Info Unknown": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Not recorded"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "未记录"
-        }
-      }
-    }
-  },
-  "Foil Info Pixels": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Pixel dimensions"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "像素尺寸"
-        }
-      }
-    }
-  },
-  "Foil Info Pages": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Pages"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "页数"
-        }
-      }
-    }
-  },
-  "Foil Info Source": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Source"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "来源"
-        }
-      }
-    }
-  },
-  "Foil Info Artist": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Artist / curator"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "艺术家／策展人"
-        }
-      }
-    }
-  },
-  "Foil Info Initial URL": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Initial URL"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "初始网址"
-        }
-      }
-    }
-  },
-  "Foil Info Current URL": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Current URL"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "当前网址"
-        }
-      }
-    }
-  },
-  "Foil Info Characters": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Characters"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "字符数"
-        }
-      }
-    }
-  },
-  "Foil Info Lines": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Lines"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "行数"
-        }
-      }
-    }
-  },
-  "Foil Info Items": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Items in list"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "列表项目数"
-        }
-      }
-    }
-  },
-  "Foil Info Current Item": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Current item"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "当前项目"
-        }
-      }
-    }
-  },
-  "Foil Info Camera": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Camera"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "摄像头"
-        }
-      }
-    }
-  },
-  "Foil Info Duration": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Duration"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "时长"
-        }
-      }
-    }
-  },
-  "Foil Info First Visit": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "First visit"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "首次访问时间"
-        }
-      }
-    }
-  },
-  "Foil Info Last Visit": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Last visit"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "最近访问时间"
-        }
-      }
-    }
-  },
-  "Show in Finder": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Show in Finder"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "在 Finder 中显示"
-        }
-      }
-    }
-  },
-  "Foil Info Type 0": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Note"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "便签"
-        }
-      }
-    }
-  },
-  "Foil Info Type 1": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Text"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "文本"
-        }
-      }
-    }
-  },
-  "Foil Info Type 2": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Markdown"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Markdown"
-        }
-      }
-    }
-  },
-  "Foil Info Type 3": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "CSV"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "CSV 表格"
-        }
-      }
-    }
-  },
-  "Foil Info Type 4": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Image"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "图片"
-        }
-      }
-    }
-  },
-  "Foil Info Type 5": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Web page"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "网页"
-        }
-      }
-    }
-  },
-  "Foil Info Type 6": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "PDF"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "PDF 文档"
-        }
-      }
-    }
-  },
-  "Foil Info Type 7": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Video"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "视频"
-        }
-      }
-    }
-  },
-  "Foil Info Type 8": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Audio"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "音频"
-        }
-      }
-    }
-  },
-  "Foil Info Type 9": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Document"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "文档"
-        }
-      }
-    }
-  },
-  "Foil Info Type 10": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "E-book"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "电子书"
-        }
-      }
-    }
-  },
-  "Foil Info Type 11": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "File preview"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "文件预览"
-        }
-      }
-    }
-  },
-  "Foil Info Type 12": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Camera"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "摄像头"
-        }
-      }
-    }
-  },
-
-  "Delete History Record": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Delete Record"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "删除记录"
-        }
-      }
-    }
-  },
-  "Expose Clear Note Confirmation": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Delete this note record?"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "删除这条便签记录？"
-        }
-      }
-    }
-  },
-  "Expose Clear Note Confirmation Format": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Delete the history record for “%@” and its saved content? This cannot be undone."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "确定删除“%@”的历史记录及保存的内容吗？此操作无法撤销。"
-        }
-      }
-    }
-  },
-  "Expose Clear All History": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Clear Unfavorited History…"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "清除未收藏的历史记录…"
-        }
-      }
-    }
-  },
-  "Expose Clear Category History Format": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Clear Unfavorited %@ History…"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "清除未收藏的%@历史记录…"
-        }
-      }
-    }
-  },
-  "Expose Clear History Confirmation Format": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Clear %ld unfavorited history records and their cached content? This includes all closed items in this category, beyond the current search results. Favorited records, open foils, and original files will be kept."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "清除 %ld 条未收藏历史记录及其缓存内容？将清除该分类中所有已关闭的未收藏记录，不限于当前搜索结果。已收藏记录、已打开箔片和原始文件将保留。"
-        }
-      }
-    }
-  },
-  "Expose Clear History Failed": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "History could not be cleared. Please try again."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "未能清除历史记录，请重试。"
-        }
-      }
-    }
-  },
-  "Expose History Category all": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "All"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "全部"
-        }
-      }
-    }
-  },
-  "Expose History Category images": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Images"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "图片"
-        }
-      }
-    }
-  },
-  "Expose History Category media": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Audio & Video"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "影音"
-        }
-      }
-    }
-  },
-  "Expose History Category web": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Web"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "网页"
-        }
-      }
-    }
-  },
-  "Expose History Category documents": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Documents"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "文档"
-        }
-      }
-    }
-  },
-  "Expose History Category notes": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Notes"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "便签"
-        }
-      }
-    }
-  },
-  "Expose History Category Empty": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "No matching history in this category."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "此分类暂无匹配的历史记录。"
-        }
-      }
-    }
-  },
-  "Music Enable Library Note": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Browse and play albums, songs, and playlists from your library, search music in Quick Open and the overview, and open Apple Music sharing links. Authorization is required on first access."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "浏览并播放资料库中的专辑、歌曲和歌单，在快速打开和总览中搜索音乐，也可直接打开 Apple Music 分享链接。首次访问需要授权。"
-        }
-      }
-    }
-  },
-  "File Feedback Unsupported": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Opening this file is not supported yet."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "暂不支持打开此文件。"
-        }
-      }
-    }
-  },
-  "File Feedback Remove History": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Remove from History"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "从历史记录中移除"
-        }
-      }
-    }
-  },
-  "File Feedback Remove History Failed": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Unable to remove this history record. Try again."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "无法移除此历史记录，请重试。"
-        }
-      }
-    }
-  },
-  "File Feedback Missing": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "This file no longer exists."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "此文件已不存在。"
-        }
-      }
-    }
-  },
-  "File Feedback Unreadable": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Unable to read this file. Check its access permissions."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "无法读取此文件，请检查访问权限。"
-        }
-      }
-    }
-  },
-  "File Feedback Empty Directory": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "There is no content to open in this folder."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "此文件夹中没有可打开的内容。"
-        }
-      }
-    }
-  },
-  "File Feedback Failed": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Unable to read or preview this file."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "无法读取或预览此文件。"
-        }
-      }
-    }
-  },
-  "File Feedback Different Type": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "This file cannot be added to the current foil’s content type."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "此文件无法加入当前类型的箔片。"
-        }
-      }
-    }
-  },
-  "File Feedback Title": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Unable to Open Files"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "无法打开文件"
-        }
-      }
-    }
-  },
-  "Share Menu Entry Music Note": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Enable both foofoil and Incognito Foil under Sharing in System Settings to open content from Finder, Preview, Apple Music, and other apps."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "在系统设置的共享列表中勾选「浮箔」和「无痕箔」，即可从 Finder、预览、Apple Music 等应用打开内容。"
-        }
-      }
-    }
-  },
-  "Music Enable Library": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Enable Apple Music Library"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "启用 Apple Music 资料库"
-        }
-      }
-    }
-  },
-  "Share Menu Entry": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Open in foofoil"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "在浮箔中打开"
-        }
-      }
-    }
-  },
-  "Share Menu Entry Note": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Enable both foofoil and Incognito Foil under Sharing in System Settings to open content from Finder, Preview, and other apps."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "在系统设置的共享列表中勾选「浮箔」和「无痕箔」，即可从 Finder、预览等应用打开内容。"
-        }
-      }
-    }
-  },
-  "Open Sharing Settings": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Open System Settings…"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "打开系统设置…"
-        }
-      }
-    }
-  },
-  "Sharing Section": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Share Menu"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "共享菜单"
-        }
-      }
-    }
-  },
-  "Share Import Failed": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Unable to Save Shared Content"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "无法保存共享内容"
-        }
-      }
-    }
-  },
-  "Music Open Shared Link": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Open in Apple Music Foil"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "在音乐箔中打开"
-        }
-      }
-    }
-  },
-  "Music Link Open Failed": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Unable to Open Apple Music Link"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "无法打开 Apple Music 链接"
-        }
-      }
-    }
-  },
-  "Music Link Unavailable": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "This Apple Music content is unavailable or cannot be accessed in your region."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "此 Apple Music 内容不可用，或无法在你的地区访问。"
-        }
-      }
-    }
-  },
-  "Search More Files": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "More Files"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "更多文件"
-        }
-      }
-    }
-  },
-  "Search More History": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "More History"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "更多历史记录"
-        }
-      }
-    }
-  },
-  "Open Directory...": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Open Directory..."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "打开目录…"
-        }
-      }
-    }
-  },
-  "Open File...": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Open File..."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "打开文件…"
-        }
-      }
-    }
-  },
-  "Music Untitled Playlist": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Untitled Playlist"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "未命名歌单"
-        }
-      }
-    }
-  },
-  "Music Untitled Song": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Untitled Song"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "未命名歌曲"
-        }
-      }
-    }
-  },
-  "Music Untitled Album": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Untitled Album"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "未命名专辑"
-        }
-      }
-    }
-  },
-  "System Audio": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "System Audio"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "系统音频"
-        }
-      }
-    }
-  },
-  "System Audio Status Format": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "System Audio (%@)"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "系统音频（%@）"
-        }
-      }
-    }
-  },
-  "System Output Device": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "System Output Device"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "系统输出设备"
-        }
-      }
-    }
-  },
-  "Device Sample Rate": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Device Sample Rate"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "设备采样率"
-        }
-      }
-    }
-  },
-  "Device Sample Rate Unavailable": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Unavailable"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "不可用"
-        }
-      }
-    }
-  },
-  "Audio Output Change Unavailable": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "The device is unavailable or cannot be changed."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "设备不可用或无法更改。"
-        }
-      }
-    }
-  },
-  "Audio Output Change Failed Format": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Could not change audio output (%d)."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "无法更改音频输出（%d）。"
-        }
-      }
-    }
-  },
-    "Music Playing Quality Format" : {
+    "Subtitle Theme": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theme"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主题"
+          }
+        }
+      }
+    },
+    "Subtitle White Shadow": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Silver Screen"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "银幕"
+          }
+        }
+      }
+    },
+    "Subtitle Black Background": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Obsidian"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "墨晶"
+          }
+        }
+      }
+    },
+    "Subtitle Warm Yellow": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Golden Hour"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "流金"
+          }
+        }
+      }
+    },
+    "Subtitle Light Background": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moonlight"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "月白"
+          }
+        }
+      }
+    },
+    "Subtitle Font Size": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Font size (at 1080p)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字号（以 1080p 为基准）"
+          }
+        }
+      }
+    },
+    "Subtitle Shadow Color": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shadow color"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "阴影色"
+          }
+        }
+      }
+    },
+    "Subtitle Bottom Position": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distance from bottom"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "距底边位置"
+          }
+        }
+      }
+    },
+    "Subtitle Delay": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delay"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "延迟"
+          }
+        }
+      }
+    },
+    "Subtitle Positive Delay Notice": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Positive values show subtitles later; negative values show them earlier."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正值使字幕晚出现，负值使字幕提前出现。"
+          }
+        }
+      }
+    },
+    "Subtitle Bitmap Styling Notice": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Font and colors apply to text subtitles. Bitmap subtitles support position, delay, and visibility."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字体和颜色应用于文字字幕。图形字幕支持位置、延迟和显示开关。"
+          }
+        }
+      }
+    },
+    "Show Line Numbers": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Line Numbers"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示行号"
+          }
+        }
+      }
+    },
+    "Show Subtitles": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show subtitles"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示字幕"
+          }
+        }
+      }
+    },
+    "Subtitle File Too Large": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subtitle file exceeds 16 MB."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕文件超过 16 MB。"
+          }
+        }
+      }
+    },
+    "Subtitle Encoding Unsupported": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cannot read the subtitle text encoding."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取字幕的文字编码。"
+          }
+        }
+      }
+    },
+    "Subtitle File Has No Cues": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No valid subtitle cues were found."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未找到有效字幕条目。"
+          }
+        }
+      }
+    },
+    "Document or Subtitle Style": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Document / Subtitle Style"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文档 / 字幕样式"
+          }
+        }
+      }
+    },
+    "Shortcut Scope Document or Subtitle Style": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Documents and videos"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文档和视频"
+          }
+        }
+      }
+    },
+    "Seconds": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "seconds"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "秒"
+          }
+        }
+      }
+    },
+    "System Font": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System font"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统字体"
+          }
+        }
+      }
+    },
+    "Audio and Subtitles": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio and Subtitles"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音轨和字幕"
+          }
+        }
+      }
+    },
+    "Subtitles Off": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subtitles Off"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭字幕"
+          }
+        }
+      }
+    },
+    "Audio Track": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio Track"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音轨"
+          }
+        }
+      }
+    },
+    "Subtitle Track": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Subtitle Track"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字幕"
+          }
+        }
+      }
+    },
+    "Foil Information Menu": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foil Information…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "箔信息…"
+          }
+        }
+      }
+    },
+    "Foil Information": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foil Information"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "箔信息"
+          }
+        }
+      }
+    },
+    "Foil Info Title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标题"
+          }
+        }
+      }
+    },
+    "Foil Info Type": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Content type"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内容类型"
+          }
+        }
+      }
+    },
+    "Foil Info Window Size": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Window size"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前窗口大小"
+          }
+        }
+      }
+    },
+    "Foil Info File Path": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original file path"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原文件路径"
+          }
+        }
+      }
+    },
+    "Foil Info File Size": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File size"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件大小"
+          }
+        }
+      }
+    },
+    "Foil Info File Status": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Original file status"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原文件状态"
+          }
+        }
+      }
+    },
+    "Foil Info Source Missing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The original file no longer exists at this path."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "原文件已不在此路径，可能已移动或删除。"
+          }
+        }
+      }
+    },
+    "Foil Info Source Unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The original file cannot be accessed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法访问原文件。"
+          }
+        }
+      }
+    },
+    "Foil Info Path Unknown": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No original file path was recorded, or this content has no local source file."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未记录原文件路径，或此内容没有本地源文件。"
+          }
+        }
+      }
+    },
+    "Foil Info Unknown": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not recorded"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未记录"
+          }
+        }
+      }
+    },
+    "Foil Info Pixels": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pixel dimensions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "像素尺寸"
+          }
+        }
+      }
+    },
+    "Foil Info Pages": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pages"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "页数"
+          }
+        }
+      }
+    },
+    "Foil Info Source": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "来源"
+          }
+        }
+      }
+    },
+    "Foil Info Artist": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Artist / curator"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "艺术家／策展人"
+          }
+        }
+      }
+    },
+    "Foil Info Initial URL": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Initial URL"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "初始网址"
+          }
+        }
+      }
+    },
+    "Foil Info Current URL": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current URL"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前网址"
+          }
+        }
+      }
+    },
+    "Foil Info Characters": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Characters"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字符数"
+          }
+        }
+      }
+    },
+    "Foil Info Lines": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lines"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "行数"
+          }
+        }
+      }
+    },
+    "Foil Info Items": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Items in list"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "列表项目数"
+          }
+        }
+      }
+    },
+    "Foil Info Current Item": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current item"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前项目"
+          }
+        }
+      }
+    },
+    "Foil Info Camera": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camera"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "摄像头"
+          }
+        }
+      }
+    },
+    "Foil Info Duration": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Duration"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时长"
+          }
+        }
+      }
+    },
+    "Foil Info First Visit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "First visit"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "首次访问时间"
+          }
+        }
+      }
+    },
+    "Foil Info Last Visit": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last visit"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近访问时间"
+          }
+        }
+      }
+    },
+    "Show in Finder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show in Finder"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 Finder 中显示"
+          }
+        }
+      }
+    },
+    "Foil Info Type 0": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Note"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "便签"
+          }
+        }
+      }
+    },
+    "Foil Info Type 1": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文本"
+          }
+        }
+      }
+    },
+    "Foil Info Type 2": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Markdown"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Markdown"
+          }
+        }
+      }
+    },
+    "Foil Info Type 3": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CSV"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CSV 表格"
+          }
+        }
+      }
+    },
+    "Foil Info Type 4": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Image"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图片"
+          }
+        }
+      }
+    },
+    "Foil Info Type 5": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Web page"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网页"
+          }
+        }
+      }
+    },
+    "Foil Info Type 6": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PDF"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PDF 文档"
+          }
+        }
+      }
+    },
+    "Foil Info Type 7": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Video"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "视频"
+          }
+        }
+      }
+    },
+    "Foil Info Type 8": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频"
+          }
+        }
+      }
+    },
+    "Foil Info Type 9": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Document"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文档"
+          }
+        }
+      }
+    },
+    "Foil Info Type 10": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "E-book"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "电子书"
+          }
+        }
+      }
+    },
+    "Foil Info Type 11": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File preview"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件预览"
+          }
+        }
+      }
+    },
+    "Foil Info Type 12": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Camera"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "摄像头"
+          }
+        }
+      }
+    },
+    "Delete History Record": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Record"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除记录"
+          }
+        }
+      }
+    },
+    "Expose Clear Note Confirmation": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete this note record?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "删除这条便签记录？"
+          }
+        }
+      }
+    },
+    "Expose Clear Note Confirmation Format": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete the history record for “%@” and its saved content? This cannot be undone."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "确定删除“%@”的历史记录及保存的内容吗？此操作无法撤销。"
+          }
+        }
+      }
+    },
+    "Expose Clear All History": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear Unfavorited History…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除未收藏的历史记录…"
+          }
+        }
+      }
+    },
+    "Expose Clear Category History Format": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear Unfavorited %@ History…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除未收藏的%@历史记录…"
+          }
+        }
+      }
+    },
+    "Expose Clear History Confirmation Format": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear %ld unfavorited history records and their cached content? This includes all closed items in this category, beyond the current search results. Favorited records, open foils, and original files will be kept."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除 %ld 条未收藏历史记录及其缓存内容？将清除该分类中所有已关闭的未收藏记录，不限于当前搜索结果。已收藏记录、已打开箔片和原始文件将保留。"
+          }
+        }
+      }
+    },
+    "Expose Clear History Failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History could not be cleared. Please try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未能清除历史记录，请重试。"
+          }
+        }
+      }
+    },
+    "Expose History Category all": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部"
+          }
+        }
+      }
+    },
+    "Expose History Category images": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Images"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "图片"
+          }
+        }
+      }
+    },
+    "Expose History Category media": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio & Video"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "影音"
+          }
+        }
+      }
+    },
+    "Expose History Category web": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Web"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "网页"
+          }
+        }
+      }
+    },
+    "Expose History Category documents": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Documents"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文档"
+          }
+        }
+      }
+    },
+    "Expose History Category notes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "便签"
+          }
+        }
+      }
+    },
+    "Expose History Category Empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matching history in this category."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此分类暂无匹配的历史记录。"
+          }
+        }
+      }
+    },
+    "Music Enable Library Note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Browse and play albums, songs, and playlists from your library, search music in Quick Open and the overview, and open Apple Music sharing links. Authorization is required on first access."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浏览并播放资料库中的专辑、歌曲和歌单，在快速打开和总览中搜索音乐，也可直接打开 Apple Music 分享链接。首次访问需要授权。"
+          }
+        }
+      }
+    },
+    "File Feedback Unsupported": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opening this file is not supported yet."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "暂不支持打开此文件。"
+          }
+        }
+      }
+    },
+    "File Feedback Remove History": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove from History"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从历史记录中移除"
+          }
+        }
+      }
+    },
+    "File Feedback Remove History Failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to remove this history record. Try again."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法移除此历史记录，请重试。"
+          }
+        }
+      }
+    },
+    "File Feedback Missing": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This file no longer exists."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此文件已不存在。"
+          }
+        }
+      }
+    },
+    "File Feedback Unreadable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to read this file. Check its access permissions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取此文件，请检查访问权限。"
+          }
+        }
+      }
+    },
+    "File Feedback Empty Directory": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "There is no content to open in this folder."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此文件夹中没有可打开的内容。"
+          }
+        }
+      }
+    },
+    "File Feedback Failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to read or preview this file."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取或预览此文件。"
+          }
+        }
+      }
+    },
+    "File Feedback Different Type": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This file cannot be added to the current foil’s content type."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此文件无法加入当前类型的箔片。"
+          }
+        }
+      }
+    },
+    "File Feedback Title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to Open Files"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法打开文件"
+          }
+        }
+      }
+    },
+    "Share Menu Entry Music Note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable both foofoil and Incognito Foil under Sharing in System Settings to open content from Finder, Preview, Apple Music, and other apps."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在系统设置的共享列表中勾选「浮箔」和「无痕箔」，即可从 Finder、预览、Apple Music 等应用打开内容。"
+          }
+        }
+      }
+    },
+    "Music Enable Library": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable Apple Music Library"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启用 Apple Music 资料库"
+          }
+        }
+      }
+    },
+    "Share Menu Entry": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in foofoil"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在浮箔中打开"
+          }
+        }
+      }
+    },
+    "Share Menu Entry Note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable both foofoil and Incognito Foil under Sharing in System Settings to open content from Finder, Preview, and other apps."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在系统设置的共享列表中勾选「浮箔」和「无痕箔」，即可从 Finder、预览等应用打开内容。"
+          }
+        }
+      }
+    },
+    "Open Sharing Settings": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open System Settings…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开系统设置…"
+          }
+        }
+      }
+    },
+    "Sharing Section": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Share Menu"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共享菜单"
+          }
+        }
+      }
+    },
+    "Share Import Failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to Save Shared Content"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法保存共享内容"
+          }
+        }
+      }
+    },
+    "Music Open Shared Link": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in Apple Music Foil"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在音乐箔中打开"
+          }
+        }
+      }
+    },
+    "Music Link Open Failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unable to Open Apple Music Link"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法打开 Apple Music 链接"
+          }
+        }
+      }
+    },
+    "Music Link Unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This Apple Music content is unavailable or cannot be accessed in your region."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此 Apple Music 内容不可用，或无法在你的地区访问。"
+          }
+        }
+      }
+    },
+    "Search More Files": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More Files"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多文件"
+          }
+        }
+      }
+    },
+    "Search More History": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More History"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多历史记录"
+          }
+        }
+      }
+    },
+    "Open Directory...": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Directory..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开目录…"
+          }
+        }
+      }
+    },
+    "Open File...": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open File..."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开文件…"
+          }
+        }
+      }
+    },
+    "Music Untitled Playlist": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untitled Playlist"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未命名歌单"
+          }
+        }
+      }
+    },
+    "Music Untitled Song": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untitled Song"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未命名歌曲"
+          }
+        }
+      }
+    },
+    "Music Untitled Album": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Untitled Album"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未命名专辑"
+          }
+        }
+      }
+    },
+    "System Audio": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Audio"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统音频"
+          }
+        }
+      }
+    },
+    "System Audio Status Format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Audio (%@)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统音频（%@）"
+          }
+        }
+      }
+    },
+    "System Output Device": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "System Output Device"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "系统输出设备"
+          }
+        }
+      }
+    },
+    "Device Sample Rate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device Sample Rate"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备采样率"
+          }
+        }
+      }
+    },
+    "Device Sample Rate Unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unavailable"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不可用"
+          }
+        }
+      }
+    },
+    "Audio Output Change Unavailable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The device is unavailable or cannot be changed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设备不可用或无法更改。"
+          }
+        }
+      }
+    },
+    "Audio Output Change Failed Format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not change audio output (%d)."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法更改音频输出（%d）。"
+          }
+        }
+      }
+    },
+    "Music Playing Quality Format": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3543,7 +3530,7 @@
         }
       }
     },
-    "Music Available Quality Format" : {
+    "Music Available Quality Format": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3560,7 +3547,7 @@
         }
       }
     },
-    "Music Quality Hi Res Lossless" : {
+    "Music Quality Hi Res Lossless": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3577,7 +3564,7 @@
         }
       }
     },
-    "Music Quality Lossless" : {
+    "Music Quality Lossless": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3594,7 +3581,7 @@
         }
       }
     },
-    "Music Quality Dolby Atmos" : {
+    "Music Quality Dolby Atmos": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3611,7 +3598,7 @@
         }
       }
     },
-    "Music Quality Dolby Audio" : {
+    "Music Quality Dolby Audio": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3628,7 +3615,7 @@
         }
       }
     },
-    "Music Quality Spatial Audio" : {
+    "Music Quality Spatial Audio": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3645,7 +3632,7 @@
         }
       }
     },
-    "Music Quality Lossy Stereo" : {
+    "Music Quality Lossy Stereo": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3662,7 +3649,7 @@
         }
       }
     },
-    "Music Library Item Missing" : {
+    "Music Library Item Missing": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -3679,749 +3666,749 @@
         }
       }
     },
-  "Search Filter Files": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "User Files"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "用户文件"
-        }
-      }
-    }
-  },
-  "Search Filter All": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "All"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "全部"
+    "Search Filter Files": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "User Files"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用户文件"
+          }
         }
       }
-    }
-  },
-  "Search Result Limit Notice Format": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Showing the first %lld matches; more are available. Refine your search or choose a type."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "已展示前 %lld 个匹配结果，还有更多。请细化关键词或选择类型。"
-        }
-      }
-    }
-  },
-  "Music More Albums": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "More Albums"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "更多专辑"
+    },
+    "Search Filter All": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部"
+          }
         }
       }
-    }
-  },
-  "Music More Songs": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "More Songs"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "更多歌曲"
-        }
-      }
-    }
-  },
-  "Music More Playlists": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "More Playlists"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "更多歌单"
+    },
+    "Search Result Limit Notice Format": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Showing the first %lld matches; more are available. Refine your search or choose a type."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已展示前 %lld 个匹配结果，还有更多。请细化关键词或选择类型。"
+          }
         }
       }
-    }
-  },
-  "Music Search Settings Note": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Search your Apple Music library in Quick Open and the overview. Music access authorization is required."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "在快速打开和总览中搜索 Apple Music 资料库，需要授权音乐访问。"
-        }
-      }
-    }
-  },
-  "Music Search Authorization Note": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Authorize Apple Music access in Settings → General → Search."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "请在「设置 → 通用 → 搜索」中授权 Apple Music 访问。"
+    },
+    "Music More Albums": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More Albums"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多专辑"
+          }
         }
       }
-    }
-  },
-  "Music No Search Results": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "No matching music in your library."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "资料库中没有匹配的音乐。"
-        }
-      }
-    }
-  },
-  "Music Quick Open Placeholder": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Search history, music, type / for scopes…"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "搜索历史、音乐，输入 / 限定范围…"
+    },
+    "Music More Songs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More Songs"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多歌曲"
+          }
         }
       }
-    }
-  },
-  "Open Apple Music Library": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Open Apple Music Library…"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "打开 Apple Music 资料库…"
-        }
-      }
-    }
-  },
-  "Music Library": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Apple Music Library"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Apple Music 资料库"
+    },
+    "Music More Playlists": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More Playlists"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多歌单"
+          }
         }
       }
-    }
-  },
-  "Music Section Albums": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Apple Music Albums"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Apple Music 专辑"
-        }
-      }
-    }
-  },
-  "Music Section Playlists": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Apple Music Playlists"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Apple Music 歌单"
+    },
+    "Music Search Settings Note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search your Apple Music library in Quick Open and the overview. Music access authorization is required."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在快速打开和总览中搜索 Apple Music 资料库，需要授权音乐访问。"
+          }
         }
       }
-    }
-  },
-  "Music Section Songs": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Apple Music Songs"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Apple Music 音乐"
-        }
-      }
-    }
-  },
-  "Music Songs": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Songs"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "歌曲"
+    },
+    "Music Search Authorization Note": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authorize Apple Music access in Settings → General → Search."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请在「设置 → 通用 → 搜索」中授权 Apple Music 访问。"
+          }
         }
       }
-    }
-  },
-  "Music Albums": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Albums"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "专辑"
-        }
-      }
-    }
-  },
-  "Music Playlists": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Playlists"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "歌单"
+    },
+    "Music No Search Results": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matching music in your library."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "资料库中没有匹配的音乐。"
+          }
         }
       }
-    }
-  },
-  "Music Search Library": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Search your music library"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "搜索音乐资料库"
-        }
-      }
-    }
-  },
-  "Music Authorize": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Allow Music Library Access"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "允许访问音乐资料库"
+    },
+    "Music Quick Open Placeholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search history, music, type / for scopes…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索历史、音乐，输入 / 限定范围…"
+          }
         }
       }
-    }
-  },
-  "Music Authorization Message": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Browse and play your songs, albums, and playlists in a foil."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "在浮箔中浏览和播放你的歌曲、专辑和歌单。"
-        }
-      }
-    }
-  },
-  "Music Authorization Denied": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Music library access is unavailable. Allow foofoil access in System Settings > Privacy & Security > Media & Apple Music, then refresh."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "无法访问音乐资料库。请在系统设置 → 隐私与安全性 → 媒体与 Apple Music 中允许浮箔访问，然后刷新。"
+    },
+    "Open Apple Music Library": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Apple Music Library…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开 Apple Music 资料库…"
+          }
         }
       }
-    }
-  },
-  "Music Authorization Required": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Allow access to your music library before playing."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "请先允许访问音乐资料库再播放。"
-        }
-      }
-    }
-  },
-  "Music Refresh Authorization": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Refresh Authorization"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "刷新授权状态"
+    },
+    "Music Library": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Music Library"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Music 资料库"
+          }
         }
       }
-    }
-  },
-  "Music Enable Search": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Enable Apple Music Search"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "启用 Apple Music 搜索"
-        }
-      }
-    }
-  },
-  "Music No Playable Tracks": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "No playable tracks are available."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "没有可播放的曲目。"
+    },
+    "Music Section Albums": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Music Albums"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Music 专辑"
+          }
         }
       }
-    }
-  },
-  "Music Load More": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Load More"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "载入更多"
-        }
-      }
-    }
-  },
-  "Music Library Empty": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "No music found in your library."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "资料库中没有找到音乐。"
+    },
+    "Music Section Playlists": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Music Playlists"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Music 歌单"
+          }
         }
       }
-    }
-  },
-  "Music Retry": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Retry"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "重试"
-        }
-      }
-    }
-  },
-  "Music Back": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Back"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "返回"
+    },
+    "Music Section Songs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Music Songs"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Music 音乐"
+          }
         }
       }
-    }
-  },
-  "Music Play": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Play"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "播放"
-        }
-      }
-    }
-  },
-  "Music Previous": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Previous Track"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "上一曲"
+    },
+    "Music Songs": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Songs"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌曲"
+          }
         }
       }
-    }
-  },
-  "Music Next": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Next Track"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "下一曲"
-        }
-      }
-    }
-  },
-  "Music Shuffle": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Shuffle"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "随机播放"
+    },
+    "Music Albums": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Albums"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "专辑"
+          }
         }
       }
-    }
-  },
-  "Music Repeat": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Repeat Queue"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "循环队列"
-        }
-      }
-    }
-  },
-  "Music Queue": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Play Queue"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "播放队列"
+    },
+    "Music Playlists": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Playlists"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "歌单"
+          }
         }
       }
-    }
-  },
-  "Shortcut Overview Purpose": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Quickly find, switch to, or open a foil—even from another app."
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "快速查找、切换或打开箔片；其他应用在前台时也可使用。"
-        }
-      }
-    }
-  },
-  "Document Theme None": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "None"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "无"
+    },
+    "Music Search Library": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search your music library"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索音乐资料库"
+          }
         }
       }
-    }
-  },
-  "Shortcut Overview Unassigned": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Unassigned"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "未设置"
-        }
-      }
-    }
-  },
-  "Supported Content Shortcut Format": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": " (%@)"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "（%@）"
+    },
+    "Music Authorize": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow Music Library Access"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许访问音乐资料库"
+          }
         }
       }
-    }
-  },
-  "Supported Content Overview": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Supported Content"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "支持内容一览"
-        }
-      }
-    }
-  },
-  "Keyboard Shortcuts Overview": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Keyboard Shortcuts Overview"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "快捷键一览"
+    },
+    "Music Authorization Message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Browse and play your songs, albums, and playlists in a foil."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在浮箔中浏览和播放你的歌曲、专辑和歌单。"
+          }
         }
       }
-    }
-  },
-  "Hide All Foils": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Hide All Foils"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "隐藏所有箔片"
-        }
-      }
-    }
-  },
-  "Hide Current Foil": {
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Hide Current Foil"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "隐藏当前箔片"
+    },
+    "Music Authorization Denied": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Music library access is unavailable. Allow foofoil access in System Settings > Privacy & Security > Media & Apple Music, then refresh."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法访问音乐资料库。请在系统设置 → 隐私与安全性 → 媒体与 Apple Music 中允许浮箔访问，然后刷新。"
+          }
         }
       }
-    }
-  },
-    "Camera Devices" : {
+    },
+    "Music Authorization Required": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow access to your music library before playing."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先允许访问音乐资料库再播放。"
+          }
+        }
+      }
+    },
+    "Music Refresh Authorization": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refresh Authorization"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刷新授权状态"
+          }
+        }
+      }
+    },
+    "Music Enable Search": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enable Apple Music Search"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启用 Apple Music 搜索"
+          }
+        }
+      }
+    },
+    "Music No Playable Tracks": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No playable tracks are available."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有可播放的曲目。"
+          }
+        }
+      }
+    },
+    "Music Load More": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Load More"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "载入更多"
+          }
+        }
+      }
+    },
+    "Music Library Empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No music found in your library."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "资料库中没有找到音乐。"
+          }
+        }
+      }
+    },
+    "Music Retry": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重试"
+          }
+        }
+      }
+    },
+    "Music Back": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "返回"
+          }
+        }
+      }
+    },
+    "Music Play": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放"
+          }
+        }
+      }
+    },
+    "Music Previous": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous Track"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一曲"
+          }
+        }
+      }
+    },
+    "Music Next": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next Track"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一曲"
+          }
+        }
+      }
+    },
+    "Music Shuffle": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shuffle"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "随机播放"
+          }
+        }
+      }
+    },
+    "Music Repeat": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repeat Queue"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "循环队列"
+          }
+        }
+      }
+    },
+    "Music Queue": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Play Queue"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放队列"
+          }
+        }
+      }
+    },
+    "Shortcut Overview Purpose": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quickly find, switch to, or open a foil—even from another app."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快速查找、切换或打开箔片；其他应用在前台时也可使用。"
+          }
+        }
+      }
+    },
+    "Document Theme None": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无"
+          }
+        }
+      }
+    },
+    "Shortcut Overview Unassigned": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unassigned"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未设置"
+          }
+        }
+      }
+    },
+    "Supported Content Shortcut Format": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": " (%@)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "（%@）"
+          }
+        }
+      }
+    },
+    "Supported Content Overview": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Supported Content"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "支持内容一览"
+          }
+        }
+      }
+    },
+    "Keyboard Shortcuts Overview": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Keyboard Shortcuts Overview"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "快捷键一览"
+          }
+        }
+      }
+    },
+    "Hide All Foils": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide All Foils"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏所有箔片"
+          }
+        }
+      }
+    },
+    "Hide Current Foil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide Current Foil"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏当前箔片"
+          }
+        }
+      }
+    },
+    "Camera Devices": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -4438,7 +4425,7 @@
         }
       }
     },
-    "Camera Access Message" : {
+    "Camera Access Message": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4454,7 +4441,7 @@
         }
       }
     },
-    "Camera Unavailable" : {
+    "Camera Unavailable": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4470,7 +4457,7 @@
         }
       }
     },
-    "Camera Foil" : {
+    "Camera Foil": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4486,7 +4473,7 @@
         }
       }
     },
-    "Open Camera" : {
+    "Open Camera": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4502,7 +4489,7 @@
         }
       }
     },
-    "Shortcut Scope Non Full Screen" : {
+    "Shortcut Scope Non Full Screen": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4518,7 +4505,7 @@
         }
       }
     },
-    "Shortcut Scope Border" : {
+    "Shortcut Scope Border": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4534,7 +4521,7 @@
         }
       }
     },
-    "Shortcut Scope Document Style" : {
+    "Shortcut Scope Document Style": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4550,7 +4537,7 @@
         }
       }
     },
-    "Shortcut Scope Bordered Images" : {
+    "Shortcut Scope Bordered Images": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4566,7 +4553,7 @@
         }
       }
     },
-    "Shortcut Scope Detected Image Subject" : {
+    "Shortcut Scope Detected Image Subject": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4582,7 +4569,7 @@
         }
       }
     },
-    "Shortcut Scope Raster Images" : {
+    "Shortcut Scope Raster Images": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4598,7 +4585,7 @@
         }
       }
     },
-    "Shortcut Scope App" : {
+    "Shortcut Scope App": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4614,7 +4601,7 @@
         }
       }
     },
-    "Shortcut Scope Global" : {
+    "Shortcut Scope Global": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4630,7 +4617,7 @@
         }
       }
     },
-    "Shortcut Switch Navigator Side" : {
+    "Shortcut Switch Navigator Side": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4646,7 +4633,7 @@
         }
       }
     },
-    "Shortcut Toggle Full Screen" : {
+    "Shortcut Toggle Full Screen": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4662,7 +4649,7 @@
         }
       }
     },
-    "Shortcut Group Web" : {
+    "Shortcut Group Web": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4678,7 +4665,7 @@
         }
       }
     },
-    "Shortcut Group Images" : {
+    "Shortcut Group Images": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4694,7 +4681,7 @@
         }
       }
     },
-    "Shortcut Group Display" : {
+    "Shortcut Group Display": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4710,7 +4697,7 @@
         }
       }
     },
-    "Shortcut Group Navigation" : {
+    "Shortcut Group Navigation": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4726,7 +4713,7 @@
         }
       }
     },
-    "Shortcut Group Content" : {
+    "Shortcut Group Content": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -4742,7 +4729,7 @@
         }
       }
     },
-    "Shortcut Group Global" : {
+    "Shortcut Group Global": {
       "localizations": {
         "en": {
           "stringUnit": {
@@ -5067,8 +5054,18 @@
     "Global": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Global" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "全局" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Global"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全局"
+          }
+        }
       }
     },
     "No files or folders were received from the service.": {
@@ -5241,108 +5238,6 @@
         }
       }
     },
-    "File Search Needs Authorization": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn on file search to look through indexed files in your home folder."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "开启文件搜索后，可搜索用户目录中已建立索引的文件。"
-          }
-        }
-      }
-    },
-    "File Search Authorization Unavailable": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "File search access expired. Turn it on again."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "文件搜索的授权已失效，请重新开启。"
-          }
-        }
-      }
-    },
-    "File Search Authorization Message": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Allow access to your home folder so foofoil can search its indexed files."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请为用户目录授权，以使浮箔能够搜索其中已建立索引的文件。"
-          }
-        }
-      }
-    },
-    "File Search Authorization Confirm": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Turn On"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "开启"
-          }
-        }
-      }
-    },
-    "File Search Needs Home Folder": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Select your home folder to turn on file search."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "请选择用户目录以开启文件搜索。"
-          }
-        }
-      }
-    },
-    "File Search Authorization Failed": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Could not save file search access. Please try again."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "无法保存文件搜索授权，请重试。"
-          }
-        }
-      }
-    },
     "Search File Not Downloaded": {
       "extractionState": "manual",
       "localizations": {
@@ -5480,23 +5375,23 @@
       }
     },
     "Searching Music Library": {
-    "extractionState": "manual",
-    "localizations": {
-      "en": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "Searching Apple Music Library…"
-        }
-      },
-      "zh-Hans": {
-        "stringUnit": {
-          "state": "translated",
-          "value": "正在搜索 Apple Music 资料库…"
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searching Apple Music Library…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在搜索 Apple Music 资料库…"
+          }
         }
       }
-    }
-  },
-  "Searching Local Files": {
+    },
+    "Searching Local Files": {
       "extractionState": "manual",
       "localizations": {
         "en": {
@@ -5964,40 +5859,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法打开该音频文件。"
-          }
-        }
-      }
-    },
-    "Audio Cover Access Message Format": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "foofoil needs access to the folder “%@” to display the album cover and detect the music list stored next to the audio file."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "foofoil 需要访问文件夹“%@”，才能显示与音频同目录存放的专辑封面并检测同目录的音乐列表。"
-          }
-        }
-      }
-    },
-    "Cue Audio Access Message Format": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "foofoil needs access to the folder “%@” to load the audio referenced by the CUE sheet and its album cover."
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "foofoil 需要访问文件夹“%@”，才能载入 CUE 引用的音频和专辑封面。"
           }
         }
       }
@@ -11965,18 +11826,17 @@
       }
     },
     "Enable Local Search Index Note": {
-      "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Find files in your home folder during quick search."
+            "value": "Search file names in your home folder using Spotlight. macOS privacy permissions still apply."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在快速搜索中查找主目录下的本地文件。"
+            "value": "使用 Spotlight 搜索主目录中的文件名，仍受 macOS 隐私权限控制。"
           }
         }
       }
@@ -11984,50 +11844,600 @@
     "Search Keyboard Shortcuts": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Search Shortcuts" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "搜索快捷键" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search Shortcuts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索快捷键"
+          }
+        }
       }
     },
     "Press Shortcut to Search": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Press a shortcut…" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "请按下快捷键…" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Press a shortcut…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请按下快捷键…"
+          }
+        }
       }
     },
     "Cancel Shortcut Recording": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Cancel Shortcut Recording" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "取消录制快捷键" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel Shortcut Recording"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消录制快捷键"
+          }
+        }
       }
     },
     "Search by Keys": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "By Shortcut" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "按键搜索" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "By Shortcut"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按键搜索"
+          }
+        }
       }
     },
     "Search Shortcut Recorder Help": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Click, then press a key combination to find the command using it. Press Delete to clear." } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "点击后按下快捷键，查找使用该快捷键的命令。按 Delete 清除。" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Click, then press a key combination to find the command using it. Press Delete to clear."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点击后按下快捷键，查找使用该快捷键的命令。按 Delete 清除。"
+          }
+        }
       }
     },
     "No Matching Shortcuts": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "No Matching Shortcuts" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "没有匹配的快捷键" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Matching Shortcuts"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有匹配的快捷键"
+          }
+        }
       }
     },
     "Clear Shortcut Search": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Clear Shortcut Search" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清除按键搜索" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear Shortcut Search"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除按键搜索"
+          }
+        }
+      }
+    },
+    "File Search Disabled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File search is disabled."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件搜索已关闭。"
+          }
+        }
+      }
+    },
+    "Terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "终端"
+          }
+        }
+      }
+    },
+    "Terminal Ready": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ready to start"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "待启动"
+          }
+        }
+      }
+    },
+    "Start Terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start Terminal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启动终端"
+          }
+        }
+      }
+    },
+    "Restart Terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start New Session"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启动新会话"
+          }
+        }
+      }
+    },
+    "Terminal Closing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Stopping terminal…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在停止终端…"
+          }
+        }
+      }
+    },
+    "Terminal Trusted Script": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trusted startup script"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可信初始化脚本"
+          }
+        }
+      }
+    },
+    "Terminal Close Title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminate terminal tasks?"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "终止终端任务？"
+          }
+        }
+      }
+    },
+    "Terminal Close Message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active tasks may be running. Closing will terminate processes managed by this terminal. Detached sessions are not managed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "终端可能仍有活动任务。关闭将终止此终端管理的进程；已脱离会话的进程不在管理范围内。"
+          }
+        }
+      }
+    },
+    "Terminate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminate"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "终止"
+          }
+        }
+      }
+    },
+    "Create": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建"
+          }
+        }
+      }
+    },
+    "Terminal Exit Format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session ended (%@)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会话已结束（%@）"
+          }
+        }
+      }
+    },
+    "Terminal Title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标题"
+          }
+        }
+      }
+    },
+    "Terminal Directory": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Working directory"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工作目录"
+          }
+        }
+      }
+    },
+    "Terminal Shell": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shell (zsh or bash)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shell（zsh 或 bash）"
+          }
+        }
+      }
+    },
+    "Terminal Environment": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Environment (KEY=VALUE, one per line)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "环境变量（每行 KEY=VALUE）"
+          }
+        }
+      }
+    },
+    "Terminal Environment Note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These values are saved in history. Do not enter passwords, tokens or private keys."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这些值会保存在历史记录中，请勿输入密码、token 或私钥。"
+          }
+        }
+      }
+    },
+    "Terminal Configuration Failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cannot create terminal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法创建终端"
+          }
+        }
+      }
+    },
+    "Agent CLI Help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foil — window control and terminal sessions, protocol 1\nfoil show FILE [--title TITLE] [--incognito] [--json]\nfoil update BOARD FILE [--expected-revision N] [--json]\nfoil list [--scope all] [--json]\nfoil open FILE | foil open --stdin --type markdown\nfoil reveal ID | foil hide ID | foil inspect ID\nfoil close ID --scope all [--force]\nfoil set ID opacity VALUE\nfoil terminal create [--title TITLE] [--cwd DIR] [--shell PATH]\n     [--command SCRIPT] [--env KEY=VALUE]\nfoil close BOARD [--expected-revision N] [--json]\nOptions: --request-id ID --caller NAME --session FILE --app APP\nA timeout may have committed. Retry with the same request ID and arguments within 600 seconds.\nKeep original files available. Markdown images are not loaded. User-closed boards must not be recreated automatically.\nfoil install [--directory DIR] | foil uninstall [--directory DIR]\nfoil --version"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foil — 窗口控制与终端会话，协议 1\nfoil show FILE [--title TITLE] [--incognito] [--json]\nfoil update BOARD FILE [--expected-revision N] [--json]\nfoil list [--scope all] [--json]\nfoil open FILE | foil open --stdin --type markdown\nfoil reveal ID | foil hide ID | foil inspect ID\nfoil close ID --scope all [--force]\nfoil set ID opacity VALUE\nfoil terminal create [--title TITLE] [--cwd DIR] [--shell PATH]\n     [--command SCRIPT] [--env KEY=VALUE]\nfoil close BOARD [--expected-revision N] [--json]\n选项： --request-id ID --caller NAME --session FILE --app APP\n超时可能已提交。请在 600 秒内以相同请求 ID 和参数重试。\n请保留原文件。Agent Markdown 不加载图片。用户关闭的窗口不得自动重建。\nfoil install [--directory DIR] | foil uninstall [--directory DIR]\nfoil --version"
+          }
+        }
+      }
+    },
+    "Terminal Environment Label": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Environment\n(KEY=VALUE per line)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "环境变量\n（每行 KEY=VALUE）"
+          }
+        }
+      }
+    },
+    "Terminal Previous Output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous session record (read-only)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次会话记录（只读）"
+          }
+        }
+      }
+    },
+    "Terminal New Session": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New session"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新会话"
+          }
+        }
+      }
+    },
+    "Terminal Session Record": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session record"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会话记录"
+          }
+        }
+      }
+    },
+    "Hide Previous Terminal Output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide previous session record"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏上次会话记录"
+          }
+        }
+      }
+    },
+    "Expanded": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expanded"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已展开"
+          }
+        }
+      }
+    },
+    "Collapsed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Collapsed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已收起"
+          }
+        }
+      }
+    },
+    "Open Terminal Menu Item": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Terminal…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开终端…"
+          }
+        }
+      }
+    },
+    "Open Terminal Title": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Terminal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开终端"
+          }
+        }
+      }
+    },
+    "Choose Terminal Directory": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择…"
+          }
+        }
+      }
+    },
+    "Open": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开"
+          }
+        }
       }
     }
   },

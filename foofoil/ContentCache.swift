@@ -45,17 +45,21 @@ nonisolated final class ContentCache: @unchecked Sendable {
     func flushBodyWrites() { bodyQueue.sync {} }
     func flushCleanup() { queue.sync {} }
 
+    private static func canonical(_ path: String) -> String {
+        URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
+    }
     private func owns(_ url: URL) -> Bool {
         if AppState.isManagedCacheURL(url) { return true }
         // 测试可注入隔离目录；运行时目录仍只来自应用支持路径。
-        return directories().contains { $0.standardizedFileURL.path == url.deletingLastPathComponent().standardizedFileURL.path }
+        return directories().contains { Self.canonical($0.path) == Self.canonical(url.deletingLastPathComponent().path) }
             && ["managed_body_", "session_body_", "cached_image_", "cached_text_", "cached_web_", "cached_cover_", "cached_subject_"].contains { url.lastPathComponent.hasPrefix($0) }
     }
 
     func hasLease(for path: String) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        return (leasedPaths[path] ?? 0) > 0
+        let target = Self.canonical(path)
+        return leasedPaths.contains { Self.canonical($0.key) == target && $0.value > 0 }
     }
 
     func retain(_ paths: Set<String>) {
@@ -93,10 +97,16 @@ nonisolated final class ContentCache: @unchecked Sendable {
             self.lock.lock()
             defer { self.cleanupScheduled = false; self.lock.unlock() }
             for path in self.retiredPaths {
-                let prefix = path + "/"
-                guard !self.activePaths.contains(where: { $0 == path || $0.hasPrefix(prefix) }),
-                      !referenced.contains(where: { $0 == path || $0.hasPrefix(prefix) }),
-                      !self.leasedPaths.contains(where: { ($0.key == path || $0.key.hasPrefix(prefix)) && $0.value > 0 }) else { continue }
+                // 非沙盒临时目录可同时出现 /var 与 /private/var，不能把同一文件误判成孤儿。
+                let target = Self.canonical(path)
+                let prefix = target + "/"
+                func includes(_ candidate: String) -> Bool {
+                    let value = Self.canonical(candidate)
+                    return value == target || value.hasPrefix(prefix)
+                }
+                guard !self.activePaths.contains(where: includes),
+                      !referenced.contains(where: includes),
+                      !self.leasedPaths.contains(where: { includes($0.key) && $0.value > 0 }) else { continue }
                 let url = URL(fileURLWithPath: path)
                 if self.owns(url) {
                     try? FileManager.default.removeItem(at: url)
@@ -205,7 +215,7 @@ nonisolated final class ContentCache: @unchecked Sendable {
         if let path = config.imagePath, let copy = FragmentedMP4PlaybackCopy.copyURL(for: URL(fileURLWithPath: path)) { paths.insert(copy.path) }
         // 列表图片和派生文件也属于同一条记录。
         paths.formUnion(files.keys.filter { $0.contains(config.id.uuidString) })
-        return paths
+        return paths.union(paths.map(Self.canonical))
     }
 
     private func trim(to limit: Int64, excluding excluded: Set<String>) throws {
@@ -239,6 +249,7 @@ nonisolated final class ContentCache: @unchecked Sendable {
             bodies.formUnion(config.fileList?.items.map(\.path) ?? [])
             bodies.formUnion(config.archiveSource?.volumes.map(\.path) ?? [])
         }
+        bodies.formUnion(bodies.map(Self.canonical))
         for path in referenced where cached[path] != nil && !bodies.contains(path) && !protectedPaths.contains(path) {
             candidates.append([path])
         }

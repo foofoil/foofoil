@@ -59,22 +59,24 @@ struct DocumentStyleView: View {
 
                     fontSection
 
-                    section(NSLocalizedString("Line Spacing", comment: "")) {
-                        spacingRow(
-                            binding: lineSpacingBinding,
-                            range: lineHeightRange,
-                            defaultStart: 1.6,
-                            valueLabel: { String(format: "%.2f×", $0) }
-                        )
-                    }
+                    if appState.supportsDocumentSpacing {
+                        section(NSLocalizedString("Line Spacing", comment: "")) {
+                            spacingRow(
+                                binding: lineSpacingBinding,
+                                range: lineHeightRange,
+                                defaultStart: 1.6,
+                                valueLabel: { String(format: "%.2f×", $0) }
+                            )
+                        }
 
-                    section(NSLocalizedString("Paragraph Spacing", comment: "")) {
-                        spacingRow(
-                            binding: paragraphSpacingBinding,
-                            range: paragraphSpacingRange,
-                            defaultStart: 0.6,
-                            valueLabel: { String(format: "%.2f em", $0) }
-                        )
+                        section(NSLocalizedString("Paragraph Spacing", comment: "")) {
+                            spacingRow(
+                                binding: paragraphSpacingBinding,
+                                range: paragraphSpacingRange,
+                                defaultStart: 0.6,
+                                valueLabel: { String(format: "%.2f em", $0) }
+                            )
+                        }
                     }
                 }
             }
@@ -86,7 +88,7 @@ struct DocumentStyleView: View {
             let loaded = await DocumentFontCatalog.load()
             catalog = loaded
             selectedFamily = resolvedFamily(in: loaded)
-            if appState.presentsAsCode {
+            if appState.prefersMonospacedDocumentFonts {
                 filterOnly = SettingsStore.shared.documentFontsMonospacedOnly ?? true
             } else {
                 filterOnly = SettingsStore.shared.documentFontsChineseOnly
@@ -487,7 +489,7 @@ struct DocumentStyleView: View {
 
     /// 代码内容使用等宽筛选，其余文档使用中文字体筛选。
     private var fontFilter: DocumentFontCatalog.FontFilter {
-        appState.presentsAsCode ? .monospaced : .chinese
+        appState.prefersMonospacedDocumentFonts ? .monospaced : .chinese
     }
 
     /// 是否显示字体筛选开关：「只显示中文字体」只对中文系统用户有意义；

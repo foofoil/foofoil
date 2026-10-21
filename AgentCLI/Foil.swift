@@ -18,10 +18,16 @@ struct FoilCLI {
             var arguments = Array(CommandLine.arguments.dropFirst())
             if arguments.isEmpty || arguments.contains("--help") || arguments == ["help"] {
                 let help = """
-                foil — read-only file presentation, protocol 1
+                foil — window control and terminal sessions, protocol 1
                 foil show FILE [--title TITLE] [--incognito] [--json]
                 foil update BOARD FILE [--expected-revision N] [--json]
-                foil list [--json]
+                foil list [--scope all] [--json]
+                foil open FILE | foil open --stdin --type markdown
+                foil reveal ID | foil hide ID | foil inspect ID
+                foil close ID --scope all [--force]
+                foil set ID opacity VALUE
+                foil terminal create [--title TITLE] [--cwd DIR] [--shell PATH]
+                     [--command SCRIPT] [--env KEY=VALUE]
                 foil close BOARD [--expected-revision N] [--json]
                 Options: --request-id ID --caller NAME --session FILE --app APP
                 A timeout may have committed. Retry with the same request ID and arguments within 600 seconds.
@@ -47,31 +53,79 @@ struct FoilCLI {
             let expected = try option("--expected-revision")
             requestID = try option("--request-id") ?? requestID
             let directory = try option("--directory")
+            let scope = try option("--scope")
+            let cwd = try option("--cwd")
+            let shell = try option("--shell")
+            let command = try option("--command")
+            let inputType = try option("--type")
+            var environment: [String: String] = [:]
+            while let value = try option("--env") {
+                guard let equal = value.firstIndex(of: "=") else { throw CLIError(code: "INVALID_ARGUMENTS") }
+                let key = String(value[..<equal])
+                guard environment[key] == nil else { throw CLIError(code: "INVALID_ARGUMENTS") }
+                environment[key] = String(value[value.index(after: equal)...])
+            }
+            let force = arguments.contains("--force")
+            let stdin = arguments.contains("--stdin")
+            arguments.removeAll { $0 == "--force" || $0 == "--stdin" }
             let incognito = arguments.contains("--incognito")
             arguments.removeAll { $0 == "--incognito" || $0 == "--json" }
-            guard let action = arguments.first else { throw CLIError(code: "INVALID_ARGUMENTS") }
+            guard var action = arguments.first else { throw CLIError(code: "INVALID_ARGUMENTS") }
             if action == "install" || action == "uninstall" {
                 guard arguments.count == 1 else { throw CLIError(code: "INVALID_ARGUMENTS") }
                 try install(directory: directory, removing: action == "uninstall")
                 return
             }
-            guard directory == nil, ["show", "update", "list", "close"].contains(action),
-                  !incognito || action == "show", title == nil || action == "show",
-                  expected == nil || action == "update" || action == "close" else { throw CLIError(code: "INVALID_ARGUMENTS") }
+            let terminal = action == "terminal" && arguments.dropFirst().first == "create"
+            if terminal { action = "terminal.create"; arguments.remove(at: 1) }
+            guard directory == nil, ["show", "update", "list", "close", "open", "reveal", "hide", "inspect", "set", "terminal.create"].contains(action),
+                  scope == nil || scope == "all",
+                  !incognito || action == "show" || terminal, title == nil || action == "show" || terminal || stdin,
+                  expected == nil || (scope == nil && (action == "update" || action == "close")),
+                  !force || (action == "close" && scope == "all"),
+                  terminal || (cwd == nil && shell == nil && command == nil && environment.isEmpty),
+                  !stdin || (action == "open" && inputType == "markdown"), stdin || inputType == nil,
+                  scope == nil || ["list", "close"].contains(action) else { throw CLIError(code: "INVALID_ARGUMENTS") }
             var request = AgentRequest(request_id: requestID, action: action, caller: caller)
-            switch action {
-            case "show":
-                guard arguments.count == 2 else { throw CLIError(code: "INVALID_ARGUMENTS") }
-                request.path = URL(fileURLWithPath: arguments[1]).standardizedFileURL.path
-                request.title = title; request.incognito = incognito
-            case "update":
-                guard arguments.count == 3 else { throw CLIError(code: "INVALID_ARGUMENTS") }
-                request.board_id = arguments[1]
-                request.path = URL(fileURLWithPath: arguments[2]).standardizedFileURL.path
-            case "close":
-                guard arguments.count == 2 else { throw CLIError(code: "INVALID_ARGUMENTS") }
-                request.board_id = arguments[1]
-            default: guard arguments.count == 1 else { throw CLIError(code: "INVALID_ARGUMENTS") }
+            request.scope = scope
+            request.force = force ? true : nil
+            var temporary: URL?
+            defer { if let temporary { try? FileManager.default.removeItem(at: temporary) } }
+            if stdin {
+                guard arguments.count == 1 else { throw CLIError(code: "INVALID_ARGUMENTS") }
+                var data = Data()
+                while let chunk = try FileHandle.standardInput.read(upToCount: min(65_536, AgentLimits.textBytes + 1 - data.count)), !chunk.isEmpty {
+                    data.append(chunk)
+                    guard data.count <= AgentLimits.textBytes else { throw CLIError(code: "INVALID_ARGUMENTS") }
+                }
+                guard data.count <= AgentLimits.textBytes, String(data: data, encoding: .utf8) != nil else { throw CLIError(code: "INVALID_ARGUMENTS") }
+                let url = FileManager.default.temporaryDirectory.appendingPathComponent("foil-stdin-\(UUID()).md")
+                guard FileManager.default.createFile(atPath: url.path, contents: data, attributes: [.posixPermissions: 0o600]) else { throw CLIError(code: "CLI_IO_ERROR") }
+                temporary = url
+                request.action = "show"; request.path = url.path; request.incognito = true; request.title = title
+            } else {
+                switch action {
+                case "show", "open":
+                    guard arguments.count == 2 else { throw CLIError(code: "INVALID_ARGUMENTS") }
+                    request.path = URL(fileURLWithPath: NSString(string: arguments[1]).expandingTildeInPath).standardizedFileURL.path
+                    if action == "show" { request.title = title; request.incognito = incognito }
+                case "update":
+                    guard arguments.count == 3 else { throw CLIError(code: "INVALID_ARGUMENTS") }
+                    request.board_id = arguments[1]
+                    request.path = URL(fileURLWithPath: arguments[2]).standardizedFileURL.path
+                case "close", "reveal", "hide", "inspect", "set":
+                    guard arguments.count == (action == "set" ? 4 : 2) else { throw CLIError(code: "INVALID_ARGUMENTS") }
+                    request.board_id = arguments[1]
+                    if action == "set" {
+                        guard arguments[2] == "opacity", let value = Double(arguments[3]), value.isFinite, (0.1...1).contains(value) else { throw CLIError(code: "INVALID_ARGUMENTS") }
+                        request.property = "opacity"; request.value = value
+                    }
+                case "terminal.create":
+                    guard arguments.count == 1 else { throw CLIError(code: "INVALID_ARGUMENTS") }
+                    request.terminal = TerminalLaunchConfiguration(shellPath: shell, workingDirectory: cwd.map { URL(fileURLWithPath: NSString(string: $0).expandingTildeInPath).standardizedFileURL.path }, environment: environment, startupCommands: command ?? "")
+                    request.title = title; request.incognito = incognito ? true : nil
+                default: guard arguments.count == 1 else { throw CLIError(code: "INVALID_ARGUMENTS") }
+                }
             }
             if let expected {
                 guard let revision = UInt64(expected) else { throw CLIError(code: "INVALID_ARGUMENTS") }
@@ -80,24 +134,31 @@ struct FoilCLI {
             let app = try application(explicit: appOption)
             let hello = try exchange(AgentRequest(action: "hello"), app: app)
             guard hello.protocol_version == AgentLimits.protocolVersion else { throw CLIError(code: "PROTOCOL_MISMATCH") }
+            let general = scope == "all" || ["open", "reveal", "hide", "inspect", "set", "terminal.create"].contains(request.action)
+            guard !general || hello.capabilities?.contains("application-control-v1") == true else { throw CLIError(code: "PROTOCOL_MISMATCH") }
             let credential = try credential(run: hello.run_id, explicit: sessionOption)
             var authorization = AgentRequest(action: "authorize", run_id: hello.run_id, credential: credential.secret)
             authorization.caller = caller
-            let authorized = try exchange(authorization, app: app)
+            let authorized = try controlExchange(authorization, app: app, endpoint: hello.socket_path)
             if let error = authorized.error { throw CLIError(code: error) }
             request.run_id = hello.run_id
             request.credential = credential.secret
-            let response = try exchange(request, app: app)
+            let response = try controlExchange(request, app: app, endpoint: hello.socket_path)
             print(String(decoding: try JSONEncoder().encode(response), as: UTF8.self))
             if let error = response.error { fputs("foil: \(error)\n", stderr); exit(1) }
         } catch {
-            let code = (error as? CLIError)?.code ?? "CLI_IO_ERROR"
+            let code = (error as? CLIError)?.code ?? (error as? AgentTransportFailure)?.code ?? "CLI_IO_ERROR"
             var response = AgentResponse(request_id: requestID, run_id: "", status: "failed")
             response.error = code
             if let data = try? JSONEncoder().encode(response) { print(String(decoding: data, as: UTF8.self)) }
             fputs("foil: \(code)\n", stderr)
             exit(1)
         }
+    }
+
+    private static func controlExchange(_ request: AgentRequest, app: URL, endpoint: String?) throws -> AgentResponse {
+        if let endpoint { return try AgentSocketIO.exchange(request, path: endpoint) }
+        return try exchange(request, app: app)
     }
 
     private static func localized(_ key: String, fallback: String) -> String {

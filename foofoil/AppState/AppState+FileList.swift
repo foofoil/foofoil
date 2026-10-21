@@ -14,7 +14,7 @@ extension AppState {
     static let fileListNavigatorID = "builtin.file-list"
 
     var hasOpenedContent: Bool {
-        archiveSession != nil || isCamera || imageURL != nil
+        terminalConfiguration != nil || archiveSession != nil || isCamera || imageURL != nil
             || webURL != nil
             || textURL != nil
             || extensionSession != nil
@@ -1394,22 +1394,4 @@ extension AppState {
         }
     }
 
-    func beginCueRelatedAccess(for item: FileListItem) {
-        guard let cuePath = item.cue?.cueSheetPath else { return }
-        let cueURL: URL
-        if let section = fileList?.sections.first(where: { $0.id == item.cue?.sectionID }),
-           let bookmark = section.cueSheetBookmark,
-           let resolved = Self.resolveVideoBookmark(bookmark) {
-            cueURL = resolved
-        } else {
-            cueURL = URL(fileURLWithPath: cuePath)
-        }
-        let audioURL = resolvedURL(for: item) ?? item.url
-        if cueURL.startAccessingSecurityScopedResource() {
-            accessingCueURL = cueURL
-        }
-        let presenter = CueRelatedFilePresenter(primary: cueURL, related: audioURL)
-        NSFileCoordinator.addFilePresenter(presenter)
-        cueRelatedPresenter = presenter
-    }
 }

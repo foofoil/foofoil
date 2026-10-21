@@ -8,15 +8,13 @@ enum HistorySearchMode {
 
 /// 文件来源的结束状态；只有明确原因时才展示具体说明，正常零结果不解释为故障。
 enum FileSearchStatus: Equatable {
-    case needsAuthorization
-    case authorizationUnavailable
+    case disabled
     case unavailable
     case timedOut
 
     var localizationKey: String {
         switch self {
-        case .needsAuthorization: "File Search Needs Authorization"
-        case .authorizationUnavailable: "File Search Authorization Unavailable"
+        case .disabled: "File Search Disabled"
         case .unavailable: "File Search Unavailable"
         case .timedOut: "File Search Timed Out"
         }
@@ -138,7 +136,7 @@ final class HistorySearchViewModel: ObservableObject {
     private let historySearch: (String) async -> [HistorySearchResult]
     private let fileSearch: (String, SpotlightSearchTarget, @escaping (SpotlightSearchOutcome) -> Void) -> Void
     private let cancelFiles: () -> Void
-    private var authCancellable: AnyCancellable?
+    private var fileSettingsCancellable: AnyCancellable?
     private var searchTask: Task<Void, Never>?
     private var generation = 0
     private var rawFiles: [SpotlightFileResult] = []
@@ -152,7 +150,7 @@ final class HistorySearchViewModel: ObservableObject {
     var openWebURL: ((URL) -> Void)?
     var openFile: ((URL) -> Void)?
     var enableFileSearch: (() -> Void)?
-    var isFileSearchAuthorized: Bool { SpotlightSearchAccess.shared.isAuthorized }
+    var isFileSearchEnabled: Bool { LocalFileSearchSettings.shared.isEnabled }
 
     init(historySearch: @escaping (String) async -> [HistorySearchResult] = { await HistoryRepository.shared.search($0, limit: SearchResultLimits.probe) },
          fileSearch: ((String, @escaping (SpotlightSearchOutcome) -> Void) -> Void)? = nil,
@@ -186,7 +184,7 @@ final class HistorySearchViewModel: ObservableObject {
             }
         }
         self.cancelFiles = cancelFiles ?? { service.cancel() }
-        self.authCancellable = NotificationCenter.default.publisher(for: .spotlightSearchAuthorizationDidChange)
+        self.fileSettingsCancellable = NotificationCenter.default.publisher(for: .localFileSearchDidChange)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.objectWillChange.send()
@@ -438,8 +436,7 @@ final class HistorySearchViewModel: ObservableObject {
                         self.reconcileSelection(previousIndex: previousIndex)
                         return
                     case .results(let files): self.rawFiles = Array(files.prefix(SearchResultLimits.probe))
-                    case .needsAuthorization: self.fileStatus = .needsAuthorization
-                    case .authorizationUnavailable: self.fileStatus = .authorizationUnavailable
+                    case .disabled: self.fileStatus = .disabled
                     case .unavailable: self.fileStatus = .unavailable
                     case .timedOut: self.fileStatus = .timedOut
                     }

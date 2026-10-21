@@ -76,6 +76,7 @@ final class FileDropHostingView<Content: View>: NSHostingView<Content> {
     }
 
     private func canAcceptDrop(from sender: any NSDraggingInfo) -> Bool {
+        guard appState.terminalConfiguration == nil else { return false }
         if !droppedFileURLs(from: sender).isEmpty { return true }
         return sender.draggingPasteboard.canReadItem(withDataConformingToTypes: [
             NSPasteboard.PasteboardType.URL.rawValue,
@@ -310,6 +311,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     /// 文件文档采用更大的阅读尺寸；笔记与网页保留各自默认大小。
     static func initialWindowSize(for appState: AppState) -> NSSize {
+        if appState.terminalConfiguration != nil { return NSSize(width: 720, height: 460) }
         if appState.readingState.webURL != nil { return NSSize(width: 512, height: 512) }
         if appState.readingState.isReadOnlyTextFile || appState.readingState.isExtensionDocument || appState.readingState.isPDFDocument
             || (appState.readingState.isMarkdownDocument && appState.readingState.isMarkdownPreview) {
@@ -322,7 +324,20 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         fatalError("init(coder:) has not been implemented")
     }
 
+    let controlID = UUID().uuidString
+    private var terminalCloseApproved = false
+    func closeWithoutTerminalPrompt() {
+        terminalCloseApproved = true
+        close()
+    }
+    public func windowShouldClose(_ sender: NSWindow) -> Bool { approveTerminalClose() }
+    private func approveTerminalClose() -> Bool {
+        guard !terminalCloseApproved, appState.terminalSession?.needsCloseConfirmation == true else { return true }
+        terminalCloseApproved = TerminalSession.confirmTermination()
+        return terminalCloseApproved
+    }
     public override func close() {
+        guard approveTerminalClose() else { return }
         removePointerScrollMonitor()
         navigatorPanelController.detachAndClose()
         super.close()
@@ -2133,6 +2148,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
            }) ?? false) == false {
             AppleMusicPlaybackController.stopIfActive()
         }
+        appState.terminalSession?.stop()
         appState.persistManagedTextIfNeeded(createIfNeeded: !appState.isIncognito)
         appState.endExtensionSessionOnWindowClose()
         appState.saveState()

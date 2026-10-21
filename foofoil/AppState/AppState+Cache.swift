@@ -21,7 +21,6 @@ extension AppState {
             if accessingVideoURL == url { return }
             stopVideoAccess()
             videoBookmarkData = nil
-            mediaSidecarBookmarkData = nil
             guard url.isFileURL, !Self.isManagedCacheURL(url) else { return }
             if url.startAccessingSecurityScopedResource() { accessingVideoURL = url }
             videoBookmarkData = Self.makeSecurityScopedBookmark(for: url)

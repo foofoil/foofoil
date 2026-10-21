@@ -310,7 +310,7 @@ public final class HistoryManager: ObservableObject {
 
     func hasPersistableContent(_ config: WindowConfig) -> Bool {
         guard config.sourceFingerprint?.hasPrefix("archive-entry:") != true else { return false }
-        return config.appleMusicReference != nil || config.extensionID != nil || config.imagePath != nil || config.webURLString != nil || config.textPath != nil || !config.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return config.terminalConfiguration != nil || config.appleMusicReference != nil || config.extensionID != nil || config.imagePath != nil || config.webURLString != nil || config.textPath != nil || !config.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
 

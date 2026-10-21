@@ -157,21 +157,21 @@ extension AppState {
             return stem + (track == .video ? ".mp4" : ".m4a")
         }
 
-        /// 为视频/音频原始文件创建安全范围书签，用于跨进程生命周期保留沙盒访问授权。
+        /// 为原始文件创建普通书签，用于重启后及文件移动时定位来源。
         public static func makeSecurityScopedBookmark(for url: URL) -> Data? {
-            try? url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+            try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
         }
 
-        /// 解析视频安全范围书签并校验文件仍存在；返回解析后的 URL（文件移动后可解析到新路径）。
+        /// 解析来源书签并校验文件仍存在；返回解析后的 URL（文件移动后可解析到新路径）。
         /// 仅在内部临时持有访问授权完成存在性检查，不会长期占用授权。
         nonisolated public static func resolveVideoBookmark(_ bookmark: Data) -> URL? {
             var isStale = false
             guard let url = try? URL(
                 resolvingBookmarkData: bookmark,
-                options: .withSecurityScope,
+                options: .withoutUI,
                 bookmarkDataIsStale: &isStale
             ) else { return nil }
-            // 重启后尚未持有授权，fileExists 需在安全范围内检查才准确
+            // 系统可能为交付的 URL 附带访问能力；读取失败仍交由上层显示。
             let accessed = url.startAccessingSecurityScopedResource()
             defer { if accessed { url.stopAccessingSecurityScopedResource() } }
             return FileManager.default.fileExists(atPath: url.path) ? url : nil
