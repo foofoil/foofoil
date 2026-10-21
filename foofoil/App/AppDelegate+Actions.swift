@@ -226,47 +226,13 @@ extension AppDelegate {
     }
 
     @objc func openFileAction() {
-        // 无箔窗口时同样弹出选择面板；选中的文件在确认后由 openGroupedFiles 落入新开的箔片。
-        let appState = activeAppState.flatMap { state in
-            // 普通打开不能把无痕空箔当成可复用目标；直接拖入仍由目标箔处理。
-            state.isIncognito && isBlank(state) ? availableBlankWindowController?.appState : state
-        }
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-
-        // Quick Look 接管其它文件类型，选择面板不再维护格式白名单。
-        panel.treatsFilePackagesAsDirectories = false
-
-        panel.begin { response in
-            if response == .OK {
-                DispatchQueue.main.async {
-                    self.openGroupedFiles(panel.urls, into: appState, append: false)
-                }
-            }
-        }
+        let target = activeAppState.flatMap { $0.isIncognito ? availableBlankWindowController?.appState : $0 }
+        openContentPanel(directory: false, target: target)
     }
 
     @objc func openDirectoryAction() {
-        let appState = activeAppState.flatMap { state in
-            // 普通打开不能把无痕空箔当成可复用目标；直接拖入仍由目标箔处理。
-            state.isIncognito && isBlank(state) ? availableBlankWindowController?.appState : state
-        }
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.treatsFilePackagesAsDirectories = false
-
-        panel.begin { response in
-            if response == .OK {
-                DispatchQueue.main.async {
-                    // 复用目录拖入入口，保持内容筛选、列表追加和空箔打开行为一致。
-                    self.openDroppedFiles(panel.urls, into: appState)
-                }
-            }
-        }
+        let target = activeAppState.flatMap { $0.isIncognito ? availableBlankWindowController?.appState : $0 }
+        openContentPanel(directory: true, target: target)
     }
 
     @objc func addToFileListAction() {
@@ -441,8 +407,8 @@ extension AppDelegate {
     }
 
     @objc func openClipboardContentAction() {
-        // 无痕箔激活时沿用无痕属性：普通打开快捷键也不能把剪贴板内容写进历史。
-        _ = openClipboardContentInNewWindow(isIncognito: isActiveFoilIncognito)
+        // 普通命令始终有痕；无痕由明确入口或派生快捷键决定。
+        _ = openClipboardContentInNewWindow(isIncognito: false)
     }
 
     /// 直接打开剪贴板内容：文件/文件夹/图片复用拖入箔片的处理管线，文本按 Markdown / 网址 / HTML / 笔记区分。

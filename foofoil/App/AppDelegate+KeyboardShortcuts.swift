@@ -23,7 +23,12 @@ extension AppDelegate {
     func applyKeyboardShortcuts(to menu: NSMenu?) {
         guard let menu else { return }
         for item in menu.items {
-            if let identifier = item.representedObject as? String,
+            if let identifier = item.representedObject as? String, identifier.hasSuffix(IncognitoOpening.suffix) {
+                let baseID = String(identifier.dropLast(IncognitoOpening.suffix.count))
+                let shortcut = KeyboardShortcutStore.shared.incognitoShortcut(forID: baseID)
+                item.keyEquivalent = shortcut?.keyEquivalent ?? ""
+                item.keyEquivalentModifierMask = shortcut?.modifiers ?? [.option]
+            } else if let identifier = item.representedObject as? String,
                let definition = KeyboardShortcutCatalog.definition(withID: identifier) {
                 let shortcut = KeyboardShortcutStore.shared.shortcut(for: definition)
                 item.keyEquivalent = shortcut?.keyEquivalent ?? ""
@@ -49,11 +54,15 @@ extension AppDelegate {
         let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
         // AppKit 允许带 Shift 产生的符号（如 ⌘+ 实际按 ⇧⌘=）匹配键位表中不带 Shift 的组合。
         let modifiersWithoutShift = modifiers.subtracting(.shift)
+        if KeyboardShortcutStore.shared.matches(event, identifier: "file.openClipboardIncognito") { return true }
         return KeyboardShortcutCatalog.sections.contains { section in
             section.definitions.contains { definition in
-                guard let shortcut = KeyboardShortcutStore.shared.shortcut(for: definition),
-                      keys.contains(shortcut.keyEquivalent) else { return false }
-                return shortcut.modifiers == modifiers || shortcut.modifiers == modifiersWithoutShift
+                let shortcuts = [KeyboardShortcutStore.shared.shortcut(for: definition),
+                                 KeyboardShortcutStore.shared.incognitoShortcut(forID: definition.id)].compactMap { $0 }
+                return shortcuts.contains { shortcut in
+                    keys.contains(shortcut.keyEquivalent) &&
+                    (shortcut.modifiers == modifiers || shortcut.modifiers == modifiersWithoutShift)
+                }
             }
         }
     }

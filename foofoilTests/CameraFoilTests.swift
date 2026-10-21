@@ -34,7 +34,7 @@ struct CameraFoilTests {
         let model = FoilExposeModel(items: [], historyItems: [], cameraAvailable: { true })
         model.searchText = "camera"
         #expect(model.currentItems.first?.id == FoilExposeItem.cameraCommandID)
-        #expect(model.currentItems.first?.symbolName == "camera")
+        #expect(model.currentItems.first?.symbolName == "web.camera.fill")
         #expect(model.currentItems.first?.isNewFoil == false)
         model.stopFileSearch()
         let unavailable = FoilExposeModel(items: [], historyItems: [], cameraAvailable: { false })
@@ -48,7 +48,7 @@ struct CameraFoilTests {
         let decoded = try JSONDecoder().decode(WindowConfig.self, from: JSONEncoder().encode(config))
         #expect(decoded.isCamera)
         #expect(HistoryContentKind.infer(from: decoded) == .camera)
-        #expect(decoded.historyMenuSymbolName == "web.camera")
+        #expect(decoded.historyMenuSymbolName == "web.camera.fill")
         #expect(!HistoryContentKind.camera.storesIndexedText)
     }
     @MainActor @Test(arguments: [true, false])

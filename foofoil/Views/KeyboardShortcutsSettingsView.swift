@@ -58,6 +58,18 @@ struct KeyboardShortcutsSettingsView: View {
         }
     }
 
+    private func sectionHeader(_ section: KeyboardShortcutSection) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(NSLocalizedString(section.titleKey, comment: ""))
+            if section == .opening {
+                Text(NSLocalizedString("Incognito Opening Section Help", comment: ""))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .textCase(nil)
+            }
+        }
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 4) {
@@ -90,7 +102,7 @@ struct KeyboardShortcutsSettingsView: View {
                                 KeyboardShortcutRow(definition: definition)
                             }
                         } header: {
-                            Text(NSLocalizedString(result.section.titleKey, comment: ""))
+                            sectionHeader(result.section)
                         }
                     }
                 } else {
@@ -100,7 +112,7 @@ struct KeyboardShortcutsSettingsView: View {
                                 KeyboardShortcutRow(definition: definition)
                             }
                         } header: {
-                            Text(NSLocalizedString(section.titleKey, comment: ""))
+                            sectionHeader(section)
                         }
                     }
                 }
@@ -120,6 +132,7 @@ private struct KeyboardShortcutRow: View {
     let definition: KeyboardShortcutDefinition
 
     @State private var shortcut: KeyboardShortcut?
+    @State private var validationError: String?
     @State private var isCustomized: Bool
 
     init(definition: KeyboardShortcutDefinition) {
@@ -141,6 +154,10 @@ private struct KeyboardShortcutRow: View {
             Spacer(minLength: 8)
             // 固定录制框宽度并统一靠右对齐，避免行与行之间参差不齐。
             ShortcutRecorderView(shortcut: shortcut) { newValue in
+                if let error = KeyboardShortcutStore.shared.validationMessage(newValue, for: definition) {
+                    validationError = error
+                    return
+                }
                 shortcut = newValue
                 KeyboardShortcutStore.shared.setShortcut(newValue, for: definition)
                 isCustomized = KeyboardShortcutStore.shared.isCustomized(definition)
@@ -159,10 +176,19 @@ private struct KeyboardShortcutRow: View {
             .opacity(isCustomized ? 1 : 0)
             .disabled(!isCustomized)
         }
+        .alert(NSLocalizedString("Shortcut Unavailable", comment: ""), isPresented: Binding(
+            get: { validationError != nil }, set: { if !$0 { validationError = nil } }
+        )) { Button("OK") { validationError = nil } } message: {
+            Text(validationError ?? "")
+        }
     }
 
     private func reset() {
         let value = definition.defaultShortcut
+        if let error = KeyboardShortcutStore.shared.validationMessage(value, for: definition) {
+            validationError = error
+            return
+        }
         shortcut = value
         isCustomized = false
         KeyboardShortcutStore.shared.reset(definition)

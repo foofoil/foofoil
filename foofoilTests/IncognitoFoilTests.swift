@@ -147,8 +147,8 @@ struct IncognitoFoilTests {
         #expect(HistoryRepository.shared.config(id: state.id) == nil)
     }
 
-    /// 无痕箔激活时，普通打开剪贴板内容（⌘⇧V）也应落到无痕箔，不能把私密内容写进历史。
-    @Test func clipboardOpenInheritsActiveIncognitoFoil() throws {
+    /// 普通命令不受当前无痕箔影响，也不能接管无痕空箔。
+    @Test func ordinaryClipboardOpenIgnoresActiveIncognitoFoil() throws {
         let delegate = AppDelegate()
         let incognito = FloatingWindowController(appState: AppState(isIncognito: true))
         delegate.windowControllers = [incognito]
@@ -169,8 +169,11 @@ struct IncognitoFoilTests {
         delegate.openClipboardContentAction()
 
         #expect(delegate.windowControllers.count == 2)
-        #expect(delegate.windowControllers.allSatisfy { $0.appState.isIncognito })
-        #expect(delegate.windowControllers.allSatisfy { HistoryRepository.shared.config(id: $0.appState.id) == nil })
+        let opened = try #require(delegate.windowControllers.first { !$0.appState.isIncognito })
+        #expect(opened.appState.text == "Private clipboard note")
+        #expect(incognito.appState.isBlank)
+        #expect(HistoryRepository.shared.config(id: incognito.appState.id) == nil)
+        HistoryManager.shared.removeFromHistory(opened.appState.toConfig())
     }
 
     /// 普通箔激活时不受影响：⌘⇧V 仍打开普通箔并进入历史。

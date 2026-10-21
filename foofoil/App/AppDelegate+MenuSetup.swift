@@ -106,8 +106,15 @@ extension AppDelegate {
 
         fileMenu.addItem(NSMenuItem.separator())
 
+        let quickOpenItem = NSMenuItem(title: NSLocalizedString("Search History Menu Item", comment: ""), action: #selector(showHistorySearchAction), keyEquivalent: "p")
+        quickOpenItem.withSymbol("magnifyingglass")
+        quickOpenItem.representedObject = "history.search"
+        quickOpenItem.target = self
+        fileMenu.addItem(quickOpenItem)
+
         let openItem = NSMenuItem(title: NSLocalizedString("Open File...", comment: ""), action: #selector(openFileAction), keyEquivalent: "o")
-        openItem.withSymbol("folder")
+        openItem.withSymbol("document")
+        openItem.representedObject = "file.openFile"
         openItem.target = self
         fileMenu.addItem(openItem)
 
@@ -124,11 +131,12 @@ extension AppDelegate {
         openWebURLItem.target = self
         fileMenu.addItem(openWebURLItem)
         let terminalItem = NSMenuItem(title: NSLocalizedString("Open Terminal Menu Item", comment: ""), action: #selector(openTerminalAction), keyEquivalent: "")
+        terminalItem.representedObject = "file.openTerminal"
         terminalItem.target = self
         terminalItem.withSymbol("terminal")
         fileMenu.addItem(terminalItem)
         let cameraItem = NSMenuItem(title: NSLocalizedString("Open Camera", comment: ""), action: #selector(openCameraAction), keyEquivalent: "")
-        cameraItem.withSymbol("camera")
+        cameraItem.withSymbol("web.camera.fill")
         cameraItem.representedObject = "file.openCamera"
         cameraItem.target = self
         cameraItem.isHidden = !CameraCaptureController.isAvailable
@@ -148,19 +156,12 @@ extension AppDelegate {
         openClipboardContentItem.target = self
         fileMenu.addItem(openClipboardContentItem)
         let privateClipboardItem = NSMenuItem(title: NSLocalizedString("Open Clipboard Incognito", comment: ""), action: #selector(openClipboardIncognitoAction), keyEquivalent: "v")
-        privateClipboardItem.keyEquivalentModifierMask = [.command, .shift, .option]
+        privateClipboardItem.keyEquivalentModifierMask = [.command, .option]
+        privateClipboardItem.allowsKeyEquivalentWhenHidden = true
         privateClipboardItem.representedObject = "file.openClipboardIncognito"
         privateClipboardItem.withImage(IncognitoFoilIcon.menuImage)
         privateClipboardItem.target = self
         fileMenu.addItem(privateClipboardItem)
-
-        fileMenu.addItem(NSMenuItem.separator())
-
-        let quickOpenItem = NSMenuItem(title: NSLocalizedString("Search History Menu Item", comment: ""), action: #selector(showHistorySearchAction), keyEquivalent: "p")
-        quickOpenItem.withSymbol("magnifyingglass")
-        quickOpenItem.representedObject = "history.search"
-        quickOpenItem.target = self
-        fileMenu.addItem(quickOpenItem)
 
         fileMenu.addItem(NSMenuItem.separator())
 
@@ -238,6 +239,8 @@ extension AppDelegate {
         closeWindowItem.withSymbol("xmark.circle")
         closeWindowItem.target = self
         fileMenu.addItem(closeWindowItem)
+
+        installIncognitoOpeningAlternates(in: fileMenu)
 
         let fileMenuItem = NSMenuItem(title: NSLocalizedString("File", comment: ""), action: nil, keyEquivalent: "")
         fileMenuItem.submenu = fileMenu

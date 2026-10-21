@@ -43,13 +43,13 @@ extension AppState {
         }
 
         @discardableResult
-        public func loadConfig(_ inputConfig: WindowConfig, isRefreshing: Bool = false) -> Bool {
+        public func loadConfig(_ inputConfig: WindowConfig, isRefreshing: Bool = false, preservesIdentity: Bool = false) -> Bool {
             if let path = inputConfig.textPath, Self.isManagedCacheURL(URL(fileURLWithPath: path)),
                ContentCache.shared.hasLease(for: path) { ContentCache.shared.flushBodyWrites() }
             let historyIsPinned = HistoryRepository.shared.config(id: inputConfig.id)?.historyIsPinned ?? inputConfig.historyIsPinned
-            let resolution = inputConfig.resolvingFileReferences(removeMissingItems: !isRefreshing && SettingsStore.shared.automaticallyRemoveMissingHistory && !historyIsPinned)
+            let resolution = inputConfig.resolvingFileReferences(removeMissingItems: !isIncognito && !isRefreshing && SettingsStore.shared.automaticallyRemoveMissingHistory && !historyIsPinned)
             let config = resolution.config
-            if resolution.missing, SettingsStore.shared.automaticallyRemoveMissingHistory, !isRefreshing {
+            if resolution.missing, !isIncognito, SettingsStore.shared.automaticallyRemoveMissingHistory, !isRefreshing {
                 HistoryManager.shared.removeFromHistory(inputConfig, preservingLegacyBody: true)
                 if let failure = config.historyRestoreFileFailure() { reportFileOpenFeedback([failure]) }
                 return false
@@ -78,8 +78,8 @@ extension AppState {
                 updateRenderedMarkdown()
             }
 
-            // 载入历史项必须沿用原 UUID，否则随后的自动保存会创建一条重复历史。
-            self.id = config.id
+            // 普通恢复沿用历史 UUID；无痕副本保留自己的会话身份。
+            if !preservesIdentity { self.id = config.id }
             self.sourceFingerprint = config.sourceFingerprint
             self.agentReadOnly = config.readOnlyPresentation
             self.isPinned = config.isPinned

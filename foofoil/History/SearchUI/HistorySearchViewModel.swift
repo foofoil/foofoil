@@ -124,6 +124,7 @@ final class HistorySearchViewModel: ObservableObject {
     private var musicSettingsCancellable: AnyCancellable?
     private var isActive = false
     @Published private(set) var files: [SpotlightFileResult] = []
+    @Published var opensIncognito = false
     @Published private(set) var openURL: URL?
     @Published private(set) var selectedID: String?
     @Published private(set) var isHistorySearching = false

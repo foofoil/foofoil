@@ -151,10 +151,23 @@ extension AppDelegate {
     }
 
     /// 搜索结果优先复用已打开的空白窗口，否则新建窗口。
-    public func openSearchResultInNewWindow(id: UUID) {
+    public func openSearchResultInNewWindow(id: UUID, isIncognito: Bool = false, target: AppState? = nil) {
         guard let config = HistoryRepository.shared.config(id: id),
               SettingsStore.shared.appleMusicLibraryEnabled || config.appleMusicReference == nil else { return }
-        openHistoryConfig(config: config, id: id)
+        if isIncognito {
+            openHistoryConfigIncognito(config, target: target)
+        } else { openHistoryConfig(config: config, id: id) }
+    }
+
+    /// 无痕恢复使用独立身份，不更新来源历史的访问时间或窗口状态。
+    func openHistoryConfigIncognito(_ config: WindowConfig, target: AppState? = nil) {
+        let state = target.flatMap { $0.isIncognito && isBlank($0) ? $0 : nil } ?? AppState(isIncognito: true)
+        guard state.loadConfig(config, preservesIdentity: true) else { return }
+        state.startTerminalForExplicitOpen()
+        if let controller = windowControllers.first(where: { $0.appState === state }) {
+            activateWindow(controller)
+        } else { showNewWindow(with: state) }
+        HistorySearchWindowController.shared.dismiss()
     }
 
     func openHistoryConfig(config: WindowConfig, id: UUID) {

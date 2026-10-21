@@ -203,7 +203,7 @@ struct FoilExposeShortcutTests {
     }
 
     @Test func globalAndFileShortcutGroups() throws {
-        #expect(KeyboardShortcutCatalog.sections.prefix(2) == [.global, .file])
+        #expect(KeyboardShortcutCatalog.sections.prefix(2) == [.global, .opening])
         #expect(KeyboardShortcutCatalog.global.map(\.id) == ["window.showAllFoils", "global.openClipboardContent"])
         #expect(KeyboardShortcutCatalog.global.last?.defaultShortcut == nil)
         #expect(!KeyboardShortcutCatalog.window.contains { $0.id == "window.showAllFoils" })
@@ -214,11 +214,11 @@ struct FoilExposeShortcutTests {
         let camera = try #require(KeyboardShortcutCatalog.definition(withID: "file.openCamera"))
         #expect(camera.titleKey == "Open Camera")
         #expect(camera.defaultShortcut == nil)
-        #expect(KeyboardShortcutCatalog.file.contains { $0.id == "file.openCamera" })
+        #expect(KeyboardShortcutCatalog.opening.contains { $0.id == "file.openCamera" })
     }
 
     @Test func shortcutsAreGroupedByPurpose() {
-        #expect(KeyboardShortcutCatalog.sections == [.global, .file, .go, .view, .image, .web, .playback, .window, .history])
+        #expect(KeyboardShortcutCatalog.sections == [.global, .opening, .file, .go, .view, .image, .web, .playback, .window, .history])
         #expect(KeyboardShortcutCatalog.image.map(\.id) == [
             "edit.extractText", "edit.extractImageSubject", "view.selectColor", "view.slideshow",
             "view.fitWindowToImage", "view.fitImageToWindowWidth"
@@ -265,25 +265,25 @@ struct FoilExposeShortcutTests {
         let config = state.toConfig()
         #expect(config.sourceFingerprint == KeyboardShortcutsOverview.sourceFingerprint)
         #expect(HistoryManager.shared.historyConfigs.contains { $0.id == config.id })
-        store.setShortcut(KeyboardShortcut(keyEquivalent: "j", modifiers: [.command, .option]), for: definition)
+        store.setShortcut(KeyboardShortcut(keyEquivalent: "j", modifiers: [.command, .control]), for: definition)
         let restored = AppState(config: config)
-        #expect(restored.text.contains("| ⇧⌘V | \(KeyboardShortcutsOverview.changedKeyStart)⌥⌘J\(KeyboardShortcutsOverview.changedKeyEnd) |"))
+        #expect(restored.text.contains("| ⇧⌘V | \(KeyboardShortcutsOverview.changedKeyStart)⌃⌘J\(KeyboardShortcutsOverview.changedKeyEnd) |"))
         #expect(restored.isMarkdownPreview)
         #expect(restored.id == config.id)
         store.setShortcut(nil, for: definition)
         state.loadConfig(config)
         #expect(state.text != restored.text)
-        #expect(!state.text.contains("| ⇧⌘V | ⌥⌘J |"))
+        #expect(!state.text.contains("| ⇧⌘V | ⌃⌘J |"))
         let none = NSLocalizedString("Shortcut Overview Unassigned", comment: "")
         #expect(state.text.contains("| ⇧⌘V | \(KeyboardShortcutsOverview.changedKeyStart)\(none)\(KeyboardShortcutsOverview.changedKeyEnd) |"))
         store.setShortcut(definition.defaultShortcut, for: definition)
         #expect(KeyboardShortcutsOverview.markdown().contains("| ⇧⌘V | ⇧⌘V |"))
         restored.updateRenderedMarkdown()
         for _ in 0..<200 {
-            if restored.renderedMarkdown.string.contains("⌥⌘J") { break }
+            if restored.renderedMarkdown.string.contains("⌃⌘J") { break }
             try await Task.sleep(for: .milliseconds(20))
         }
-        let keyRange = (restored.renderedMarkdown.string as NSString).range(of: "⌥⌘J")
+        let keyRange = (restored.renderedMarkdown.string as NSString).range(of: "⌃⌘J")
         #expect(keyRange.location != NSNotFound)
         let color = try #require(restored.renderedMarkdown.attribute(.foregroundColor, at: keyRange.location, effectiveRange: nil) as? NSColor)
         #expect(color == NSColor.systemRed)

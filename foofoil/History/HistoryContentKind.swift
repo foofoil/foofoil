@@ -22,7 +22,7 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
         switch self {
         case .terminal: return "terminal"
         case .archive: return "archivebox"
-        case .camera: return "web.camera"
+        case .camera: return "web.camera.fill"
         case .quickLook: return "doc"
         case .web: return "globe"
         case .image: return "photo"

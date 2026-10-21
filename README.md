@@ -79,7 +79,7 @@ The overview shortcut also works while another app is active. Within the overvie
 
 In the overview, use arrow keys to select a foil, Return to switch to it, `/` to search, and Esc to leave search or dismiss the overview. The positioning keys follow three keyboard rows: Q/W/E for the top, A/S/D for the middle, and Z/X/C for the bottom of the screen. ⌘H hides only the active foil; select it in the overview to show it again. ⇧⌘H hides the entire app; switch back to foofoil to restore it. Hiding keeps content open and audio playing.
 
-Visit **Settings → Keyboard Shortcuts** for all configurable commands: search by name, scope, or key combination, change a shortcut, or restore its default. The global **Open Clipboard Content** command has no default shortcut; assign one there if needed. Standard menu shortcuts such as Hide, New, and Open File are outside this configuration list. The menu bar shows the shortcuts currently in effect.
+Visit **Settings → Keyboard Shortcuts** for all configurable commands: search by name, scope, or key combination, change a shortcut, or restore its default. The global **Open Clipboard Content** command has no default shortcut; assign one there if needed. Opening shortcuts automatically gain an incognito variant with Option; Option is reserved for this purpose. ⌥⌘V always opens clipboard content incognito. Standard menu shortcuts such as Hide and New are outside this configuration list. The menu bar shows the shortcuts currently in effect.
 
 ## Open from Finder with a Keyboard Shortcut
 

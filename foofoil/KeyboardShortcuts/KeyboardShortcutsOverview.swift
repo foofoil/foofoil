@@ -28,7 +28,11 @@ enum KeyboardShortcutsOverview {
                 let currentCell = currentShortcut == definition.defaultShortcut
                     ? currentKey
                     : "\(changedKeyStart)\(currentKey)\(changedKeyEnd)"
-                return "| \(cell(definition.displayName)) | \(cell(defaultKey)) | \(currentCell) | \(cell(definition.note ?? "")) |"
+                let row = "| \(cell(definition.displayName)) | \(cell(defaultKey)) | \(currentCell) | \(cell(definition.note ?? "")) |"
+                guard let title = IncognitoOpening.titles[definition.id] else { return row }
+                let defaultPrivate = IncognitoOpening.derived(definition.defaultShortcut)?.displayString ?? none
+                let currentPrivate = IncognitoOpening.derived(currentShortcut)?.displayString ?? none
+                return row + "\n| \(cell(NSLocalizedString(title, comment: ""))) | \(cell(defaultPrivate)) | \(cell(currentPrivate)) | ⌥ |"
             }.joined(separator: "\n")
             text = text.replacingOccurrences(of: "{{\(section.rawValue)}}", with: rows)
         }

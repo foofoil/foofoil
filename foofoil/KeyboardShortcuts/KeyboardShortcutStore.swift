@@ -26,6 +26,7 @@ final class KeyboardShortcutStore {
 
     /// 当前生效的快捷键；nil 表示该命令没有快捷键。
     func shortcut(for definition: KeyboardShortcutDefinition) -> KeyboardShortcut? {
+        if definition.id == "file.openClipboardIncognito" { return IncognitoOpening.clipboardShortcut }
         switch overrides[definition.id] {
         case .custom(let shortcut): return shortcut
         case .disabled: return nil
@@ -39,8 +40,17 @@ final class KeyboardShortcutStore {
     }
 
     func matches(_ event: NSEvent, identifier: String) -> Bool {
-        guard let shortcut = shortcut(forID: identifier),
-              let characters = event.charactersIgnoringModifiers else { return false }
+        guard let shortcut = shortcut(forID: identifier) else { return false }
+        return matches(event, shortcut: shortcut)
+    }
+
+    func matchesIncognito(_ event: NSEvent, identifier: String) -> Bool {
+        guard let shortcut = incognitoShortcut(forID: identifier) else { return false }
+        return matches(event, shortcut: shortcut)
+    }
+
+    private func matches(_ event: NSEvent, shortcut: KeyboardShortcut) -> Bool {
+        guard let characters = event.charactersIgnoringModifiers else { return false }
         let key = KeyboardShortcut.normalizedKeyEquivalent(characters)
         let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
         // 仅符号键允许隐含 Shift，字母组合必须精确匹配。
@@ -60,7 +70,9 @@ final class KeyboardShortcutStore {
     }
 
     /// 覆盖为指定快捷键；传 nil 表示清除快捷键。
-    func setShortcut(_ shortcut: KeyboardShortcut?, for definition: KeyboardShortcutDefinition) {
+    @discardableResult
+    func setShortcut(_ shortcut: KeyboardShortcut?, for definition: KeyboardShortcutDefinition) -> Bool {
+        guard validationMessage(shortcut, for: definition) == nil else { return false }
         var values = overrides
         if let shortcut {
             values[definition.id] = .custom(shortcut)
@@ -69,16 +81,20 @@ final class KeyboardShortcutStore {
         } else {
             values.removeValue(forKey: definition.id)
         }
-        guard values != overrides else { return }
+        guard values != overrides else { return true }
         persist(values)
+        return true
     }
 
     /// 恢复默认（默认可能仍为无快捷键）。
-    func reset(_ definition: KeyboardShortcutDefinition) {
+    @discardableResult
+    func reset(_ definition: KeyboardShortcutDefinition) -> Bool {
+        guard validationMessage(definition.defaultShortcut, for: definition) == nil else { return false }
         var values = overrides
         values.removeValue(forKey: definition.id)
-        guard values != overrides else { return }
+        guard values != overrides else { return true }
         persist(values)
+        return true
     }
 
     private var overrides: [String: KeyboardShortcutOverride] {

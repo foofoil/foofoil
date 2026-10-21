@@ -29,6 +29,7 @@ nonisolated struct KeyboardShortcutDefinition: Identifiable, Hashable {
 /// 声明顺序即设置界面的分组顺序。
 nonisolated enum KeyboardShortcutSection: String, CaseIterable, Identifiable {
     case global
+    case opening
     case file
     case go
     case view
@@ -43,7 +44,8 @@ nonisolated enum KeyboardShortcutSection: String, CaseIterable, Identifiable {
     var titleKey: String {
         switch self {
         case .global: return "Shortcut Group Global"
-        case .file: return "Shortcut Group Content"
+        case .opening: return "Shortcut Group Opening"
+        case .file: return "Shortcut Group Management"
         case .go: return "Shortcut Group Navigation"
         case .view: return "Shortcut Group Display"
         case .image: return "Shortcut Group Images"
@@ -57,6 +59,7 @@ nonisolated enum KeyboardShortcutSection: String, CaseIterable, Identifiable {
     var definitions: [KeyboardShortcutDefinition] {
         switch self {
         case .global: return KeyboardShortcutCatalog.global
+        case .opening: return KeyboardShortcutCatalog.opening
         case .file: return KeyboardShortcutCatalog.file
         case .go: return KeyboardShortcutCatalog.go
         case .view: return KeyboardShortcutCatalog.view
@@ -88,15 +91,19 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("global.openClipboardContent", "Open Clipboard Content", nil, [], "Shortcut Scope Global")
     ]
 
+    static let opening: [KeyboardShortcutDefinition] = [
+        definition("history.search", "Search History Menu Item", "p", [.command], "Shortcut Quick Open Purpose"),
+        definition("file.openFile", "Open File...", "o", [.command]),
+        definition("file.openDirectory", "Open Directory...", "o", [.command, .shift]),
+        definition("file.openURL", "Open URL Menu Item", "l", [.command]),
+        definition("file.openTerminal", "Open Terminal Menu Item", nil, []),
+        definition("file.openCamera", "Open Camera", nil, []),
+        openClipboardContent
+    ]
+
     static let file: [KeyboardShortcutDefinition] = [
         definition("file.newIncognito", "New Incognito Foil", "n", [.command, .shift]),
-        definition("file.openClipboardIncognito", "Open Clipboard Incognito", "v", [.command, .option]),
-        definition("file.openDirectory", "Open Directory...", "o", [.command, .shift]),
-        definition("history.search", "Search History Menu Item", "p", [.command], "Shortcut Quick Open Purpose"),
         definition("file.addToList", "Add to List...", nil, []),
-        openClipboardContent,
-        definition("file.openURL", "Open URL Menu Item", "l", [.command]),
-        definition("file.openCamera", "Open Camera", nil, []),
         definition("file.share", "Share...", nil, []),
         definition("file.reset", "Reset", "k", [.command])
     ]
@@ -110,7 +117,7 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("go.previousItem", "Previous Item", "\u{F700}", [], "Shortcut Scope Lists"),
         definition("go.nextItem", "Next Item", "\u{F701}", [], "Shortcut Scope Lists"),
         definition("view.toggleNavigator", "Cycle Navigator Visibility", "l", [.command, .shift], "Shortcut Scope Navigator"),
-        definition("view.moveNavigatorSide", "Shortcut Switch Navigator Side", "l", [.command, .option], "Shortcut Scope Navigator")
+        definition("view.moveNavigatorSide", "Shortcut Switch Navigator Side", "l", [.command, .control, .shift], "Shortcut Scope Navigator")
     ]
 
     static let view: [KeyboardShortcutDefinition] = [
@@ -168,7 +175,10 @@ nonisolated enum KeyboardShortcutCatalog {
     ]
 
     static func definition(withID id: String) -> KeyboardShortcutDefinition? {
-        sections.flatMap { $0.definitions }.first { $0.id == id }
+        if id == "file.openClipboardIncognito" {
+            return definition(id, "Open Clipboard Incognito", "v", [.command, .option])
+        }
+        return sections.flatMap { $0.definitions }.first { $0.id == id }
     }
 
     /// 设置页顶部搜索：按命令名称（本地化标题或说明）和/或当前生效的快捷键过滤。

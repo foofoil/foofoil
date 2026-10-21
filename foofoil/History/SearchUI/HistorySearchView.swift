@@ -95,7 +95,7 @@ struct HistorySearchView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 if model.showsOpenCamera {
                                     Button { model.openCamera?() } label: {
-                                        Label(NSLocalizedString("Open Camera", comment: ""), systemImage: "camera")
+                                        Label(NSLocalizedString("Open Camera", comment: ""), systemImage: "web.camera.fill")
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                     }
                                         .buttonStyle(.plain)
@@ -242,6 +242,7 @@ struct HistorySearchView: View {
     }
 
     private var placeholder: String {
+        if model.opensIncognito { return NSLocalizedString("Quick Open Incognito...", comment: "") }
         if let scope = model.activeScope {
             return String(format: NSLocalizedString("Search In Scope Placeholder", comment: ""), scope.displayName)
         }

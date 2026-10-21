@@ -29,26 +29,19 @@ enum SpotlightFileOpener {
 
     /// 复用 AppDelegate 的分组打开流程：优先空白浮箔，否则新建；返回是否已接受打开请求。
     @discardableResult
-    static func openInFoil(_ url: URL) -> Bool {
-        guard let delegate = NSApp.delegate as? AppDelegate else {
-            return false
-        }
+    static func openInFoil(_ url: URL, isIncognito: Bool = false, target: AppState? = nil) -> Bool {
+        guard let delegate = NSApp.delegate as? AppDelegate else { return false }
+        let source = target.flatMap { $0.isIncognito == isIncognito && delegate.isBlank($0) ? $0 : nil }
+        let state = source ?? delegate.blankWindowController(isIncognito: isIncognito)?.appState ?? AppState(isIncognito: isIncognito)
         let isDir = (try? url.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
         if isDir {
-            let target = delegate.availableBlankWindowController?.appState
-            if let target {
-                guard target.handleDroppedFileURLs([url]) else {
-                    return false
-                }
-            } else {
-                delegate.openFilesInNewFoil([url])
-            }
-            return true
+            guard state.handleDroppedFileURLs([url]) else { return false }
+        } else {
+            guard delegate.openGroupedFiles([url], into: state, append: false) else { return false }
         }
-        let target = delegate.availableBlankWindowController?.appState
-        guard delegate.openGroupedFiles([url], into: target, append: false) else {
-            return false
-        }
+        if let controller = delegate.windowControllers.first(where: { $0.appState === state }) {
+            delegate.activateWindow(controller)
+        } else { delegate.showNewWindow(with: state) }
         return true
     }
 }

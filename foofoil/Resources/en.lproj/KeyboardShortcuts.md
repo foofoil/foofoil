@@ -1,12 +1,12 @@
 # Keyboard Shortcuts Overview
 
-Customize bindings in Settings → Keyboard Shortcuts. The table below shows the default and current bindings, including Open Clipboard Incognito. Except for global shortcuts, foofoil must be active; some actions apply only to specific content.
+Customize bindings in Settings → Keyboard Shortcuts. The table below shows the default and current bindings, including automatically derived incognito opening shortcuts. Except for global shortcuts, foofoil must be active; some actions apply only to specific content.
 
 ⌘ Command · ⇧ Shift · ⌥ Option · ⌃ Control · Esc Escape · Space · Tab
 
 
 Incognito foils never enter history and are not restored after quitting. Use File → New Incognito Foil or Open Clipboard Incognito; the system Share menu also offers Incognito Foil. Content dropped into an incognito foil stays out of history, including any additional foils created for separate file groups.
-Ordinary opening actions only reuse ordinary blank foils; incognito opening creates a new foil. While an incognito foil is active, Open Clipboard Content also opens an incognito foil. An empty incognito foil shows a footprints-with-slash icon and offers no history cards or recent-history number shortcuts.
+Ordinary opening actions only reuse ordinary blank foils; incognito opening creates a new foil. Menu commands and ordinary opening shortcuts always open ordinary content, regardless of the active foil. Hold Option in the File menu to reveal incognito opening commands. Incognito shortcuts automatically add Option to the configured ordinary shortcuts; opening shortcuts cannot contain Option themselves. ⌥⌘V remains a fixed incognito clipboard shortcut. Buttons inside incognito foils open incognito. An empty incognito foil shows a footprints-with-slash icon and offers no history cards or recent-history number shortcuts.
 
 ## Global Shortcuts
 
@@ -17,12 +17,19 @@ Ordinary opening actions only reuse ordinary blank foils; incognito opening crea
 
 <!-- Quick Open belongs to content opening and management. -->
 
-## Open and Manage Content
+## Open Content
+
+Add ⌥ to the configured shortcut to open incognito.
+
+| Action | Default shortcut | Current shortcut | Notes |
+| --- | --- | --- | --- |
+{{opening}}
+
+## Manage Content
 
 | Action | Default shortcut | Current shortcut | Notes |
 | --- | --- | --- | --- |
 | New foil | ⌘N | ⌘N |  |
-| Open file | ⌘O | ⌘O |  |
 | Save Content Image | ⌘S | ⌘S | Save the visible content as HEIC by default, with PNG and JPG choices; audio saves the cover image when available |
 | Save As | ⇧⌘S | ⇧⌘S | Save the source file or complete text; websites save a web archive. Unavailable for camera, CUE, SACD ISO, and Apple Music |
 {{file}}

@@ -30,6 +30,7 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     var historyMenu: NSMenu?
     var editMenu: NSMenu?
     var fileMenu: NSMenu?
+    var fileMenuOptionTimer: Timer?
     var goMenu: NSMenu?
     var goMenuItem: NSMenuItem?
     var viewMenu: NSMenu?

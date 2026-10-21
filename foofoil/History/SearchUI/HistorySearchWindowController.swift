@@ -46,7 +46,9 @@ final class HistorySearchPanel: NSPanel {
 @MainActor
 final class HistorySearchWindowController: NSWindowController, NSWindowDelegate {
     static let shared = HistorySearchWindowController()
-    private let model = HistorySearchViewModel()
+    let model = HistorySearchViewModel()
+    private(set) var openingIsIncognito = false
+    private var openingTarget: AppState?
     private var sizeCancellable: AnyCancellable?
     private var isResizeScheduled = false
     private var isOpeningFile = false
@@ -73,8 +75,8 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
         panel.delegate = self
         panel.dismissSearch = { [weak self] in self?.dismiss() }
         model.enableFileSearch = { [weak self] in self?.enableFileSearch() }
-        model.openMusicLink = { url in (NSApp.delegate as? AppDelegate)?.openAppleMusicLink(url) }
-        model.openMusic = { item in (NSApp.delegate as? AppDelegate)?.openAppleMusic(item) }
+        model.openMusicLink = { [weak self] url in (NSApp.delegate as? AppDelegate)?.openAppleMusicLink(url, isIncognito: self?.openingIsIncognito == true) }
+        model.openMusic = { [weak self] item in (NSApp.delegate as? AppDelegate)?.openAppleMusic(item, isIncognito: self?.openingIsIncognito == true) }
         model.enableMusicSearch = { [weak self] in
             guard let self, SettingsStore.shared.appleMusicLibraryEnabled else { return }
             self.isOpeningFile = true
@@ -91,12 +93,18 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
             }
         }
         model.openFile = { [weak self] url in self?.openFile(url) }
-        model.openResult = { id in
-            (NSApplication.shared.delegate as? AppDelegate)?.openSearchResultInNewWindow(id: id)
+        model.openResult = { [weak self] id in
+            (NSApp.delegate as? AppDelegate)?.openSearchResultInNewWindow(id: id, isIncognito: self?.openingIsIncognito == true, target: self?.openingTarget)
         }
-        model.openCamera = { (NSApp.delegate as? AppDelegate)?.openCameraAction() }
-        model.openWebURL = { url in
-            (NSApplication.shared.delegate as? AppDelegate)?.openWebURLInPreferredWindow(url)
+        model.openCamera = { [weak self] in
+            (NSApp.delegate as? AppDelegate)?.openCamera(isIncognito: self?.openingIsIncognito == true)
+        }
+        model.openWebURL = { [weak self] url in
+            guard let self, let delegate = NSApp.delegate as? AppDelegate else { return }
+            if let target = self.openingTarget ?? (self.openingIsIncognito ? AppState(isIncognito: true) : nil) {
+                delegate.openWebURL(url, into: target)
+                self.dismiss()
+            } else { delegate.openWebURLInPreferredWindow(url) }
         }
         sizeCancellable = model.objectWillChange.sink { [weak self] _ in
             self?.scheduleResizeToFit()
@@ -105,12 +113,21 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    func show() {
+    func show(isIncognito: Bool = false, target: AppState? = nil) {
+        configureOpening(isIncognito: isIncognito, target: target)
         show(mode: .history)
     }
 
-    func showURLInput(initialQuery: String? = nil) {
+    func showURLInput(initialQuery: String? = nil, target: AppState? = nil) {
+        configureOpening(isIncognito: target?.isIncognito == true, target: target)
         show(mode: .url, initialQuery: initialQuery)
+    }
+
+    // 模式在入口处固定，文件授权面板与异步搜索不会改变本次打开的隐私属性。
+    func configureOpening(isIncognito: Bool, target: AppState? = nil) {
+        openingIsIncognito = isIncognito
+        openingTarget = target?.isIncognito == isIncognito ? target : nil
+        model.opensIncognito = isIncognito
     }
 
     private func show(mode: HistorySearchMode, initialQuery: String? = nil) {
@@ -173,6 +190,10 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
     func dismiss() {
         openingTask?.cancel()
         model.stop()
+        // 搜索面板是单例；关闭后释放来源箔，避免额外保留无痕会话。
+        openingTarget = nil
+        openingIsIncognito = false
+        model.opensIncognito = false
         window?.orderOut(nil)
     }
 
@@ -219,7 +240,7 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
     }
 
     private func acceptFile(_ url: URL) {
-        guard SpotlightFileOpener.openInFoil(url) else {
+        guard SpotlightFileOpener.openInFoil(url, isIncognito: openingIsIncognito, target: openingTarget) else {
             restoreSearch()
             model.openError = NSLocalizedString("Search File Open Failed", comment: "")
             return

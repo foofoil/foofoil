@@ -111,6 +111,10 @@ private final class TerminalConfigurationPanel: NSPanel {
 
 extension AppDelegate {
     @objc func openTerminalAction() {
+        openTerminal(isIncognito: false)
+    }
+
+    func openTerminal(isIncognito: Bool) {
         let model = TerminalEditorModel()
         let panel = TerminalConfigurationPanel(contentRect: NSRect(x: 0, y: 0, width: 512, height: 430),
                                                styleMask: [.titled, .closable], backing: .buffered, defer: false)
@@ -132,7 +136,7 @@ extension AppDelegate {
         let response = NSApp.runModal(for: panel)
         panel.orderOut(nil)
         guard response == .OK else { return }
-        do { _ = try applicationControl.createTerminal(model.configuration(), title: model.title, reuseBlankWindow: true) }
+        do { _ = try applicationControl.createTerminal(model.configuration(), title: model.title, incognito: isIncognito, reuseBlankWindow: true) }
         catch {
             let failure = NSAlert()
             failure.messageText = NSLocalizedString("Terminal Configuration Failed", comment: "")

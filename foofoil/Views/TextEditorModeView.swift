@@ -120,6 +120,12 @@ struct TextEditorModeView: View {
                         Spacer(minLength: 0)
                     }
 
+                    if isBlank && geometry.size.height >= 140 {
+                        BlankOpenButtons(appState: appState)
+                            .padding(.horizontal, 16)
+                            .padding(.bottom, appState.isIncognito ? 16 : 4)
+                    }
+
                     if isBlank && showTipsAndHistory {
                         VStack(alignment: .leading, spacing: 0) {
                             ScrollView(.horizontal, showsIndicators: false) {

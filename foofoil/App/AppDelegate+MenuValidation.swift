@@ -30,6 +30,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             updateExtractImageSubjectMenuItem()
         } else if let fileMenu, menu === fileMenu {
             updateFileMenu(menu)
+            refreshIncognitoClipboardVisibility()
             setMenuItem(withAction: #selector(openCameraAction), in: menu, isHidden: !CameraCaptureController.isAvailable)
         } else if let goMenu, menu === goMenu {
             updateGoMenu(goMenu)
@@ -316,6 +317,14 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
                 return false
             }
             menuItem.state = appState.showCodeLineNumbers ? .on : .off
+            return true
+        }
+
+        if menuItem.action == #selector(openIncognitoContentAction(_:)) {
+            if menuItem.representedObject as? String == "file.openCamera.incognito" { return CameraCaptureController.isAvailable }
+            if menuItem.representedObject as? String == "file.openClipboardContent.incognito" {
+                return hasOpenableClipboardContent(using: activeAppState)
+            }
             return true
         }
 

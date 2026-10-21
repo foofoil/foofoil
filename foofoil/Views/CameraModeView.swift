@@ -194,7 +194,7 @@ struct CameraModeView: View {
     var body: some View {
         Group {
             if controller.unavailable {
-                ContentUnavailableView(NSLocalizedString("Camera Unavailable", comment: ""), systemImage: "camera",
+                ContentUnavailableView(NSLocalizedString("Camera Unavailable", comment: ""), systemImage: "web.camera.fill",
                     description: Text(NSLocalizedString("Camera Access Message", comment: "")))
             } else if shouldHideBorder {
                 preview(fillsWindow: !appState.isFullScreen)
@@ -240,14 +240,18 @@ extension AppState {
 
 extension AppDelegate {
     @objc func openCameraAction() {
+        openCamera(isIncognito: false)
+    }
+
+    func openCamera(isIncognito: Bool) {
         guard CameraCaptureController.isAvailable else { return }
         // 与打开网址一致，优先接管空箔；摄像头已有画面时不会被当作空箔替换。
-        if let controller = availableBlankWindowController {
+        if let controller = blankWindowController(isIncognito: isIncognito) {
             controller.appState.showBorder = false
             controller.appState.openCamera()
             activateWindow(controller)
         } else {
-            let state = AppState()
+            let state = AppState(isIncognito: isIncognito)
             state.showBorder = false
             state.openCamera()
             showNewWindow(with: state)

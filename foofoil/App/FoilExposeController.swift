@@ -341,7 +341,7 @@ final class FoilExposeModel: ObservableObject {
             .filter { SettingsStore.shared.appleMusicLibraryEnabled || $0.symbolName != AppleMusicReference.symbolName }
         guard !searchQuery.isEmpty else { return combined }
         guard resultFilter == .all || resultFilter == .history else { return [] }
-        let command = (resultFilter == .all && CameraCaptureController.matches(searchQuery, available: cameraAvailable())) ? [FoilExposeItem(id: FoilExposeItem.cameraCommandID, controller: nil, isHistoryEntry: false, title: NSLocalizedString("Open Camera", comment: ""), symbolName: "camera", contentKind: .camera, thumbnailPath: nil)] : []
+        let command = (resultFilter == .all && CameraCaptureController.matches(searchQuery, available: cameraAvailable())) ? [FoilExposeItem(id: FoilExposeItem.cameraCommandID, controller: nil, isHistoryEntry: false, title: NSLocalizedString("Open Camera", comment: ""), symbolName: "web.camera.fill", contentKind: .camera, thumbnailPath: nil)] : []
         let query = searchQuery
         return command + combined.filter { $0.matches(query: query) }
     }
@@ -1182,8 +1182,6 @@ final class FoilExposeController {
         if isPresentingSystemUI { return event }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let key = event.charactersIgnoringModifiers?.lowercased()
-            let onlyCommand = modifiers.contains(.command)
-                && !modifiers.contains(.control) && !modifiers.contains(.option) && !modifiers.contains(.shift)
             let hasCommand = modifiers.contains(.command)
             let hasOption = modifiers.contains(.option)
             let hasControl = modifiers.contains(.control)
@@ -1202,10 +1200,11 @@ final class FoilExposeController {
             }
             // ⌘O/⌘P/⌘L 会打开文件对话框、历史搜索等新视图：先收起覆盖层再放行给菜单，
             // 避免打开的内容被覆盖层挡住。
-            let opensAnotherView = ["file.openURL", "file.openCamera", "history.search", "file.newIncognito", "file.openClipboardIncognito"].contains {
+            let opensAnotherView = (Array(IncognitoOpening.titles.keys) + ["history.search", "file.newIncognito", "file.openClipboardIncognito"]).contains {
                 KeyboardShortcutStore.shared.matches(event, identifier: $0)
+                    || KeyboardShortcutStore.shared.matchesIncognito(event, identifier: $0)
             }
-            if (onlyCommand && key == "o") || opensAnotherView {
+            if opensAnotherView {
                 self.dismiss()
                 return event
             }
