@@ -9,7 +9,7 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
     enum State: Equatable { case waiting, running, closing, exited(Int32?), failed(String) }
     let id = UUID().uuidString
     let configuration: TerminalLaunchConfiguration
-    let previousOutput: String?
+    @Published private(set) var previousOutput: String?
     var onOutputSnapshotChanged: (() -> Void)?
     private var snapshotSave: Task<Void, Never>?
     private var hasStarted = false
@@ -44,6 +44,10 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
         guard !current.isEmpty else { return previousOutput }
         let combined = previousOutput.map { $0 + "\n\n── " + NSLocalizedString("Terminal Session Record", comment: "") + " ──\n" + current } ?? current
         return Self.boundedScrollback(combined)
+    }
+
+    func clearPreviousOutput() {
+        previousOutput = nil
     }
 
     nonisolated static func boundedScrollback(_ text: String) -> String {

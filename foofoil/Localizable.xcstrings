@@ -12285,13 +12285,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Previous session record (read-only)"
+            "value": "Session history (read-only)"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "上次会话记录（只读）"
+            "value": "历史会话记录（只读）"
           }
         }
       }
@@ -12333,13 +12333,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hide previous session record"
+            "value": "Hide session history"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "隐藏上次会话记录"
+            "value": "隐藏历史会话记录"
           }
         }
       }
@@ -12436,6 +12436,118 @@
           "stringUnit": {
             "state": "translated",
             "value": "打开"
+          }
+        }
+      }
+    },
+    "Terminal Initial Directory": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Initial working directory"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "初始工作目录"
+          }
+        }
+      }
+    },
+    "Edit Terminal Field Format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修改%@"
+          }
+        }
+      }
+    },
+    "Terminal Configuration Edit Note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Changes apply the next time this terminal starts. The current session keeps running."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "修改在此终端下次启动时生效，当前会话继续运行。"
+          }
+        }
+      }
+    },
+    "Foil Info Type 14": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "终端"
+          }
+        }
+      }
+    },
+    "Clear Previous Terminal Output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear session history"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清除历史会话记录"
+          }
+        }
+      }
+    },
+    "Clear Previous Terminal Output Confirm": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear Permanently"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "彻底清除"
+          }
+        }
+      }
+    },
+    "Clear Previous Terminal Output Message": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Session history will be permanently cleared and cannot be recovered. The current session and its output will be kept."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "将彻底清除历史会话记录，此操作不可恢复。当前会话及其输出将保留。"
           }
         }
       }

@@ -36,7 +36,8 @@ struct FoilInformationTests {
             WindowConfig(id: UUID(), imagePath: "/tmp/source.png", originalImageName: "source.png", imageSource: .clipboard, contentKind: .image),
             WindowConfig(id: UUID(), webURLString: "https://example.com", originalImageName: "Original page", contentKind: .web),
             WindowConfig(id: UUID(), originalImageName: "source.csv", text: "a,b", textPath: "/tmp/source.csv", contentKind: .csv),
-            WindowConfig(id: UUID(), originalImageName: "source.md", text: "# Heading", contentKind: .markdown)
+            WindowConfig(id: UUID(), originalImageName: "source.md", text: "# Heading", contentKind: .markdown),
+            WindowConfig(id: UUID(), contentKind: .terminal, terminalConfiguration: .init())
         ]
         for config in configs {
             #expect(repository.upsert(config))

@@ -205,6 +205,110 @@ struct TerminalFoilTests {
         }
     }
 
+    @Test func clearingPreviousOutputRemovesPersistedCopiesWithoutStoppingCurrentSession() throws {
+        let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let configuration = TerminalLaunchConfiguration(shellPath: "/bin/zsh", workingDirectory: root.path,
+            environment: ["ZDOTDIR": root.path, "HISTFILE": "/dev/null"])
+        let config = WindowConfig(id: UUID(), contentKind: .terminal,
+            terminalConfiguration: configuration, terminalScrollback: "old-record-must-disappear")
+        let savedWindows = SettingsStore.shared.windowConfigs
+        let savedLastOpen = SettingsStore.shared.lastOpenWindowConfigs
+        let previousDelegate = NSApp.delegate
+        let delegate = AppDelegate()
+        NSApp.delegate = delegate
+        let state = AppState(config: config)
+        let peer = AppState(config: config)
+        let controller = FloatingWindowController(appState: state)
+        let peerController = FloatingWindowController(appState: peer)
+        delegate.windowControllers = [controller, peerController]
+        defer {
+            state.terminalSession?.onOutputSnapshotChanged = nil
+            peer.terminalSession?.onOutputSnapshotChanged = nil
+            controller.closeWithoutTerminalPrompt()
+            peerController.closeWithoutTerminalPrompt()
+            _ = HistoryRepository.shared.remove(ids: [config.id])
+            SettingsStore.shared.windowConfigs = savedWindows
+            SettingsStore.shared.lastOpenWindowConfigs = savedLastOpen
+            NSApp.delegate = previousDelegate
+        }
+        SettingsStore.shared.windowConfigs = [config]
+        SettingsStore.shared.lastOpenWindowConfigs = [config]
+        let session = try #require(state.terminalSession)
+        session.start()
+        session.view.feed(text: "current-session-kept\r\n")
+        state.saveState()
+        #expect(HistoryRepository.shared.config(id: config.id)?.terminalScrollback?.contains("old-record-must-disappear") == true)
+        state.clearPreviousTerminalOutput()
+        #expect(state.terminalSession === session)
+        #expect(session.state == .running)
+        #expect(session.previousOutput == nil)
+        #expect(peer.terminalSession?.previousOutput == nil)
+        #expect(session.outputSnapshot?.contains("current-session-kept") == true)
+        #expect(HistoryRepository.shared.config(id: config.id)?.terminalScrollback?.contains("old-record-must-disappear") != true)
+        #expect(SettingsStore.shared.windowConfigs.first?.terminalScrollback?.contains("old-record-must-disappear") != true)
+        #expect(SettingsStore.shared.lastOpenWindowConfigs.first?.terminalScrollback?.contains("old-record-must-disappear") != true)
+        peer.saveState()
+        #expect(HistoryRepository.shared.config(id: config.id)?.terminalScrollback == nil)
+        state.saveState()
+        let reopened = AppState(config: try #require(HistoryRepository.shared.config(id: config.id)))
+        #expect(reopened.terminalSession?.previousOutput?.contains("old-record-must-disappear") != true)
+        #expect(reopened.terminalSession?.previousOutput?.contains("current-session-kept") == true)
+    }
+
+    @Test func configurationEditingPreservesRunningSessionAndAppliesOnNextStart() async throws {
+        let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let marker = root.appendingPathComponent("edited-script-ran")
+        let state = AppState()
+        defer {
+            state.terminalSession?.onOutputSnapshotChanged = nil
+            state.terminalSession?.stop()
+            _ = HistoryRepository.shared.remove(ids: [state.id])
+        }
+        let initial = TerminalLaunchConfiguration(shellPath: "/bin/zsh", workingDirectory: root.path,
+            environment: ["ZDOTDIR": root.path, "HISTFILE": "/dev/null"])
+        state.prepareTerminal(initial, start: true)
+        let original = try #require(state.terminalSession)
+        var edited = try TerminalConfigurationField.environment.updating(initial, with: "ZDOTDIR=\(root.path)\nHISTFILE=/dev/null\nEDITED=one=two")
+        edited = try TerminalConfigurationField.script.updating(edited, with: "printf edited > \(TerminalBootstrap.quote(marker.path))\nexport SECOND_LINE=yes")
+        try state.updateTerminalConfiguration(edited)
+        #expect(state.terminalSession === original)
+        #expect(original.configuration == initial)
+        #expect(!FileManager.default.fileExists(atPath: marker.path))
+        #expect(HistoryRepository.shared.config(id: state.id)?.terminalConfiguration == edited)
+        #expect(state.toConfig().canRenameTitle)
+        state.applyFoilTitle("A terminal title")
+        state.saveState()
+        #expect(HistoryRepository.shared.config(id: state.id)?.customTitle == "A terminal title")
+        let restored = AppState(config: state.toConfig())
+        defer { restored.terminalSession?.stop() }
+        #expect(restored.terminalSession?.state == .waiting)
+        #expect(restored.terminalConfiguration == edited)
+        #expect(!FileManager.default.fileExists(atPath: marker.path))
+        restored.startTerminalForExplicitOpen()
+        try await waitFor { FileManager.default.fileExists(atPath: marker.path) }
+        #expect(edited.environment["EDITED"] == "one=two")
+    }
+
+    @Test func waitingConfigurationEditsValidateBeforeReplacingSession() throws {
+        let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let state = AppState(isIncognito: true)
+        let configuration = TerminalLaunchConfiguration(shellPath: "/bin/zsh", workingDirectory: root.path)
+        state.prepareTerminal(configuration, start: false)
+        let original = try #require(state.terminalSession)
+        let invalid = try TerminalConfigurationField.directory.updating(configuration, with: root.appendingPathComponent("missing").path)
+        #expect(throws: AgentFailure.self) { try state.updateTerminalConfiguration(invalid) }
+        #expect(state.terminalSession === original)
+        #expect(state.terminalConfiguration == configuration)
+        #expect(throws: AgentFailure.self) { try TerminalConfigurationField.environment.updating(configuration, with: "KEY=one\nKEY=two") }
+        #expect(throws: AgentFailure.self) { try TerminalConfigurationField.environment.updating(configuration, with: "missing equal") }
+        let edited = try TerminalConfigurationField.shell.updating(configuration, with: "/bin/bash")
+        try state.updateTerminalConfiguration(edited)
+        #expect(state.terminalSession !== original)
+        #expect(state.terminalSession?.configuration.shellPath == "/bin/bash")
+        #expect(state.terminalSession?.state == .waiting)
+        #expect(TerminalConfigurationField.environment.value(in: .init(environment: ["B": "2", "A": "1"])) == "A=1\nB=2")
+    }
+
     @Test func menuOpenReusesBlankThenCreatesWithoutReplacingContent() throws {
         let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let delegate = AppDelegate()

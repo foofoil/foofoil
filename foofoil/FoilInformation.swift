@@ -88,6 +88,11 @@ extension AppDelegate {
         var rows = [FoilInformation.Row(key: "Foil Info Title", value: config.historyMenuDisplayName),
                     .init(key: "Foil Info Type", value: NSLocalizedString("Foil Info Type \(kind.rawValue)", comment: "")),
                     .init(key: "Foil Info Window Size", value: "\(Int(size.width.rounded())) × \(Int(size.height.rounded())) pt")]
+        if let configuration = state.terminalConfiguration {
+            rows.append(contentsOf: TerminalConfigurationField.allCases.map {
+                .init(key: $0.rawValue, value: $0.value(in: configuration))
+            })
+        }
         if let ownership = state.agentOwnership {
             rows.append(.init(key: "Agent Created By", value: ownership.caller))
         }
@@ -185,7 +190,7 @@ extension AppDelegate {
             value.font = .systemFont(ofSize: 13)
             value.isSelectable = true
             value.maximumNumberOfLines = 0
-            value.lineBreakMode = .byWordWrapping
+            value.lineBreakMode = .byCharWrapping
             let entry = NSStackView(views: [label, value])
             entry.alignment = .firstBaseline
             entry.spacing = 16
@@ -197,6 +202,19 @@ extension AppDelegate {
                 button.setAccessibilityLabel(NSLocalizedString("Change Title", comment: ""))
                 button.appState = state
                 button.titleLabel = value
+                button.widthAnchor.constraint(equalToConstant: 28).isActive = true
+                entry.addArrangedSubview(button)
+                value.widthAnchor.constraint(equalToConstant: 288).isActive = true
+            } else if let field = TerminalConfigurationField(rawValue: row.key), state.terminalConfiguration != nil {
+                let button = FoilTerminalEditButton(title: "", target: self, action: #selector(editTerminalConfiguration(_:)))
+                button.field = field
+                button.appState = state
+                button.valueLabel = value
+                let editLabel = String(format: NSLocalizedString("Edit Terminal Field Format", comment: ""), NSLocalizedString(row.key, comment: ""))
+                button.image = NSImage(systemSymbolName: "pencil", accessibilityDescription: editLabel)
+                button.bezelStyle = .accessoryBarAction
+                button.toolTip = editLabel
+                button.setAccessibilityLabel(editLabel)
                 button.widthAnchor.constraint(equalToConstant: 28).isActive = true
                 entry.addArrangedSubview(button)
                 value.widthAnchor.constraint(equalToConstant: 288).isActive = true
@@ -214,6 +232,7 @@ extension AppDelegate {
             } else {
                 value.widthAnchor.constraint(equalToConstant: 332).isActive = true
             }
+            value.preferredMaxLayoutWidth = row.key == "Foil Info Title" || TerminalConfigurationField(rawValue: row.key) != nil ? 288 : 332
             stack.addArrangedSubview(entry)
         }
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -283,7 +302,73 @@ extension AppDelegate {
                   let field = alert.accessoryView as? NSTextField else { return }
             HistoryManager.shared.updateHistoryTitle(configId: id, newTitle: field.stringValue)
             sender?.titleLabel?.stringValue = state.toConfig().historyMenuDisplayName
+            if let label = sender?.titleLabel { self.resizeInformationDocument(containing: label) }
         }
+    }
+
+    @objc private func editTerminalConfiguration(_ sender: FoilTerminalEditButton) {
+        guard let state = sender.appState, let configuration = state.terminalConfiguration,
+              let field = sender.field, let panel = sender.window, panel.attachedSheet == nil else { return }
+        let id = state.id
+        let alert = NSAlert()
+        alert.messageText = String(format: NSLocalizedString("Edit Terminal Field Format", comment: ""), NSLocalizedString(field.rawValue, comment: ""))
+        alert.informativeText = NSLocalizedString("Terminal Configuration Edit Note", comment: "")
+        alert.addButton(withTitle: NSLocalizedString("OK", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
+        let readValue: () -> String
+        if field.isMultiline {
+            let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 400, height: 180))
+            scroll.hasVerticalScroller = true
+            scroll.borderType = .noBorder
+            scroll.wantsLayer = true
+            scroll.layer?.cornerRadius = 6
+            scroll.layer?.borderWidth = 1
+            scroll.layer?.borderColor = NSColor.separatorColor.cgColor
+            scroll.layer?.masksToBounds = true
+            let text = NSTextView(frame: scroll.bounds)
+            text.isRichText = false
+            text.textContainerInset = NSSize(width: 6, height: 6)
+            text.isAutomaticQuoteSubstitutionEnabled = false
+            text.isAutomaticDashSubstitutionEnabled = false
+            text.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
+            text.isVerticallyResizable = true
+            text.isHorizontallyResizable = false
+            text.autoresizingMask = [.width]
+            text.textContainer?.widthTracksTextView = true
+            text.string = field.value(in: configuration)
+            scroll.documentView = text
+            alert.accessoryView = scroll
+            alert.window.initialFirstResponder = text
+            readValue = { text.string }
+        } else {
+            let text = NSTextField(frame: NSRect(x: 0, y: 0, width: 400, height: 24))
+            text.stringValue = field.value(in: configuration)
+            alert.accessoryView = text
+            alert.window.initialFirstResponder = text
+            readValue = { text.stringValue }
+        }
+        alert.beginSheetModal(for: panel) { [weak sender, weak state] response in
+            guard response == .alertFirstButtonReturn, let state, state.id == id,
+                  let current = state.terminalConfiguration else { return }
+            do {
+                let updated = try field.updating(current, with: readValue())
+                try state.updateTerminalConfiguration(updated)
+                sender?.valueLabel?.stringValue = field.value(in: updated)
+                if let label = sender?.valueLabel { self.resizeInformationDocument(containing: label) }
+            } catch {
+                let failure = NSAlert()
+                failure.messageText = NSLocalizedString("Terminal Configuration Failed", comment: "")
+                failure.informativeText = (error as? AgentFailure)?.code ?? "INVALID_ARGUMENTS"
+                failure.beginSheetModal(for: panel)
+            }
+        }
+    }
+
+    private func resizeInformationDocument(containing label: NSTextField) {
+        label.invalidateIntrinsicContentSize()
+        guard let document = label.enclosingScrollView?.documentView else { return }
+        document.layoutSubtreeIfNeeded()
+        document.setFrameSize(NSSize(width: document.frame.width, height: document.fittingSize.height))
     }
 
     @objc private func dismissFoilInformation(_ sender: NSButton) {
@@ -300,6 +385,12 @@ extension AppDelegate {
 private final class FoilTitleEditButton: NSButton {
     weak var appState: AppState?
     weak var titleLabel: NSTextField?
+}
+
+private final class FoilTerminalEditButton: NSButton {
+    weak var appState: AppState?
+    weak var valueLabel: NSTextField?
+    var field: TerminalConfigurationField?
 }
 
 private final class SourceRevealButton: NSButton {

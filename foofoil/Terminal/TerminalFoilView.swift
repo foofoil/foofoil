@@ -7,7 +7,8 @@ struct TerminalFoilView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let previous = session.previousOutput {
-                TerminalPreviousOutputView(previousOutput: previous, showsNewSession: session.state != .waiting)
+                TerminalPreviousOutputView(previousOutput: previous, showsNewSession: session.state != .waiting,
+                    onClear: { appState.clearPreviousTerminalOutput() })
                     .id(session.id)
             }
             if session.state != .waiting {
@@ -32,7 +33,7 @@ struct TerminalFoilView: View {
                 HStack {
                     Text(String(format: NSLocalizedString("Terminal Exit Format", comment: ""), code.map(String.init) ?? "—"))
                     Spacer()
-                    Button("Restart Terminal") { appState.prepareTerminal(session.configuration, start: true) }
+                    Button("Restart Terminal") { appState.prepareTerminal(appState.terminalConfiguration ?? session.configuration, start: true) }
                 }.font(.caption).padding(8)
             case .failed(let code): Text(code).font(.caption).foregroundStyle(.red).padding(8)
             }
@@ -46,6 +47,8 @@ struct TerminalFoilView: View {
 private struct TerminalPreviousOutputView: View {
     let previousOutput: String
     let showsNewSession: Bool
+    let onClear: () -> Void
+    @State private var confirmsClear = false
     @State private var isExpanded = false
     @State private var isHidden = false
     @State private var preparedOutput: AttributedString?
@@ -66,6 +69,12 @@ private struct TerminalPreviousOutputView: View {
                     .buttonStyle(.plain)
                     .accessibilityValue(isExpanded ? Text("Expanded") : Text("Collapsed"))
                     Spacer()
+                    Button { confirmsClear = true } label: {
+                        Image(systemName: "trash")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(Text("Clear Previous Terminal Output"))
+                    .help("Clear Previous Terminal Output")
                     Button {
                         // 仅隐藏当前视图；会话快照仍保留，下次从历史打开时重新显示。
                         isHidden = true
@@ -100,6 +109,12 @@ private struct TerminalPreviousOutputView: View {
                 }
             }
             .padding(8)
+            .alert("Clear Previous Terminal Output", isPresented: $confirmsClear) {
+                Button("Clear Previous Terminal Output Confirm", role: .destructive) { onClear() }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("Clear Previous Terminal Output Message")
+            }
             Divider()
             if showsNewSession {
                 Text("Terminal New Session").font(.caption).foregroundStyle(.secondary)
@@ -125,12 +140,35 @@ private struct TerminalSurface: NSViewRepresentable {
 }
 
 extension AppState {
+    func clearPreviousTerminalOutput() {
+        guard let terminalSession else { return }
+        // 同一历史项可能有多个窗口；一并移除旧快照，避免其他窗口的自动保存把它写回。
+        let peers = (NSApp.delegate as? AppDelegate)?.windowControllers.map(\.appState)
+            .filter { $0.id == id && $0.isIncognito == isIncognito } ?? []
+        for peer in peers { peer.terminalSession?.clearPreviousOutput() }
+        terminalSession.clearPreviousOutput()
+        saveState()
+        guard !isIncognito else { return }
+        let snapshot = terminalSession.outputSnapshot
+        // 恢复配置也可能保留快照副本，必须同时清除，不能只隐藏当前视图。
+        SettingsStore.shared.windowConfigs = SettingsStore.shared.windowConfigs.map { config in
+            var updated = config
+            if updated.id == id { updated.terminalScrollback = snapshot }
+            return updated
+        }
+        SettingsStore.shared.lastOpenWindowConfigs = SettingsStore.shared.lastOpenWindowConfigs.map { config in
+            var updated = config
+            if updated.id == id { updated.terminalScrollback = snapshot }
+            return updated
+        }
+    }
+
     func startTerminalForExplicitOpen() {
         guard terminalConfiguration != nil else { return }
         if let session = terminalSession {
             switch session.state {
             case .exited, .failed:
-                prepareTerminal(session.configuration, start: true)
+                prepareTerminal(terminalConfiguration ?? session.configuration, start: true)
             default: session.start()
             }
         }

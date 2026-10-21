@@ -527,7 +527,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     /// 摄像头与没有内容来源的空箔使用系统标题，不提供改名。
     var canRenameTitle: Bool {
         guard !isCamera, contentKind != .camera else { return false }
-        return imagePath != nil || webURLString != nil || textPath != nil
+        return terminalConfiguration != nil || imagePath != nil || webURLString != nil || textPath != nil
             || extensionID != nil || appleMusicReference != nil || fileList?.isPresentable == true
             || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }

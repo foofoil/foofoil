@@ -13,7 +13,12 @@ enum FoilTitleEditing {
         alert.messageText = NSLocalizedString("Change Title", comment: "")
         alert.addButton(withTitle: NSLocalizedString("OK", comment: ""))
         alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        let field = WrappingTitleField(frame: NSRect(x: 0, y: 0, width: 360, height: 76))
+        field.usesSingleLineMode = false
+        field.cell?.wraps = true
+        field.cell?.isScrollable = false
+        field.lineBreakMode = .byCharWrapping
+        field.maximumNumberOfLines = 0
         field.stringValue = title
         alert.accessoryView = field
         alert.window.initialFirstResponder = field
@@ -34,5 +39,17 @@ extension AppState {
         } else {
             customTitle = normalized
         }
+    }
+}
+
+/// 视觉折行不改变标题内容；粘贴或输入换行时合并为单行。
+private final class WrappingTitleField: NSTextField {
+    override func textDidChange(_ notification: Notification) {
+        if let editor = currentEditor(), editor.string.rangeOfCharacter(from: .newlines) != nil {
+            let selection = editor.selectedRange
+            editor.string = editor.string.components(separatedBy: .newlines).joined(separator: " ")
+            editor.selectedRange = NSRange(location: min(selection.location, (editor.string as NSString).length), length: 0)
+        }
+        super.textDidChange(notification)
     }
 }
