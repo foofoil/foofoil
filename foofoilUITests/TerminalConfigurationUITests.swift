@@ -21,7 +21,8 @@ final class TerminalConfigurationUITests: XCTestCase {
         environment.click()
         environment.typeText("FOIL_TEST=one\nFOIL_SECOND=two")
         XCTAssertEqual(environment.value as? String, "FOIL_TEST=one\nFOIL_SECOND=two")
-        let script = app.textViews.matching(NSPredicate(format: "label IN %@", ["Trusted startup script", "可信初始化脚本"])).firstMatch
+        let script = app.textViews.matching(NSPredicate(format: "label IN %@ OR identifier IN %@", ["Trusted startup script", "可信初始化脚本"], ["Trusted startup script", "可信初始化脚本"])).firstMatch
+        XCTAssertTrue(script.waitForExistence(timeout: 5), app.debugDescription)
         script.click()
         script.typeText("echo first\necho second")
         XCTAssertEqual(script.value as? String, "echo first\necho second")
