@@ -7,6 +7,43 @@ import SwiftTerm
 @MainActor
 @Suite(.sharedApplicationState, .serialized)
 struct TerminalFoilTests {
+    private final class MenuTarget: NSObject {
+        var invoked = false
+        @objc func move(_ sender: Any?) { invoked = true }
+    }
+
+    @Test func windowPositionShortcutsReachMenuWithTerminalFocus() throws {
+        _ = NSApplication.shared
+        let previousMenu = NSApp.mainMenu
+        defer { NSApp.mainMenu = previousMenu }
+        let state = AppState(isIncognito: true)
+        state.prepareTerminal(.init(), start: false)
+        let controller = FloatingWindowController(appState: state)
+        defer { controller.close() }
+        let window = try #require(controller.window)
+        let session = try #require(state.terminalSession)
+        window.contentView = session.view
+        window.makeFirstResponder(session.view)
+        #expect(window.firstResponder === session.view)
+        for definition in KeyboardShortcutCatalog.window where definition.id.hasPrefix("window.") {
+            let shortcut = try #require(KeyboardShortcutStore.shared.shortcut(for: definition))
+            let target = MenuTarget()
+            let menu = NSMenu()
+            menu.autoenablesItems = false
+            let item = NSMenuItem(title: definition.id, action: #selector(MenuTarget.move(_:)), keyEquivalent: shortcut.keyEquivalent)
+            item.keyEquivalentModifierMask = shortcut.modifiers
+            item.target = target
+            menu.addItem(item)
+            NSApp.mainMenu = menu
+            let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
+                modifierFlags: shortcut.modifiers, timestamp: 0, windowNumber: window.windowNumber,
+                context: nil, characters: shortcut.keyEquivalent, charactersIgnoringModifiers: shortcut.keyEquivalent,
+                isARepeat: false, keyCode: 0))
+            #expect(window.performKeyEquivalent(with: event))
+            #expect(target.invoked, "\(definition.id) should reach the window menu")
+        }
+    }
+
     private func fixture() throws -> URL {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("terminal-tests-\(UUID())")
         try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)

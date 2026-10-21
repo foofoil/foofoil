@@ -655,6 +655,12 @@ public class FloatingWindow: NSWindow {
         if event.modifierFlags.contains(.control), !event.modifierFlags.contains(.command),
            let session = (windowController as? FloatingWindowController)?.appState.terminalSession,
            firstResponder === session.view {
+            // 窗口布局命令先走当前菜单键位，避免被终端的 Control 输入截获。
+            if KeyboardShortcutCatalog.window.contains(where: {
+                $0.id.hasPrefix("window.") && KeyboardShortcutStore.shared.matches(event, identifier: $0.id)
+            }), NSApplication.shared.mainMenu?.performKeyEquivalent(with: event) == true {
+                return true
+            }
             session.view.keyDown(with: event)
             return true
         }
