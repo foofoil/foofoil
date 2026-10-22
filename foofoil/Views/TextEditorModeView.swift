@@ -59,6 +59,7 @@ struct TextEditorModeView: View {
             } else {
                 let isBlank = appState.isBlank
                 let showTipsAndHistory = geometry.size.height >= 140 && appState.canOpenRecentHistory
+                let showsIncognitoOverlay = isBlank && appState.isIncognito
 
                 VStack(alignment: .leading, spacing: 0) {
                     ZStack(alignment: .topLeading) {
@@ -117,11 +118,21 @@ struct TextEditorModeView: View {
                     }
 
                     if isBlank && showTipsAndHistory {
-                        BlankStateTipCarousel()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        if appState.isTemporaryIncognito {
+                            // 临时无痕图标占用走马灯区域，避免压住底部打开提示。
+                            GeometryReader { proxy in
+                                let side = max(0, min(96, proxy.size.width, proxy.size.height))
+                                IncognitoFoilMark(side: side, accessibilityLabel: "Incognito Foil")
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            }
                             .padding(.horizontal, 24)
-                            // 不接收鼠标事件，保留窗口背景的拖拽行为和输入焦点。
-                            .allowsHitTesting(false)
+                        } else {
+                            BlankStateTipCarousel()
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .padding(.horizontal, 24)
+                                // 不接收鼠标事件，保留窗口背景的拖拽行为和输入焦点。
+                                .allowsHitTesting(false)
+                        }
                     } else {
                         // 剩余区域保持为窗口背景，以支持拖动。
                         Spacer(minLength: 0)
@@ -279,17 +290,12 @@ struct TextEditorModeView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay {
-                    if isBlank && appState.isIncognito {
-                        Image(nsImage: IncognitoFoilIcon.image)
-                            .renderingMode(.template)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: min(96, geometry.size.width * 0.28),
-                                   height: min(96, geometry.size.height * 0.28))
-                            .foregroundStyle(.secondary)
-                            .accessibilityLabel(Text("Incognito Foil History Hint"))
-                            // 大图标覆盖在窗口正中央，不阻挡文本输入、拖放或窗口拖动。
-                            .allowsHitTesting(false)
+                    if showsIncognitoOverlay {
+                        // 真正的无痕箔没有历史卡片，大图标仍居中显示。
+                        IncognitoFoilMark(
+                            side: min(96, geometry.size.width * 0.28, geometry.size.height * 0.28),
+                            accessibilityLabel: "Incognito Foil History Hint"
+                        )
                     }
                 }
             }
@@ -344,6 +350,23 @@ struct TextEditorModeView: View {
         .onChange(of: appState.textURL) { _, _ in
             codePreviewFailed = false
         }
+    }
+}
+
+/// 空箔中的无痕标记；模板图不拦截鼠标，保留文本输入、拖放和窗口拖动。
+private struct IncognitoFoilMark: View {
+    let side: CGFloat
+    let accessibilityLabel: LocalizedStringKey
+
+    var body: some View {
+        Image(nsImage: IncognitoFoilIcon.image)
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: side, height: side)
+            .foregroundStyle(.secondary)
+            .accessibilityLabel(Text(accessibilityLabel))
+            .allowsHitTesting(false)
     }
 }
 

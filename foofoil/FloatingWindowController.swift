@@ -35,23 +35,33 @@ final class FileDropHostingView<Content: View>: NSHostingView<Content> {
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
         guard canAcceptDrop(from: sender) else { return [] }
         appState.isFileDropTargeted = true
+        syncOptionKeyStateForDrag()
         return .copy
     }
 
     override func draggingUpdated(_ sender: any NSDraggingInfo) -> NSDragOperation {
         guard canAcceptDrop(from: sender) else { return [] }
         appState.isFileDropTargeted = true
+        syncOptionKeyStateForDrag()
         return .copy
     }
 
     override func draggingExited(_ sender: (any NSDraggingInfo)?) {
         appState.isFileDropTargeted = false
+        // 拖拽离开后不再保留预览状态；重新进入时由 draggingEntered/Updated 刷新。
+        appState.isOptionKeyPressed = false
     }
 
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         defer { appState.isFileDropTargeted = false }
         let urls = droppedFileURLs(from: sender)
         if !urls.isEmpty {
+            // 空箔内按住 Option 拖入文件时走显式无痕入口；当前空箔仍保持原状态。
+            if appState.shouldOpenTemporarilyIncognito(optionPressed: NSEvent.modifierFlags.contains(.option)),
+               let delegate = NSApp.delegate as? AppDelegate {
+                delegate.openFilesInNewFoil(urls, isIncognito: true)
+                return true
+            }
             return appState.handleDroppedFileURLs(urls)
         }
 
@@ -63,6 +73,13 @@ final class FileDropHostingView<Content: View>: NSHostingView<Content> {
 
     override func concludeDragOperation(_ sender: (any NSDraggingInfo)?) {
         appState.isFileDropTargeted = false
+        syncOptionKeyStateForDrag()
+    }
+
+    /// Finder 拖拽期间不经过本窗口的 flagsChanged；用拖拽事件同步临时无痕提示。
+    private func syncOptionKeyStateForDrag() {
+        guard appState.isBlank, !appState.isIncognito else { return }
+        appState.isOptionKeyPressed = NSEvent.modifierFlags.contains(.option)
     }
 
     private func droppedFileURLs(from sender: any NSDraggingInfo) -> [URL] {
@@ -1922,13 +1939,15 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     // MARK: - NSWindowDelegate
 
     public func windowDidBecomeKey(_ notification: Notification) {
-        let isCommandPressed = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.command)
-        appState.isCommandKeyPressed = isCommandPressed
+        let modifiers = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        appState.isCommandKeyPressed = modifiers.contains(.command)
+        appState.isOptionKeyPressed = modifiers.contains(.option)
         updateNavigatorPanelVisibility()
     }
 
     public func windowDidResignKey(_ notification: Notification) {
         appState.isCommandKeyPressed = false
+        appState.isOptionKeyPressed = false
     }
 
     public func windowWillEnterFullScreen(_ notification: Notification) {

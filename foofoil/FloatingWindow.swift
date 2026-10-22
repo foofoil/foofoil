@@ -166,6 +166,7 @@ public class FloatingWindow: NSWindow {
             updateCommandDragCursor(isCommandPressed: isCommandPressed)
             if let controller = self.windowController as? FloatingWindowController {
                 controller.appState.isCommandKeyPressed = isCommandPressed
+                controller.appState.isOptionKeyPressed = modifiers.contains(.option)
             }
         }
 

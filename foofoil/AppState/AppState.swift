@@ -61,6 +61,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     var closesEmptyWindowAfterFileOpenFailure = false
 
     @Published public var isCommandKeyPressed: Bool = false
+    /// 普通空箔按住 Option 时临时显示无痕入口；窗口失焦或被内容替换后复位。
+    @Published var isOptionKeyPressed: Bool = false
     /// 由窗口内容区的 AppKit tracking area 驱动，供需要整窗 hover 的内容控件使用。
     @Published var isPointerInsideWindow: Bool = false {
         didSet { archiveSession?.preview?.isPointerInsideWindow = isPointerInsideWindow }
@@ -525,6 +527,19 @@ public class AppState: NSObject, ObservableObject, Identifiable {
 
     /// 历史卡片和编号快捷键只属于普通空箔，避免将历史内容带入无痕窗口。
     var canOpenRecentHistory: Bool { isBlank && !isIncognito }
+
+    /// 普通空箔按住 Option 时临时进入无痕打开状态；无痕窗口和已有内容的箔不受影响。
+    var isTemporaryIncognito: Bool {
+        shouldOpenTemporarilyIncognito(optionPressed: isOptionKeyPressed)
+    }
+
+    /// 打开入口按无痕呈现：无痕箔本身始终是，普通空箔仅在按住 Option 时临时切换。
+    var usesIncognitoOpening: Bool { isIncognito || isTemporaryIncognito }
+
+    /// 拖放与键盘状态共用同一判定，确保临时无痕只作用于普通空箔。
+    func shouldOpenTemporarilyIncognito(optionPressed: Bool) -> Bool {
+        isBlank && !isIncognito && optionPressed
+    }
 
     @Published public var isPinned: Bool {
         didSet {

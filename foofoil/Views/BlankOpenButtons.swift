@@ -30,16 +30,18 @@ struct BlankOpenButtons: View {
         return result
     }
 
+    private var opensIncognito: Bool { appState.usesIncognitoOpening }
+
     private func shortcut(for item: Item) -> String? {
         guard let id = item.shortcutID else { return nil }
-        let shortcut = appState.isIncognito
+        let shortcut = opensIncognito
             ? KeyboardShortcutStore.shared.incognitoShortcut(forID: id)
             : KeyboardShortcutStore.shared.shortcut(forID: id)
         return shortcut?.displayString
     }
 
     private func title(for item: Item) -> String {
-        let key = appState.isIncognito ? item.shortcutID.flatMap { IncognitoOpening.titles[$0] } ?? item.title : item.title
+        let key = opensIncognito ? item.shortcutID.flatMap { IncognitoOpening.titles[$0] } ?? item.title : item.title
         return NSLocalizedString(key, comment: "")
     }
 
@@ -147,21 +149,32 @@ struct BlankOpenButtons: View {
         if let controller = delegate.windowControllers.first(where: { $0.appState === appState }) {
             delegate.activateWindow(controller)
         }
+        // 临时无痕不改变当前空箔的持久属性，显式打开的入口都落到新的无痕目标。
+        let temporaryTarget = appState.isTemporaryIncognito ? AppState(isIncognito: true) : nil
         switch index {
         case 0, 1:
-            delegate.openContentPanel(directory: index == 1, target: appState)
+            let target = appState.isTemporaryIncognito ? temporaryTarget : appState
+            delegate.openContentPanel(directory: index == 1, target: target)
         case 2:
-            HistorySearchWindowController.shared.showURLInput(target: appState)
+            HistorySearchWindowController.shared.showURLInput(target: appState.isTemporaryIncognito ? temporaryTarget : appState)
         case 3:
-            delegate.openTerminal(isIncognito: appState.isIncognito)
+            delegate.openTerminal(isIncognito: opensIncognito)
         default:
             if items[index].selector == #selector(AppDelegate.showHistorySearchAction) {
-                HistorySearchWindowController.shared.show(isIncognito: appState.isIncognito, target: appState)
+                if let temporaryTarget {
+                    HistorySearchWindowController.shared.show(isIncognito: true)
+                } else {
+                    HistorySearchWindowController.shared.show(isIncognito: opensIncognito, target: appState)
+                }
             } else if items[index].selector == #selector(AppDelegate.openCameraAction) {
-                appState.showBorder = false
-                appState.openCamera()
+                if appState.isTemporaryIncognito {
+                    delegate.openCamera(isIncognito: true)
+                } else {
+                    appState.showBorder = false
+                    appState.openCamera()
+                }
             } else {
-                _ = delegate.openClipboardContentInNewWindow(isIncognito: appState.isIncognito)
+                _ = delegate.openClipboardContentInNewWindow(isIncognito: opensIncognito)
             }
         }
     }
