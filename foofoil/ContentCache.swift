@@ -52,7 +52,7 @@ nonisolated final class ContentCache: @unchecked Sendable {
         if AppState.isManagedCacheURL(url) { return true }
         // 测试可注入隔离目录；运行时目录仍只来自应用支持路径。
         return directories().contains { Self.canonical($0.path) == Self.canonical(url.deletingLastPathComponent().path) }
-            && ["managed_body_", "session_body_", "cached_image_", "cached_text_", "cached_web_", "cached_cover_", "cached_subject_"].contains { url.lastPathComponent.hasPrefix($0) }
+            && ["managed_body_", "session_body_", "cached_image_", "cached_text_", "cached_web_", "cached_cover_", "cached_subject_", FragmentedMP4PlaybackCopy.filePrefix].contains { url.lastPathComponent.hasPrefix($0) }
     }
 
     func hasLease(for path: String) -> Bool {
@@ -128,7 +128,8 @@ nonisolated final class ContentCache: @unchecked Sendable {
             for directory in self.directories() {
                 guard let files = try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey]) else { continue }
                 let candidates = files.filter {
-                    ($0.lastPathComponent.hasPrefix("session_body_") || $0.lastPathComponent.hasPrefix("managed_body_")) &&
+                    ($0.lastPathComponent.hasPrefix("session_body_") || $0.lastPathComponent.hasPrefix("managed_body_") ||
+                     $0.lastPathComponent.hasPrefix(FragmentedMP4PlaybackCopy.filePrefix)) &&
                     ((try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantFuture) < cutoff
                 }
                 self.retire(Set(candidates.map(\.path)))
@@ -200,6 +201,8 @@ nonisolated final class ContentCache: @unchecked Sendable {
             for case let url as URL in enumerator where AppState.isManagedCacheURL(url) ||
                 (url.deletingLastPathComponent().standardizedFileURL.path == directory.standardizedFileURL.path && ["cached_image_", "cached_text_", "cached_web_", "cached_cover_", "cached_subject_"].contains(where: { url.lastPathComponent.hasPrefix($0) })) || (url.deletingLastPathComponent().lastPathComponent == "Thumbnails" && UUID(uuidString: url.deletingPathExtension().lastPathComponent) != nil) {
                 guard !url.lastPathComponent.hasPrefix("managed_body_"), !url.lastPathComponent.hasPrefix("session_body_"),
+                      // 兼容副本只能由 APFS 克隆生成；共享数据不按整片逻辑大小计入缓存配额。
+                      !url.lastPathComponent.hasPrefix(FragmentedMP4PlaybackCopy.filePrefix),
                       !url.path.contains("/Shared Items/"), !url.path.contains("/Session Shared Items/") else { continue }
                 guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]), values.isRegularFile == true else { continue }
                 result[url.path] = Int64(values.fileSize ?? 0)

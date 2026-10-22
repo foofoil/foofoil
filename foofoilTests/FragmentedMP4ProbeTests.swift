@@ -1,4 +1,5 @@
 import Foundation
+import AVFoundation
 import Testing
 @testable import foofoil
 
@@ -46,10 +47,11 @@ struct FragmentedMP4ProbeTests {
         #expect(AppState.externalMediaDisplayName(for: url) == "clip.mp4")
     }
 
-    @Test func hev1SampleEntryIsRewrittenInPlaybackCopy() throws {
+    @Test(arguments: ["m4s", "mp4", "m4v", "mov"])
+    func hev1SampleEntryIsRewrittenInPlaybackCopy(ext: String) throws {
         let bytes = try fragmentedFile(handlers: ["vide"], sampleEntry: "hev1")
-        let url = try writeFile(named: "hevc.m4s", bytes)
-        let offset = Int(try #require(FragmentedMP4Probe.hev1TagOffset(of: url)))
+        let url = try writeFile(named: "hevc.\(ext)", bytes)
+        let offset = Int(try #require(FragmentedMP4Probe.hev1TagOffsets(of: url).first))
         #expect(Array(bytes[offset..<(offset + 4)]) == Array("hev1".utf8))
 
         let playable = FragmentedMP4PlaybackCopy.playableURL(for: url)
@@ -65,14 +67,74 @@ struct FragmentedMP4ProbeTests {
 
     @Test func nonHEVCSegmentsArePlayedDirectly() throws {
         let url = try writeFile(named: "avc.m4s", try fragmentedFile(handlers: ["vide"], sampleEntry: "avc1"))
-        #expect(FragmentedMP4Probe.hev1TagOffset(of: url) == nil)
+        #expect(FragmentedMP4Probe.hev1TagOffsets(of: url).first == nil)
         #expect(FragmentedMP4PlaybackCopy.playableURL(for: url) == url)
     }
 
-    private func fragmentedFile(handlers: [String], sampleEntry: String = "avc1") throws -> [UInt8] {
+    @Test func incompleteHEVCConfigurationIsNotRetagged() throws {
+        let bytes = try fragmentedFile(handlers: ["vide"], sampleEntry: "hev1", parameterTypes: [33, 34])
+        let url = try writeFile(named: "incomplete.mp4", bytes)
+        #expect(FragmentedMP4Probe.hev1TagOffsets(of: url).isEmpty)
+        #expect(FragmentedMP4PlaybackCopy.playableURL(for: url) == url)
+        #expect(try Data(contentsOf: url) == Data(bytes))
+    }
+
+    @Test func allHEVCVideoTracksAreRetagged() throws {
+        let url = try writeFile(named: "multi.mp4", try fragmentedFile(handlers: ["vide", "soun", "vide"], sampleEntry: "hev1"))
+        let offsets = FragmentedMP4Probe.hev1TagOffsets(of: url)
+        #expect(offsets.count == 2)
+        let playable = FragmentedMP4PlaybackCopy.playableURL(for: url)
+        defer { if playable != url { try? FileManager.default.removeItem(at: playable) } }
+        let bytes = [UInt8](try Data(contentsOf: playable))
+        for offset in offsets {
+            #expect(Array(bytes[Int(offset)..<(Int(offset) + 4)]) == Array("hvc1".utf8))
+        }
+    }
+
+    @Test func playbackCloneCanExceedDefaultCacheLimit() throws {
+        let url = try writeFile(named: "large.mp4", try fragmentedFile(handlers: ["vide"], sampleEntry: "hev1"))
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let size = UInt64(ContentCache.defaultLimit) + 4096
+        let handle = try FileHandle(forUpdating: url)
+        try handle.truncate(atOffset: size)
+        try handle.close()
+        let playable = FragmentedMP4PlaybackCopy.playableURL(for: url)
+        defer { if playable != url { try? FileManager.default.removeItem(at: playable) } }
+        #expect(playable != url)
+        #expect(try playable.resourceValues(forKeys: [.fileSizeKey]).fileSize == Int(size))
+        #expect(FragmentedMP4PlaybackCopy.playableURL(for: url) == playable)
+        // 源文件变化后不复用旧副本。
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: 10)], ofItemAtPath: url.path)
+        #expect(FragmentedMP4PlaybackCopy.copyURL(for: url) != playable)
+    }
+
+    @Test func malformedBoxSizesAreRejectedWithoutOverflow() throws {
+        var bytes = box("ftyp", payload: Array("iso5".utf8) + [0, 0, 0, 0])
+        bytes += [0, 0, 0, 1] + Array("moov".utf8) + [UInt8](repeating: 255, count: 8)
+        let url = try writeFile(named: "overflow.mp4", bytes)
+        #expect(FragmentedMP4Probe.hev1TagOffsets(of: url).isEmpty)
+    }
+
+    @Test func ordinaryMP4WithTrailingMoovUsesCompatibilityCopy() throws {
+        let bytes = try fragmentedFile(handlers: ["vide"], sampleEntry: "hev1")
+        let ftypSize = 16
+        let moovSize = Int(bytes[16]) << 24 | Int(bytes[17]) << 16 | Int(bytes[18]) << 8 | Int(bytes[19])
+        let ordinary = Array(bytes[..<ftypSize]) + box("mdat", payload: [UInt8](repeating: 0, count: 128)) + Array(bytes[ftypSize..<(ftypSize + moovSize)])
+        let url = try writeFile(named: "ordinary.mp4", ordinary)
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let asset = AVURLAsset.media(url: url)
+        defer { if asset.url != url { try? FileManager.default.removeItem(at: asset.url) } }
+        #expect(asset.url != url)
+        #expect(FragmentedMP4Probe.hev1TagOffsets(of: asset.url).isEmpty)
+        #expect(try Data(contentsOf: url) == Data(ordinary))
+    }
+
+    private func fragmentedFile(handlers: [String], sampleEntry: String = "avc1", parameterTypes: [UInt8] = [32, 33, 34]) throws -> [UInt8] {
         let traks = handlers.map { handler -> [UInt8] in
             let hdlrPayload: [UInt8] = [0, 0, 0, 0, 0, 0, 0, 0] + Array(handler.utf8) + [UInt8](repeating: 0, count: 13)
-            let entry = box(sampleEntry, payload: [UInt8](repeating: 0, count: 78))
+            var configuration: [UInt8] = [1] + [UInt8](repeating: 0, count: 21) + [UInt8(parameterTypes.count)]
+            for type in parameterTypes { configuration += [type, 0, 1, 0, 2, type << 1, 1] }
+            let entry = box(sampleEntry, payload: [UInt8](repeating: 0, count: 78) + box("hvcC", payload: configuration))
             let stsd = box("stsd", payload: [0, 0, 0, 0, 0, 0, 0, 1] + entry)
             let minf = box("minf", payload: box("stbl", payload: stsd))
             return box("trak", payload: box("mdia", payload: box("hdlr", payload: hdlrPayload) + minf))

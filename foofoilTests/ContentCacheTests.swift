@@ -59,4 +59,31 @@ struct ContentCacheTests {
         #expect(try Data(contentsOf: file) == Data(repeating: 1, count: 60))
         #expect(repository.config(id: id) != nil)
     }
+
+    @Test func playbackCopiesBypassQuotaAndExpiredCopiesRespectActiveWindows() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let suite = "cache-test-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let repository = HistoryRepository(databaseURL: root.appendingPathComponent("history.sqlite"))
+        let cache = ContentCache(repository: repository, defaults: defaults, directories: { [root] })
+        let copy = root.appendingPathComponent("\(FragmentedMP4PlaybackCopy.filePrefix)test.mp4")
+        try Data(repeating: 0, count: 128).write(to: copy)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSinceNow: -172800)], ofItemAtPath: copy.path)
+        let regular = root.appendingPathComponent("cached_cover_test.png")
+        try cache.write(Data(repeating: 1, count: 32), to: regular)
+        #expect(cache.usage == 32)
+        try cache.setLimit(64)
+        cache.protect([], paths: [copy.path])
+        cache.recoverOrphanBodies()
+        cache.flushCleanup()
+        cache.flushCleanup()
+        #expect(FileManager.default.fileExists(atPath: copy.path))
+        cache.protect([])
+        cache.flushCleanup()
+        #expect(!FileManager.default.fileExists(atPath: copy.path))
+        #expect(FileManager.default.fileExists(atPath: regular.path))
+    }
 }

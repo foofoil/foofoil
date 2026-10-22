@@ -367,11 +367,12 @@ extension AppState {
         /// UTType 对音视频的声明较宽（MKV/AVI 等也归为 movie），需再确认 macOS 原生可播放后才打开。
         /// - Parameter holdsSecurityAccess: 已对 `url` 取得安全范围访问；不可播放时由本方法释放，可播放时转交窗口持有。
         func openExternalMediaIfPlayable(url: URL, holdsSecurityAccess: Bool = false) {
-            let asset = AVURLAsset.media(url: url)
             let routeGeneration = currentMediaRouteGeneration
             beginPendingContentOpen()
             Task { @MainActor [weak self] in
                 defer { self?.endPendingContentOpen() }
+                let playable = await FragmentedMP4PlaybackCopy.prepare(for: url)
+                let asset = AVURLAsset.media(url: playable)
                 let isPlayable = (try? await asset.load(.isPlayable)) ?? false
                 guard let self else {
                     if holdsSecurityAccess { url.stopAccessingSecurityScopedResource() }

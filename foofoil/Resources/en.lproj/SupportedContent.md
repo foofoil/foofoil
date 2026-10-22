@@ -58,6 +58,8 @@ Markdown task lists display read-only checkboxes that reflect the source documen
 | SACD images | .iso | Play uncompressed stereo tracks |
 | Track lists | .cue | Play an album by track; keep the accompanying audio files |
 
+Some HEVC MP4, MOV, M4V, and M4S files tagged `hev1` are opened through a compatibility copy using the system player, without re-encoding or removing HDR information. This requires the source and app cache to share a volume that supports APFS cloning; files on other volumes or with incomplete codec configuration may remain unplayable. Compatibility copies share the source data and do not count their full movie size toward the regular cache limit. History cleanup removes them, and startup cleanup reclaims copies older than one day that are not in use by open windows.
+
 Audio foils show the embedded or same-folder cover as a background. Copy Cover (⌘C, also in the Edit menu and context menu) copies the cover currently shown; it is unavailable when no cover is shown. Video foils do not offer it.
 
 ## Other Documents

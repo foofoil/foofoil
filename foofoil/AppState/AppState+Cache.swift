@@ -138,7 +138,7 @@ extension AppState {
                 name.hasPrefix(FragmentedMP4PlaybackCopy.filePrefix)
         }
 
-        /// 当前窗口正在使用的本地缓存路径；分片媒体的播放副本随源文件一并保留。
+        /// 当前窗口正在使用的本地缓存路径；HEVC 媒体的兼容副本随源文件一并保留。
         public var cachedContentPaths: Set<String> {
             let playbackCopies = [imageURL].compactMap { $0 }.compactMap(FragmentedMP4PlaybackCopy.copyURL(for:))
             return ([imageURL, textURL, webURL, customCoverURL] + playbackCopies + (fileList?.items.map(\.url) ?? []) + (archiveSession?.source.volumes.map { URL(fileURLWithPath: $0.path) } ?? []))

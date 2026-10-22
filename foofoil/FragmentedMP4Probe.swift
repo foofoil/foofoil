@@ -4,9 +4,10 @@ import Foundation
 extension AVURLAsset {
     /// 创建用于播放或读取元数据的资源。AVFoundation 依据扩展名选择容器解析器，`.m4s` 没有对应类型，
     /// 因此以 MP4 容器提示打开；内容本身仍由系统解析，音视频轨道以文件实际内容为准。
+    /// MP4 家族的 `hev1` HEVC 在编码配置完整时使用兼容副本。
     nonisolated static func media(url: URL) -> AVURLAsset {
-        guard url.pathExtension.lowercased() == "m4s" else { return AVURLAsset(url: url) }
         let playable = FragmentedMP4PlaybackCopy.playableURL(for: url)
+        guard url.pathExtension.lowercased() == "m4s" else { return AVURLAsset(url: playable) }
         return AVURLAsset(url: playable, options: [AVURLAssetOverrideMIMETypeKey: "video/mp4"])
     }
 }
@@ -30,11 +31,10 @@ nonisolated enum FragmentedMP4Probe {
         return trackKind(inMoov: moov.bytes)
     }
 
-    /// 视频样本描述为 `hev1` 时，返回该四字符码在文件中的偏移；其它情况返回 nil。
-    static func hev1TagOffset(of url: URL) -> UInt64? {
-        guard let moov = loadMoov(of: url),
-              let relative = hev1TagOffset(inMoov: moov.bytes) else { return nil }
-        return moov.fileOffset + UInt64(relative)
+    /// 仅修正 hvcC 已带齐 VPS/SPS/PPS 的 HEVC 描述；缺少配置时不能只换标签。
+    static func hev1TagOffsets(of url: URL) -> [UInt64] {
+        guard let moov = loadMoov(of: url) else { return [] }
+        return hev1TagOffsets(inMoov: moov.bytes).map { moov.fileOffset + UInt64($0) }
     }
 
     private struct MoovPayload {
@@ -78,7 +78,7 @@ nonisolated enum FragmentedMP4Probe {
     }
 
     private static func readBox(at offset: UInt64, handle: FileHandle, fileSize: UInt64) -> Box? {
-        guard offset + 8 <= fileSize,
+        guard offset <= fileSize, fileSize - offset >= 8,
               let data = read(handle, at: offset, count: Int(min(16, fileSize - offset))) else { return nil }
         let bytes = [UInt8](data)
         var size = readBigEndian(bytes, at: 0, count: 4)
@@ -90,7 +90,7 @@ nonisolated enum FragmentedMP4Probe {
         } else if size == 0 {
             size = fileSize - offset
         }
-        guard size >= headerSize, offset + size <= fileSize else { return nil }
+        guard size >= headerSize, size <= fileSize - offset else { return nil }
         return Box(type: fourCC(bytes, at: 4), start: offset, headerSize: headerSize, size: size)
     }
 
@@ -111,7 +111,8 @@ nonisolated enum FragmentedMP4Probe {
         return nil
     }
 
-    private static func hev1TagOffset(inMoov bytes: [UInt8]) -> Int? {
+    private static func hev1TagOffsets(inMoov bytes: [UInt8]) -> [Int] {
+        var offsets: [Int] = []
         for trak in children(in: bytes, 0..<bytes.count) where trak.type == "trak" {
             guard handlerType(inTrak: trak, bytes: bytes) == "vide",
                   let minf = child("mdia", in: bytes, trak.payload).flatMap({ child("minf", in: bytes, $0.payload) }),
@@ -119,11 +120,40 @@ nonisolated enum FragmentedMP4Probe {
                   let stsd = child("stsd", in: bytes, stbl.payload),
                   stsd.payload.count >= 8 else { continue }
             // stsd 载荷：version/flags(4) + entry_count(4)，之后紧跟样本描述 box
-            guard let entry = children(in: bytes, (stsd.payload.lowerBound + 8)..<stsd.payload.upperBound).first,
-                  entry.type == "hev1" else { continue }
-            return entry.start + 4
+            let entries = children(in: bytes, (stsd.payload.lowerBound + 8)..<stsd.payload.upperBound)
+            guard entries.count == Int(readBigEndian(bytes, at: stsd.payload.lowerBound + 4, count: 4)) else { return [] }
+            for entry in entries where entry.type == "hev1" {
+                // VisualSampleEntry 的固定载荷为 78 字节，之后才是 hvcC 等子 box。
+                guard entry.payload.count >= 78,
+                      let configuration = child("hvcC", in: bytes, (entry.payload.lowerBound + 78)..<entry.payload.upperBound),
+                      hasHEVCParameterSets(bytes, in: configuration.payload) else { return [] }
+                offsets.append(entry.start + 4)
+            }
         }
-        return nil
+        return offsets
+    }
+
+    private static func hasHEVCParameterSets(_ bytes: [UInt8], in range: Range<Int>) -> Bool {
+        // HEVCDecoderConfigurationRecord：23 字节固定头，随后是 NAL 数组。
+        guard range.count >= 23, bytes[range.lowerBound] == 1 else { return false }
+        var cursor = range.lowerBound + 23
+        var types: Set<UInt8> = []
+        for _ in 0..<Int(bytes[range.lowerBound + 22]) {
+            guard range.upperBound - cursor >= 3 else { return false }
+            let type = bytes[cursor] & 0x3f
+            let count = Int(readBigEndian(bytes, at: cursor + 1, count: 2))
+            cursor += 3
+            for _ in 0..<count {
+                guard range.upperBound - cursor >= 2 else { return false }
+                let length = Int(readBigEndian(bytes, at: cursor, count: 2))
+                cursor += 2
+                guard length >= 2, length <= range.upperBound - cursor,
+                      (bytes[cursor] >> 1) & 0x3f == type else { return false }
+                types.insert(type)
+                cursor += length
+            }
+        }
+        return cursor == range.upperBound && types.isSuperset(of: [32, 33, 34])
     }
 
     /// `hdlr` 载荷：version/flags(4) + pre_defined(4) + handler_type(4)。
