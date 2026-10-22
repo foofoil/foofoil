@@ -1522,6 +1522,18 @@ struct FoofoilTests {
         #expect((item.representedObject as? WindowConfig)?.id == config.id)
     }
 
+    @Test func dockMenuOffersOverviewAndNewFoilActionsWithoutClearHistory() throws {
+        let delegate = AppDelegate()
+        let menu = try #require(delegate.applicationDockMenu(NSApplication.shared))
+        let actions = menu.items.map(\.action)
+        #expect(actions.contains(#selector(AppDelegate.showAllFoilsAction)))
+        #expect(actions.contains(#selector(AppDelegate.newWindowAction)))
+        #expect(actions.contains(#selector(AppDelegate.newIncognitoWindowAction)))
+        #expect(!actions.contains(#selector(AppDelegate.showHistorySearchAction)))
+        // 清除历史属于破坏性操作，不再出现在程序坞菜单中。
+        #expect(!actions.contains(#selector(AppDelegate.clearHistoryAction)))
+    }
+
     @Test func blankFoilRecentHistoryShortcutMatchesNumberKeys() throws {
         // ⌘1-9 已从可配置快捷键目录移除，改由空白箔窗口按固定键位处理。
         #expect(KeyboardShortcutCatalog.definition(withID: "history.openRecent1") == nil)

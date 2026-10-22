@@ -42,15 +42,20 @@ extension AppDelegate {
 
         dockMenu.addItem(NSMenuItem.separator())
 
-        let searchItem = NSMenuItem(title: NSLocalizedString("Search History Menu Item", comment: ""), action: #selector(showHistorySearchAction), keyEquivalent: "")
-        searchItem.withSymbol("magnifyingglass")
-        searchItem.target = self
-        dockMenu.addItem(searchItem)
+        let overviewItem = NSMenuItem(title: NSLocalizedString("Foil Overview", comment: ""), action: #selector(showAllFoilsAction), keyEquivalent: "")
+        overviewItem.withSymbol("rectangle.grid.2x2")
+        overviewItem.target = self
+        dockMenu.addItem(overviewItem)
 
-        let clearHistoryItem = NSMenuItem(title: NSLocalizedString("Clear History Menu Item", comment: ""), action: #selector(clearHistoryAction), keyEquivalent: "")
-        clearHistoryItem.withSymbol("trash")
-        clearHistoryItem.target = self
-        dockMenu.addItem(clearHistoryItem)
+        let newFoilItem = NSMenuItem(title: NSLocalizedString("New foofoil", comment: ""), action: #selector(newWindowAction), keyEquivalent: "")
+        newFoilItem.withSymbol("plus.rectangle.on.rectangle")
+        newFoilItem.target = self
+        dockMenu.addItem(newFoilItem)
+
+        let incognitoItem = NSMenuItem(title: NSLocalizedString("New Incognito Foil", comment: ""), action: #selector(newIncognitoWindowAction), keyEquivalent: "")
+        incognitoItem.withImage(IncognitoFoilIcon.menuImage)
+        incognitoItem.target = self
+        dockMenu.addItem(incognitoItem)
 
         return dockMenu
     }
