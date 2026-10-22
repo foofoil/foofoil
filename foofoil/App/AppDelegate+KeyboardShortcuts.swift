@@ -25,7 +25,10 @@ extension AppDelegate {
         for item in menu.items {
             if let identifier = item.representedObject as? String, identifier.hasSuffix(IncognitoOpening.suffix) {
                 let baseID = String(identifier.dropLast(IncognitoOpening.suffix.count))
-                let shortcut = KeyboardShortcutStore.shared.incognitoShortcut(forID: baseID)
+                let store = KeyboardShortcutStore.shared
+                // 无痕全局键由独立菜单项承接；alternate 仅保留按住 Option 的菜单入口。
+                let shortcut = baseID == "file.openClipboardContent" && store.shortcut(forID: "global.openClipboardIncognito") != nil
+                    ? nil : store.incognitoShortcut(forID: baseID)
                 item.keyEquivalent = shortcut?.keyEquivalent ?? ""
                 item.keyEquivalentModifierMask = shortcut?.modifiers ?? [.option]
             } else if let identifier = item.representedObject as? String,

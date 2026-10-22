@@ -26,7 +26,27 @@ final class KeyboardShortcutStore {
 
     /// 当前生效的快捷键；nil 表示该命令没有快捷键。
     func shortcut(for definition: KeyboardShortcutDefinition) -> KeyboardShortcut? {
+        if let globalID = clipboardGlobalID(for: definition.id), let shortcut = shortcut(forID: globalID) {
+            return shortcut
+        }
         if definition.id == "file.openClipboardIncognito" { return IncognitoOpening.clipboardShortcut }
+        return storedShortcut(for: definition)
+    }
+
+    /// 全局键位只覆盖生效值，保留原应用内设置供清除全局键位后恢复。
+    func clipboardGlobalID(for id: String) -> String? {
+        switch id {
+        case "file.openClipboardContent": return "global.openClipboardContent"
+        case "file.openClipboardIncognito": return "global.openClipboardIncognito"
+        default: return nil
+        }
+    }
+
+    func followsGlobalShortcut(_ definition: KeyboardShortcutDefinition) -> Bool {
+        clipboardGlobalID(for: definition.id).flatMap { shortcut(forID: $0) } != nil
+    }
+
+    func storedShortcut(for definition: KeyboardShortcutDefinition) -> KeyboardShortcut? {
         switch overrides[definition.id] {
         case .custom(let shortcut): return shortcut
         case .disabled: return nil
@@ -72,6 +92,7 @@ final class KeyboardShortcutStore {
     /// 覆盖为指定快捷键；传 nil 表示清除快捷键。
     @discardableResult
     func setShortcut(_ shortcut: KeyboardShortcut?, for definition: KeyboardShortcutDefinition) -> Bool {
+        guard !followsGlobalShortcut(definition) else { return false }
         guard validationMessage(shortcut, for: definition) == nil else { return false }
         var values = overrides
         if let shortcut {
@@ -89,6 +110,7 @@ final class KeyboardShortcutStore {
     /// 恢复默认（默认可能仍为无快捷键）。
     @discardableResult
     func reset(_ definition: KeyboardShortcutDefinition) -> Bool {
+        guard !followsGlobalShortcut(definition) else { return false }
         guard validationMessage(definition.defaultShortcut, for: definition) == nil else { return false }
         var values = overrides
         values.removeValue(forKey: definition.id)

@@ -29,11 +29,17 @@ nonisolated enum IncognitoOpening {
 extension KeyboardShortcutStore {
     func incognitoShortcut(forID id: String) -> KeyboardShortcut? {
         guard IncognitoOpening.titles[id] != nil else { return nil }
+        if id == "file.openClipboardContent" {
+            if let global = shortcut(forID: "global.openClipboardIncognito") { return global }
+            // 普通全局键位不派生额外无痕键；未设置无痕全局键时沿用原应用内规则。
+            return IncognitoOpening.derived(storedShortcut(for: KeyboardShortcutCatalog.openClipboardContent))
+        }
         return IncognitoOpening.derived(shortcut(forID: id))
     }
 
     /// 检查候选键及其无痕派生键；只读运行中菜单补齐系统固定键位。
     func validationMessage(_ candidate: KeyboardShortcut?, for definition: KeyboardShortcutDefinition) -> String? {
+        if followsGlobalShortcut(definition) { return NSLocalizedString("Shortcut Follows Global", comment: "") }
         guard let candidate else { return nil }
         let opensContent = IncognitoOpening.titles[definition.id] != nil
         if opensContent && candidate.modifiers.contains(.option) {
@@ -42,20 +48,26 @@ extension KeyboardShortcutStore {
         if opensContent && !candidate.hasRequiredModifiers {
             return NSLocalizedString("Opening Shortcut Requires Modifier", comment: "")
         }
-        let candidates = [candidate] + (opensContent ? [IncognitoOpening.derived(candidate)!] : [])
+        let derivesPrivate = opensContent && !(definition.id == "file.openClipboardContent" && shortcut(forID: "global.openClipboardIncognito") != nil)
+        let candidates = [candidate] + (derivesPrivate ? [IncognitoOpening.derived(candidate)!] : [])
         func conflict(_ shortcut: KeyboardShortcut, title: String) -> String? {
             guard candidates.contains(where: { IncognitoOpening.canonical($0) == IncognitoOpening.canonical(shortcut) }) else { return nil }
             return String(format: NSLocalizedString("Shortcut Conflicts With %@", comment: ""), title)
         }
-        if let error = conflict(IncognitoOpening.clipboardShortcut, title: NSLocalizedString("Open Clipboard Incognito", comment: "")) { return error }
+        if definition.id != "global.openClipboardIncognito",
+           let privateKey = shortcut(forID: "file.openClipboardIncognito"),
+           let error = conflict(privateKey, title: NSLocalizedString("Open Clipboard Incognito", comment: "")) { return error }
         for other in KeyboardShortcutCatalog.sections.flatMap(\.definitions) where other.id != definition.id {
+            // 同一命令的全局与应用内入口允许共用键位，其他命令仍需检查冲突。
+            if clipboardGlobalID(for: other.id) == definition.id { continue }
             if let shortcut = shortcut(for: other) {
                 // 默认方向键等按内容范围复用；保留目录中明确设计的默认共享键位。
                 let sharesDefault = !opensContent && candidate == definition.defaultShortcut
                     && shortcut == other.defaultShortcut
                 if !sharesDefault, let error = conflict(shortcut, title: other.displayName) { return error }
             }
-            if let title = IncognitoOpening.titles[other.id], let shortcut = incognitoShortcut(forID: other.id),
+            if !(definition.id == "global.openClipboardIncognito" && other.id == "file.openClipboardContent"),
+               let title = IncognitoOpening.titles[other.id], let shortcut = incognitoShortcut(forID: other.id),
                let error = conflict(shortcut, title: NSLocalizedString(title, comment: "")) { return error }
         }
         func inspect(_ menu: NSMenu?) -> String? {

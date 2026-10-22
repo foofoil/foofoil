@@ -695,6 +695,7 @@ final class FoilExposeController {
     private var keyMonitor: Any?
     private var showAllHotKeyRef: EventHotKeyRef?
     private var clipboardHotKeyRef: EventHotKeyRef?
+    private var incognitoClipboardHotKeyRef: EventHotKeyRef?
     private var hotKeyHandler: EventHandlerRef?
     /// 系统面板（文件选择、授权）展示期间：覆盖层让出焦点，键盘监听放行，避免误操作覆盖层。
     private var isPresentingSystemUI = false
@@ -737,6 +738,11 @@ final class FoilExposeController {
             _ = UnregisterEventHotKey(clipboardHotKeyRef)
             self.clipboardHotKeyRef = nil
         }
+        if let incognitoClipboardHotKeyRef {
+            _ = UnregisterEventHotKey(incognitoClipboardHotKeyRef)
+            self.incognitoClipboardHotKeyRef = nil
+        }
+        incognitoClipboardHotKeyRef = registerGlobalHotKey(definitionID: "global.openClipboardIncognito", id: 3)
         clipboardHotKeyRef = registerGlobalHotKey(definitionID: "global.openClipboardContent", id: 2)
         showAllHotKeyRef = registerGlobalHotKey(definitionID: "window.showAllFoils", id: 1)
     }
@@ -783,6 +789,8 @@ final class FoilExposeController {
                 MainActor.assumeIsolated {
                     if hotKeyID.id == 2 {
                         FoilExposeController.shared.openClipboard()
+                    } else if hotKeyID.id == 3 {
+                        FoilExposeController.shared.openClipboard(isIncognito: true)
                     } else if hotKeyID.id == 1 {
                         FoilExposeController.shared.handleGlobalHotKey()
                     }
@@ -1054,10 +1062,10 @@ final class FoilExposeController {
     }
 
     /// 剪贴板提示与快捷键共用入口：先收起覆盖层，再打开剪贴板内容。
-    private func openClipboard() {
+    private func openClipboard(isIncognito: Bool = false) {
         dismiss()
         NSApp.activate(ignoringOtherApps: true)
-        (NSApplication.shared.delegate as? AppDelegate)?.openClipboardContentInNewWindow()
+        (NSApplication.shared.delegate as? AppDelegate)?.openClipboardContentInNewWindow(isIncognito: isIncognito)
     }
 
     private func renameItem(_ item: FoilExposeItem) {

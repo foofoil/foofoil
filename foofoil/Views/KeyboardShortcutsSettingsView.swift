@@ -134,6 +134,7 @@ private struct KeyboardShortcutRow: View {
     @State private var shortcut: KeyboardShortcut?
     @State private var validationError: String?
     @State private var isCustomized: Bool
+    @State private var followsGlobal = false
 
     init(definition: KeyboardShortcutDefinition) {
         self.definition = definition
@@ -145,7 +146,7 @@ private struct KeyboardShortcutRow: View {
         HStack(alignment: .center, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(definition.displayName)
-                if let note = definition.note {
+                if let note = followsGlobal ? NSLocalizedString("Shortcut Follows Global", comment: "") : definition.note {
                     Text(note)
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -153,14 +154,22 @@ private struct KeyboardShortcutRow: View {
             }
             Spacer(minLength: 8)
             // 固定录制框宽度并统一靠右对齐，避免行与行之间参差不齐。
-            ShortcutRecorderView(shortcut: shortcut) { newValue in
-                if let error = KeyboardShortcutStore.shared.validationMessage(newValue, for: definition) {
-                    validationError = error
-                    return
+            Group {
+                if followsGlobal {
+                    Text(shortcut?.displayString ?? "")
+                        .foregroundStyle(.secondary)
+                        .help(NSLocalizedString("Shortcut Follows Global", comment: ""))
+                } else {
+                    ShortcutRecorderView(shortcut: shortcut) { newValue in
+                        if let error = KeyboardShortcutStore.shared.validationMessage(newValue, for: definition) {
+                            validationError = error
+                            return
+                        }
+                        shortcut = newValue
+                        KeyboardShortcutStore.shared.setShortcut(newValue, for: definition)
+                        isCustomized = KeyboardShortcutStore.shared.isCustomized(definition)
+                    }
                 }
-                shortcut = newValue
-                KeyboardShortcutStore.shared.setShortcut(newValue, for: definition)
-                isCustomized = KeyboardShortcutStore.shared.isCustomized(definition)
             }
             .frame(width: 128)
             // 恢复默认入口始终占位，保证录制框列对齐。
@@ -174,13 +183,22 @@ private struct KeyboardShortcutRow: View {
             .accessibilityLabel(NSLocalizedString("Reset Shortcut", comment: ""))
             .frame(width: 20)
             .opacity(isCustomized ? 1 : 0)
-            .disabled(!isCustomized)
+            .disabled(!isCustomized || followsGlobal)
         }
+        .onAppear { refresh() }
+        .onReceive(NotificationCenter.default.publisher(for: .keyboardShortcutsDidChange)) { _ in refresh() }
         .alert(NSLocalizedString("Shortcut Unavailable", comment: ""), isPresented: Binding(
             get: { validationError != nil }, set: { if !$0 { validationError = nil } }
         )) { Button("OK") { validationError = nil } } message: {
             Text(validationError ?? "")
         }
+    }
+
+    private func refresh() {
+        let store = KeyboardShortcutStore.shared
+        shortcut = store.shortcut(for: definition)
+        isCustomized = store.isCustomized(definition)
+        followsGlobal = store.followsGlobalShortcut(definition)
     }
 
     private func reset() {

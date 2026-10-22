@@ -201,9 +201,34 @@ struct FoilExposeShortcutTests {
         #expect(favorite.preferredImageVisibility == .visible)
     }
 
+    @Test @MainActor func globalIncognitoClipboardShortcutCanBeConfiguredIndependently() throws {
+        let definition = try #require(KeyboardShortcutCatalog.definition(withID: "global.openClipboardIncognito"))
+        let store = KeyboardShortcutStore.shared
+        let previous = store.shortcut(for: definition)
+        let customized = store.isCustomized(definition)
+        let ordinary = store.shortcut(forID: "global.openClipboardContent")
+        defer {
+            if customized { store.setShortcut(previous, for: definition) }
+            else { store.reset(definition) }
+        }
+        #expect(definition.defaultShortcut == nil)
+        #expect(store.reset(definition))
+        #expect(store.shortcut(for: definition) == nil)
+        let custom = KeyboardShortcut(keyEquivalent: "j", modifiers: [.command, .control, .shift, .option])
+        #expect(store.setShortcut(custom, for: definition))
+        #expect(store.shortcut(for: definition) == custom)
+        #expect(store.shortcut(forID: "global.openClipboardContent") == ordinary)
+        #expect(store.validationMessage(IncognitoOpening.clipboardShortcut, for: definition) == nil)
+        #expect(KeyboardShortcutsOverview.markdown().contains(custom.displayString))
+        #expect(store.setShortcut(nil, for: definition))
+        #expect(store.shortcut(for: definition) == nil)
+        #expect(store.reset(definition))
+        #expect(store.shortcut(for: definition) == nil)
+    }
+
     @Test func globalAndFileShortcutGroups() throws {
         #expect(KeyboardShortcutCatalog.sections.prefix(2) == [.global, .opening])
-        #expect(KeyboardShortcutCatalog.global.map(\.id) == ["window.showAllFoils", "global.openClipboardContent"])
+        #expect(KeyboardShortcutCatalog.global.map(\.id) == ["window.showAllFoils", "global.openClipboardContent", "global.openClipboardIncognito"])
         #expect(KeyboardShortcutCatalog.global.last?.defaultShortcut == nil)
         #expect(!KeyboardShortcutCatalog.window.contains { $0.id == "window.showAllFoils" })
         #expect(KeyboardShortcutCatalog.openClipboardContent.defaultShortcut ==

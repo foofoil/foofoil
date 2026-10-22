@@ -5,6 +5,51 @@ import Testing
 @Suite(.sharedApplicationState)
 @MainActor
 struct IncognitoOpeningShortcutTests {
+    @Test func clipboardAppBindingsFollowGlobalAndRejectLocalChanges() throws {
+        let store = KeyboardShortcutStore.shared
+        let ids = ["global.openClipboardContent", "global.openClipboardIncognito", "file.openClipboardContent"]
+        let definitions = try ids.map { try #require(KeyboardShortcutCatalog.definition(withID: $0)) }
+        let saved = definitions.map { (store.shortcut(for: $0), store.isCustomized($0)) }
+        defer {
+            for definition in definitions.prefix(2) { store.setShortcut(nil, for: definition) }
+            for (definition, value) in zip(definitions.reversed(), saved.reversed()) {
+                if value.1 { store.setShortcut(value.0, for: definition) } else { store.reset(definition) }
+            }
+        }
+        for definition in definitions.prefix(2) { #expect(store.setShortcut(nil, for: definition)) }
+        let ordinary = definitions[2]
+        let original = store.shortcut(for: ordinary)
+        let oldPrivate = store.incognitoShortcut(forID: ordinary.id)
+        let global = KeyboardShortcut(keyEquivalent: "j", modifiers: [.control, .command, .shift])
+        let privateGlobal = KeyboardShortcut(keyEquivalent: "j", modifiers: [.control, .command, .shift, .option])
+        #expect(store.setShortcut(global, for: definitions[0]))
+        #expect(store.shortcut(for: ordinary) == global)
+        #expect(store.followsGlobalShortcut(ordinary))
+        #expect(!store.setShortcut(nil, for: ordinary))
+        #expect(!store.reset(ordinary))
+        #expect(store.incognitoShortcut(forID: ordinary.id) == oldPrivate)
+        #expect(store.setShortcut(privateGlobal, for: definitions[1]))
+        #expect(store.shortcut(forID: "file.openClipboardIncognito") == privateGlobal)
+        #expect(store.incognitoShortcut(forID: ordinary.id) == privateGlobal)
+        let menu = NSMenu()
+        for id in [ordinary.id, "file.openClipboardContent.incognito", "file.openClipboardIncognito"] {
+            let item = NSMenuItem(title: id, action: nil, keyEquivalent: "v")
+            item.representedObject = id
+            menu.addItem(item)
+        }
+        AppDelegate().applyKeyboardShortcuts(to: menu)
+        #expect(menu.items[0].keyEquivalent == global.keyEquivalent)
+        #expect(menu.items[0].keyEquivalentModifierMask == global.modifiers)
+        #expect(menu.items[1].keyEquivalent.isEmpty)
+        #expect(menu.items[2].keyEquivalentModifierMask == privateGlobal.modifiers)
+        #expect(store.setShortcut(nil, for: definitions[0]))
+        #expect(store.shortcut(for: ordinary) == original)
+        #expect(!store.followsGlobalShortcut(ordinary))
+        #expect(store.setShortcut(nil, for: definitions[1]))
+        #expect(store.shortcut(forID: "file.openClipboardIncognito") == IncognitoOpening.clipboardShortcut)
+        #expect(store.incognitoShortcut(forID: ordinary.id) == oldPrivate)
+    }
+
     @Test func derivationFollowsCustomizationAndClearing() throws {
         let store = KeyboardShortcutStore.shared
         let definition = try #require(KeyboardShortcutCatalog.definition(withID: "file.openURL"))

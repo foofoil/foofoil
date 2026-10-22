@@ -8,13 +8,17 @@ Customize bindings in Settings → Keyboard Shortcuts. The table below shows the
 
 
 Incognito foils never enter history and are not restored after quitting. Use File → New Incognito Foil or Open Clipboard Incognito; the system Share menu also offers Incognito Foil. Content dropped into an incognito foil stays out of history, including any additional foils created for separate file groups.
-Ordinary opening actions only reuse ordinary blank foils; incognito opening creates a new foil. Menu commands and ordinary opening shortcuts always open ordinary content, regardless of the active foil. Hold Option in the File menu to reveal incognito opening commands. Incognito shortcuts automatically add Option to the configured ordinary shortcuts; opening shortcuts cannot contain Option themselves. ⌥⌘V remains a fixed incognito clipboard shortcut. Buttons inside incognito foils open incognito. An empty incognito foil shows a footprints-with-slash icon and offers no history cards or recent-history number shortcuts.
+Ordinary opening actions only reuse ordinary blank foils; incognito opening creates a new foil. Menu commands and ordinary opening shortcuts always open ordinary content, regardless of the active foil. Hold Option in the File menu to reveal incognito opening commands. Incognito shortcuts automatically add Option to the configured ordinary shortcuts; opening shortcuts cannot contain Option themselves. When no incognito clipboard global shortcut is assigned, ⌥⌘V is the fixed app shortcut for opening the clipboard incognito. Buttons inside incognito foils open incognito. An empty incognito foil shows a footprints-with-slash icon and offers no history cards or recent-history number shortcuts.
 
 ## Global Shortcuts
 
 | Action | Default shortcut | Current shortcut | Notes |
 | --- | --- | --- | --- |
 {{global}}
+
+When a clipboard global shortcut is assigned, its app shortcut follows the same binding and cannot be edited separately. Previous app bindings stop working until the global shortcut is cleared; this also replaces both previous incognito clipboard shortcuts.
+
+Both clipboard global shortcuts can be configured independently in Settings → Keyboard Shortcuts → Global and are unassigned by default. Open Clipboard Incognito creates a new incognito foil even when another app is active.
 
 
 <!-- Quick Open belongs to content opening and management. -->

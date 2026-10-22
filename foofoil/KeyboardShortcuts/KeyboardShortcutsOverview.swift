@@ -31,7 +31,16 @@ enum KeyboardShortcutsOverview {
                 let row = "| \(cell(definition.displayName)) | \(cell(defaultKey)) | \(currentCell) | \(cell(definition.note ?? "")) |"
                 guard let title = IncognitoOpening.titles[definition.id] else { return row }
                 let defaultPrivate = IncognitoOpening.derived(definition.defaultShortcut)?.displayString ?? none
-                let currentPrivate = IncognitoOpening.derived(currentShortcut)?.displayString ?? none
+                let privateShortcut: KeyboardShortcut?
+                if definition.id == "file.openClipboardContent",
+                   let globalPrivate = KeyboardShortcutCatalog.definition(withID: "global.openClipboardIncognito") {
+                    privateShortcut = shortcutProvider(globalPrivate)
+                        ?? IncognitoOpening.derived(KeyboardShortcutStore.shared.followsGlobalShortcut(definition)
+                            ? KeyboardShortcutStore.shared.storedShortcut(for: definition) : currentShortcut)
+                } else {
+                    privateShortcut = IncognitoOpening.derived(currentShortcut)
+                }
+                let currentPrivate = privateShortcut?.displayString ?? none
                 return row + "\n| \(cell(NSLocalizedString(title, comment: ""))) | \(cell(defaultPrivate)) | \(cell(currentPrivate)) | ⌥ |"
             }.joined(separator: "\n")
             text = text.replacingOccurrences(of: "{{\(section.rawValue)}}", with: rows)

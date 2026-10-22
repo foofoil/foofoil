@@ -1267,6 +1267,12 @@
         }
       }
     },
+    "Shortcut Follows Global": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Follows the global shortcut; edit it in Global." } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "跟随全局快捷键，请在全局快捷键中修改。" } }
+      }
+    },
     "Open Clipboard Incognito": {
       "localizations": {
         "en": {
@@ -12763,13 +12769,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Add ⌥ to the configured shortcut to open incognito"
+            "value": "Add ⌥ to open incognito; clipboard commands follow their global shortcuts when assigned"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "⌥与所设置快捷键组合为无痕打开"
+            "value": "⌥与所设置快捷键组合为无痕打开；剪贴板命令设置全局键位后跟随全局设置"
           }
         }
       }
