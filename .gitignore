@@ -28,3 +28,4 @@ playground.xcworkspace
 
 # Swift Package Manager
 .build/
+default.profraw

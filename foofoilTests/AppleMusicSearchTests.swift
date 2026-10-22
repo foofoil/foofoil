@@ -140,7 +140,6 @@ struct AppleMusicSearchTests {
         let first = try #require(model.highlightedItem)
         #expect(first.musicItem?.id == item.id)
         #expect(!first.isNewFoil && !first.isHistoryEntry)
-        model.setVisibleIDs([first.id])
         #expect(model.item(forKey: "1")?.musicItem?.id == item.id)
         var openedID: String?
         model.onSelect = { openedID = $0.musicItem?.id }

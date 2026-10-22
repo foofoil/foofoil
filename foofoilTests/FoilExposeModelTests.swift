@@ -349,27 +349,37 @@ struct FoilExposeModelTests {
         #expect(model.selectedIndex == 0)
     }
 
-    @Test func itemForKeyOnlyMatchesVisibleEntries() {
-        let model = makeModel()
-        let first = model.items[0].id
-        let second = model.items[1].id
-        let hidden = model.items[5].id
-        model.setVisibleIDs([first, second])
-
-        #expect(model.item(forKey: "1")?.id == first)
-        #expect(model.item(forKey: "2")?.id == second)
-        // 不可见项没有编号，直选不命中。
-        #expect(model.item(forKey: "6") == nil)
-        // 大小写不敏感：字母编号转大写后匹配。
-        model.setVisibleIDs([hidden])
-        #expect(model.item(forKey: "1")?.id == hidden)
+    @Test func itemForKeyUsesFixedListOrderAcrossNavigationAndPaging() {
+        let model = makeModel(openCount: 38)
+        let items = model.currentItems
+        model.selectedIndex = 20
+        model.requestPageScroll(direction: .down)
+        #expect(model.item(forKey: "1")?.id == items[0].id)
+        #expect(model.item(forKey: "6")?.id == items[5].id)
+        #expect(model.item(forKey: "0")?.id == items[9].id)
+        #expect(model.item(forKey: "A")?.id == items[10].id)
+        #expect(model.item(forKey: "a")?.id == items[10].id)
+        #expect(model.item(forKey: "Z")?.id == items[35].id)
+        #expect(model.item(forKey: "!") == nil)
+        #expect(model.item(forKey: "") == nil)
     }
 
     @Test func itemForKeyMatchesHistoryEntriesInCombinedList() {
         let model = makeModel()
-        let history = model.historyItems[0].id
-        model.setVisibleIDs([history])
-        #expect(model.item(forKey: "1")?.id == history)
+        #expect(model.item(forKey: "7")?.id == model.historyItems[0].id)
+        #expect(model.item(forKey: "8")?.id == model.historyItems[1].id)
+        #expect(model.item(forKey: "9") == nil)
+    }
+
+    @Test func fixedNumberingFollowsFilteredResults() {
+        let open = makeItem(title: "Open")
+        let history = makeItem(title: "History", isHistoryEntry: true)
+        let model = makeModel(items: [open], historyItems: [history])
+        #expect(model.item(forKey: "1")?.id == open.id)
+        #expect(model.item(forKey: "2")?.id == history.id)
+        model.searchText = "History"
+        #expect(model.item(forKey: "1")?.id == history.id)
+        #expect(model.item(forKey: "2") == nil)
     }
 
     @Test func bodyPreviewOnlyForDocumentKindsWithContent() {

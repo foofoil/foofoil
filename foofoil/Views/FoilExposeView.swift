@@ -82,7 +82,7 @@ final class FoilExposeThumbnailLoader: ObservableObject {
     }
 }
 
-/// 汇总每张卡片在窗口坐标系里的外框，用于计算“当前可见条目”（只有可见项才有编号）。
+/// 汇总每张卡片在窗口坐标系里的外框，仅用于键盘导航和翻页后的高亮定位。
 private struct ItemFramesPreference: PreferenceKey {
     static var defaultValue: [UUID: CGRect] = [:]
     static func reduce(value: inout [UUID: CGRect], nextValue: () -> [UUID: CGRect]) {
@@ -108,7 +108,7 @@ private struct FoilExposeSelectionSnapshot: Equatable {
 
 /// 覆盖层主体：深色半透明背景 + 标题/搜索控件 + 自适应网格缩略图；点击背景关闭。
 /// 只在当前活跃显示器上展示，包含全部打开的箔片；历史记录与文件搜索各自独立分区。
-/// 编号随滚动实时重排，保证可见项都有编号。
+/// 编号按列表顺序固定分配，不随滚动改变。
 struct FoilExposeView: View {
     @ObservedObject var model: FoilExposeModel
 
@@ -121,7 +121,7 @@ struct FoilExposeView: View {
         GridItem(.adaptive(minimum: 320, maximum: 620), spacing: 10)
     ]
 
-    /// 当前可见条目的下标（显示顺序）；编号与编号直选都据此实时计算。
+    /// 当前可见条目的下标，仅用于避免键盘导航重复滚动和翻页后的高亮定位。
     @State private var visibleIndices: [Int] = []
     @State private var repositionAfterPageScroll = false
     @State private var scrollPosition = ScrollPosition()
@@ -133,7 +133,6 @@ struct FoilExposeView: View {
     var body: some View {
         let entries: [(offset: Int, item: FoilExposeItem)] = model.currentItems.enumerated()
             .map { (offset: $0.offset, item: $0.element) }
-        let shortcutByID = Self.shortcutByID(for: entries, visibleIndices: visibleIndices)
         ZStack {
             Rectangle().fill(.ultraThinMaterial)
             Rectangle().fill(Color.black.opacity(0.42))
@@ -145,7 +144,7 @@ struct FoilExposeView: View {
                     header
                         .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { headerHeight = $0 }
                     ScrollView {
-                        content(for: entries, shortcutByID: shortcutByID)
+                        content(for: entries)
                             .padding(.horizontal, 44)
                             // 高亮卡片放大约 3%，屏幕较矮时首行贴住滚动区顶部会被裁掉，这里留出余量。
                             .padding(.top, 8)
@@ -192,7 +191,7 @@ struct FoilExposeView: View {
                         // 保留浏览位置；内容缩短时由 ScrollView 自然限制到有效范围。
                     }
                     .onChange(of: model.searchText) { _, _ in
-                        // 关键字变化后结果集重排，回到顶部；可见编号由外框回调自然重算。
+                        // 关键字变化后结果集重排，回到顶部；编号按新的结果顺序分配。
                         repositionAfterPageScroll = false
                         scrollPosition.scrollTo(edge: .top)
                     }
@@ -229,7 +228,6 @@ struct FoilExposeView: View {
         if indices != visibleIndices {
             visibleIndices = indices
         }
-        model.setVisibleIDs(visible.map(\.item.id))
         if repositionAfterPageScroll {
             repositionToFirstVisible()
         }
@@ -244,25 +242,9 @@ struct FoilExposeView: View {
         }
     }
 
-    /// 可见条目按显示顺序拿到 1-9、A-Z 的编号；不可见条目不编号（编号直选也不命中）。
-    private static func shortcutByID(
-        for entries: [(offset: Int, item: FoilExposeItem)],
-        visibleIndices: [Int]
-    ) -> [UUID: String] {
-        let itemByIndex = Dictionary(uniqueKeysWithValues: entries.map { ($0.offset, $0.item) })
-        var result: [UUID: String] = [:]
-        for (position, index) in visibleIndices.enumerated() {
-            guard let key = FoilExposeShortcut.key(forIndex: position),
-                  let item = itemByIndex[index] else { break }
-            result[item.id] = key
-        }
-        return result
-    }
-
     @ViewBuilder
     private func content(
-        for entries: [(offset: Int, item: FoilExposeItem)],
-        shortcutByID: [UUID: String]
+        for entries: [(offset: Int, item: FoilExposeItem)]
     ) -> some View {
         VStack(spacing: 24) {
             // 剪贴板入口贴在内容区上方、与内容右对齐；只有剪贴板里有可打开内容时出现。
@@ -270,14 +252,13 @@ struct FoilExposeView: View {
                 ClipboardHintButton(content: clipboardContent, action: model.onOpenClipboard)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            contentSections(for: entries, shortcutByID: shortcutByID)
+            contentSections(for: entries)
         }
     }
 
     @ViewBuilder
     private func contentSections(
-        for entries: [(offset: Int, item: FoilExposeItem)],
-        shortcutByID: [UUID: String]
+        for entries: [(offset: Int, item: FoilExposeItem)]
     ) -> some View {
         // 有关键字时不再给整页空态：文件结果区会说明“主目录中没有匹配的文件”。
         if entries.isEmpty && model.searchQuery.isEmpty && !model.showsHistorySection {
@@ -302,7 +283,7 @@ struct FoilExposeView: View {
                 if !openEntries.isEmpty {
                     VStack(alignment: .leading, spacing: 16) {
                         sectionHeader("Expose Open Section", symbol: "macwindow", count: openEntries.filter { !$0.item.isNewFoil }.count, tint: .mint)
-                        grid(for: openEntries, shortcutByID: shortcutByID)
+                        grid(for: openEntries)
                     }
                 }
                 if model.showsHistorySection {
@@ -314,7 +295,7 @@ struct FoilExposeView: View {
                                 .foregroundStyle(.white.opacity(0.6))
                                 .frame(maxWidth: .infinity, minHeight: 96)
                         } else {
-                            grid(for: historyEntries, shortcutByID: shortcutByID)
+                            grid(for: historyEntries)
                         }
                     }
                     .id("expose-history")
@@ -327,8 +308,7 @@ struct FoilExposeView: View {
                                 sectionHeader(category.sectionLocalizationKey, symbol: category.symbolName,
                                               count: nil, tint: .pink)
                                 musicResultsGrid(
-                                    for: musicEntries.filter { $0.item.musicItem?.searchCategory == category },
-                                    shortcutByID: shortcutByID
+                                    for: musicEntries.filter { $0.item.musicItem?.searchCategory == category }
                                 )
                                 if model.canExpandMusicResults(in: category) {
                                     fileActionButton(category.moreLocalizationKey) {
@@ -358,7 +338,7 @@ struct FoilExposeView: View {
     }
 
     private func musicResultsGrid(
-        for entries: [(offset: Int, item: FoilExposeItem)], shortcutByID: [UUID: String]
+        for entries: [(offset: Int, item: FoilExposeItem)]
     ) -> some View {
         LazyVGrid(columns: Self.fileColumns, spacing: 10) {
             ForEach(entries, id: \.item.id) { entry in
@@ -367,7 +347,7 @@ struct FoilExposeView: View {
                         symbolName: entry.item.symbolName, title: music.title,
                         subtitle: music.searchSubtitle,
                         isHighlighted: entry.offset == model.selectedIndex,
-                        shortcut: shortcutByID[entry.item.id], showsSearchModifier: model.isSearching
+                        shortcut: FoilExposeShortcut.key(forIndex: entry.offset), showsSearchModifier: model.isSearching
                     ) { model.onSelect(entry.item) }
                     .background(ItemFrameReporter(id: entry.item.id))
                 }
@@ -463,15 +443,14 @@ struct FoilExposeView: View {
     }
 
     private func grid(
-        for entries: [(offset: Int, item: FoilExposeItem)],
-        shortcutByID: [UUID: String]
+        for entries: [(offset: Int, item: FoilExposeItem)]
     ) -> some View {
         LazyVGrid(columns: Self.gridColumns, spacing: 18) {
             ForEach(entries, id: \.item.id) { entry in
                 FoilExposeItemView(
                     item: entry.item,
                     isHighlighted: entry.offset == model.selectedIndex,
-                    shortcut: shortcutByID[entry.item.id],
+                    shortcut: FoilExposeShortcut.key(forIndex: entry.offset),
                     showsSearchModifier: model.isSearching
                 ) {
                     model.onSelect(entry.item)
@@ -853,7 +832,7 @@ private struct SearchFieldFocusProbe: NSViewRepresentable {
 struct FoilExposeItemView: View {
     let item: FoilExposeItem
     var isHighlighted: Bool = false
-    /// 动态编号：随滚动实时变化，只有当前可见项才有编号。
+    /// 固定编号：按列表顺序分配 1-9、0、A-Z，超出 36 项不编号。
     var shortcut: String?
     /// 搜索输入状态：编号直选需要 ⌃，角标同步显示修饰键。
     var showsSearchModifier: Bool = false

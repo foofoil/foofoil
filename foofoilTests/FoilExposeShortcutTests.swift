@@ -23,7 +23,6 @@ struct FoilExposeShortcutTests {
         defer { controller.model = previousModel }
         model.searchText = "Match"
         model.columnCount = 4
-        model.setVisibleIDs(items.map(\.id))
         var activated = false
         model.onSelect = { _ in activated = true }
         for (key, index) in [("n", 4), ("f", 5), ("p", 1), ("b", 0), ("p", 0), ("b", 0)] {
@@ -292,21 +291,22 @@ struct FoilExposeShortcutTests {
         #expect(!state.text.contains("{{"))
     }
 
-    @Test func indicesZeroThroughEightMapToDigits() {
+    @Test func indicesZeroThroughNineMapToDigits() {
         #expect(FoilExposeShortcut.key(forIndex: 0) == "1")
         #expect(FoilExposeShortcut.key(forIndex: 4) == "5")
         #expect(FoilExposeShortcut.key(forIndex: 8) == "9")
+        #expect(FoilExposeShortcut.key(forIndex: 9) == "0")
     }
 
-    @Test func indicesNineThroughThirtyFourMapToLetters() {
-        #expect(FoilExposeShortcut.key(forIndex: 9) == "A")
-        #expect(FoilExposeShortcut.key(forIndex: 10) == "B")
-        #expect(FoilExposeShortcut.key(forIndex: 16) == "H")
-        #expect(FoilExposeShortcut.key(forIndex: 34) == "Z")
+    @Test func indicesTenThroughThirtyFiveMapToLetters() {
+        #expect(FoilExposeShortcut.key(forIndex: 10) == "A")
+        #expect(FoilExposeShortcut.key(forIndex: 11) == "B")
+        #expect(FoilExposeShortcut.key(forIndex: 17) == "H")
+        #expect(FoilExposeShortcut.key(forIndex: 35) == "Z")
     }
 
-    @Test func indexThirtyFiveAndBeyondHaveNoShortcut() {
-        #expect(FoilExposeShortcut.key(forIndex: 35) == nil)
+    @Test func indexThirtySixAndBeyondHaveNoShortcut() {
+        #expect(FoilExposeShortcut.key(forIndex: 36) == nil)
         #expect(FoilExposeShortcut.key(forIndex: 100) == nil)
     }
 
@@ -316,8 +316,8 @@ struct FoilExposeShortcutTests {
     }
 
     @Test func allAssignedShortcutsAreUnique() {
-        let keys = (0..<35).compactMap { FoilExposeShortcut.key(forIndex: $0) }
-        #expect(keys.count == 35)
-        #expect(Set(keys).count == 35)
+        let keys = (0..<36).compactMap { FoilExposeShortcut.key(forIndex: $0) }
+        #expect(keys.count == 36)
+        #expect(Set(keys).count == 36)
     }
 }

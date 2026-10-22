@@ -139,7 +139,7 @@ Editing shortcuts apply to text fields or selectable content, depending on focus
 
 ## Inside Foil Overview
 
-- Arrow keys select; ↑ / ↓ move between visual rows using the cards’ left edges for alignment; Return activates the selected foil. Control + number or letter selects visible items directly.
+- Arrow keys select; ↑ / ↓ move between visual rows using the cards’ left edges for alignment; Return activates the selected foil. Control + number or letter selects numbered items directly, including offscreen items. The first 36 items are numbered 1–9, 0, A–Z in list order; scrolling does not change their numbers.
 - Tab switches the highlight between the first open foil and the first history result, keeping search focused. Empty sections are skipped; scope selection and input method composition keep their existing Tab behavior.
 - ⌃P / ⌃N / ⌃F / ⌃B move the highlight up / down / right / left, taking priority over letter selection while keeping search focused.
 - Search is shown and focused automatically and stays active; type `/` to choose a search scope.

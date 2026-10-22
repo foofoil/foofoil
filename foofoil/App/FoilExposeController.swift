@@ -10,13 +10,13 @@ import Carbon.HIToolbox
 import Combine
 import SwiftUI
 
-/// 索引到数字/字母快捷键的纯函数映射：0-8 → 1-9，9-34 → A-Z，35 起没有可用键（仍可点击选择）。
+/// 索引到数字/字母快捷键的纯函数映射：0-9 → 1-9、0，10-35 → A-Z，36 起没有可用键（仍可点击选择）。
 enum FoilExposeShortcut {
     static func key(forIndex index: Int) -> String? {
         guard index >= 0 else { return nil }
-        if index < 9 { return String(index + 1) }
-        guard index < 35 else { return nil }
-        return String(UnicodeScalar(65 + (index - 9))!)
+        if index < 10 { return String((index + 1) % 10) }
+        guard index < 36 else { return nil }
+        return String(UnicodeScalar(65 + (index - 10))!)
     }
 }
 
@@ -128,15 +128,13 @@ final class FoilExposeModel: ObservableObject {
     @Published var historyCategory: FoilExposeHistoryCategory = .all {
         didSet {
             guard oldValue != historyCategory else { return }
-            // 分类切换后的可见集由视图重新回传，避免编号直选命中旧卡片。
-            visibleIDs = []
+            // 分类切换后将高亮定位到新的历史分区首项。
             selectedIndex = currentItems.firstIndex(where: \.isHistoryEntry) ?? 0
         }
     }
 
     @Published var pinnedOnly = false {
         didSet {
-            visibleIDs = []
             selectedIndex = currentItems.firstIndex(where: \.isHistoryEntry) ?? 0
         }
     }
@@ -274,8 +272,6 @@ final class FoilExposeModel: ObservableObject {
     var onEnableFileSearch: () -> Void = {}
     /// 点击剪贴板提示：由控制器关闭覆盖层并打开剪贴板内容（等价于 ⌘⇧V）。
     var onOpenClipboard: () -> Void = {}
-    /// 面板视图当前可见条目的 id（按显示顺序），随滚动实时回填；编号直选只命中可见项。
-    private var visibleIDs: [UUID] = []
     private let fileSearch: (String, SpotlightSearchTarget, @escaping (SpotlightSearchOutcome) -> Void) -> Void
     private let cameraAvailable: () -> Bool
     private let cancelFiles: () -> Void
@@ -370,7 +366,6 @@ final class FoilExposeModel: ObservableObject {
     func replaceHistoryItems(_ items: [FoilExposeItem]) {
         historyItems = items
         normalizeHistoryCategory()
-        visibleIDs = []
         selectedIndex = currentItems.firstIndex(where: \.isHistoryEntry) ?? 0
     }
 
@@ -380,7 +375,6 @@ final class FoilExposeModel: ObservableObject {
         items = open
         historyItems = history
         normalizeHistoryCategory()
-        visibleIDs = []
         selectedIndex = selectedID.flatMap { id in currentItems.firstIndex { $0.id == id } }
             ?? min(selectedIndex, max(0, currentItems.count - 1))
     }
@@ -666,26 +660,12 @@ final class FoilExposeModel: ObservableObject {
         selectedIndex = min(row * columns + columns - 1, currentItems.count - 1)
     }
 
-    /// 面板视图回填当前可见条目；随滚动实时更新。
-    func setVisibleIDs(_ ids: [UUID]) {
-        visibleIDs = ids
-    }
-
-    private var visibleKeyMap: [String: UUID] {
-        var map: [String: UUID] = [:]
-        for (index, id) in visibleIDs.enumerated() {
-            guard let key = FoilExposeShortcut.key(forIndex: index) else { break }
-            if map[key] == nil { map[key] = id }
-        }
-        return map
-    }
-
-    /// 按键先转大写再查询；编号直选只命中当前可见条目。
+    /// 编号按当前列表从头分配，滚动和高亮变化不影响编号；屏外条目也可直选。
     func item(forKey key: String) -> FoilExposeItem? {
         let upper = key.uppercased()
-        guard let id = visibleKeyMap[upper],
-              let match = currentItems.first(where: { $0.id == id }) else { return nil }
-        return match
+        return currentItems.enumerated().first {
+            FoilExposeShortcut.key(forIndex: $0.offset) == upper
+        }?.element
     }
 
     /// 发起整页滚动：由面板滚动其内容，完成后把高亮重定位到可见第一项。
