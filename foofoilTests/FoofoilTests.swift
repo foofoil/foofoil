@@ -1013,16 +1013,21 @@ struct FoofoilTests {
     }
 
     @Test func testClearHistoryPreservesActiveCacheAndRemovesOtherCacheFiles() throws {
-        let activeSourceURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("foofoil-active-\(UUID().uuidString).png")
-        let historicalSourceURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("foofoil-history-\(UUID().uuidString).png")
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("foofoil-clear-history-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let suite = "cache-test-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let repository = HistoryRepository(databaseURL: root.appendingPathComponent("history.sqlite"))
+        let cache = ContentCache(repository: repository, defaults: defaults, directories: { [root] })
+        let manager = HistoryManager(repository: repository, contentCache: cache, cacheDirectories: { [root] })
+
+        let activeSourceURL = root.appendingPathComponent("foofoil-active-\(UUID().uuidString).png")
+        let historicalSourceURL = root.appendingPathComponent("foofoil-history-\(UUID().uuidString).png")
         try Data("active".utf8).write(to: activeSourceURL)
         try Data("history".utf8).write(to: historicalSourceURL)
-        defer {
-            try? FileManager.default.removeItem(at: activeSourceURL)
-            try? FileManager.default.removeItem(at: historicalSourceURL)
-        }
 
         let activeState = AppState()
         activeState.imageURL = activeSourceURL
@@ -1030,31 +1035,29 @@ struct FoofoilTests {
         let historicalState = AppState()
         historicalState.imageURL = historicalSourceURL
         let historicalCacheURL = try #require(historicalState.imageURL)
-        let cacheDirectoryURL = try #require(AppState.cacheDirectoryURLs().first)
-        let orphanCacheURL = cacheDirectoryURL
-            .appendingPathComponent("cached_text_\(UUID().uuidString).txt")
+        let orphanCacheURL = root.appendingPathComponent("cached_text_\(UUID().uuidString).txt")
         try Data("orphan".utf8).write(to: orphanCacheURL)
 
-        HistoryManager.shared.clearHistory(preserving: [activeConfig])
+        manager.clearHistory(preserving: [activeConfig])
+        cache.flushCleanup()
 
         let activeCacheURL = try #require(activeState.imageURL)
         #expect(FileManager.default.fileExists(atPath: activeCacheURL.path))
         #expect(FileManager.default.fileExists(atPath: historicalCacheURL.path))
         #expect(FileManager.default.fileExists(atPath: orphanCacheURL.path) == false)
-        #expect(SettingsStore.shared.historyConfigs.map(\.id) == [activeConfig.id])
-
-        HistoryManager.shared.clearHistory(preserving: [])
+        #expect(repository.recent(limit: 30).map(\.id) == [activeConfig.id])
     }
 
     @Test func testSettingsStoreDefaults() async throws {
-        let store = SettingsStore.shared
+        let suite = "settings-defaults-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = SettingsStore(userDefaults: defaults)
 
-        // 清理所有数据以确保独立性
-        store.clear()
-
-        // 验证默认值为空
-        #expect(store.windowConfigs.isEmpty == true)
-        #expect(store.historyConfigs.isEmpty == true)
+        // 历史记录由 SQLite 统一管理，默认值只验证 UserDefaults 承载的窗口与偏好。
+        #expect(store.windowConfigs.isEmpty)
+        #expect(store.startupBehavior == .newWindow)
+        #expect(store.navigatorPanelSide == .left)
     }
 
     @Test func testOpacityClamping() async throws {
@@ -1722,10 +1725,10 @@ struct FoofoilTests {
         #expect(modes.compactMap { $0.representedObject as? String } == ["always", "onHover", "hidden"])
         #expect(modes.allSatisfy { appDelegate.validateMenuItem($0) == false })
 
-        // 挂左/挂右两项合并为单个换边动作，⌘⌥L 触发。
+        // 挂左/挂右两项合并为单个换边动作，⌘⌃⇧L 触发。
         let moveSide = try #require(viewMenu.items.first { $0.action == #selector(AppDelegate.moveNavigatorToOppositeSideAction) })
         #expect(moveSide.keyEquivalent == "l")
-        #expect(moveSide.keyEquivalentModifierMask == [.command, .option])
+        #expect(moveSide.keyEquivalentModifierMask == [.command, .control, .shift])
 
         // 换边项紧跟导航子菜单，中间不插分割线。
         if let submenuIndex = viewMenu.items.firstIndex(where: { $0.submenu === navigatorSubmenu }),

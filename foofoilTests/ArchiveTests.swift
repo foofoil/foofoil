@@ -104,7 +104,7 @@ struct ArchiveTests {
         archive.select(other.id)
         try await wait { !archive.busy }
         #expect(owner.readingState.text == "outside")
-        #expect(owner.toConfig().archiveSource?.primaryURL == outer.url)
+        #expect(TestFileIdentity.equals(owner.toConfig().archiveSource?.primaryURL, outer.url))
         #expect(archive.message == nil)
         withExtendedLifetime(observation) {}
     }
@@ -355,7 +355,7 @@ struct ArchiveTests {
         #expect(state.navigatorContributions.count == 1)
         #expect(!state.navigatorContributions.contains { $0.id == AppState.markdownOutlineNavigatorID })
         let config = state.toConfig()
-        #expect(config.imagePath == fixture.url.path)
+        #expect(TestFileIdentity.equals(config.imagePath, fixture.url.path))
         #expect(config.text.isEmpty && config.textPath == nil && config.extensionID == nil)
         #expect(config.contentKind == .archive)
         let repository = HistoryRepository(databaseURL: fixture.directory.appendingPathComponent("history.sqlite"))
@@ -422,7 +422,7 @@ struct ArchiveTests {
         state.openFile(url: fixture.url)
         state.endExtensionSessionOnWindowClose()
         #expect(state.toConfig().contentKind == .archive)
-        #expect(state.toConfig().imagePath == fixture.url.path)
+        #expect(TestFileIdentity.equals(state.toConfig().imagePath, fixture.url.path))
         state.resetContent()
     }
 

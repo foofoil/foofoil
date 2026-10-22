@@ -16,7 +16,7 @@ struct QuickLookTests {
         state.openFile(url: url)
         defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
         #expect(state.isQuickLookDocument)
-        #expect(state.imageURL == url)
+        #expect(TestFileIdentity.equals(state.imageURL, url))
         #expect(state.cachedContentPaths.isEmpty)
         #expect(state.listableKind == nil)
         #expect(state.currentDroppedFileKind == FileListGrouper.dropKind(url: url))
@@ -27,7 +27,7 @@ struct QuickLookTests {
         #expect(config.contentKind == .quickLook)
         let restored = AppState(config: config)
         #expect(restored.isQuickLookDocument)
-        #expect(restored.imageURL == url)
+        #expect(TestFileIdentity.equals(restored.imageURL, url))
         let reused = AppState()
         reused.loadConfig(config)
         #expect(reused.isQuickLookDocument)

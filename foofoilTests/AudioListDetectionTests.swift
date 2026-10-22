@@ -53,11 +53,11 @@ import Foundation
         try write("cover.jpg", in: directory)
 
         let match = try #require(AudioListDetector.detect(for: directory.appendingPathComponent("02 - Track 02.flac")))
-        #expect(match == .files([
+        #expect(match == .files(canonicalURLs([
             directory.appendingPathComponent("01 - Track 01.flac"),
             directory.appendingPathComponent("02 - Track 02.flac"),
             directory.appendingPathComponent("03 - Track 03.flac")
-        ]))
+        ])))
     }
 
     @Test func detectRequiresTheOpenedFileToBelongToTheList() throws {
@@ -90,7 +90,7 @@ import Foundation
             trackCount: 2
         )
 
-        #expect(AudioListDetector.detect(for: audio) == .cue(cue))
+        #expect(TestFileIdentity.equals(cueURL(from: AudioListDetector.detect(for: audio)), cue))
     }
 
     @Test func detectFindsCueReferencingTheOpenedTrack() throws {
@@ -105,8 +105,8 @@ import Foundation
             trackCount: 2
         )
 
-        #expect(AudioListDetector.detect(for: first) == .cue(cue))
-        #expect(AudioListDetector.detect(for: second) == .cue(cue))
+        #expect(TestFileIdentity.equals(cueURL(from: AudioListDetector.detect(for: first)), cue))
+        #expect(TestFileIdentity.equals(cueURL(from: AudioListDetector.detect(for: second)), cue))
     }
 
     @Test func detectIgnoresCueThatDoesNotReferenceTheFile() throws {
@@ -162,12 +162,25 @@ import Foundation
         state.installDetectedAudioList(.files([first, second]), preferredURL: second)
 
         #expect(state.id == originalID)
-        #expect(state.fileList?.items.map(\.path) == [first.path, second.path])
-        #expect(state.fileList?.currentItem?.path == second.path)
-        #expect(state.imageURL?.path == second.path)
+        #expect(state.fileList?.items.map { TestFileIdentity.path($0.path) } == canonicalPaths([first, second]))
+        #expect(state.fileList?.currentItem.map { TestFileIdentity.path($0.path) } == TestFileIdentity.path(second))
+        #expect(state.imageURL.map { TestFileIdentity.path($0) } == TestFileIdentity.path(second))
     }
 
     // MARK: - Helpers
+
+    private func canonicalURLs(_ urls: [URL]) -> [URL] {
+        urls.map { URL(fileURLWithPath: TestFileIdentity.path($0)) }
+    }
+
+    private func canonicalPaths(_ urls: [URL]) -> [String] {
+        urls.map { TestFileIdentity.path($0) }
+    }
+
+    private func cueURL(from match: AudioListDetector.Match?) -> URL? {
+        guard case let .cue(url) = match else { return nil }
+        return url
+    }
 
     private func makeDirectory() throws -> URL {
         let url = FileManager.default.temporaryDirectory

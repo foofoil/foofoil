@@ -14,6 +14,11 @@ struct BlankFoilMinimumSizeTests {
             controller.close()
             HistoryManager.shared.removeFromHistory(state.toConfig())
         }
+        // 窗口装载 SwiftUI 后可能异步再应用一次尺寸限制，给初始状态留出稳定时间。
+        for _ in 0..<100 {
+            if window.minSize.width == 308 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
         #expect(window.minSize == NSSize(width: 308, height: 308))
         state.text = "A note"
         for _ in 0..<100 {
