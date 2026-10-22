@@ -67,7 +67,12 @@ When editing the app together with `extension-kit` or `hifi`, open `foofoil.xcwo
 
 - Add or update focused tests for behavior changes, persistence migrations, parsing, history/search behavior, and regressions.
 - Prefer the Swift Testing framework for unit tests already under `foofoilTests`; use XCTest for UI tests under `foofoilUITests`.
-- Build the app and run the relevant tests before considering a change complete. A typical full verification command is:
+- Build the app and run tests targeted to the affected behavior before considering an app code change complete. For bug fixes, prioritize regression tests that cover the reported issue. Do not run the full test suite automatically.
+- When changing shared modules, dependencies, build configuration, or cross-module behavior, run reasonably scoped checks and assess whether full-suite testing is warranted. Uncertain impact is a reason to recommend full-suite testing, not authorization to run it.
+- Once relevant checks pass, do not repeat or broaden testing unless new changes, failures, or unresolved risks justify it.
+- Recommend full-suite testing only when there is a concrete reason. Explain the remaining risks and estimated duration, if known, and ask whether to run it now, offering “Run now” and “Skip for now” options when supported. Wait for explicit approval before running it. If the user has already requested full-suite testing, run it without asking again.
+- If the user defers full-suite testing, finish the other authorized work and record the unverified scope and its implications in the handoff. Always report which checks ran and their results; do not describe targeted test success as complete verification.
+- The following command runs the full test suite and requires the user's explicit approval or request:
 
   ```sh
   xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platform=macOS'
