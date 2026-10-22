@@ -116,6 +116,7 @@ struct HistoryCardView: View {
     private var isAudioHistory: Bool { historyKind == .audio }
     private var isVideoHistory: Bool { historyKind == .video }
     private var isCameraHistory: Bool { historyKind == .camera }
+    private var isTerminalHistory: Bool { historyKind == .terminal }
 
     @ViewBuilder
     private var shortcutOverlay: some View {
@@ -261,6 +262,9 @@ struct HistoryCardView: View {
                 mediaPlaceholder(systemName: "archivebox")
             } else if isCameraHistory {
                 cameraPlaceholder
+            } else if isTerminalHistory {
+                // 终端没有可预览的图片或正文，缩略图位置固定显示终端图标。
+                mediaPlaceholder(systemName: historyKind.symbolName)
             } else if Self.shouldShowMediaCard(config: config, hasLoadedImage: cardImage != nil) {
                 if let nsImage = cardImage {
                     ZStack {
