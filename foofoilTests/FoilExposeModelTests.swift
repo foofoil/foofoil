@@ -88,6 +88,28 @@ struct FoilExposeModelTests {
         #expect(model.currentItems.isEmpty)
     }
 
+    @Test func terminalHistoryCategoryFiltersAndClearsOnlyClosedTerminals() {
+        let open = makeItem(title: "Open document")
+        let terminal = FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true,
+                                     title: "Terminal", symbolName: "terminal", contentKind: .terminal, thumbnailPath: nil)
+        let document = makeItem(title: "Document", isHistoryEntry: true)
+        let model = makeModel(items: [open], historyItems: [document, terminal])
+        #expect(model.visibleHistoryCategories == [.all, .documents, .terminal])
+        #expect(model.historyCount(in: .terminal) == 1)
+        model.historyCategory = .terminal
+        #expect(model.currentItems.map(\.id) == [open.id, terminal.id])
+
+        let closed = WindowConfig(id: terminal.id, contentKind: .terminal)
+        let active = WindowConfig(id: UUID(), contentKind: .terminal)
+        var pinned = WindowConfig(id: UUID(), contentKind: .terminal)
+        pinned.historyIsPinned = true
+        let other = WindowConfig(id: document.id, contentKind: .text)
+        #expect(FoilExposeModel.historyToClear([closed, active, pinned, other], category: .terminal,
+                                             openIDs: [active.id]).map(\.id) == [closed.id])
+        model.replaceHistoryItems([document])
+        #expect(model.historyCategory == .all)
+    }
+
     @Test func clearingCategoryUsesAllClosedRecordsAndInfersKinds() {
         let open = WindowConfig(id: UUID(), text: "Open", contentKind: .note)
         let note = WindowConfig(id: UUID(), text: "Closed", contentKind: .note)
@@ -101,7 +123,7 @@ struct FoilExposeModelTests {
     }
 
     @Test func historyCategoriesCoverSupportedKinds() {
-        #expect(FoilExposeHistoryCategory.allCases.count == 6)
+        #expect(FoilExposeHistoryCategory.allCases.count == 7)
         for kind in [HistoryContentKind.audio, .video] {
             #expect(FoilExposeHistoryCategory.media.includes(kind))
         }
@@ -111,6 +133,7 @@ struct FoilExposeModelTests {
         #expect(FoilExposeHistoryCategory.images.includes(.image))
         #expect(FoilExposeHistoryCategory.web.includes(.web))
         #expect(FoilExposeHistoryCategory.notes.includes(.note))
+        #expect(FoilExposeHistoryCategory.terminal.includes(.terminal))
         for kind in [HistoryContentKind.camera, .extensionContent] {
             #expect(FoilExposeHistoryCategory.all.includes(kind))
             #expect(FoilExposeHistoryCategory.allCases.dropFirst().allSatisfy { !$0.includes(kind) })

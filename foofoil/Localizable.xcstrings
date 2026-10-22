@@ -2936,6 +2936,23 @@
         }
       }
     },
+    "Expose History Category terminal": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "终端"
+          }
+        }
+      }
+    },
     "Expose History Category Empty": {
       "extractionState": "manual",
       "localizations": {

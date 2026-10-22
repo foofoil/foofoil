@@ -27,7 +27,7 @@ enum FoilExposeMoveDirection: Equatable {
 
 /// 总览历史的内容分类；摄像头和未归类内容只出现在“全部”。
 enum FoilExposeHistoryCategory: String, CaseIterable, Identifiable {
-    case all, images, media, web, documents, notes
+    case all, images, media, web, documents, notes, terminal
 
     var id: Self { self }
     var localizationKey: String { "Expose History Category " + rawValue }
@@ -39,6 +39,7 @@ enum FoilExposeHistoryCategory: String, CaseIterable, Identifiable {
         case .web: "globe"
         case .documents: "doc.text"
         case .notes: "note.text"
+        case .terminal: "terminal"
         }
     }
 
@@ -56,6 +57,7 @@ enum FoilExposeHistoryCategory: String, CaseIterable, Identifiable {
         case .web: kind == .web
         case .documents: [.text, .markdown, .csv, .pdf, .quickLook, .ebook].contains(kind)
         case .notes: kind == .note
+        case .terminal: kind == .terminal
         }
     }
 }
