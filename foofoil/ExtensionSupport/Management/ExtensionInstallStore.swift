@@ -204,10 +204,14 @@ struct ExtensionPackageBuilder {
         let bundle = try makeBundle(manifest: manifest, directory: directory, fileManager: fileManager)
         var files: [String: Data] = [:]
         let enumerator = fileManager.enumerator(at: bundle, includingPropertiesForKeys: [.isRegularFileKey])
+        let rootPath = FileReference.canonicalPath(bundle.deletingLastPathComponent().path)
         while let fileURL = enumerator?.nextObject() as? URL {
             let values = try fileURL.resourceValues(forKeys: [.isRegularFileKey])
             guard values.isRegularFile == true else { continue }
-            let relative = fileURL.path.replacingOccurrences(of: bundle.deletingLastPathComponent().path + "/", with: "")
+            let filePath = FileReference.canonicalPath(fileURL)
+            // 临时目录可能以 /var 创建、以 /private/var 枚举；统一后再取相对路径。
+            guard filePath.hasPrefix(rootPath + "/") else { continue }
+            let relative = String(filePath.dropFirst(rootPath.count + 1))
             files[relative] = try Data(contentsOf: fileURL)
         }
         return try ExtensionArchive.pack(files: files)

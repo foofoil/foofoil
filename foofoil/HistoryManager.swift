@@ -152,7 +152,7 @@ public final class HistoryManager: ObservableObject {
         let activePaths = Set((active + pinned).flatMap(cachePaths(for:))).union(activeCachePaths())
         for directoryURL in cacheDirectories() {
             guard let enumerator = FileManager.default.enumerator(at: directoryURL, includingPropertiesForKeys: [.isRegularFileKey], options: [.skipsHiddenFiles]) else { continue }
-            for case let fileURL as URL in enumerator where AppState.isManagedCacheURL(fileURL) && !activePaths.contains(fileURL.path) {
+            for case let fileURL as URL in enumerator where contentCache.isManaged(fileURL) && !activePaths.contains(fileURL.path) {
                 contentCache.retire([fileURL.path])
             }
         }

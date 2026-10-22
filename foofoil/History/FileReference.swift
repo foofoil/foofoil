@@ -1,7 +1,20 @@
 import Foundation
+import Darwin
 
 /// 定位与授权分开：只对可访问的本地卷上明确的 ENOENT 作删除判断。
 nonisolated enum FileReference {
+    /// 统一路径表示：书签解析和目录枚举可能返回 `/private/var/...`，而用户输入仍是 `/var/...`。
+    /// Foundation 的 `resolvingSymlinksInPath` 在部分系统版本上不会消除 `/private` 前缀，改用 `realpath`。
+    static func canonicalPath(_ path: String) -> String {
+        if let resolved = realpath(path, nil) {
+            defer { free(resolved) }
+            return String(cString: resolved)
+        }
+        return URL(fileURLWithPath: path).standardizedFileURL.path
+    }
+
+    static func canonicalPath(_ url: URL) -> String { canonicalPath(url.path) }
+
     enum Status: Equatable { case available, missing, authorizationRequired, offline, temporaryFailure }
     struct Resolution {
         var url: URL

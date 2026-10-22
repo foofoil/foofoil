@@ -79,7 +79,7 @@ nonisolated enum ArchiveReader {
             freshURL.removeAllCachedResourceValues()
             let values = try freshURL.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey, .fileResourceIdentifierKey])
             guard let size = values.fileSize, size <= 8 * 1_024 * 1_024 * 1_024 else { throw ArchiveFailure.limit }
-            return "\(url.path)|\(size)|\(values.contentModificationDate?.timeIntervalSince1970 ?? 0)|\(String(describing: values.fileResourceIdentifier))"
+            return "\(FileReference.canonicalPath(url))|\(size)|\(values.contentModificationDate?.timeIntervalSince1970 ?? 0)|\(String(describing: values.fileResourceIdentifier))"
         }
     }
 

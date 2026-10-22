@@ -46,7 +46,25 @@ nonisolated final class ContentCache: @unchecked Sendable {
     func flushCleanup() { queue.sync {} }
 
     private static func canonical(_ path: String) -> String {
-        URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
+        FileReference.canonicalPath(path)
+    }
+
+    /// 缓存文件命名规则；供历史清理识别注入目录中的缓存，而不依赖固定的应用支持路径。
+    static func isManagedFileName(_ name: String) -> Bool {
+        name.hasPrefix("managed_body_") || name.hasPrefix("session_body_") || name.hasPrefix("cached_image") ||
+            name.hasPrefix("cached_text_") ||
+            name.hasPrefix("cached_web_") ||
+            name.hasPrefix("cached_cover_") ||
+            name.hasPrefix("cached_subject_") ||
+            name.hasPrefix("cached_package_") ||
+            name.hasPrefix(FragmentedMP4PlaybackCopy.filePrefix)
+    }
+
+    func isManaged(_ url: URL) -> Bool {
+        if AppState.isManagedCacheURL(url) { return true }
+        let parent = Self.canonical(url.deletingLastPathComponent().path)
+        guard directories().contains(where: { Self.canonical($0.path) == parent }) else { return false }
+        return Self.isManagedFileName(url.lastPathComponent)
     }
     private func owns(_ url: URL) -> Bool {
         if AppState.isManagedCacheURL(url) { return true }
@@ -198,8 +216,9 @@ nonisolated final class ContentCache: @unchecked Sendable {
         var result: [String: Int64] = [:]
         for directory in directories() {
             guard let enumerator = FileManager.default.enumerator(at: directory, includingPropertiesForKeys: [.fileSizeKey, .isRegularFileKey], options: [.skipsHiddenFiles]) else { continue }
-            for case let url as URL in enumerator where AppState.isManagedCacheURL(url) ||
-                (url.deletingLastPathComponent().standardizedFileURL.path == directory.standardizedFileURL.path && ["cached_image_", "cached_text_", "cached_web_", "cached_cover_", "cached_subject_"].contains(where: { url.lastPathComponent.hasPrefix($0) })) || (url.deletingLastPathComponent().lastPathComponent == "Thumbnails" && UUID(uuidString: url.deletingPathExtension().lastPathComponent) != nil) {
+            for case let url as URL in enumerator where (Self.isManagedFileName(url.lastPathComponent) &&
+                (AppState.isManagedCacheURL(url) || Self.canonical(url.deletingLastPathComponent().path) == Self.canonical(directory.path))) ||
+                (url.deletingLastPathComponent().lastPathComponent == "Thumbnails" && UUID(uuidString: url.deletingPathExtension().lastPathComponent) != nil) {
                 guard !url.lastPathComponent.hasPrefix("managed_body_"), !url.lastPathComponent.hasPrefix("session_body_"),
                       // 兼容副本只能由 APFS 克隆生成；共享数据不按整片逻辑大小计入缓存配额。
                       !url.lastPathComponent.hasPrefix(FragmentedMP4PlaybackCopy.filePrefix),
