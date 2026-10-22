@@ -40,6 +40,8 @@ Add ⌥ to the configured shortcut to open incognito.
 | Save As | ⇧⌘S | ⇧⌘S | Save the source file or complete text; websites save a web archive. Unavailable for camera, CUE, SACD ISO, and Apple Music |
 {{file}}
 
+“Reset to Blank Foil” clears the current content and returns the window to a blank foil. It has no default shortcut; you can assign one in Settings → Keyboard Shortcuts → Content Management.
+
 In the Apple Music library window, Esc closes the window, including while the search field is focused. Drag the blank area of the sidebar to move the window.
 
 Open directories with File → Open Directory. The configurable shortcut is listed in this section; directories use the same handling as dragging them into a foil.
@@ -72,6 +74,8 @@ Read-only presentations created through foil also support the border toggle for 
 | Action | Default shortcut | Current shortcut | Notes |
 | --- | --- | --- | --- |
 {{view}}
+
+In a terminal foil, ⌘K (View → Clear Terminal Content) clears earlier screen content, scrollback, and saved output from a previous session while keeping the current prompt, input, and Shell session. Its binding can be changed in Keyboard Shortcuts → Content Display.
 
 Use **View → Reload Content** (default ⌘R) to reread the current local file or reload a web page. The current foil and its window settings are retained.
 

@@ -1587,7 +1587,10 @@ struct FoofoilTests {
             shortcutQuery: foofoil.KeyboardShortcut(keyEquivalent: "k", modifiers: [.command]),
             shortcutProvider: provider
         )
-        #expect(keyResults.flatMap { $0.definitions.map { $0.id } } == ["file.reset"])
+        #expect(keyResults.flatMap { $0.definitions.map(\.id) } == ["terminal.clear"])
+        let reset = try #require(KeyboardShortcutCatalog.definition(withID: "file.reset"))
+        #expect(reset.defaultShortcut == nil)
+        #expect(reset.titleKey == "Reset to Blank Foil")
 
         // 无修饰键键位也能按精确匹配搜到（搜索录制控件允许无修饰键输入）。
         let arrowResults = KeyboardShortcutCatalog.searchResults(

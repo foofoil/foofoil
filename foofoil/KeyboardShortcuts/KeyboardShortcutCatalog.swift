@@ -106,7 +106,7 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("file.newIncognito", "New Incognito Foil", "n", [.command, .shift]),
         definition("file.addToList", "Add to List...", nil, []),
         definition("file.share", "Share...", nil, []),
-        definition("file.reset", "Reset", "k", [.command])
+        definition("file.reset", "Reset to Blank Foil", nil, [])
     ]
 
     static let go: [KeyboardShortcutDefinition] = [
@@ -122,6 +122,7 @@ nonisolated enum KeyboardShortcutCatalog {
     ]
 
     static let view: [KeyboardShortcutDefinition] = [
+        definition("terminal.clear", "Clear Terminal Content", "k", [.command], "Shortcut Scope Terminal"),
         definition("view.reloadPage", "Reload Content", "r", [.command], "Shortcut Scope Reloadable Content"),
         definition("view.zoomInContent", "Zoom In Content", "+", [.command]),
         definition("view.zoomOutContent", "Zoom Out Content", "-", [.command]),

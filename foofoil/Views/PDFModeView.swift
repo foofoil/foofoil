@@ -240,12 +240,12 @@ struct PDFModeView: NSViewRepresentable {
             menu.addItem(copyItem)
 
             let resetItem = NSMenuItem(
-                title: NSLocalizedString("Reset (ContextMenu)", comment: ""),
+                title: NSLocalizedString("Reset to Blank Foil", comment: ""),
                 action: #selector(resetAction(_:)),
-                keyEquivalent: "k"
+                keyEquivalent: ""
             )
             resetItem.withSymbol("arrow.counterclockwise")
-            resetItem.keyEquivalentModifierMask = [.command]
+            resetItem.keyEquivalentModifierMask = []
             resetItem.applyConfiguredShortcut("file.reset")
             resetItem.target = self
             menu.addItem(resetItem)

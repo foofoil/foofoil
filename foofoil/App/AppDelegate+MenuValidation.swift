@@ -305,6 +305,10 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             return activeReadingState?.isVideoDocument == true
         }
 
+        if menuItem.action == #selector(clearTerminalContentAction) {
+            return activeReadingState?.terminalSession != nil
+        }
+
         if menuItem.action == #selector(documentStyleAction) {
             guard let appState = activeReadingState else { return false }
             menuItem.title = NSLocalizedString(appState.isVideoDocument ? "Subtitle Style" : "Document Style", comment: "")

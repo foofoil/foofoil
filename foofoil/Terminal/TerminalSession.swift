@@ -50,6 +50,22 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
         return Self.boundedScrollback(combined)
     }
 
+    /// 保留当前提示符、输入和光标列，只清除其他显示及滚动记录；不向 PTY 发送命令。
+    func clearContent() {
+        let terminal = view.getTerminal()
+        let cursor = terminal.getCursorLocation()
+        // 直接复制终端单元格，保留提示符颜色、宽字符及光标右侧尚在编辑的内容。
+        view.scroll(toPosition: 1)
+        let currentLine = terminal.getLine(row: cursor.y).map { BufferLine(from: $0) }
+        view.feed(text: "\u{1b}[2J\u{1b}[3J\u{1b}[H")
+        if let currentLine {
+            terminal.getLine(row: 0)?.copyFrom(line: currentLine)
+            view.feed(text: "\u{1b}[\(min(cursor.x + 1, terminal.cols))G")
+            view.needsDisplay = true
+        }
+        previousOutput = nil
+    }
+
     func clearPreviousOutput() {
         previousOutput = nil
     }

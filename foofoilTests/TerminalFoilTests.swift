@@ -12,7 +12,7 @@ struct TerminalFoilTests {
         @objc func move(_ sender: Any?) { invoked = true }
     }
 
-    @Test func windowPositionShortcutsReachMenuWithTerminalFocus() throws {
+    @Test func menuShortcutsReachMenuWithTerminalFocus() throws {
         _ = NSApplication.shared
         let previousMenu = NSApp.mainMenu
         defer { NSApp.mainMenu = previousMenu }
@@ -25,7 +25,9 @@ struct TerminalFoilTests {
         window.contentView = session.view
         window.makeFirstResponder(session.view)
         #expect(window.firstResponder === session.view)
-        for definition in KeyboardShortcutCatalog.window where definition.id.hasPrefix("window.") {
+        let definitions = KeyboardShortcutCatalog.window.filter { $0.id.hasPrefix("window.") }
+            + [try #require(KeyboardShortcutCatalog.definition(withID: "terminal.clear"))]
+        for definition in definitions {
             let shortcut = try #require(KeyboardShortcutStore.shared.shortcut(for: definition))
             let target = MenuTarget()
             let menu = NSMenu()
@@ -42,6 +44,39 @@ struct TerminalFoilTests {
             #expect(window.performKeyEquivalent(with: event))
             #expect(target.invoked, "\(definition.id) should reach the window menu")
         }
+    }
+
+    @Test func clearContentRemovesScreenScrollbackAndPreviousSessionWithoutReplacingSession() throws {
+        let session = TerminalSession(configuration: .init(), previousOutput: "previous session marker")
+        let view = session.view
+        let definition = try #require(KeyboardShortcutCatalog.definition(withID: "terminal.clear"))
+        #expect(definition.defaultShortcut == KeyboardShortcut(keyEquivalent: "k", modifiers: [.command]))
+        view.feed(text: String(repeating: "scrollback marker\r\n", count: 100) + "old screen marker\r\n\u{1b}[32muser@host % \u{1b}[0mecho 中文\u{1b}[2D")
+        #expect(String(decoding: view.getTerminal().getBufferAsData(), as: UTF8.self).contains("scrollback marker"))
+        let cursor = view.getTerminal().getCursorLocation()
+        let prompt = try #require(view.getTerminal().getLine(row: cursor.y)).getData()
+        view.scroll(toPosition: 0)
+        session.clearContent()
+        #expect(view.getTerminal().getCursorLocation().x == cursor.x)
+        #expect(view.getTerminal().getCursorLocation().y == 0)
+        let preserved = try #require(view.getTerminal().getLine(row: 0)).getData()
+        #expect(preserved.map(\.debugDescription) == prompt.map(\.debugDescription))
+        #expect(preserved.map(\.attribute) == prompt.map(\.attribute))
+        #expect(preserved.map(\.width) == prompt.map(\.width))
+        #expect(session.view === view)
+        #expect(session.state == .waiting)
+        #expect(session.previousOutput == nil)
+        let text = String(decoding: view.getTerminal().getBufferAsData(), as: UTF8.self)
+        #expect(!text.contains("scrollback marker"))
+        #expect(!text.contains("old screen marker"))
+        let inputLine = try #require(view.getTerminal().getLine(row: 0))
+            .translateToString(trimRight: true, skipNullCellsFollowingWide: true,
+                characterProvider: { view.getTerminal().getCharacter(for: $0) })
+        #expect(inputLine == "user@host % echo 中文")
+        session.clearContent()
+        #expect(try #require(view.getTerminal().getLine(row: 0)).getData().map(\.debugDescription) == prompt.map(\.debugDescription))
+        view.feed(text: "new output")
+        #expect(String(decoding: view.getTerminal().getBufferAsData(), as: UTF8.self).contains("new output"))
     }
 
     private func fixture() throws -> URL {

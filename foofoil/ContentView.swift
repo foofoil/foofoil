@@ -445,7 +445,7 @@ struct FoilContentView: View {
             Button(action: {
                 windowState.resetContent()
             }) {
-                Label(NSLocalizedString("Reset (ContextMenu)", comment: ""), systemImage: "arrow.counterclockwise")
+                Label(NSLocalizedString("Reset to Blank Foil", comment: ""), systemImage: "arrow.counterclockwise")
             }
             .configuredKeyboardShortcut("file.reset")
 

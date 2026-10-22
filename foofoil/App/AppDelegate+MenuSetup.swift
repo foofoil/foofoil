@@ -228,9 +228,9 @@ extension AppDelegate {
         informationItem.target = self
         fileMenu.addItem(informationItem)
 
-        let resetContentItem = NSMenuItem(title: NSLocalizedString("Reset", comment: ""), action: #selector(resetContentAction), keyEquivalent: "k")
+        let resetContentItem = NSMenuItem(title: NSLocalizedString("Reset to Blank Foil", comment: ""), action: #selector(resetContentAction), keyEquivalent: "")
         resetContentItem.withSymbol("arrow.counterclockwise")
-        resetContentItem.keyEquivalentModifierMask = [.command]
+        resetContentItem.keyEquivalentModifierMask = []
         resetContentItem.representedObject = "file.reset"
         resetContentItem.target = self
         fileMenu.addItem(resetContentItem)
@@ -450,6 +450,11 @@ extension AppDelegate {
         reloadPageItem.representedObject = "view.reloadPage"
         reloadPageItem.target = self
         viewMenu.addItem(reloadPageItem)
+
+        let clearTerminalItem = NSMenuItem(title: NSLocalizedString("Clear Terminal Content", comment: ""), action: #selector(clearTerminalContentAction), keyEquivalent: "")
+        clearTerminalItem.representedObject = "terminal.clear"
+        clearTerminalItem.target = self
+        viewMenu.addItem(clearTerminalItem)
 
         // Capture Image Foofoil - 截取图片箔
         let captureImageFoofoilItem = NSMenuItem(

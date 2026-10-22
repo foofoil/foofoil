@@ -725,6 +725,12 @@ extension AppDelegate {
         SettingsStore.shared.navigatorPanelSide = next
     }
 
+    @objc func clearTerminalContentAction() {
+        guard let state = activeReadingState, let session = state.terminalSession else { return }
+        session.clearContent()
+        state.clearPreviousTerminalOutput()
+    }
+
     @objc func reloadPageAction() {
         guard let appState = activeReadingState else { return }
         Task { @MainActor in await appState.reloadContent() }

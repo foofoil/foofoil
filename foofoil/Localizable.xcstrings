@@ -9402,19 +9402,31 @@
         }
       }
     },
-    "Reset (ContextMenu)": {
+    "Clear Terminal Content": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Clear Terminal Content" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清空终端内容" } }
+      }
+    },
+    "Shortcut Scope Terminal": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Terminal foils only" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "仅终端箔" } }
+      }
+    },
+    "Reset to Blank Foil": {
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reset"
+            "value": "Reset to Blank Foil"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "重置"
+            "value": "重置为空箔"
           }
         }
       }
