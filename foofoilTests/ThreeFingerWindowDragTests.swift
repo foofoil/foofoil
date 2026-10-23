@@ -13,8 +13,8 @@ struct ThreeFingerWindowDragTests {
         var drag = ThreeFingerWindowDrag()
         let origin = NSPoint(x: 200, y: 300)
         #expect(drag.update(contacts: contacts(), windowOrigin: origin) == nil)
-        #expect(drag.update(contacts: contacts(5, -4), windowOrigin: origin) == NSPoint(x: 215, y: 288))
-        #expect(drag.update(contacts: contacts(10, -8), windowOrigin: NSPoint(x: 215, y: 288)) == NSPoint(x: 230, y: 276))
+        #expect(drag.update(contacts: contacts(5, -4), windowOrigin: origin) == NSPoint(x: 225, y: 280))
+        #expect(drag.update(contacts: contacts(10, -8), windowOrigin: NSPoint(x: 225, y: 280)) == NSPoint(x: 250, y: 260))
     }
 
     @Test func ignoresLandingJitterAndTracksUnorderedContacts() {
@@ -22,16 +22,16 @@ struct ThreeFingerWindowDragTests {
         _ = drag.update(contacts: contacts(), windowOrigin: .zero)
         #expect(drag.update(contacts: contacts(0.5, 0.5), windowOrigin: .zero) == nil)
         #expect(!drag.isDragging)
-        #expect(drag.update(contacts: contacts(3).reversed(), windowOrigin: .zero) == NSPoint(x: 9, y: 0))
+        #expect(drag.update(contacts: contacts(3).reversed(), windowOrigin: .zero) == NSPoint(x: 15, y: 0))
     }
 
     @Test func replacementFingerReanchorsInsteadOfJumping() {
         var drag = ThreeFingerWindowDrag()
         _ = drag.update(contacts: contacts(), windowOrigin: .zero)
         _ = drag.update(contacts: contacts(3), windowOrigin: .zero)
-        let origin = NSPoint(x: 9, y: 0)
+        let origin = NSPoint(x: 15, y: 0)
         #expect(drag.update(contacts: contacts(40, ids: [1, 2, 4]), windowOrigin: origin) == nil)
-        #expect(drag.update(contacts: contacts(43, ids: [1, 2, 4]), windowOrigin: origin) == NSPoint(x: 18, y: 0))
+        #expect(drag.update(contacts: contacts(43, ids: [1, 2, 4]), windowOrigin: origin) == NSPoint(x: 30, y: 0))
     }
 
     @Test(arguments: [0, 1, 2, 4]) func otherFingerCountsStopDragging(count: Int) {

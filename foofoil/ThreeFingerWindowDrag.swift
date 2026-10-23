@@ -46,6 +46,6 @@ struct ThreeFingerWindowDrag {
         // 过滤落指抖动；触摸板物理点映射为屏幕点，留出足够的移动行程。
         guard isDragging || hypot(dx, dy) >= 2 else { return nil }
         isDragging = true
-        return NSPoint(x: initialOrigin.x + dx * 3, y: initialOrigin.y + dy * 3)
+        return NSPoint(x: initialOrigin.x + dx * 5, y: initialOrigin.y + dy * 5)
     }
 }
