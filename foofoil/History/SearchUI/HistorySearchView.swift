@@ -93,6 +93,11 @@ struct HistorySearchView: View {
                     ScrollViewReader { proxy in
                         ScrollView {
                             VStack(alignment: .leading, spacing: 2) {
+                                if let directPath = model.directPath {
+                                    DirectFilePathSearchResultRow(file: directPath, isSelected: model.selectedID == directPath.id)
+                                        .id(directPath.id)
+                                        .onTapGesture { model.openFile?(directPath.url) }
+                                }
                                 if model.showsOpenCamera {
                                     Button { model.openCamera?() } label: {
                                         Label(NSLocalizedString("Open Camera", comment: ""), systemImage: "web.camera.fill")

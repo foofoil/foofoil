@@ -37,6 +37,28 @@ struct OpenURLSearchResultRow: View {
     }
 }
 
+/// 用户在搜索框直接输入且存在的路径；排在所有结果之前并默认选中。
+struct DirectFilePathSearchResultRow: View {
+    let file: DirectFilePath
+    let isSelected: Bool
+
+    var body: some View {
+        let fileKey = file.isDirectory ? "Open Folder Search Result Format" : "Open File Search Result Format"
+        let parentPath = file.url.deletingLastPathComponent().path
+        SearchResultRow(symbolName: file.symbolName,
+                        title: String(format: NSLocalizedString(fileKey, comment: ""), file.name),
+                        snippet: parentPath,
+                        pageNumber: nil, thumbnailPath: nil,
+                        showsInlineIcon: false, isSelected: isSelected)
+            .help(file.url.path)
+            .accessibilityLabel(String(
+                format: NSLocalizedString("Search File Accessibility Format", comment: ""),
+                file.name,
+                parentPath
+            ))
+    }
+}
+
 private struct SearchResultRow: View {
     let symbolName: String
     let title: String

@@ -9009,6 +9009,40 @@
         }
       }
     },
+    "Open File Search Result Format": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open File: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开文件：%@"
+          }
+        }
+      }
+    },
+    "Open Folder Search Result Format": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Folder: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开文件夹：%@"
+          }
+        }
+      }
+    },
     "Open URL Search Result Format": {
       "extractionState": "manual",
       "localizations": {

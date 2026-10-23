@@ -26,7 +26,7 @@ Built with SwiftUI and AppKit, foofoil favors native macOS capabilities, fast in
 - Restore window state and keep a local content history.
 - Favorite history records for long-term access, preserve them when clearing history, and filter them in Exposé. Toggle the current foil’s favorite status with ⌘D by default; a brief toast confirms the result. In Exposé, ⇧⌘D filters favorites; highlighted history items support Backspace to delete, ⌘E to rename, ⌘D to favorite, and ⌘I for information.
 - Search history by title and content, including on-device OCR for images and extracted text from PDFs and web pages.
-- Use ⌘P for Quick Open: find and open history content or local files from authorized folders, or enter a URL.
+- Use ⌘P for Quick Open: find and open history content or local files from authorized folders, enter a URL, or paste an existing file path to open it directly. Exposé’s search field accepts the same file paths and web addresses.
 - Customize keyboard shortcuts in Settings and use English or Simplified Chinese throughout the interface.
 
 Hi-Fi currently supports DSF, raw DFF, uncompressed stereo SACD ISO, and APE/CUE. DSD playback requires a DoP-capable output device, with no DSD-to-PCM fallback; DST and SACD multichannel are not supported yet. EPUB supports table-of-contents navigation and reading-position restore; DRM-protected books are unsupported.

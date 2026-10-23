@@ -162,6 +162,8 @@ Paste an Apple Music song, album, or public playlist sharing link into Quick Ope
 
 Quick Open shows all sources without category tabs, initially 12 results per group; More adds 18 at a time within the shared 60-result limit.
 
+An existing absolute path, a path beginning with `~/`, or a `file://` URL becomes the first result in Quick Open and appears in Exposé’s scope dropdown as Open File or Open Folder; Return opens it. An openable web address appears in Exposé’s scope dropdown as Open URL, and Quick Open offers it as an open-URL result. Surrounding quotes and terminal-style backslash escapes are accepted for paths; relative paths are not resolved.
+
 Apple Music shortcuts and link handling require Enable Apple Music Library in Settings → Types → Audio and Video, which is off by default. When disabled, Quick Open and Open Clipboard Content treat Apple Music sharing links as ordinary websites.
 
 The configurable Document / Subtitle Style command opens subtitle settings for videos and document settings for documents. Subtitle styles and timing are global.

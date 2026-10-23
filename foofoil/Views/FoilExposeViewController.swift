@@ -5,10 +5,6 @@ import Combine
 final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
     let model: FoilExposeModel
     let searchField = NSTextField()
-    private let heading = NSTextField(labelWithString:
-        (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
-        ?? (Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String)
-        ?? "foofoil")
     private let hint = NSTextField(labelWithString: NSLocalizedString("Search Foils Hint", comment: ""))
     private let searchBackground = NSView()
     private let searchIcon = NSImageView()
@@ -53,11 +49,9 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         shade.frame = root.bounds
         shade.autoresizingMask = [.width, .height]
         root.addSubview(shade)
-        for child in [grid, heading, hint, searchBackground, clipboardButton, scopePicker, toast] {
+        for child in [grid, hint, searchBackground, clipboardButton, scopePicker, toast] {
             root.addSubview(child)
         }
-        heading.font = .systemFont(ofSize: 22, weight: .semibold)
-        heading.textColor = .white
         hint.font = .systemFont(ofSize: 13)
         hint.textColor = .white.withAlphaComponent(0.62)
         hint.alignment = .center
@@ -163,7 +157,7 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         scopeButton.title = model.activeScope.map { $0.displayName + "  ×" } ?? ""
         scopeButton.setAccessibilityLabel(NSLocalizedString("Clear Search Scope", comment: ""))
         scopeButton.image = model.activeScope.flatMap { NSImage(systemSymbolName: $0.symbolName, accessibilityDescription: nil) }
-        hint.isHidden = model.isPickingScope
+        hint.isHidden = model.isChoosingScope
         clipboardButton.isHidden = model.clipboardContent == nil
         if let content = model.clipboardContent {
             let title = String(format: NSLocalizedString("Open Clipboard Item Format", comment: ""), content.localizedName)
@@ -221,19 +215,25 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
     }
 
     private func updateScopes() {
-        scopePicker.isHidden = !model.isPickingScope
+        scopePicker.isHidden = !model.isChoosingScope
         let scopes = model.filteredScopes
-        let signature = scopes.map { $0.id } + [String(model.highlightedScopeIndex), String(model.isPickingScope)]
+        let signature = scopes.map { $0.id }
+            + [model.directAction?.id ?? "-", String(model.highlightedScopeIndex), String(model.isChoosingScope)]
         guard scopeSignature != signature else { return }
         scopeSignature = signature
         scopePicker.arrangedSubviews.forEach { scopePicker.removeArrangedSubview($0); $0.removeFromSuperview() }
+        // 直接输入的路径/网址借用范围下拉框，作为唯一且默认高亮的打开项。
+        if let directAction = model.directAction {
+            addDirectActionButton(directAction)
+            return
+        }
         for (index, scope) in scopes.enumerated() {
             let button = ExposeActionButton()
             button.title = scope.displayName + "    " + scope.englishName
             button.image = NSImage(systemSymbolName: scope.symbolName, accessibilityDescription: nil)
             button.isEmphasized = index == model.highlightedScopeIndex
             button.perform = { [weak self] in self?.model.selectScope(scope); self?.focusSearch() }
-            button.widthAnchor.constraint(equalToConstant: 300).isActive = true
+            button.widthAnchor.constraint(equalToConstant: scopePickerWidth - 12).isActive = true
             scopePicker.addArrangedSubview(button)
         }
         if scopes.isEmpty {
@@ -246,6 +246,51 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         tip.font = .systemFont(ofSize: 10)
         tip.textColor = .white.withAlphaComponent(0.55)
         scopePicker.addArrangedSubview(tip)
+    }
+
+    /// 直接打开项使用与范围列表相同的下拉框外观；完整路径或网址放在帮助提示中。
+    private func addDirectActionButton(_ action: DirectSearchAction) {
+        let button = ExposeActionButton()
+        let width = scopePickerWidth - 12
+        let title: String
+        let tooltip: String
+        switch action {
+        case .file(let file):
+            let key = file.isDirectory ? "Open Folder Search Result Format" : "Open File Search Result Format"
+            title = String(format: NSLocalizedString(key, comment: ""), file.name)
+            tooltip = file.url.path
+            button.setAccessibilityIdentifier("expose.scope.openFile")
+            button.image = NSImage(systemSymbolName: file.symbolName, accessibilityDescription: nil)
+        case .url(let url):
+            title = String(format: NSLocalizedString("Open URL Search Result Format", comment: ""), url.absoluteString)
+            tooltip = url.absoluteString
+            button.setAccessibilityIdentifier("expose.scope.openURL")
+            button.image = NSImage(systemSymbolName: "globe", accessibilityDescription: nil)
+        }
+        button.title = fittedTitle(title, width: max(40, width - 37))
+        button.toolTip = tooltip
+        button.isEmphasized = true
+        button.perform = { [weak self] in self?.model.openDirectAction(); self?.focusSearch() }
+        button.widthAnchor.constraint(equalToConstant: width).isActive = true
+        scopePicker.addArrangedSubview(button)
+    }
+
+    /// 直接打开项的名字可能很长，按按钮实际可用宽度截断，避免文字溢出下拉框。
+    private func fittedTitle(_ title: String, width: CGFloat) -> String {
+        let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12, weight: .medium)]
+        guard (title as NSString).size(withAttributes: attributes).width > width else { return title }
+        var text = title
+        while text.count > 1 {
+            text.removeLast()
+            let candidate = text + "…"
+            if (candidate as NSString).size(withAttributes: attributes).width <= width { return candidate }
+        }
+        return "…"
+    }
+
+    private var scopePickerWidth: CGFloat {
+        guard model.directAction != nil else { return 312 }
+        return max(312, min(520, view.bounds.width - 40))
     }
 
     private func updateToast() {
@@ -266,12 +311,11 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
     override func viewDidLayout() {
         super.viewDidLayout()
         let width = view.bounds.width
-        let titleWidth = heading.intrinsicContentSize.width
         let scopeWidth: CGFloat = scopeButton.isHidden ? 0 : min(180, scopeButton.intrinsicContentSize.width)
-        let searchWidth = min(480, 260 + scopeWidth)
-        let left = max(20, (width - titleWidth - 14 - searchWidth) / 2)
-        heading.frame = NSRect(x: left, y: 30, width: titleWidth, height: 32)
-        searchBackground.frame = NSRect(x: left + titleWidth + 14, y: 30, width: max(80, min(searchWidth, width - left - titleWidth - 34)), height: 32)
+        // 标题移除后搜索框可以更宽，并在窗口内保持居中。
+        let searchWidth = max(120, min(760, width - 40))
+        let left = max(20, (width - searchWidth) / 2)
+        searchBackground.frame = NSRect(x: left, y: 30, width: searchWidth, height: 32)
         searchIcon.frame = NSRect(x: 12, y: 10, width: 12, height: 12)
         scopeButton.frame = NSRect(x: 31, y: 3, width: scopeWidth, height: 26)
         // 按原生单行文本的实际高度居中，让占位文字、光标和编辑文字共用同一基线。
@@ -287,7 +331,7 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
             top += 44
         }
         grid.frame = NSRect(x: 0, y: top, width: width, height: max(0, view.bounds.height - top))
-        let pickerSize = NSSize(width: 312, height: scopePicker.arrangedSubviews.reduce(12) {
+        let pickerSize = NSSize(width: scopePickerWidth, height: scopePicker.arrangedSubviews.reduce(12) {
             $0 + max(16, $1.intrinsicContentSize.height) + 2
         })
         scopePicker.frame = NSRect(x: searchBackground.frame.minX, y: 68, width: pickerSize.width, height: pickerSize.height)

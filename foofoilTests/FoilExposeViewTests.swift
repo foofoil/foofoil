@@ -239,4 +239,62 @@ struct FoilExposeViewTests {
         layoutContent()
         #expect(grid.documentVisibleRect.contains(first.frame))
     }
+
+    @Test func overviewDropsHeadingAndWidensSearchField() {
+        let controller = FoilExposeViewController(model: model())
+        controller.view.frame = NSRect(x: 0, y: 0, width: 1240, height: 900)
+        controller.synchronize()
+        controller.view.layoutSubtreeIfNeeded()
+        #expect(controller.searchField.frame.width > 600)
+        let displayName = (Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+            ?? (Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String)
+        if let displayName {
+            #expect(!descendants(controller.view).compactMap { $0 as? NSTextField }
+                .contains { $0.stringValue == displayName })
+        }
+    }
+
+    @Test func directPathAndURLActionsUseTheScopeDropdown() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("expose-direct-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("Long Report 2026.pdf")
+        try Data("path".utf8).write(to: file)
+
+        let model = model()
+        let controller = FoilExposeViewController(model: model)
+        controller.view.frame = NSRect(x: 0, y: 0, width: 1240, height: 900)
+        controller.synchronize()
+
+        var openedFile: URL?
+        model.onOpenFile = { openedFile = $0 }
+        model.searchText = "\"\(file.path)\""
+        controller.synchronize()
+        let fileButton = try #require(descendants(controller.view).compactMap { $0 as? NSButton }.first {
+            $0.accessibilityIdentifier() == "expose.scope.openFile"
+        })
+        #expect(fileButton.title == String(
+            format: NSLocalizedString("Open File Search Result Format", comment: ""),
+            file.lastPathComponent
+        ))
+        #expect(!fileButton.isHiddenOrHasHiddenAncestor)
+        fileButton.performClick(nil)
+        #expect(openedFile?.path == file.path)
+
+        var openedURL: URL?
+        model.onOpenURL = { openedURL = $0 }
+        model.searchText = "example.com"
+        controller.synchronize()
+        let urlButton = try #require(descendants(controller.view).compactMap { $0 as? NSButton }.first {
+            $0.accessibilityIdentifier() == "expose.scope.openURL"
+        })
+        #expect(urlButton.title == String(
+            format: NSLocalizedString("Open URL Search Result Format", comment: ""),
+            "https://example.com"
+        ))
+        urlButton.performClick(nil)
+        #expect(openedURL?.absoluteString == "https://example.com")
+        model.stopFileSearch()
+    }
 }

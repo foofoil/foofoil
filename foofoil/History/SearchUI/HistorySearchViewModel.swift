@@ -35,7 +35,8 @@ final class HistorySearchViewModel: ObservableObject {
     }
 
     var isPickingScope: Bool {
-        activeScope == nil && query.hasPrefix("/")
+        activeScope == nil && directPath == nil && query.hasPrefix("/")
+            && !DirectFilePathResolver.looksLikePath(query)
     }
 
     var scopeFilterText: String {
@@ -131,6 +132,7 @@ final class HistorySearchViewModel: ObservableObject {
     private var musicSettingsCancellable: AnyCancellable?
     private var isActive = false
     @Published private(set) var files: [SpotlightFileResult] = []
+    @Published private(set) var directPath: DirectFilePath?
     @Published var opensIncognito = false
     @Published private(set) var openURL: URL?
     @Published private(set) var selectedID: String?
@@ -264,14 +266,15 @@ final class HistorySearchViewModel: ObservableObject {
     }
     /// 所有来源都结束且没有任何候选时显示整体空态；来源仍加载或已给出具体状态时不抢先下结论。
     var showsOverallEmptyState: Bool {
-        guard !isSearching, musicLink == nil, !isPickingScope else { return false }
+        guard !isSearching, musicLink == nil, directPath == nil, !isPickingScope else { return false }
         if mode == .url { return resultCount == 0 }
         return results.isEmpty && files.isEmpty && musicResults.isEmpty && musicError == nil && openURL == nil && !showsOpenCamera && fileStatus == nil
     }
     var itemIDs: [String] {
         if isPickingScope { return [] }
         if let musicLink { return ["music-link:\(musicLink.url.absoluteString)"] }
-        return (showsOpenCamera ? ["camera"] : []) + visibleResults.map { "history:\($0.id)" } + visibleFiles.map { "file:\($0.id)" }
+        let pathItems = directPath.map { [$0.id] } ?? []
+        return pathItems + (showsOpenCamera ? ["camera"] : []) + visibleResults.map { "history:\($0.id)" } + visibleFiles.map { "file:\($0.id)" }
             + visibleMusicResults.map { "music:\($0.id)" }
             + (openURL.map { ["url:\($0.absoluteString)"] } ?? [])
     }
@@ -317,6 +320,7 @@ final class HistorySearchViewModel: ObservableObject {
 
     func openSelected() {
         if musicLink != nil { openLinkedMusic(); return }
+        if let directPath, selectedID == directPath.id { openFile?(directPath.url); return }
         if selectedID == "camera" { openCamera?(); return }
         guard let selectedID else { return }
         if let row = visibleResults.first(where: { "history:\($0.id)" == selectedID }) { open(row) }
@@ -367,6 +371,8 @@ final class HistorySearchViewModel: ObservableObject {
         isActive = true
         let currentGeneration = generation
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        // 直接输入的路径优先于所有来源：命中时排在第一项并默认选中。
+        directPath = mode == .history ? DirectFilePathResolver.resolve(trimmed) : nil
         results = []; files = []; rawFiles = []
         musicResults = []; musicError = nil
         musicLink = nil; linkedMusicItem = nil; musicLinkError = nil
@@ -380,8 +386,10 @@ final class HistorySearchViewModel: ObservableObject {
             selectedID = nil
             return
         }
-        openURL = trimmed.isEmpty || resultFilter != .all ? nil : Self.url(from: trimmed)
-        if musicLibraryEnabled(), let url = Self.url(from: trimmed), let link = AppleMusicLink(url: url) {
+        let allowsURL = !trimmed.isEmpty && resultFilter == .all && directPath == nil
+            && !DirectFilePathResolver.looksLikePath(trimmed)
+        openURL = allowsURL ? DirectURLResolver.url(from: trimmed) : nil
+        if musicLibraryEnabled(), let url = DirectURLResolver.url(from: trimmed), let link = AppleMusicLink(url: url) {
             musicLink = link
             openURL = nil
             selectedID = itemIDs.first
@@ -462,19 +470,5 @@ final class HistorySearchViewModel: ObservableObject {
             self.mergeFiles()
             self.reconcileSelection(previousIndex: previousIndex)
         }
-    }
-
-    private static func url(from input: String) -> URL? {
-        guard !input.isEmpty, !input.contains(where: \.isWhitespace) else { return nil }
-        let candidate: String
-        if input.lowercased().hasPrefix("http://") || input.lowercased().hasPrefix("https://") {
-            candidate = input
-        } else if input == "localhost" || input.contains(".") {
-            candidate = "https://\(input)"
-        } else {
-            return nil
-        }
-        guard let url = URL(string: candidate), let host = url.host, !host.isEmpty else { return nil }
-        return url
     }
 }

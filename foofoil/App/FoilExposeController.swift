@@ -160,12 +160,22 @@ final class FoilExposeModel: ObservableObject {
         didSet {
             if oldValue != activeScope {
                 resultFilter = activeScope?.filter ?? .all
+                updateDirectAction()
             }
         }
     }
 
+    /// 输入可直接打开的文件路径或网址；与范围选择共用下拉框，命中时默认高亮。
+    @Published private(set) var directAction: DirectSearchAction?
+
     var isPickingScope: Bool {
-        isSearching && activeScope == nil && searchText.hasPrefix("/")
+        isSearching && activeScope == nil && directAction == nil && searchText.hasPrefix("/")
+            && !DirectFilePathResolver.looksLikePath(searchText)
+    }
+
+    /// 下拉框可见：正在筛选范围，或已有可直接打开的输入。
+    var isChoosingScope: Bool {
+        isSearching && activeScope == nil && (isPickingScope || directAction != nil)
     }
 
     var scopeFilterText: String {
@@ -185,17 +195,23 @@ final class FoilExposeModel: ObservableObject {
     @Published var highlightedScopeIndex: Int = 0
 
     func moveScopeSelection(by offset: Int) {
-        guard !filteredScopes.isEmpty else { return }
+        guard directAction == nil, !filteredScopes.isEmpty else { return }
         highlightedScopeIndex = min(max(highlightedScopeIndex + offset, 0), filteredScopes.count - 1)
     }
 
     func selectHighlightedScope() {
+        if directAction != nil {
+            openDirectAction()
+            return
+        }
         guard isPickingScope, !filteredScopes.isEmpty else { return }
         let index = min(max(highlightedScopeIndex, 0), filteredScopes.count - 1)
         selectScope(filteredScopes[index])
     }
 
     var onOpenCommand: ((SearchScope) -> Void)?
+    /// 直接输入的网址：由控制器收起覆盖层并在空白箔中打开。
+    var onOpenURL: (URL) -> Void = { _ in }
 
     func selectScope(_ scope: SearchScope) {
         // 打开命令直接执行，不切换为搜索范围。
@@ -210,6 +226,14 @@ final class FoilExposeModel: ObservableObject {
         requestSearchFieldFocus()
     }
 
+    func openDirectAction() {
+        guard let directAction else { return }
+        switch directAction {
+        case .file(let file): onOpenFile(file.url)
+        case .url(let url): onOpenURL(url)
+        }
+    }
+
     func clearActiveScope() {
         activeScope = nil
         resultFilter = .all
@@ -220,6 +244,7 @@ final class FoilExposeModel: ObservableObject {
     /// 搜索关键字；输入时即时过滤。
     @Published var searchText: String = "" {
         didSet {
+            updateDirectAction()
             if isPickingScope {
                 highlightedScopeIndex = 0
                 if searchText.contains(" ") {
@@ -348,6 +373,14 @@ final class FoilExposeModel: ObservableObject {
 
     // 分类输入只过滤下拉选项，确认前保留此前的搜索内容和结果。
     private var committedSearchQuery = ""
+
+    /// 有活动范围时下拉框只服务范围选择，不解析直接打开的输入。
+    private func updateDirectAction() {
+        let action = activeScope == nil ? DirectSearchAction.resolve(searchText) : nil
+        guard action != directAction else { return }
+        directAction = action
+        if action != nil { highlightedScopeIndex = 0 }
+    }
 
     /// 去掉首尾空白后的有效搜索关键字；空字符串表示不过滤。
     var searchQuery: String { committedSearchQuery }
@@ -876,6 +909,7 @@ final class FoilExposeController {
         model.onSelect = { [weak self] item in self?.select(item) }
         model.onDismiss = { [weak self] in self?.dismiss() }
         model.onOpenFile = { [weak self] url in self?.openFile(url) }
+        model.onOpenURL = { [weak self] url in self?.openWebURL(url) }
         model.onEnableFileSearch = { [weak self] in self?.enableFileSearch() }
         model.onOpenClipboard = { [weak self] in self?.openClipboard() }
         model.onClearHistory = { [weak self] category in self?.confirmClearHistory(category) }
@@ -1108,6 +1142,13 @@ final class FoilExposeController {
         }
     }
 
+    /// 直接输入的网址沿用空白箔打开流程，先收起覆盖层再打开。
+    private func openWebURL(_ url: URL) {
+        dismiss()
+        NSApp.activate(ignoringOtherApps: true)
+        (NSApplication.shared.delegate as? AppDelegate)?.openWebURLInPreferredWindow(url)
+    }
+
     /// 剪贴板提示与快捷键共用入口：先收起覆盖层，再打开剪贴板内容。
     private func openClipboard(isIncognito: Bool = false) {
         dismiss()
@@ -1255,8 +1296,8 @@ final class FoilExposeController {
                 model.requestSearchFieldFocus()
                 return nil
             }
-            // 历史条目快捷键优先于主菜单；组合输入及分类选择仍交给输入框。
-            if !isComposing, !model.isPickingScope, let item = model.highlightedItem, item.isHistoryEntry {
+            // 历史条目快捷键优先于主菜单；组合输入及下拉框选择仍交给输入框。
+            if !isComposing, !model.isChoosingScope, let item = model.highlightedItem, item.isHistoryEntry {
                 if KeyboardShortcutStore.shared.matches(event, identifier: "history.toggleFavorite") {
                     model.onTogglePinned(item)
                     return nil
@@ -1293,9 +1334,9 @@ final class FoilExposeController {
             if hasOption {
                 return event
             }
-            if event.keyCode == 53 { // Esc：组合输入和范围选择优先处理，否则关闭总览。
+            if event.keyCode == 53 { // Esc：组合输入和下拉框优先处理，否则关闭总览。
                 if isComposing { return event }
-                if model.isPickingScope {
+                if model.isChoosingScope {
                     model.searchText = ""
                     return nil
                 }
@@ -1308,7 +1349,7 @@ final class FoilExposeController {
             }
             // ⌃P/N/F/B 优先移动高亮，⌃A/⌃E 跳到行首/行尾，其余 ⌃ + 编号/字母仍可直选。
             if hasControl {
-                if model.isPickingScope {
+                if model.isChoosingScope {
                     if key == "n" || event.keyCode == 45 {
                         model.moveScopeSelection(by: 1)
                         return nil
@@ -1340,9 +1381,9 @@ final class FoilExposeController {
                 return nil
             }
             switch event.keyCode {
-            case 48: // Tab：输入法和范围选择优先，其余情况切换箔片分区
+            case 48: // Tab：输入法和下拉框优先，其余情况切换箔片分区
                 if model.isSearching, isComposing { return event }
-                if model.isPickingScope {
+                if model.isChoosingScope {
                     model.selectHighlightedScope()
                     return nil
                 }
@@ -1350,9 +1391,9 @@ final class FoilExposeController {
                 return nil
             case 116, 121: // PageUp / PageDown：整页滚动
                 model.requestPageScroll(direction: event.keyCode == 116 ? .up : .down)
-            case 36, 76: // 回车打开高亮箔片或选择限定范围
+            case 36, 76: // 回车打开下拉框项、高亮箔片或选择限定范围
                 if model.isSearching, isComposing { return event }
-                if model.isPickingScope {
+                if model.isChoosingScope {
                     model.selectHighlightedScope()
                     return nil
                 }
@@ -1360,13 +1401,13 @@ final class FoilExposeController {
             case 123: model.moveSelection(.left)   // ←
             case 124: model.moveSelection(.right)  // →
             case 125:
-                if model.isPickingScope {
+                if model.isChoosingScope {
                     model.moveScopeSelection(by: 1)
                     return nil
                 }
                 model.moveSelection(.down)   // ↓
             case 126:
-                if model.isPickingScope {
+                if model.isChoosingScope {
                     model.moveScopeSelection(by: -1)
                     return nil
                 }

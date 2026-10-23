@@ -472,4 +472,42 @@ struct FoilExposeShortcutTests {
         #expect(keys.count == 30)
         #expect(Set(keys).count == 30)
     }
+
+    @Test @MainActor func returnOpensDirectPathAndURLFromTheScopeDropdown() throws {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("expose-return-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let file = directory.appendingPathComponent("Return Target.txt")
+        try Data("path".utf8).write(to: file)
+
+        let controller = FoilExposeController.shared
+        let previousModel = controller.model
+        defer { controller.model = previousModel }
+        let model = FoilExposeModel(items: [], historyItems: [], fileSearch: { _, _ in },
+                                    cancelFiles: {}, cameraAvailable: { false }, musicEnabled: { false })
+        controller.model = model
+
+        var openedFile: URL?
+        var openedURL: URL?
+        var selectedItem = false
+        model.onOpenFile = { openedFile = $0 }
+        model.onOpenURL = { openedURL = $0 }
+        model.onSelect = { _ in selectedItem = true }
+
+        let returnEvent = try #require(NSEvent.keyEvent(
+            with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: 0,
+            context: nil, characters: "\r", charactersIgnoringModifiers: "\r", isARepeat: false, keyCode: 36
+        ))
+        model.searchText = "'\(file.path)'"
+        #expect(controller.handleKeyEvent(returnEvent) == nil)
+        #expect(openedFile?.path == file.path)
+        #expect(!selectedItem)
+
+        model.searchText = "example.com"
+        #expect(controller.handleKeyEvent(returnEvent) == nil)
+        #expect(openedURL?.absoluteString == "https://example.com")
+        #expect(!selectedItem)
+        model.stopFileSearch()
+    }
 }
