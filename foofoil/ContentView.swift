@@ -329,20 +329,22 @@ struct FoilContentView: View {
                 .configuredKeyboardShortcut("view.slideshow")
             }
 
-            Button {
-                (NSApp.delegate as? AppDelegate)?.saveContentImageAction()
-            } label: {
-                Label("Save Content Image", systemImage: "photo")
+            if appState.terminalConfiguration == nil {
+                Button {
+                    (NSApp.delegate as? AppDelegate)?.saveContentImageAction()
+                } label: {
+                    Label("Save Content Image", systemImage: "photo")
+                }
+                .keyboardShortcut("s", modifiers: [.command])
+                .disabled(!appState.canSaveContentImage)
             }
-            .keyboardShortcut("s", modifiers: [.command])
-            .disabled(!appState.canSaveContentImage)
             Button {
                 (NSApp.delegate as? AppDelegate)?.saveAsAction()
             } label: {
-                Label("Save As...", systemImage: "square.and.arrow.down")
+                Label(appState.saveAsTitle, systemImage: "square.and.arrow.down")
             }
             .keyboardShortcut("s", modifiers: [.command, .shift])
-            .disabled(windowState.selectedArchiveSession.map { !$0.canExport } ?? (appState.contentSavePayload == nil))
+            .disabled(!appState.canSaveAs)
 
             if appState.packageContentsURL != nil {
                 Button {
@@ -420,7 +422,7 @@ struct FoilContentView: View {
 
             if appState.isCamera {
                 if let camera = appState.cameraController { CameraDeviceContextMenu(controller: camera) }
-            } else if !appState.isVideoDocument {
+            } else if !appState.isVideoDocument && appState.terminalConfiguration == nil {
                 // 提取文字：仅光栅图片箔可用；图中无字时也禁用，检测未完成前保持禁用。
                 Button(action: {
                     (NSApplication.shared.delegate as? AppDelegate)?.extractTextFromImage(from: appState)
@@ -438,6 +440,16 @@ struct FoilContentView: View {
                 }
                 .disabled(!appState.canExtractImageSubject)
                 .configuredKeyboardShortcut("edit.extractImageSubject")
+            }
+
+            if appState.terminalConfiguration != nil {
+                Button {
+                    appState.terminalSession?.clearContent()
+                    appState.clearPreviousTerminalOutput()
+                } label: {
+                    Label(NSLocalizedString("Clear Terminal Content", comment: ""), systemImage: "clear")
+                }
+                .configuredKeyboardShortcut("terminal.clear")
             }
 
             Divider()

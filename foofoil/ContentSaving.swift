@@ -159,8 +159,25 @@ extension AppState {
         }
         return ((originalImageName ?? "Untitled") as NSString).deletingPathExtension + ".heic"
     }
+    var savesClipboardImageAsContentImage: Bool {
+        imageSource == .clipboard && imageURL != nil && webURL == nil && !isExternalMediaDocument
+    }
+
+    var canSaveAs: Bool {
+        selectedArchiveSession.map { $0.canExport }
+            ?? (savesClipboardImageAsContentImage ? canSaveContentImage : contentSavePayload != nil)
+    }
+
+    var saveAsTitle: String {
+        NSLocalizedString(terminalConfiguration != nil ? "Export Terminal Transcript..." : "Save As...", comment: "")
+    }
+
     var contentSavePayload: ContentSavePayload? {
         guard !isCamera, !isLoading, !isFileOpenFeedback, appleMusicReference == nil else { return nil }
+        if terminalConfiguration != nil {
+            // 导出当前保留的普通屏幕记录，面板打开时冻结内容，包含恢复的旧会话输出。
+            return .text(terminalSession?.outputTranscript ?? "", markdown: false)
+        }
         if isAudioDocument {
             let resource = extensionSession.flatMap {
                 ExtensionPlaybackSupport.authorizedResource(in: $0, fileList: fileList)
@@ -218,9 +235,9 @@ extension AppDelegate {
             }
         }
     }
-    func presentContentSavePanel(_ content: ContentSavePayload, name: String?) {
+    func presentContentSavePanel(_ content: ContentSavePayload, name: String?, title: String = NSLocalizedString("Save As...", comment: "")) {
         let panel = NSSavePanel()
-        panel.title = NSLocalizedString("Save As...", comment: "")
+        panel.title = title
         panel.allowedContentTypes = [content.contentType]
         panel.canCreateDirectories = true
         switch content {

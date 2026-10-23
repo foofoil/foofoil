@@ -50,6 +50,15 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
         return Self.boundedScrollback(combined)
     }
 
+    /// 手动导出保留的全部普通屏幕缓冲区，不套用历史持久化的 500 行快照限制。
+    var outputTranscript: String? {
+        guard hasStarted else { return previousOutput }
+        let current = String(decoding: view.getTerminal().getBufferAsData(kind: .normal), as: UTF8.self)
+            .trimmingCharacters(in: .newlines)
+        guard !current.isEmpty else { return previousOutput }
+        return previousOutput.map { $0 + "\n\n── " + NSLocalizedString("Terminal Session Record", comment: "") + " ──\n" + current } ?? current
+    }
+
     /// 保留当前提示符、输入和光标列，只清除其他显示及滚动记录；不向 PTY 发送命令。
     func clearContent() {
         let terminal = view.getTerminal()

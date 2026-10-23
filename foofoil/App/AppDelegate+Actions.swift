@@ -142,13 +142,19 @@ extension AppDelegate {
     }
 
     @objc func saveAsAction() {
+        if activeAppState?.savesClipboardImageAsContentImage == true {
+            saveContentImageAction()
+            return
+        }
         if let archive = activeAppState?.selectedArchiveSession { archive.saveSelected(); return }
         guard let state = activeAppState, let content = state.contentSavePayload else { return }
         if case .webArchive = content {
             NotificationCenter.default.post(
                 name: Notification.Name("saveWebArchive_\(state.id.uuidString)"), object: nil)
         } else {
-            presentContentSavePanel(content, name: state.originalImageName)
+            presentContentSavePanel(content,
+                name: state.terminalConfiguration != nil ? NSLocalizedString("Terminal Transcript", comment: "") + ".txt" : state.originalImageName,
+                title: state.saveAsTitle)
         }
     }
 

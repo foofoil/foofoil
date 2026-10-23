@@ -37,7 +37,7 @@ Add ⌥ to the configured shortcut to open incognito.
 | --- | --- | --- | --- |
 | New foil | ⌘N | ⌘N |  |
 | Save Content Image | ⌘S | ⌘S | Save the visible content as HEIC by default, with PNG and JPG choices; audio saves the cover image when available |
-| Save As | ⇧⌘S | ⇧⌘S | Save the source file or complete text; websites save a web archive. Unavailable for camera, CUE, SACD ISO, and Apple Music |
+| Save As | ⇧⌘S | ⇧⌘S | Save the source file or complete text; clipboard images use the image export panel, and websites save a web archive. Unavailable for camera, CUE, SACD ISO, and Apple Music |
 {{file}}
 
 “Reset to Blank Foil” clears the current content and returns the window to a blank foil. It has no default shortcut; you can assign one in Settings → Keyboard Shortcuts → Content Management.
@@ -75,7 +75,7 @@ Read-only presentations created through foil also support the border toggle for 
 | --- | --- | --- | --- |
 {{view}}
 
-In a terminal foil, ⌘K (View → Clear Terminal Content) clears earlier screen content, scrollback, and saved output from a previous session while keeping the current prompt, input, and Shell session. Its binding can be changed in Keyboard Shortcuts → Content Display.
+In a terminal foil, ⌘K (View → Clear Terminal Content) clears earlier screen content, scrollback, and saved output from a previous session while keeping the current prompt, input, and Shell session. Its binding can be changed in Keyboard Shortcuts → Content Display. In a terminal foil, Save As (⌘⇧S) appears as “Export Terminal Transcript…” and exports the retained output, including previous session output, as UTF-8 text.
 
 Use **View → Reload Content** (default ⌘R) to reread the current local file or reload a web page. The current foil and its window settings are retained.
 

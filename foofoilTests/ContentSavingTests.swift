@@ -9,6 +9,46 @@ import ImageIO
 
 @Suite(.sharedApplicationState, .serialized) @MainActor
 struct ContentSavingTests {
+    @Test func clipboardSaveAsUsesImageExportWithoutSourceFile() throws {
+        let state = AppState()
+        state.imageURL = URL(fileURLWithPath: "/missing/clipboard-image.png")
+        state.imageSource = .clipboard
+        #expect(state.savesClipboardImageAsContentImage)
+        #expect(state.canSaveAs)
+        let controller = FloatingWindowController(appState: state)
+        let delegate = ClipboardImageSaveSpy()
+        delegate.windowControllers = [controller]
+        delegate.activeWindowProvider = { controller.window }
+        delegate.saveAsAction()
+        #expect(delegate.saved == ["image"])
+        state.imageSource = nil
+        #expect(!state.savesClipboardImageAsContentImage)
+    }
+
+    @Test func terminalTranscriptExportsAsFrozenUTF8Text() throws {
+        let state = AppState()
+        let launch = TerminalLaunchConfiguration(shellPath: "/bin/zsh", workingDirectory: "/tmp")
+        state.terminalConfiguration = launch
+        let session = TerminalSession(configuration: launch, previousOutput: "旧会话\n$ echo hello\nhello")
+        state.terminalSession = session
+        let payload = try #require(state.contentSavePayload)
+        guard case .text(let transcript, let markdown) = payload else {
+            Issue.record("Missing terminal transcript"); return
+        }
+        #expect(transcript == "旧会话\n$ echo hello\nhello")
+        #expect(!markdown)
+        #expect(payload.contentType == .plainText)
+        session.clearContent()
+        guard case .text(let cleared, _) = state.contentSavePayload else {
+            Issue.record("Missing cleared transcript"); return
+        }
+        #expect(cleared.isEmpty)
+        let destination = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".txt")
+        defer { try? FileManager.default.removeItem(at: destination) }
+        try payload.write(to: destination)
+        #expect(try String(contentsOf: destination, encoding: .utf8) == transcript)
+    }
+
     @Test(arguments: ContentImageFormat.allCases)
     func imageFormatsProduceMatchingDecodableFiles(_ format: ContentImageFormat) throws {
         let space = try #require(CGColorSpace(name: CGColorSpace.sRGB))
@@ -247,4 +287,10 @@ struct ContentSavingTests {
         #expect(color.blueComponent < 0.2)
         #expect(!state.isCapturingContentImage)
     }
+}
+
+@MainActor
+private final class ClipboardImageSaveSpy: AppDelegate {
+    var saved: [String] = []
+    override func saveContentImageAction() { saved.append("image") }
 }
