@@ -24,7 +24,7 @@ Built with SwiftUI and AppKit, foofoil favors native macOS capabilities, fast in
 - Zoom images and web content, fit images to a window, and customize SVG colors or the document look: background, text color, font, line spacing and paragraph spacing for plain text, Markdown and EPUB foils, following light/dark appearance changes.
 - Save, copy, share, or capture displayed content using native macOS workflows.
 - Restore window state and keep a local content history.
-- Favorite history records for long-term access, preserve them when clearing history, and filter them in Exposé. Toggle the current foil’s favorite status with ⌘D by default; a brief toast confirms the result.
+- Favorite history records for long-term access, preserve them when clearing history, and filter them in Exposé. Toggle the current foil’s favorite status with ⌘D by default; a brief toast confirms the result. In Exposé, ⇧⌘D filters favorites; highlighted history items support Backspace to delete, ⌘E to rename, ⌘D to favorite, and ⌘I for information.
 - Search history by title and content, including on-device OCR for images and extracted text from PDFs and web pages.
 - Use ⌘P for Quick Open: find and open history content or local files from authorized folders, or enter a URL.
 - Customize keyboard shortcuts in Settings and use English or Simplified Chinese throughout the interface.

@@ -80,29 +80,35 @@ extension AppDelegate {
     @objc func showFoilInformationAction() {
         guard let controller = activeWindowController, let window = controller.window,
               window.attachedSheet == nil else { return }
-        let state = controller.appState
-        let config = state.toConfig()
+        showFoilInformation(config: controller.appState.toConfig(), state: controller.appState, window: window)
+    }
+
+    /// 总览中的历史条目直接读取快照，不恢复窗口或改变访问记录。
+    func showFoilInformation(config: WindowConfig, state: AppState?, window: NSWindow, foilWindow: NSWindow? = nil) {
+        guard window.attachedSheet == nil else { return }
         let kind = config.contentKind ?? HistoryContentKind.infer(from: config)
         let source = FoilInformation.sourceURL(for: config)
-        let size = window.frame.size
+        let size = state == nil ? config.windowFrame.map { NSRectFromString($0).size } : (foilWindow ?? window).frame.size
         var rows = [FoilInformation.Row(key: "Foil Info Title", value: config.historyMenuDisplayName),
-                    .init(key: "Foil Info Type", value: NSLocalizedString("Foil Info Type \(kind.rawValue)", comment: "")),
-                    .init(key: "Foil Info Window Size", value: "\(Int(size.width.rounded())) × \(Int(size.height.rounded())) pt")]
-        if let configuration = state.terminalConfiguration {
+                    .init(key: "Foil Info Type", value: NSLocalizedString("Foil Info Type \(kind.rawValue)", comment: ""))]
+        if let size {
+            rows.append(.init(key: "Foil Info Window Size", value: "\(Int(size.width.rounded())) × \(Int(size.height.rounded())) pt"))
+        }
+        if let configuration = state?.terminalConfiguration ?? config.terminalConfiguration {
             rows.append(contentsOf: TerminalConfigurationField.allCases.map {
                 .init(key: $0.rawValue, value: $0.value(in: configuration))
             })
         }
-        if let ownership = state.agentOwnership {
+        if let ownership = state?.agentOwnership {
             rows.append(.init(key: "Agent Created By", value: ownership.caller))
         }
         if config.isClipboardContent {
             rows.append(.init(key: "Foil Info Source", value: NSLocalizedString("From Clipboard", comment: "")))
         } else if let source {
             rows.append(.init(key: "Foil Info File Path", value: source.path))
-        } else if state.appleMusicReference != nil {
+        } else if config.appleMusicReference != nil {
             rows.append(.init(key: "Foil Info Source", value: "Apple Music"))
-            if let item = state.appleMusicItem {
+            if let item = state?.appleMusicItem {
                 rows.append(.init(key: "Foil Info Artist", value: item.subtitle))
             }
         } else if kind == .archive || kind == .image || kind == .pdf || kind == .ebook || kind == .quickLook || kind == .audio || kind == .video || config.textPath != nil {
@@ -114,7 +120,7 @@ extension AppDelegate {
             if let url = config.actualWebURLString ?? config.webURLString { rows.append(.init(key: "Foil Info Current URL", value: url)) }
         }
         if kind.storesIndexedText {
-            let text = state.agentReadOnly ? state.text : config.text
+            let text = state?.agentReadOnly == true ? (state?.text ?? config.text) : config.text
             rows.append(.init(key: "Foil Info Characters", value: text.count.formatted()))
             rows.append(.init(key: "Foil Info Lines", value: text.isEmpty ? "0" : (text.reduce(1) { $1 == "\n" ? $0 + 1 : $0 }).formatted()))
         }
@@ -123,11 +129,11 @@ extension AppDelegate {
             if let item = list.currentItem { rows.append(.init(key: "Foil Info Current Item", value: item.displayName)) }
         }
         if kind == .camera {
-            if let device = state.cameraController?.selectedDeviceID,
+            if let device = state?.cameraController?.selectedDeviceID,
                let name = CameraCaptureController.availableDevices.first(where: { $0.uniqueID == device })?.localizedName {
                 rows.append(.init(key: "Foil Info Camera", value: name))
             }
-            if let frame = state.cameraController?.frameSize {
+            if let frame = state?.cameraController?.frameSize {
                 rows.append(.init(key: "Foil Info Pixels", value: "\(Int(frame.width)) × \(Int(frame.height)) px"))
             }
         }
@@ -146,7 +152,7 @@ extension AppDelegate {
                     rows.append(.init(key: "Foil Info Duration", value: Duration.seconds(duration.seconds).formatted(.time(pattern: .hourMinuteSecond))))
                 }
             }
-            guard state.id == config.id, window.isVisible, window.attachedSheet == nil else { return }
+            guard (state == nil || state?.id == config.id), window.isVisible, window.attachedSheet == nil else { return }
             let unknown = NSLocalizedString("Foil Info Unknown", comment: "")
             rows.append(.init(key: "Foil Info First Visit", value: (visits?.first ?? config.createdAt)?.formatted(date: .numeric, time: .standard) ?? unknown))
             rows.append(.init(key: "Foil Info Last Visit", value: (visits?.last ?? config.createdAt)?.formatted(date: .numeric, time: .standard) ?? unknown))
@@ -155,7 +161,7 @@ extension AppDelegate {
         }
     }
 
-    private func presentFoilInformation(rows: [FoilInformation.Row], source: URL?, available: Bool, window: NSWindow, state: AppState) {
+    private func presentFoilInformation(rows: [FoilInformation.Row], source: URL?, available: Bool, window: NSWindow, state: AppState?) {
         let panel = FoilInformationPanel(
             contentRect: NSRect(x: 0, y: 0, width: 560, height: 360),
             styleMask: [.titled], backing: .buffered, defer: false
@@ -194,7 +200,7 @@ extension AppDelegate {
             let entry = NSStackView(views: [label, value])
             entry.alignment = .firstBaseline
             entry.spacing = 16
-            if row.key == "Foil Info Title", state.toConfig().canRenameTitle {
+            if row.key == "Foil Info Title", let state, state.toConfig().canRenameTitle {
                 let button = FoilTitleEditButton(title: "", target: self, action: #selector(editFoilTitle(_:)))
                 button.image = NSImage(systemSymbolName: "pencil", accessibilityDescription: NSLocalizedString("Change Title", comment: ""))
                 button.bezelStyle = .accessoryBarAction
@@ -205,7 +211,7 @@ extension AppDelegate {
                 button.widthAnchor.constraint(equalToConstant: 28).isActive = true
                 entry.addArrangedSubview(button)
                 value.widthAnchor.constraint(equalToConstant: 288).isActive = true
-            } else if let field = TerminalConfigurationField(rawValue: row.key), state.terminalConfiguration != nil {
+            } else if let field = TerminalConfigurationField(rawValue: row.key), let state, state.terminalConfiguration != nil {
                 let button = FoilTerminalEditButton(title: "", target: self, action: #selector(editTerminalConfiguration(_:)))
                 button.field = field
                 button.appState = state

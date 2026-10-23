@@ -207,8 +207,6 @@ final class FoilExposeModel: ObservableObject {
     /// 搜索关键字；输入时即时过滤。
     @Published var searchText: String = "" {
         didSet {
-            // 过滤结果变化后回到第一项，避免高亮落在已被过滤掉的条目上。
-            if selectedIndex != 0 { selectedIndex = 0 }
             if isPickingScope {
                 highlightedScopeIndex = 0
                 if searchText.contains(" ") {
@@ -221,6 +219,9 @@ final class FoilExposeModel: ObservableObject {
                     }
                 }
             }
+            guard !isPickingScope else { return }
+            committedSearchQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+            if selectedIndex != 0 { selectedIndex = 0 }
             normalizeHistoryCategory()
             scheduleFileSearch()
             scheduleMusicSearch()
@@ -265,6 +266,7 @@ final class FoilExposeModel: ObservableObject {
     var onClearHistoryItem: (FoilExposeItem) -> Void = { _ in }
     var onTogglePinned: (FoilExposeItem) -> Void = { _ in }
     var onRenameItem: (FoilExposeItem) -> Void = { _ in }
+    var onShowInformation: (FoilExposeItem) -> Void = { _ in }
     /// 打开文件结果：由控制器检查可用性并在浮箔中打开。
     var onOpenFile: (URL) -> Void = { _ in }
     /// 开启文件搜索偏好，不弹出目录授权面板。
@@ -331,15 +333,15 @@ final class FoilExposeModel: ObservableObject {
             }
     }
 
-    /// 去掉首尾空白后的搜索关键字；空字符串表示不过滤。
-    var searchQuery: String {
-        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
+    // 分类输入只过滤下拉选项，确认前保留此前的搜索内容和结果。
+    private var committedSearchQuery = ""
+
+    /// 去掉首尾空白后的有效搜索关键字；空字符串表示不过滤。
+    var searchQuery: String { committedSearchQuery }
 
     /// 打开的箔片在前、历史记录在后的完整列表；已在打开的箔片中出现的条目不再重复显示；
     /// 有关键字时只保留标题匹配项。
     private var unfilteredMatchedFoilItems: [FoilExposeItem] {
-        if isPickingScope { return [] }
         let openIDs = Set(items.map(\.id))
         let combined = (items + historyItems.filter { !openIDs.contains($0.id) })
             .filter { SettingsStore.shared.appleMusicLibraryEnabled || $0.symbolName != AppleMusicReference.symbolName }
@@ -362,10 +364,18 @@ final class FoilExposeModel: ObservableObject {
         if historyCount(in: historyCategory) == 0 { historyCategory = .all }
     }
 
-    func replaceHistoryItems(_ items: [FoilExposeItem]) {
+    func replaceHistoryItems(_ items: [FoilExposeItem], deleting deletedID: UUID? = nil) {
+        let deletedPosition = deletedID.flatMap { id in currentItems.firstIndex { $0.id == id } }
+            .flatMap { index in navigationRows.flatMap { $0 }.firstIndex(of: index) }
         historyItems = items
         normalizeHistoryCategory()
-        selectedIndex = currentItems.firstIndex(where: \.isHistoryEntry) ?? 0
+        if let deletedPosition {
+            // 删除后沿显示顺序选中后一项；末项回退到前一项，删空时保留安全的空选择。
+            let indices = navigationRows.flatMap { $0 }
+            selectedIndex = indices.isEmpty ? 0 : indices[min(deletedPosition, indices.count - 1)]
+        } else {
+            selectedIndex = currentItems.firstIndex(where: \.isHistoryEntry) ?? 0
+        }
     }
 
     /// 改名后重建搜索结果，优先保留当前选择；标题不再匹配搜索时限制到有效下标。
@@ -385,7 +395,7 @@ final class FoilExposeModel: ObservableObject {
     }
 
     var showsHistorySection: Bool {
-        !isPickingScope && (searchQuery.isEmpty || resultFilter == .all || resultFilter == .history)
+        (searchQuery.isEmpty || resultFilter == .all || resultFilter == .history)
     }
 
     private var matchedFoilItems: [FoilExposeItem] {
@@ -413,7 +423,22 @@ final class FoilExposeModel: ObservableObject {
     /// 高亮条目：越界时回退到第一项。
     var highlightedItem: FoilExposeItem? {
         let items = currentItems
-        return items.indices.contains(selectedIndex) ? items[selectedIndex] : items.first
+        return items.indices.contains(selectedIndex) ? items[selectedIndex] : nil
+    }
+
+    /// 文件索引接在箔片后，导航顺序仍按界面的分区排列。
+    var fileSelectionIndices: [Int] {
+        guard showsFileResults else { return [] }
+        return visibleFiles.indices.map { currentItems.count + $0 }
+    }
+
+    func openHighlightedResult() {
+        let fileIndex = selectedIndex - currentItems.count
+        if showsFileResults, visibleFiles.indices.contains(fileIndex) {
+            onOpenFile(visibleFiles[fileIndex].url)
+        } else if let item = highlightedItem {
+            onSelect(item)
+        }
     }
 
     /// 保留关键字并重新聚焦搜索框。
@@ -436,8 +461,8 @@ final class FoilExposeModel: ObservableObject {
     }
 
     /// 关键字非空时才呈现 Spotlight 文件结果区；空关键字不展示、不查询。
-    var showsFileResults: Bool { !isPickingScope && !searchQuery.isEmpty && resultFilter.includesFiles }
-    var showsMusicResults: Bool { !isPickingScope && !searchQuery.isEmpty && isMusicSearchEnabled && (resultFilter == .all || resultFilter.musicCategory != nil) }
+    var showsFileResults: Bool { !searchQuery.isEmpty && resultFilter.includesFiles }
+    var showsMusicResults: Bool { !searchQuery.isEmpty && isMusicSearchEnabled && (resultFilter == .all || resultFilter.musicCategory != nil) }
     func musicItems(in category: AppleMusicSearchCategory) -> [FoilExposeItem] {
         musicItems.filter { $0.musicItem?.searchCategory == category }
     }
@@ -467,6 +492,7 @@ final class FoilExposeModel: ObservableObject {
 
     /// 音乐结果加入同一键盘导航网格；独立取消与代际校验，防止旧查询覆盖新输入。
     private func scheduleMusicSearch() {
+        guard !isPickingScope else { return }
         let selectedID = highlightedItem?.id
         musicTask?.cancel()
         musicGeneration += 1
@@ -515,6 +541,7 @@ final class FoilExposeModel: ObservableObject {
 
     /// 关键字变化后防抖查询 Spotlight；空关键字立即清空并取消，避免结果与输入不一致。
     private func scheduleFileSearch() {
+        guard !isPickingScope else { return }
         fileSearchTask?.cancel()
         fileSearchTask = nil
         fileGeneration += 1
@@ -605,7 +632,7 @@ final class FoilExposeModel: ObservableObject {
     }
 
     func moveSelection(_ direction: FoilExposeMoveDirection) {
-        guard !currentItems.isEmpty else { return }
+        guard !navigationRows.isEmpty else { return }
         if direction == .up || direction == .down {
             let rows = navigationRows
             guard let row = rows.firstIndex(where: { $0.contains(selectedIndex) }),
@@ -615,15 +642,13 @@ final class FoilExposeModel: ObservableObject {
             selectedIndex = rows[targetRow][min(column, rows[targetRow].count - 1)]
             return
         }
-        let columns = max(1, columnCount)
-        let delta: Int
-        switch direction {
-        case .left: delta = -1
-        case .right: delta = 1
-        case .up: delta = -columns
-        case .down: delta = columns
+        let indices = navigationRows.flatMap { $0 }
+        guard let position = indices.firstIndex(of: selectedIndex) else {
+            selectedIndex = indices[0]
+            return
         }
-        selectedIndex = min(max(0, selectedIndex + delta), currentItems.count - 1)
+        let delta = direction == .left ? -1 : 1
+        selectedIndex = indices[min(max(0, position + delta), indices.count - 1)]
     }
 
     /// 分区各自从左起排满一行；不使用受滚动和高亮动画影响的卡片坐标。
@@ -632,7 +657,7 @@ final class FoilExposeModel: ObservableObject {
         let groups: [([Int], Int)] = [
             (items.indices.filter { !items[$0].isHistoryEntry && items[$0].musicItem == nil }, columnCount),
             (items.indices.filter { items[$0].isHistoryEntry }, columnCount)
-        ] + AppleMusicSearchCategory.allCases.map { category in
+        ] + [(fileSelectionIndices, musicColumnCount)] + AppleMusicSearchCategory.allCases.map { category in
             (items.indices.filter { items[$0].musicItem?.searchCategory == category }, musicColumnCount)
         }
         return groups.flatMap { indices, columns in
@@ -643,20 +668,17 @@ final class FoilExposeModel: ObservableObject {
         }
     }
 
-    /// Ctrl+A：高亮移到当前行首。行号 = 当前下标 / 列数，行首 = 行号 × 列数。
+    /// 行首、行尾沿用分区布局，文件卡片使用紧凑网格的列数。
     func moveSelectionToRowStart() {
-        guard !currentItems.isEmpty else { return }
-        let columns = max(1, columnCount)
-        let row = selectedIndex / columns
-        selectedIndex = min(row * columns, currentItems.count - 1)
+        if let row = navigationRows.first(where: { $0.contains(selectedIndex) }), let first = row.first {
+            selectedIndex = first
+        }
     }
 
-    /// Ctrl+E：高亮移到当前行尾；末行可能不满一整行，夹紧到最后一个条目。
     func moveSelectionToRowEnd() {
-        guard !currentItems.isEmpty else { return }
-        let columns = max(1, columnCount)
-        let row = selectedIndex / columns
-        selectedIndex = min(row * columns + columns - 1, currentItems.count - 1)
+        if let row = navigationRows.first(where: { $0.contains(selectedIndex) }), let last = row.last {
+            selectedIndex = last
+        }
     }
 
     /// 编号按当前列表从头分配，滚动和高亮变化不影响编号；屏外条目也可直选。
@@ -852,6 +874,12 @@ final class FoilExposeController {
             model.refreshItems(open: Self.collectItems(from: controllers), history: Self.collectHistoryItems())
         }
         model.onRenameItem = { [weak self] item in self?.renameItem(item) }
+        model.onShowInformation = { [weak self] item in
+            guard let self, let panel = self.panels.first,
+                  let delegate = NSApp.delegate as? AppDelegate,
+                  let config = item.controller?.appState.toConfig() ?? HistoryRepository.shared.config(id: item.id) else { return }
+            delegate.showFoilInformation(config: config, state: item.controller?.appState, window: panel, foilWindow: item.controller?.window)
+        }
         self.model = model
 
         // 先激活本 App，再在当前活跃显示器上铺一块非激活面板并指定它为 key window。
@@ -889,7 +917,7 @@ final class FoilExposeController {
     }
 
     @objc private func handleDidBecomeActive() {
-        guard isShowing, !isPresentingSystemUI else { return }
+        guard isShowing, !isPresentingSystemUI, !panels.contains(where: { $0.attachedSheet != nil }) else { return }
         focusPanel()
     }
 
@@ -1070,40 +1098,52 @@ final class FoilExposeController {
         (NSApplication.shared.delegate as? AppDelegate)?.openClipboardContentInNewWindow(isIncognito: isIncognito)
     }
 
-    private func renameItem(_ item: FoilExposeItem) {
-        guard item.canRenameTitle, !isPresentingSystemUI,
-              let model, let panel = panels.first else { return }
-        isPresentingSystemUI = true
-        panel.orderOut(nil)
-        defer {
-            isPresentingSystemUI = false
-            if self.model === model {
-                panel.makeKeyAndOrderFront(nil)
-                if model.isSearching { model.requestSearchFieldFocus() }
+    /// 系统对话框附着在总览上，保持背景可见并让键盘由 sheet 接管。
+    static func presentAlert(_ alert: NSAlert, on panel: NSWindow) async -> NSApplication.ModalResponse {
+        guard panel.isVisible, panel.attachedSheet == nil else { return .cancel }
+        alert.window.level = panel.level
+        return await withCheckedContinuation { continuation in
+            alert.beginSheetModal(for: panel) { response in
+                continuation.resume(returning: response)
             }
         }
-        let config = item.controller?.appState.toConfig() ?? HistoryRepository.shared.config(id: item.id)
-        guard let config, config.canRenameTitle else { return }
-        let alert = FoilTitleEditing.makeAlert(title: FoilTitleEditing.editableTitle(for: config))
-        guard alert.runModal() == .alertFirstButtonReturn,
-              let field = alert.accessoryView as? NSTextField else { return }
-        HistoryManager.shared.updateHistoryTitle(configId: item.id, newTitle: field.stringValue)
-        let controllers = (NSApp.delegate as? AppDelegate)?.windowControllers ?? []
-        model.refreshItems(open: Self.collectItems(from: controllers), history: Self.collectHistoryItems())
+    }
+
+    private func renameItem(_ item: FoilExposeItem) {
+        guard item.canRenameTitle, !isPresentingSystemUI,
+              let model, let panel = panels.first, panel.attachedSheet == nil else { return }
+        isPresentingSystemUI = true
+        Task { [weak self] in
+            guard let self else { return }
+            defer {
+                self.isPresentingSystemUI = false
+                if self.model === model, self.panels.first === panel {
+                    panel.makeKeyAndOrderFront(nil)
+                    model.requestSearchFieldFocus()
+                }
+            }
+            let config = item.controller?.appState.toConfig() ?? HistoryRepository.shared.config(id: item.id)
+            guard let config, config.canRenameTitle else { return }
+            let alert = FoilTitleEditing.makeAlert(title: FoilTitleEditing.editableTitle(for: config))
+            guard await Self.presentAlert(alert, on: panel) == .alertFirstButtonReturn,
+                  self.model === model, let field = alert.accessoryView as? NSTextField else { return }
+            HistoryManager.shared.updateHistoryTitle(configId: item.id, newTitle: field.stringValue)
+            let controllers = (NSApp.delegate as? AppDelegate)?.windowControllers ?? []
+            model.refreshItems(open: Self.collectItems(from: controllers), history: Self.collectHistoryItems())
+        }
     }
 
     /// 已钉住记录的显式删除需确认，普通记录直接清除。
     private func clearHistoryItem(_ item: FoilExposeItem) {
         guard item.isHistoryEntry, !isPresentingSystemUI,
-              let model, let panel = panels.first else { return }
+              let model, let panel = panels.first, panel.attachedSheet == nil else { return }
         isPresentingSystemUI = true
         let historyID = item.id
         Task { [weak self] in
             guard let self else { return }
-            var didHidePanel = false
             defer {
                 self.isPresentingSystemUI = false
-                if didHidePanel, self.model === model, self.panels.first === panel {
+                if self.model === model, self.panels.first === panel {
                     panel.makeKeyAndOrderFront(nil)
                     if model.isSearching { model.requestSearchFieldFocus() }
                 }
@@ -1114,28 +1154,23 @@ final class FoilExposeController {
             // 历史卡片菜单打开期间该条目可能已恢复成活跃箔片，避免清除其恢复数据。
             guard (NSApp.delegate as? AppDelegate)?.windowControllers.contains(where: { $0.appState.id == item.id }) != true else { return }
             if config.historyIsPinned {
-                // 仅在实际弹出确认框时隐藏总览，普通删除直接更新列表。
-                panel.orderOut(nil)
-                didHidePanel = true
-                guard HistoryManager.pinnedDeletionAlert().runModal() == .alertSecondButtonReturn else { return }
+                guard await Self.presentAlert(HistoryManager.pinnedDeletionAlert(), on: panel) == .alertSecondButtonReturn,
+                      self.model === model else { return }
             }
             if await HistoryManager.shared.removeFromHistory([config]) {
-                model.replaceHistoryItems(Self.collectHistoryItems())
+                model.replaceHistoryItems(Self.collectHistoryItems(), deleting: historyID)
             } else {
-                panel.orderOut(nil)
-                didHidePanel = true
                 let error = NSAlert()
                 error.messageText = NSLocalizedString("Expose Clear History Failed", comment: "")
-                error.runModal()
+                _ = await Self.presentAlert(error, on: panel)
             }
         }
     }
 
-    /// 总览位于 screenSaver 层级，确认期间先让出面板与键盘，完成后恢复同一模型。
+    /// 批量清除确认与失败提示都附着在总览上，结束后恢复搜索焦点。
     private func confirmClearHistory(_ category: FoilExposeHistoryCategory) {
-        guard !isPresentingSystemUI, let model, let panel = panels.first else { return }
+        guard !isPresentingSystemUI, let model, let panel = panels.first, panel.attachedSheet == nil else { return }
         isPresentingSystemUI = true
-        panel.orderOut(nil)
         Task { [weak self] in
             guard let self else { return }
             defer {
@@ -1160,13 +1195,13 @@ final class FoilExposeController {
             alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
             let clearButton = alert.addButton(withTitle: NSLocalizedString("Clear", comment: ""))
             clearButton.hasDestructiveAction = true
-            guard alert.runModal() == .alertSecondButtonReturn else { return }
+            guard await Self.presentAlert(alert, on: panel) == .alertSecondButtonReturn, self.model === model else { return }
             if await HistoryManager.shared.removeFromHistory(targets) {
                 model.replaceHistoryItems(Self.collectHistoryItems())
             } else {
                 let error = NSAlert()
                 error.messageText = NSLocalizedString("Expose Clear History Failed", comment: "")
-                error.runModal()
+                _ = await Self.presentAlert(error, on: panel)
             }
         }
     }
@@ -1185,7 +1220,7 @@ final class FoilExposeController {
     func handleKeyEvent(_ event: NSEvent) -> NSEvent? {
         guard let model else { return event }
         // 系统面板（文件选择、授权）接管期间把按键交回系统，避免误触覆盖层。
-        if isPresentingSystemUI { return event }
+        if isPresentingSystemUI || panels.contains(where: { $0.attachedSheet != nil }) { return event }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let key = event.charactersIgnoringModifiers?.lowercased()
         if KeyboardShortcutStore.shared.matches(event, identifier: "window.showAllFoils") {
@@ -1197,11 +1232,26 @@ final class FoilExposeController {
             let hasControl = modifiers.contains(.control)
             // 输入法正在组合文字时，Esc / 回车 / Tab 留给输入法自己处理（取消候选、上屏）。
             let isComposing = (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true
-            // 总览复用当前收藏快捷键，切换历史收藏筛选并阻止菜单收藏当前箔片。
-            if KeyboardShortcutStore.shared.matches(event, identifier: "history.toggleFavorite") {
+            // 收藏筛选与条目收藏使用独立快捷键。
+            if KeyboardShortcutStore.shared.matches(event, identifier: "history.filterFavorites") {
                 model.pinnedOnly.toggle()
                 model.requestSearchFieldFocus()
                 return nil
+            }
+            // 历史条目快捷键优先于主菜单；组合输入及分类选择仍交给输入框。
+            if !isComposing, !model.isPickingScope, let item = model.highlightedItem, item.isHistoryEntry {
+                if KeyboardShortcutStore.shared.matches(event, identifier: "history.toggleFavorite") {
+                    model.onTogglePinned(item)
+                    return nil
+                }
+                if modifiers.intersection([.command, .shift, .option, .control]) == .command {
+                    if key == "e", item.canRenameTitle { model.onRenameItem(item); return nil }
+                    if key == "i" { model.onShowInformation(item); return nil }
+                }
+                if event.keyCode == 51, modifiers.intersection([.command, .shift, .option, .control]).isEmpty {
+                    if !event.isARepeat { model.onClearHistoryItem(item) }
+                    return nil
+                }
             }
             if let delegate = NSApp.delegate as? AppDelegate,
                delegate.matchesShortcut(event, definition: KeyboardShortcutCatalog.openClipboardContent) {
@@ -1287,8 +1337,7 @@ final class FoilExposeController {
                     model.selectHighlightedScope()
                     return nil
                 }
-                guard let highlighted = model.highlightedItem else { return nil }
-                self.select(highlighted)
+                model.openHighlightedResult()
             case 123: model.moveSelection(.left)   // ←
             case 124: model.moveSelection(.right)  // →
             case 125:
@@ -1320,7 +1369,15 @@ final class FoilExposeController {
         model = nil
         let panels = self.panels
         self.panels = []
+        // 总览真正退出时一并取消嵌套 sheet，避免遗留对话框和等待中的确认任务。
+        func cancelSheets(on window: NSWindow) {
+            guard let sheet = window.attachedSheet else { return }
+            cancelSheets(on: sheet)
+            window.endSheet(sheet, returnCode: .cancel)
+            sheet.orderOut(nil)
+        }
         for panel in panels {
+            cancelSheets(on: panel)
             panel.orderOut(nil)
         }
     }

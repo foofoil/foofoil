@@ -60,6 +60,47 @@ struct FoilExposeModelTests {
         #expect(model.currentItems.map(\.id) == [open.id, history.id])
     }
 
+    @Test func deletingHistorySelectsNextThenPreviousAndHandlesEmptyResults() {
+        let open = makeItem(title: "Open")
+        let history = (0..<3).map { makeItem(title: "History \($0)", isHistoryEntry: true) }
+        let model = makeModel(items: [open], historyItems: history)
+        model.selectedIndex = 2
+        model.replaceHistoryItems([history[0], history[2]], deleting: history[1].id)
+        #expect(model.highlightedItem?.id == history[2].id)
+        model.replaceHistoryItems([history[0]], deleting: history[2].id)
+        #expect(model.highlightedItem?.id == history[0].id)
+        model.replaceHistoryItems([], deleting: history[0].id)
+        #expect(model.highlightedItem?.id == open.id)
+
+        let filtered = makeModel(items: [open], historyItems: [history[0]])
+        filtered.searchText = "History"
+        filtered.replaceHistoryItems([], deleting: history[0].id)
+        #expect(filtered.currentItems.isEmpty)
+        #expect(filtered.selectedIndex == 0)
+        #expect(filtered.highlightedItem == nil)
+        var activated = false
+        filtered.onSelect = { _ in activated = true }
+        filtered.onOpenFile = { _ in activated = true }
+        for direction in [FoilExposeMoveDirection.up, .down, .left, .right] {
+            filtered.moveSelection(direction)
+        }
+        filtered.moveSelectionToRowStart()
+        filtered.moveSelectionToRowEnd()
+        filtered.openHighlightedResult()
+        #expect(!activated)
+        #expect(filtered.selectedIndex == 0)
+    }
+
+    @Test func deletingFirstHistorySelectsItsSuccessor() {
+        let history = (0..<2).map { _ in makeItem(isHistoryEntry: true) }
+        let model = makeModel(items: [], historyItems: history)
+        model.replaceHistoryItems([history[1]], deleting: history[0].id)
+        #expect(model.highlightedItem?.id == history[1].id)
+        model.replaceHistoryItems([], deleting: history[1].id)
+        #expect(model.currentItems.isEmpty)
+        #expect(model.highlightedItem == nil)
+    }
+
     @Test func onlyPinnedHistoryRequiresSingleItemClearConfirmation() {
         for kind in [HistoryContentKind.note, .text, .markdown, .csv, .image, .web, .pdf,
                      .video, .audio, .extensionContent, .ebook, .quickLook, .camera] {
@@ -442,6 +483,43 @@ struct FoilExposeModelTests {
         #expect(!model.showsFileResults)
         #expect(model.files.isEmpty)
         #expect(cancellations >= 1)
+    }
+
+    @Test func spotlightResultsParticipateInKeyboardNavigationAndOpening() async throws {
+        var callback: ((SpotlightSearchOutcome) -> Void)?
+        let model = FoilExposeModel(items: [makeItem(title: "Alpha")], historyItems: [],
+                                    fileSearch: { _, value in callback = value }, cancelFiles: {}, musicEnabled: { false })
+        model.columnCount = 4
+        model.musicColumnCount = 2
+        model.searchText = "alpha"
+        try await eventually { callback != nil }
+        callback?(.results((1...3).map { file("/docs/alpha-\($0).txt") }))
+        let firstFile = model.currentItems.count
+        model.moveSelection(.down)
+        #expect(model.selectedIndex == firstFile)
+        #expect(model.highlightedItem == nil)
+        model.moveSelection(.right)
+        #expect(model.selectedIndex == firstFile + 1)
+        model.moveSelectionToRowStart()
+        #expect(model.selectedIndex == firstFile)
+        model.moveSelectionToRowEnd()
+        #expect(model.selectedIndex == firstFile + 1)
+        model.moveSelection(.down)
+        #expect(model.selectedIndex == firstFile + 2)
+        var opened: URL?
+        model.onOpenFile = { opened = $0 }
+        model.openHighlightedResult()
+        #expect(opened == model.visibleFiles[2].url)
+        model.moveSelection(.up)
+        model.moveSelection(.up)
+        #expect(model.selectedIndex == 0)
+        callback = nil
+        model.resultFilter = .files
+        try await eventually { callback != nil }
+        callback?(.results([file("/docs/alpha.txt"), file("/docs/alpha-next.txt")]))
+        model.moveSelection(.right)
+        #expect(model.selectedIndex == 1)
+        #expect(model.currentItems.isEmpty)
     }
 
     @Test func lateFileResultsCannotOverwriteANewQuery() async throws {

@@ -6,7 +6,7 @@ import Testing
 struct FoilExposeViewTests {
     private func model(clipboardContent: ClipboardOpenableContent? = nil) -> FoilExposeModel {
         let history = FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true, title: "Native note",
-                                     symbolName: "note.text", contentKind: .note, thumbnailPath: nil)
+                                     symbolName: "note.text", contentKind: .note, thumbnailPath: nil, hasHistoryRecord: true)
         return FoilExposeModel(items: [], historyItems: [history], clipboardContent: clipboardContent, fileSearch: { _, _ in },
                                cancelFiles: {}, cameraAvailable: { false }, musicEnabled: { false })
     }
@@ -88,6 +88,38 @@ struct FoilExposeViewTests {
         #expect(controller.searchField.placeholderString?.contains(model.activeScope!.displayName) == true)
     }
 
+    @Test func scopeInputPreservesResultsUntilSelection() {
+        let model = model()
+        let originalIDs = model.currentItems.map(\.id)
+        for input in ["/", "/history", "/no-such-category"] {
+            model.searchText = input
+            #expect(model.isPickingScope)
+            #expect(model.searchQuery.isEmpty)
+            #expect(model.currentItems.map(\.id) == originalIDs)
+            #expect(model.showsHistorySection)
+        }
+        model.searchText = "Native"
+        model.searchText = "/no-such-category"
+        #expect(model.searchQuery == "Native")
+        #expect(model.currentItems.map(\.id) == originalIDs)
+        model.selectScope(.history)
+        #expect(model.searchQuery.isEmpty)
+        #expect(!model.isPickingScope)
+    }
+
+    @Test func unmatchedScopeShowsDropdownNotice() throws {
+        let model = model()
+        let controller = FoilExposeViewController(model: model)
+        _ = controller.view
+        model.searchText = "/no-such-category"
+        controller.synchronize()
+        let notice = try #require(descendants(controller.view).first {
+            $0.accessibilityIdentifier() == "expose.scope.noMatches"
+        } as? NSTextField)
+        #expect(!notice.isHiddenOrHasHiddenAncestor)
+        #expect(notice.stringValue == NSLocalizedString("No Matching Scopes", comment: ""))
+    }
+
     @Test func nativeCategoryAndFavoriteButtonsUseSharedModel() throws {
         let model = model()
         let controller = FoilExposeViewController(model: model)
@@ -101,6 +133,34 @@ struct FoilExposeViewTests {
         favorite.performClick(nil)
         #expect(model.pinnedOnly)
         #expect(model.currentItems.isEmpty)
+    }
+
+    @Test func historyContextMenuShowsIconsShortcutsAndStandardDeletion() throws {
+        let model = model()
+        let grid = FoilExposeGrid(model: model)
+        grid.frame = NSRect(x: 0, y: 0, width: 1240, height: 900)
+        grid.update(model: model)
+        let collection = try #require(grid.documentView as? NSCollectionView)
+        collection.layoutSubtreeIfNeeded()
+        let card = try #require(collection.item(at: IndexPath(item: 0, section: 0)))
+        let event = try #require(NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [],
+                                                  timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+        let menu = try #require(card.view.menu(for: event))
+        let favorite = try #require(menu.items.first { $0.title == NSLocalizedString("Favorite History", comment: "") })
+        #expect(favorite.keyEquivalent == KeyboardShortcutStore.shared.shortcut(forID: "history.toggleFavorite")?.keyEquivalent)
+        let rename = try #require(menu.items.first { $0.title == NSLocalizedString("Change Title", comment: "") })
+        #expect(rename.keyEquivalent == "e")
+        #expect(rename.keyEquivalentModifierMask == .command)
+        let info = try #require(menu.items.first { $0.title == NSLocalizedString("Foil Information Menu", comment: "") })
+        #expect(info.keyEquivalent == "i")
+        let delete = try #require(menu.items.first { $0.title == NSLocalizedString("Delete History Record", comment: "") })
+        #expect(delete.keyEquivalent == "\u{8}")
+        #expect(delete.keyEquivalentModifierMask.isEmpty)
+        #expect(delete.attributedTitle == nil)
+        for item in [favorite, rename, info, delete] {
+            #expect(item.image != nil)
+            if #available(macOS 27.0, *) { #expect(item.preferredImageVisibility == .visible) }
+        }
     }
 
     @Test func selectionUpdatesKeepNativeCollectionItemsAlive() throws {

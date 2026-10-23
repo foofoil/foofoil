@@ -186,7 +186,7 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
     private func updateCategories() {
         categoryScroll.isHidden = !model.showsHistorySection
         let values = model.visibleHistoryCategories
-        let shortcut = KeyboardShortcutStore.shared.shortcut(forID: "history.toggleFavorite")?.displayString ?? ""
+        let shortcut = KeyboardShortcutStore.shared.shortcut(forID: "history.filterFavorites")?.displayString ?? ""
         let signature = values.map { "\($0.rawValue):\(model.historyCount(in: $0))" }
             + [model.historyCategory.rawValue, String(model.pinnedOnly), shortcut]
         guard categorySignature != signature else { return }
@@ -237,7 +237,10 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
             scopePicker.addArrangedSubview(button)
         }
         if scopes.isEmpty {
-            scopePicker.addArrangedSubview(NSTextField(labelWithString: NSLocalizedString("No Matching Scopes", comment: "")))
+            let notice = NSTextField(labelWithString: NSLocalizedString("No Matching Scopes", comment: ""))
+            notice.textColor = .white.withAlphaComponent(0.75)
+            notice.setAccessibilityIdentifier("expose.scope.noMatches")
+            scopePicker.addArrangedSubview(notice)
         }
         let tip = NSTextField(labelWithString: NSLocalizedString("Scope Hints Tip", comment: ""))
         tip.font = .systemFont(ofSize: 10)

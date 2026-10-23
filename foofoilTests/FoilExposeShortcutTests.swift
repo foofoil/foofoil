@@ -40,7 +40,7 @@ struct FoilExposeShortcutTests {
 
     @Test @MainActor func overviewFavoriteFilterFollowsConfiguredShortcut() throws {
         let store = KeyboardShortcutStore.shared
-        let definition = try #require(KeyboardShortcutCatalog.definition(withID: "history.toggleFavorite"))
+        let definition = try #require(KeyboardShortcutCatalog.definition(withID: "history.filterFavorites"))
         let previous = store.shortcut(for: definition)
         let customized = store.isCustomized(definition)
         let controller = FoilExposeController.shared
@@ -59,19 +59,104 @@ struct FoilExposeShortcutTests {
                                          isARepeat: false, keyCode: 0))
         }
         store.reset(definition)
-        #expect(controller.handleKeyEvent(try event("d", modifiers: .command)) == nil)
+        #expect(controller.handleKeyEvent(try event("d", modifiers: [.command, .shift])) == nil)
         #expect(model.pinnedOnly)
-        #expect(controller.handleKeyEvent(try event("d", modifiers: .command)) == nil)
+        #expect(controller.handleKeyEvent(try event("d", modifiers: [.command, .shift])) == nil)
         #expect(!model.pinnedOnly)
 
         store.setShortcut(KeyboardShortcut(keyEquivalent: "j", modifiers: [.command, .option]), for: definition)
-        #expect(controller.handleKeyEvent(try event("d", modifiers: .command)) != nil)
+        #expect(controller.handleKeyEvent(try event("d", modifiers: [.command, .shift])) != nil)
         #expect(!model.pinnedOnly)
         #expect(controller.handleKeyEvent(try event("j", modifiers: [.command, .option])) == nil)
         #expect(model.pinnedOnly)
         store.setShortcut(nil, for: definition)
         #expect(controller.handleKeyEvent(try event("j", modifiers: [.command, .option])) != nil)
         #expect(model.pinnedOnly)
+    }
+
+    @Test @MainActor func highlightedHistoryReceivesItemShortcuts() throws {
+        let controller = FoilExposeController.shared
+        let previous = controller.model
+        let item = FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true,
+                                  title: "History", symbolName: "note.text", contentKind: .note, thumbnailPath: nil,
+                                  hasHistoryRecord: true)
+        let model = FoilExposeModel(items: [], historyItems: [item], fileSearch: { _, _ in }, cancelFiles: {}, musicEnabled: { false })
+        controller.model = model
+        defer { controller.model = previous }
+        var actions: [String] = []
+        model.onTogglePinned = { _ in actions.append("favorite") }
+        model.onRenameItem = { _ in actions.append("rename") }
+        model.onShowInformation = { _ in actions.append("info") }
+        model.onClearHistoryItem = { _ in actions.append("delete") }
+        func event(_ key: String, modifiers: NSEvent.ModifierFlags = .command, code: UInt16 = 0, repeating: Bool = false) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers,
+                                         timestamp: 0, windowNumber: 0, context: nil,
+                                         characters: key, charactersIgnoringModifiers: key, isARepeat: repeating, keyCode: code))
+        }
+        for key in ["d", "e", "i"] { #expect(controller.handleKeyEvent(try event(key)) == nil) }
+        #expect(controller.handleKeyEvent(try event("\u{8}", modifiers: [], code: 51)) == nil)
+        #expect(actions == ["favorite", "rename", "info", "delete"])
+        _ = controller.handleKeyEvent(try event("\u{8}", modifiers: [], code: 51, repeating: true))
+        #expect(actions.count == 4)
+        model.searchText = "/"
+        #expect(controller.handleKeyEvent(try event("e")) != nil)
+        #expect(actions.count == 4)
+    }
+
+    @Test @MainActor func overviewAlertsKeepBackgroundVisibleAndCompleteAsSheets() async throws {
+        let screen = try #require(NSScreen.main)
+        let model = FoilExposeModel(items: [], historyItems: [], fileSearch: { _, _ in }, cancelFiles: {}, musicEnabled: { false })
+        let panel = FoilExposeController.makePanel(for: screen, model: model)
+        panel.makeKeyAndOrderFront(nil)
+        defer { panel.close() }
+        let clear = NSAlert()
+        clear.messageText = "Clear"
+        clear.addButton(withTitle: "Cancel")
+        clear.addButton(withTitle: "Clear")
+        let failure = NSAlert()
+        failure.messageText = "Failure"
+        for alert in [HistoryManager.pinnedDeletionAlert(), FoilTitleEditing.makeAlert(title: "Title"), clear, failure] {
+            let presentation = Task { await FoilExposeController.presentAlert(alert, on: panel) }
+            for _ in 0..<100 where panel.attachedSheet == nil {
+                try await Task.sleep(for: .milliseconds(20))
+            }
+            #expect(panel.attachedSheet === alert.window)
+            #expect(alert.window.sheetParent === panel)
+            #expect(panel.isVisible)
+            #expect(alert.window.level.rawValue >= panel.level.rawValue)
+            panel.endSheet(alert.window, returnCode: .alertFirstButtonReturn)
+            #expect(await presentation.value == .alertFirstButtonReturn)
+            #expect(panel.isVisible)
+        }
+        panel.orderOut(nil)
+        #expect(await FoilExposeController.presentAlert(NSAlert(), on: panel) == .cancel)
+    }
+
+    @Test @MainActor func historyInformationUsesSnapshotWithoutRestoringFoil() async throws {
+        let delegate = AppDelegate()
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 800, height: 600),
+                              styleMask: [.titled], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.orderFront(nil)
+        defer {
+            if let sheet = window.attachedSheet { window.endSheet(sheet); sheet.orderOut(nil) }
+            window.close()
+        }
+        var config = WindowConfig(id: UUID(), text: "Saved body")
+        config.customTitle = "Snapshot history"
+        config.windowFrame = NSStringFromRect(NSRect(x: 0, y: 0, width: 320, height: 240))
+        delegate.showFoilInformation(config: config, state: nil, window: window)
+        for _ in 0..<100 where window.attachedSheet == nil {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let sheet = try #require(window.attachedSheet)
+        func text(in view: NSView) -> [String] {
+            (view as? NSTextField).map { [$0.stringValue] } ?? view.subviews.flatMap { text(in: $0) }
+        }
+        let values = text(in: try #require(sheet.contentView))
+        #expect(values.contains("Snapshot history"))
+        #expect(values.contains("320 × 240 pt"))
+        #expect(delegate.windowControllers.isEmpty)
     }
 
     @Test @MainActor func helpDocumentsReuseTheirOpenFoilsAndRefreshContent() throws {

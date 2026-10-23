@@ -149,12 +149,12 @@ Editing shortcuts apply to text fields or selectable content, depending on focus
 
 ## Inside Foil Overview
 
-- Arrow keys select; ↑ / ↓ move between visual rows using the cards’ left edges for alignment; Return activates the selected foil. Control + number or letter selects numbered items directly, including offscreen items. The first 36 items are numbered 1–9, 0, A–Z in list order; scrolling does not change their numbers.
+- Arrow keys select; ↑ / ↓ move between visual rows using the cards’ left edges for alignment; Return activates the selected foil or opens the selected Spotlight file. Spotlight file results support the same arrow-key navigation. Control + number or letter selects numbered items directly, including offscreen items. The first 36 items are numbered 1–9, 0, A–Z in list order; scrolling does not change their numbers.
 - Tab switches the highlight between the first open foil and the first history result, keeping search focused. Empty sections are skipped; scope selection and input method composition keep their existing Tab behavior.
 - ⌃P / ⌃N / ⌃F / ⌃B move the highlight up / down / right / left, taking priority over letter selection while keeping search focused.
 - Search is shown and focused automatically and stays active; type `/` to choose a search scope.
 - Esc cancels scope selection, or dismisses the overview; composing text is handled by the input method first.
-- The Favorite Current Foil shortcut also toggles Favorited history in the overview. The toggle shows the current binding and follows changes in Settings → Keyboard Shortcuts.
+- ⇧⌘D toggles the Favorites history filter; its binding can be changed in Settings → Keyboard Shortcuts. With a history item highlighted, Backspace deletes the record, ⌘E changes its title, ⌘D toggles its favorite status, and ⌘I opens Foil Information. These shortcuts appear alongside icons in the item’s context menu. Composition and scope selection keep their input behavior.
 - {{clipboardShortcut}} opens clipboard content.
 
 Paste an Apple Music song, album, or public playlist sharing link into Quick Open to preview it and press Return to open a music foil. Open Clipboard Content also opens these links directly as music. Explicit links work when Apple Music library search is disabled; music access authorization and content availability in your region still apply. Shared content does not need to be added to your library and can be restored from history.

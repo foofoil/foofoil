@@ -122,8 +122,8 @@ final class FoilExposeGrid: NSScrollView {
                 next.append(Section(title: NSLocalizedString("Expose History Section", comment: ""), compact: history.isEmpty, count: model.historyCount(in: model.historyCategory), symbol: "clock.arrow.circlepath", isHistory: true, entries: entries))
             }
             if model.showsFileResults {
-                var entries = model.visibleFiles.map { file in
-                    Entry(title: file.name, subtitle: file.url.deletingLastPathComponent().path,
+                var entries = model.visibleFiles.enumerated().map { offset, file in
+                    Entry(index: items.count + offset, title: file.name, subtitle: file.url.deletingLastPathComponent().path,
                           symbol: file.symbolName, action: { model.onOpenFile(file.url) })
                 }
                 if model.canExpandFileResults {
@@ -232,7 +232,7 @@ final class FoilExposeGrid: NSScrollView {
             let section = sections[indexPath.section]
             let entry = section.entries[indexPath.item]
             item.card.configure(foil: entry.foil, title: entry.title, subtitle: entry.subtitle, symbol: entry.symbol,
-                                compact: section.compact, shortcut: entry.index.flatMap { FoilExposeShortcut.key(forIndex: $0) },
+                                compact: section.compact, shortcut: entry.foil == nil ? nil : entry.index.flatMap { FoilExposeShortcut.key(forIndex: $0) },
                                 highlighted: entry.index == model.selectedIndex, action: entry.action, model: model)
             return item
         }
@@ -361,26 +361,64 @@ private final class ExposeThumbnailView: NSView {
     override var isFlipped: Bool { true }
 }
 
+/// 阴影随图像轮廓直接绘制，避免 NSImageView 的内部图层让外层阴影失效。
+private final class ExposeShadowedIcon: NSImageView {
+    override func draw(_ dirtyRect: NSRect) {
+        guard let image else { return }
+        let symbol = NSImage(size: image.size, flipped: false) { rect in
+            image.draw(in: rect)
+            if image.isTemplate, let tint = self.contentTintColor {
+                tint.setFill()
+                rect.fill(using: .sourceIn)
+            }
+            return true
+        }
+        let available = bounds.insetBy(dx: 3, dy: 3)
+        let scale = min(available.width / max(1, image.size.width), available.height / max(1, image.size.height))
+        let size = NSSize(width: image.size.width * scale, height: image.size.height * scale)
+        let rect = NSRect(x: bounds.midX - size.width / 2, y: bounds.midY - size.height / 2,
+                          width: size.width, height: size.height)
+        NSGraphicsContext.saveGraphicsState()
+        let shadow = NSShadow()
+        shadow.shadowColor = NSColor.black.withAlphaComponent(0.95)
+        shadow.shadowBlurRadius = 3
+        shadow.shadowOffset = NSSize(width: 0, height: -1)
+        shadow.set()
+        symbol.draw(in: rect)
+        NSGraphicsContext.restoreGraphicsState()
+    }
+}
+
+/// 按键文字按字体行高居中，避免随胶囊高度沿用 NSTextField 的顶部对齐。
+private final class ExposeShortcutCell: NSTextFieldCell {
+    override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
+        let height = min(cellFrame.height, cellSize(forBounds: cellFrame).height)
+        let centered = NSRect(x: cellFrame.minX, y: cellFrame.midY - height / 2,
+                              width: cellFrame.width, height: height)
+        super.drawInterior(withFrame: centered, in: controlView)
+    }
+}
+
 private final class ExposeNativeCard: NSView {
     private let thumbnail = ExposeThumbnailView()
     private let imageLayer = CALayer()
     private let preview = NSTextField(wrappingLabelWithString: "")
     private let icon = NSImageView()
-    private let typeIcon = NSImageView()
+    private let typeIcon = ExposeShadowedIcon()
     private let titleLabel = NSTextField(labelWithString: "")
     private let subtitleLabel = NSTextField(labelWithString: "")
     private let badge = NSTextField(labelWithString: "")
-    private let sourceIcon = NSImageView()
     private let clipboardIcon = NSImageView()
     private let dashedBorder = CAShapeLayer()
     private let playback = CALayer()
     private var playbackSubscription: AnyCancellable?
-    private let pinned = NSImageView()
+    private let pinned = ExposeShadowedIcon()
     private let incognito = NSImageView()
     private var tracking: NSTrackingArea?
     private var hovered = false
     private var highlighted = false
     private var compact = false
+    private var isNotice = false
     private var foil: FoilExposeItem?
     private weak var model: FoilExposeModel?
     private var action: (() -> Void)?
@@ -423,6 +461,11 @@ private final class ExposeNativeCard: NSView {
         subtitleLabel.font = .systemFont(ofSize: 11)
         subtitleLabel.textColor = .white.withAlphaComponent(0.5)
         subtitleLabel.lineBreakMode = .byTruncatingMiddle
+        badge.cell = ExposeShortcutCell(textCell: "")
+        badge.isEditable = false
+        badge.isSelectable = false
+        badge.isBordered = false
+        badge.drawsBackground = false
         badge.font = .monospacedSystemFont(ofSize: 11, weight: .bold)
         badge.textColor = .white
         badge.alignment = .center
@@ -431,13 +474,13 @@ private final class ExposeNativeCard: NSView {
         badge.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.55).cgColor
         pinned.image = NSImage(systemSymbolName: "bookmark.fill", accessibilityDescription: nil)
         incognito.image = IncognitoFoilIcon.image
-        for image in [icon, typeIcon, pinned, incognito, sourceIcon, clipboardIcon] {
+        for image in [icon, typeIcon, pinned, incognito, clipboardIcon] {
             image.contentTintColor = .white
             image.imageScaling = .scaleProportionallyUpOrDown
         }
+        pinned.contentTintColor = .systemYellow
         addSubview(thumbnail)
         for view in [preview, icon, typeIcon, badge, pinned, incognito] { thumbnail.addSubview(view) }
-        addSubview(sourceIcon)
         addSubview(clipboardIcon)
         addSubview(titleLabel)
         addSubview(subtitleLabel)
@@ -463,6 +506,10 @@ private final class ExposeNativeCard: NSView {
         reset()
         self.foil = foil; self.model = model; self.action = action; self.compact = compact
         self.highlighted = highlighted
+        isNotice = compact && action == nil && foil == nil
+        thumbnail.isHidden = isNotice
+        titleLabel.font = .systemFont(ofSize: 12, weight: isNotice ? .regular : .medium)
+        titleLabel.textColor = .white.withAlphaComponent(isNotice ? 0.55 : 0.9)
         titleLabel.stringValue = title
         titleLabel.alignment = compact ? .left : .center
         subtitleLabel.stringValue = subtitle
@@ -483,9 +530,6 @@ private final class ExposeNativeCard: NSView {
             icon.image = Self.musicIcon
             typeIcon.image = Self.musicIcon
         }
-        sourceIcon.image = NSImage(systemSymbolName: foil?.isHistoryEntry == true ? "clock.arrow.circlepath" : "macwindow", accessibilityDescription: nil)
-        sourceIcon.contentTintColor = foil?.isHistoryEntry == true ? .white.withAlphaComponent(0.6) : .systemMint
-        sourceIcon.isHidden = compact || foil == nil || foil?.isNewFoil == true
         clipboardIcon.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
         clipboardIcon.isHidden = compact || foil?.isClipboardContent != true
         dashedBorder.isHidden = foil?.isNewFoil != true
@@ -526,7 +570,7 @@ private final class ExposeNativeCard: NSView {
         dashedBorder.lineWidth = highlighted ? 2 : 1
         setAccessibilitySelected(highlighted)
         // 保持与原版相同的强调尺寸，不触发集合视图布局重排。
-        let scale = hovered || highlighted ? 1.03 : 1.0
+        let scale = action != nil && (hovered || highlighted) ? 1.03 : 1.0
         let previous = layer?.presentation()?.value(forKeyPath: "transform.scale") as? Double ?? 1
         CATransaction.begin()
         CATransaction.setDisableActions(true)
@@ -558,8 +602,8 @@ private final class ExposeNativeCard: NSView {
         if !compact, foil?.contentKind == .camera {
             icon.frame = NSRect(x: (side - 56) / 2, y: (side - 56) / 2, width: 56, height: 56)
         }
-        typeIcon.frame = NSRect(x: 7, y: max(0, side - 29), width: 22, height: 22)
-        pinned.frame = NSRect(x: side - 33, y: 7, width: 22, height: 22)
+        typeIcon.frame = NSRect(x: 4, y: max(0, side - 32), width: 28, height: 28)
+        pinned.frame = NSRect(x: side - 36, y: 4, width: 28, height: 28)
         incognito.frame = NSRect(x: side - 33, y: side - 33, width: 22, height: 22)
         let badgeWidth = max(28, badge.intrinsicContentSize.width + 12)
         badge.frame = compact ? NSRect(x: bounds.width - badgeWidth - 8, y: 19, width: badgeWidth, height: 20)
@@ -567,16 +611,17 @@ private final class ExposeNativeCard: NSView {
         titleLabel.frame = compact ? NSRect(x: 50, y: subtitleLabel.isHidden ? 19 : 10, width: max(0, bounds.width - 100), height: 20)
             : NSRect(x: 0, y: side + 8, width: bounds.width, height: 18)
         if !compact {
-            let sourceWidth: CGFloat = sourceIcon.isHidden ? 0 : 18
             let clipboardWidth: CGFloat = clipboardIcon.isHidden ? 0 : 18
             let measured = (titleLabel.stringValue as NSString).size(withAttributes: [.font: titleLabel.font ?? NSFont.systemFont(ofSize: 12)]).width + 16
-            let textWidth = min(measured, max(0, bounds.width - sourceWidth - clipboardWidth))
-            let start = (bounds.width - textWidth - sourceWidth - clipboardWidth) / 2
-            sourceIcon.frame = NSRect(x: start, y: side + 9, width: 13, height: 14)
-            clipboardIcon.frame = NSRect(x: start + sourceWidth, y: side + 9, width: 13, height: 14)
+            let textWidth = min(measured, max(0, bounds.width - clipboardWidth))
+            let start = (bounds.width - textWidth - clipboardWidth) / 2
+            clipboardIcon.frame = NSRect(x: start, y: side + 9, width: 13, height: 14)
             // 标题保留整行可用宽度，避免 NSTextField 的内部边距让短标题提前省略。
-            titleLabel.frame = NSRect(x: sourceWidth + clipboardWidth, y: side + 8,
-                                      width: max(0, bounds.width - sourceWidth - clipboardWidth), height: 18)
+            titleLabel.frame = NSRect(x: clipboardWidth, y: side + 8,
+                                      width: max(0, bounds.width - clipboardWidth), height: 18)
+        }
+        if isNotice {
+            titleLabel.frame = NSRect(x: 10, y: 19, width: max(0, bounds.width - 20), height: 20)
         }
         subtitleLabel.frame = NSRect(x: 50, y: 31, width: max(0, bounds.width - 65), height: 16)
         CATransaction.commit()
@@ -613,7 +658,10 @@ private final class ExposeNativeCard: NSView {
         let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self)
         addTrackingArea(area); tracking = area
     }
-    override func mouseEntered(with event: NSEvent) { hovered = true; updateAppearance() }
+    override func mouseEntered(with event: NSEvent) {
+        guard action != nil else { return }
+        hovered = true; updateAppearance()
+    }
     override func mouseExited(with event: NSEvent) { hovered = false; updateAppearance() }
     override func hitTest(_ point: NSPoint) -> NSView? {
         super.hitTest(point) == nil ? nil : self
@@ -627,17 +675,28 @@ private final class ExposeNativeCard: NSView {
     }
     override func menu(for event: NSEvent) -> NSMenu? {
         guard let foil else { return nil }
+        if let index = model?.currentItems.firstIndex(where: { $0.id == foil.id }) {
+            model?.selectedIndex = index
+        }
         let menu = NSMenu()
-        func add(_ title: String, _ selector: Selector) {
-            let item = NSMenuItem(title: NSLocalizedString(title, comment: ""), action: selector, keyEquivalent: "")
+        func add(_ title: String, _ selector: Selector, symbol: String, key: String = "", modifiers: NSEvent.ModifierFlags = []) {
+            let item = NSMenuItem(title: NSLocalizedString(title, comment: ""), action: selector, keyEquivalent: key)
+            item.keyEquivalentModifierMask = modifiers
+            item.withSymbol(symbol)
             item.target = self; menu.addItem(item)
         }
-        if foil.hasHistoryRecord { add(foil.historyIsPinned ? "Unfavorite History" : "Favorite History", #selector(toggleFavorite)) }
-        if foil.canRenameTitle { add("Change Title", #selector(rename)) }
-        if foil.isHistoryEntry { add("Delete History Record", #selector(deleteHistory)) }
+        let favorite = KeyboardShortcutStore.shared.shortcut(forID: "history.toggleFavorite")
+        if foil.hasHistoryRecord {
+            add(foil.historyIsPinned ? "Unfavorite History" : "Favorite History", #selector(toggleFavorite), symbol: foil.historyIsPinned ? "bookmark.slash" : "bookmark",
+                key: foil.isHistoryEntry ? favorite?.keyEquivalent ?? "" : "", modifiers: foil.isHistoryEntry ? favorite?.modifiers ?? [] : [])
+        }
+        if foil.canRenameTitle { add("Change Title", #selector(rename), symbol: "pencil", key: foil.isHistoryEntry ? "e" : "", modifiers: .command) }
+        if foil.isHistoryEntry || foil.controller != nil { add("Foil Information Menu", #selector(showInformation), symbol: "info.circle", key: foil.isHistoryEntry ? "i" : "", modifiers: .command) }
+        if foil.isHistoryEntry { add("Delete History Record", #selector(deleteHistory), symbol: "trash", key: "\u{8}") }
         return menu.items.isEmpty ? nil : menu
     }
     @objc private func toggleFavorite() { if let foil { model?.onTogglePinned(foil) } }
+    @objc private func showInformation() { if let foil { model?.onShowInformation(foil) } }
     @objc private func rename() { if let foil { model?.onRenameItem(foil) } }
     @objc private func deleteHistory() { if let foil { model?.onClearHistoryItem(foil) } }
 }
