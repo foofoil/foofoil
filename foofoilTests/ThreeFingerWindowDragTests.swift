@@ -62,3 +62,49 @@ struct ThreeFingerWindowDragTests {
         #expect(drag.update(contacts: contacts(100, 100), windowOrigin: NSPoint(x: 50, y: 50)) == nil)
     }
 }
+
+@MainActor
+@Suite(.sharedApplicationState, .serialized)
+struct SidebarThreeFingerWindowDragTests {
+    @Test func sidebarRoutesToItsOwnFoilAndMovesWithIt() throws {
+        let foil = FloatingWindow(contentRect: NSRect(x: 500, y: 300, width: 400, height: 300), defer: false)
+        let otherFoil = FloatingWindow(contentRect: NSRect(x: 100, y: 100, width: 200, height: 200), defer: false)
+        let panel = NavigatorPanel(contentRect: NSRect(x: 300, y: 300, width: 200, height: 300),
+                                   styleMask: [.borderless], backing: .buffered, defer: false)
+        for window in [foil, otherFoil, panel] { window.isReleasedWhenClosed = false }
+        defer {
+            foil.removeChildWindow(panel)
+            panel.close()
+            foil.close()
+            otherFoil.close()
+        }
+        let sidebar = NavigatorHostingView(appState: AppState(isIncognito: true))
+        panel.contentView = sidebar
+        foil.addChildWindow(panel, ordered: .above)
+        #expect(sidebar.allowedTouchTypes.contains(.indirect))
+        let target = try #require(sidebar.windowDragTarget)
+        #expect(target === foil)
+        let previousPanelOrigin = panel.frame.origin
+        let otherFrame = otherFoil.frame
+        target.setFrameOrigin(NSPoint(x: foil.frame.minX + 30, y: foil.frame.minY - 20))
+        #expect(panel.frame.origin == NSPoint(x: previousPanelOrigin.x + 30, y: previousPanelOrigin.y - 20))
+        #expect(otherFoil.frame == otherFrame)
+        foil.removeChildWindow(panel)
+        #expect(sidebar.windowDragTarget == nil)
+    }
+
+    @Test func embeddedSidebarTargetsHostAndKeepsOrdinaryHitTesting() {
+        let foil = FloatingWindow(contentRect: NSRect(x: 200, y: 200, width: 400, height: 300), defer: false)
+        foil.isReleasedWhenClosed = false
+        defer { foil.close() }
+        let sidebar = NavigatorHostingView(appState: AppState(isIncognito: true), isFullScreenOverlay: true)
+        foil.contentView = sidebar
+        #expect(sidebar.windowDragTarget === foil)
+        #expect(sidebar.allowedTouchTypes.contains(.indirect))
+        // 普通点击仍命中原生控件，三指根视图不能挡住行按钮或搜索框。
+        let button = NSButton(frame: NSRect(x: 10, y: 10, width: 80, height: 24))
+        sidebar.addSubview(button, positioned: .above, relativeTo: nil)
+        let point = sidebar.convert(NSPoint(x: 30, y: 20), to: sidebar.superview)
+        #expect(sidebar.hitTest(point) === button)
+    }
+}

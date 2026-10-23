@@ -20,6 +20,7 @@ final class NavigatorHostingView: NSHostingView<NavigatorPanelView> {
     }
 
     private func observeFocusRequests(isFullScreenOverlay: Bool) {
+        allowedTouchTypes.insert(.indirect)
         focusRequest = appState.$navigatorFocusRequest.dropFirst().sink { [weak self] _ in
             // AXPress 不一定产生 mouseDown；行激活同样须把后续按键交给可见的侧栏。
             DispatchQueue.main.async { [weak self] in
@@ -33,6 +34,35 @@ final class NavigatorHostingView: NSHostingView<NavigatorPanelView> {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
     override var acceptsFirstResponder: Bool { true }
+
+    /// 桌面侧栏拖动父箔；全屏覆盖层由宿主箔统一拒绝移窗。
+    var windowDragTarget: FloatingWindow? {
+        (window as? FloatingWindow) ?? (window?.parent as? FloatingWindow)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // 列表行、搜索框和宽度手柄上的原始触摸同样归侧栏根视图所有。
+        if NSApp.currentEvent?.type == .gesture, !isHidden, bounds.contains(convert(point, from: superview)) {
+            return self
+        }
+        return super.hitTest(point)
+    }
+
+    override func touchesBegan(with event: NSEvent) {
+        windowDragTarget?.handleWindowDragTouches(event, in: self)
+    }
+
+    override func touchesMoved(with event: NSEvent) {
+        windowDragTarget?.handleWindowDragTouches(event, in: self)
+    }
+
+    override func touchesEnded(with event: NSEvent) {
+        windowDragTarget?.resetWindowDragTouches()
+    }
+
+    override func touchesCancelled(with event: NSEvent) {
+        windowDragTarget?.resetWindowDragTouches()
+    }
 
     static func enclosing(_ responder: NSResponder?) -> NavigatorHostingView? {
         var current = responder

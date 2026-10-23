@@ -139,16 +139,22 @@ public class FloatingWindow: NSWindow {
         resizeCursorTrackingArea = trackingArea
     }
 
+    var isTrackingWindowDragTouches: Bool { threeFingerWindowDrag.isTracking }
+
     func resetWindowDragTouches() {
         threeFingerWindowDrag.reset()
         threeFingerCursorAnchor = nil
     }
 
-    func handleWindowDragTouches(_ event: NSEvent) {
+    func handleWindowDragTouches(_ event: NSEvent, in sourceView: NSView) {
         guard !styleMask.contains(.fullScreen),
               (windowController as? FloatingWindowController)?.appState.isFullScreen != true,
-              let contentView else { resetWindowDragTouches(); return }
-        let touches = event.touches(matching: .touching, in: contentView)
+              sourceView.window === self || sourceView.window?.parent === self else {
+            resetWindowDragTouches()
+            return
+        }
+        // 侧栏触点锁定在伴随窗口的视图上，不能用父箔的 contentView 查询。
+        let touches = event.touches(matching: .touching, in: sourceView)
             .filter { $0.type == .indirect && !$0.isResting }
         let contacts = touches.compactMap { touch -> ThreeFingerWindowDrag.Contact? in
             guard let identity = touch.identity as? AnyHashable else { return nil }

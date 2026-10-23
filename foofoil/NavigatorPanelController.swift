@@ -26,6 +26,11 @@ final class NavigatorPanel: NSWindow {
     }
 
     override func sendEvent(_ event: NSEvent) {
+        if let foil = parent as? FloatingWindow {
+            // 三指移箔期间不让侧栏列表同时滚动；普通双指滚动仍按原路径派发。
+            if foil.isTrackingWindowDragTouches, event.type == .scrollWheel || event.type == .swipe { return }
+            if event.type == .leftMouseDown { foil.resetWindowDragTouches() }
+        }
         if event.type == .scrollWheel,
            event.modifierFlags.intersection(.deviceIndependentFlagsMask).contains(.command),
            let controller = parent?.windowController as? FloatingWindowController {
@@ -53,6 +58,7 @@ final class NavigatorPanel: NSWindow {
     }
 
     override func resignKey() {
+        (parent as? FloatingWindow)?.resetWindowDragTouches()
         super.resignKey()
         synchronizeNavigatorFocus(navigationState)
     }

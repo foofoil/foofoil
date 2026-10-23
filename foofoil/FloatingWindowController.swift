@@ -43,11 +43,11 @@ final class FileDropHostingView<Content: View>: NSHostingView<Content> {
     }
 
     override func touchesBegan(with event: NSEvent) {
-        (window as? FloatingWindow)?.handleWindowDragTouches(event)
+        (window as? FloatingWindow)?.handleWindowDragTouches(event, in: self)
     }
 
     override func touchesMoved(with event: NSEvent) {
-        (window as? FloatingWindow)?.handleWindowDragTouches(event)
+        (window as? FloatingWindow)?.handleWindowDragTouches(event, in: self)
     }
 
     override func touchesEnded(with event: NSEvent) {
