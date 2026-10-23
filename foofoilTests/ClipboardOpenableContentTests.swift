@@ -150,6 +150,21 @@ struct ClipboardOpenableContentTests {
         #expect(result?.fileExtension == "flac")
     }
 
+    @Test func singleFileHintUsesNameWithoutType() throws {
+        let directory = try makeTempDirectory()
+        let url = try makeFile("report.txt", contents: Data("hello".utf8), in: directory)
+        #expect(ClipboardOpenableContent.forFileURLs([url])?.localizedName == "report.txt")
+    }
+
+    @Test func longFileNamesKeepExtensionWithinLimit() {
+        let name = String(repeating: "文", count: 50) + ".PDF"
+        let abbreviated = ClipboardOpenableContent.abbreviatedFileName(name)
+        #expect(abbreviated.count == 40)
+        #expect(abbreviated.hasSuffix("….PDF"))
+        #expect(ClipboardOpenableContent.abbreviatedFileName("report.pdf") == "report.pdf")
+        #expect(ClipboardOpenableContent.abbreviatedFileName(String(repeating: "a", count: 50)).count == 40)
+    }
+
     @Test func sameExtensionAudioListKeepsExtension() throws {
         let directory = try makeTempDirectory()
         let urls = [

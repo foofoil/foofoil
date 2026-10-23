@@ -1177,14 +1177,25 @@ nonisolated struct ClipboardOpenableContent: Equatable {
     let kind: Kind
     /// 文件来源内容的扩展名（小写、不含点），如 “flac”、“log”；组内扩展名不一致或不是文件来源时为 nil。
     let fileExtension: String?
+    var fileName: String?
 
     init(_ kind: Kind, fileExtension: String? = nil) {
         self.kind = kind
         self.fileExtension = fileExtension
     }
 
-    /// 提示文案中的类型名：文件来源带上扩展名（如 “.flac音频”、“.log文本”），其余只显示类型名。
+    /// 单文件提示使用实际文件名；截断主体时保留完整扩展名和 Unicode 字符。
+    static func abbreviatedFileName(_ name: String, limit: Int = 40) -> String {
+        guard name.count > limit else { return name }
+        let ext = (name as NSString).pathExtension
+        let suffix = ext.isEmpty ? "" : "." + ext
+        let stem = suffix.isEmpty ? name : String(name.dropLast(suffix.count))
+        return String(stem.prefix(max(0, limit - suffix.count - 1))) + "…" + suffix
+    }
+
+    /// 单文件显示文件名，其他内容继续使用本地化类型名。
     var localizedName: String {
+        if let fileName { return Self.abbreviatedFileName(fileName) }
         let base = kind.localizedName
         guard let fileExtension, !fileExtension.isEmpty else { return base }
         return String(
@@ -1205,6 +1216,15 @@ nonisolated struct ClipboardOpenableContent: Equatable {
     /// 目录打开的是其内容，先按“文件夹”提示；没有可打开文件时返回 nil（与实际打开结果一致：无动作）。
     @MainActor
     static func forFileURLs(_ urls: [URL]) -> ClipboardOpenableContent? {
+        guard var content = classifyFileURLs(urls) else { return nil }
+        if urls.count == 1, content.kind != .folder {
+            content.fileName = urls[0].lastPathComponent
+        }
+        return content
+    }
+
+    @MainActor
+    private static func classifyFileURLs(_ urls: [URL]) -> ClipboardOpenableContent? {
         if DroppedFileResolver.containsDirectory(in: urls) { return ClipboardOpenableContent(.folder) }
         let probe = AppState()
         let openable = urls.filter { probe.canOpenFile(url: $0) }
