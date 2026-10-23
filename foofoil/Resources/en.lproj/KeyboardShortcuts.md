@@ -113,6 +113,8 @@ Webpage fullscreen fills the foil’s browser area. Press Esc while the webpage 
 
 ## Window
 
+Three-finger drag: with the pointer over foil content, move three fingers on the trackpad to move the whole foil, without pressing a key or clicking. The pointer moves with the window. Lift your fingers to stop. Window movement is disabled in full screen. If system gestures conflict, assign Mission Control and desktop switching to four fingers and turn off the system Three Finger Drag option.
+
 | Action | Default shortcut | Current shortcut | Notes |
 | --- | --- | --- | --- |
 | Hide current foil | ⌘H | ⌘H | Restore from overview |

@@ -20,6 +20,8 @@ public class FloatingWindow: NSWindow {
         static let top = ResizeEdges(rawValue: 1 << 3)
     }
 
+    private var threeFingerWindowDrag = ThreeFingerWindowDrag()
+    private var threeFingerCursorAnchor: (position: CGPoint, windowOrigin: NSPoint)?
     private var isCommandDragCursorVisible = false
     private var isCommandWindowDragInProgress = false
     private var isEdgeResizeCursorVisible = false
@@ -67,6 +69,7 @@ public class FloatingWindow: NSWindow {
     }
 
     public override func resignKey() {
+        resetWindowDragTouches()
         super.resignKey()
         synchronizeNavigatorFocus((windowController as? FloatingWindowController)?.appState)
     }
@@ -136,8 +139,48 @@ public class FloatingWindow: NSWindow {
         resizeCursorTrackingArea = trackingArea
     }
 
+    func resetWindowDragTouches() {
+        threeFingerWindowDrag.reset()
+        threeFingerCursorAnchor = nil
+    }
+
+    func handleWindowDragTouches(_ event: NSEvent) {
+        guard !styleMask.contains(.fullScreen),
+              (windowController as? FloatingWindowController)?.appState.isFullScreen != true,
+              let contentView else { resetWindowDragTouches(); return }
+        let touches = event.touches(matching: .touching, in: contentView)
+            .filter { $0.type == .indirect && !$0.isResting }
+        let contacts = touches.compactMap { touch -> ThreeFingerWindowDrag.Contact? in
+            guard let identity = touch.identity as? AnyHashable else { return nil }
+            return .init(identity: identity,
+                         position: NSPoint(x: touch.normalizedPosition.x * touch.deviceSize.width,
+                                           y: touch.normalizedPosition.y * touch.deviceSize.height))
+        }
+        let origin = threeFingerWindowDrag.update(contacts: contacts, windowOrigin: frame.origin)
+        guard threeFingerWindowDrag.isTracking else {
+            threeFingerCursorAnchor = nil
+            return
+        }
+        if !threeFingerWindowDrag.isDragging {
+            threeFingerCursorAnchor = CGEvent(source: nil).map { ($0.location, frame.origin) }
+        }
+        if let origin {
+            setFrameOrigin(origin)
+            if let anchor = threeFingerCursorAnchor {
+                // 三指不会驱动系统指针；用起始锚点跟随窗口，避免逐帧像素取整累积漂移。
+                // Warp 不生成鼠标事件，避免触发正文悬停、选区或额外拖动。
+                let target = ThreeFingerWindowDrag.cursorPosition(
+                    anchor.position, followingWindowFrom: anchor.windowOrigin, to: frame.origin)
+                _ = CGWarpMouseCursorPosition(target)
+            }
+        }
+    }
+
     public override func sendEvent(_ event: NSEvent) {
         let modifiers = KeyboardShortcut.effectiveModifiers(for: event)
+        // 三指序列期间不把同一动作解释为正文滚动或网页后退。
+        if threeFingerWindowDrag.isTracking, event.type == .scrollWheel || event.type == .swipe { return }
+        if event.type == .leftMouseDown { resetWindowDragTouches() }
 
         // ⌘ 拖窗的整段鼠标序列归窗口所有；否则残余 dragged 会让终端凭空建立文字选区。
         // performDrag 可能已消费 mouseUp，下一次 mouseDown 也要清除状态。

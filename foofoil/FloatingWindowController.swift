@@ -20,6 +20,7 @@ final class FileDropHostingView<Content: View>: NSHostingView<Content> {
         self.appState = appState
         super.init(rootView: rootView)
         registerForDraggedTypes([.fileURL, .URL, .string, .tiff, .png])
+        allowedTouchTypes = [.indirect]
     }
 
     @available(*, unavailable)
@@ -30,6 +31,31 @@ final class FileDropHostingView<Content: View>: NSHostingView<Content> {
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        // 原始触摸统一交给根视图，避免网页、PDF 或终端子视图吞掉触点。
+        // 鼠标、滚动和捏合仍走原有命中检测，不放置遮挡内容的覆盖层。
+        if NSApp.currentEvent?.type == .gesture, !isHidden, bounds.contains(convert(point, from: superview)) {
+            return self
+        }
+        return super.hitTest(point)
+    }
+
+    override func touchesBegan(with event: NSEvent) {
+        (window as? FloatingWindow)?.handleWindowDragTouches(event)
+    }
+
+    override func touchesMoved(with event: NSEvent) {
+        (window as? FloatingWindow)?.handleWindowDragTouches(event)
+    }
+
+    override func touchesEnded(with event: NSEvent) {
+        (window as? FloatingWindow)?.resetWindowDragTouches()
+    }
+
+    override func touchesCancelled(with event: NSEvent) {
+        (window as? FloatingWindow)?.resetWindowDragTouches()
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
