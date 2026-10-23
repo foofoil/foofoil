@@ -345,6 +345,23 @@ struct FoilExposeModelTests {
         #expect(model.selectedIndex == 3)
     }
 
+    @Test func navigationRequestsRevealEvenWhenHighlightStaysAtBoundary() {
+        let model = makeModel(historyCount: 0)
+        model.columnCount = 4
+        model.selectedIndex = 0
+        let initial = model.selectionRevealRequest
+        model.moveSelection(.up)
+        #expect(model.selectedIndex == 0)
+        #expect(model.selectionRevealRequest == initial + 1)
+        model.moveSelectionToRowStart()
+        #expect(model.selectedIndex == 0)
+        #expect(model.selectionRevealRequest == initial + 2)
+        model.moveSelectionToRowEnd()
+        let rowEnd = model.selectedIndex
+        #expect(rowEnd == 3)
+        #expect(model.selectionRevealRequest == initial + 3)
+    }
+
     @Test func searchFiltersOpenFoilsAndHistoryByTitle() {
         let model = makeModel(
             items: [makeItem(title: "Alpha"), makeItem(title: "Beta")],
@@ -398,9 +415,13 @@ struct FoilExposeModelTests {
         #expect(model.item(forKey: "1")?.id == items[0].id)
         #expect(model.item(forKey: "6")?.id == items[5].id)
         #expect(model.item(forKey: "0")?.id == items[9].id)
-        #expect(model.item(forKey: "A")?.id == items[10].id)
-        #expect(model.item(forKey: "a")?.id == items[10].id)
-        #expect(model.item(forKey: "Z")?.id == items[35].id)
+        #expect(model.item(forKey: "C")?.id == items[10].id)
+        #expect(model.item(forKey: "c")?.id == items[10].id)
+        #expect(model.item(forKey: "Z")?.id == items[29].id)
+        // 导航保留字母不再作为编号直选键。
+        for key in ["a", "b", "e", "f", "n", "p"] {
+            #expect(model.item(forKey: key) == nil)
+        }
         #expect(model.item(forKey: "!") == nil)
         #expect(model.item(forKey: "") == nil)
     }

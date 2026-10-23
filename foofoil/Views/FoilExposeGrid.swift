@@ -19,6 +19,29 @@ struct FoilExposeGridMetrics {
     }
 }
 
+/// 选中项的滚动策略：完全可见不动；只露出一部分时最小滚动到完整可见；完全在视口外时居中。
+enum FoilExposeGridScrollTarget {
+    static func originY(itemFrame: NSRect, visibleRect: NSRect, maximum: CGFloat) -> CGFloat? {
+        guard !visibleRect.contains(itemFrame) else { return nil }
+        let target: CGFloat
+        if itemFrame.intersects(visibleRect) {
+            target = itemFrame.minY < visibleRect.minY
+                ? itemFrame.minY
+                : itemFrame.maxY - visibleRect.height
+        } else {
+            target = itemFrame.midY - visibleRect.height / 2
+        }
+        return min(maximum, max(0, target))
+    }
+}
+
+/// 整页滚动后的高亮落点：优先选完整可见的第一项，没有时退回第一个相交项。
+enum FoilExposeGridPageSelection {
+    static func firstIndex(candidates: [(index: Int, frame: NSRect)], visibleRect: NSRect) -> Int? {
+        (candidates.first { visibleRect.contains($0.frame) } ?? candidates.first)?.index
+    }
+}
+
 /// 原生总览滚动区：卡片、排版和滚动均由 AppKit 承担。
 final class FoilExposeGrid: NSScrollView {
     private let coordinator: Coordinator
@@ -94,6 +117,7 @@ final class FoilExposeGrid: NSScrollView {
         private var sections: [Section] = []
         private var signature: [[String]] = []
         private var previousSelection: Int?
+        private var previousRevealRequest: UInt64?
         private var previousCategory: FoilExposeHistoryCategory?
         private var previousQuery: String?
         private var pageToken: UUID?
@@ -185,12 +209,17 @@ final class FoilExposeGrid: NSScrollView {
                 scroll.contentView.scroll(to: .zero)
                 scroll.reflectScrolledClipView(scroll.contentView)
             }
-            if previousSelection != model.selectedIndex {
+            if previousSelection != model.selectedIndex || previousRevealRequest != model.selectionRevealRequest {
                 if previousSelection != nil, previousCategory == model.historyCategory,
                    let path = indexPath(for: model.selectedIndex),
                    let frame = collection.layoutAttributesForItem(at: path)?.frame,
-                   !frame.intersects(scroll.documentVisibleRect) {
-                    collection.scrollToItems(at: [path], scrollPosition: .centeredVertically)
+                   let y = FoilExposeGridScrollTarget.originY(
+                       itemFrame: frame,
+                       visibleRect: scroll.documentVisibleRect,
+                       maximum: max(0, collection.bounds.height - scroll.contentSize.height)) {
+                    // 卡片露出一部分时也要滚到完整可见，否则顶部/底部会留下被裁掉的一角。
+                    scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.minX, y: y))
+                    scroll.reflectScrolledClipView(scroll.contentView)
                 }
             }
             for case let item as ExposeCollectionItem in collection.visibleItems() {
@@ -200,6 +229,7 @@ final class FoilExposeGrid: NSScrollView {
                 item.card.setHighlighted(entry.index == model.selectedIndex)
             }
             previousSelection = model.selectedIndex
+            previousRevealRequest = model.selectionRevealRequest
             previousCategory = model.historyCategory
             previousQuery = model.searchText
             if let request = model.pageScrollRequest, request.token != pageToken {
@@ -208,13 +238,19 @@ final class FoilExposeGrid: NSScrollView {
                 let maximum = max(0, collection.bounds.height - scroll.contentSize.height)
                 scroll.contentView.scroll(to: NSPoint(x: 0, y: min(maximum, max(0, y))))
                 scroll.reflectScrolledClipView(scroll.contentView)
-                let first = collection.indexPathsForVisibleItems().sorted {
+                let visibleRect = scroll.documentVisibleRect
+                let paths = collection.indexPathsForVisibleItems().sorted {
                     $0.section == $1.section ? $0.item < $1.item : $0.section < $1.section
-                }.compactMap { path -> Int? in
+                }
+                var candidates: [(index: Int, frame: NSRect)] = []
+                for path in paths {
                     guard let frame = collection.layoutAttributesForItem(at: path)?.frame,
-                          frame.intersects(scroll.documentVisibleRect) else { return nil }
-                    return sections[path.section].entries[path.item].index
-                }.first
+                          frame.intersects(visibleRect),
+                          let index = sections[path.section].entries[path.item].index else { continue }
+                    candidates.append((index, frame))
+                }
+                // 整页后高亮优先落在完整可见的第一项，避免选中只露出一角的卡片后又触发修正滚动。
+                let first = FoilExposeGridPageSelection.firstIndex(candidates: candidates, visibleRect: visibleRect)
                 if let first { DispatchQueue.main.async { [weak model] in model?.selectedIndex = first } }
             }
         }

@@ -38,6 +38,42 @@ struct FoilExposeShortcutTests {
         }
     }
 
+    @Test @MainActor func controlAAndEMoveHighlightToRowEdges() throws {
+        let controller = FoilExposeController.shared
+        let previousModel = controller.model
+        let items = (0..<8).map { index in
+            FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: false,
+                           title: "Match \(index)", symbolName: "doc", contentKind: .text, thumbnailPath: nil)
+        }
+        let model = FoilExposeModel(items: items, historyItems: [], fileSearch: { _, _ in }, cancelFiles: {}, musicEnabled: { false })
+        controller.model = model
+        defer { controller.model = previousModel }
+        model.searchText = "Match"
+        model.columnCount = 4
+        var activated = false
+        model.onSelect = { _ in activated = true }
+        func press(_ key: String) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .control,
+                                         timestamp: 0, windowNumber: 0, context: nil,
+                                         characters: key, charactersIgnoringModifiers: key,
+                                         isARepeat: false, keyCode: 0))
+        }
+        // 第二行（下标 4-7）：⌃A 到行首 4，⌃E 到行尾 7。
+        model.selectedIndex = 6
+        #expect(controller.handleKeyEvent(try press("a")) == nil)
+        #expect(model.selectedIndex == 4)
+        #expect(controller.handleKeyEvent(try press("e")) == nil)
+        #expect(model.selectedIndex == 7)
+        // 第一行（下标 0-3）：⌃A 到 0，⌃E 到 3；均不触发条目选择。
+        model.selectedIndex = 2
+        #expect(controller.handleKeyEvent(try press("A")) == nil)
+        #expect(model.selectedIndex == 0)
+        #expect(controller.handleKeyEvent(try press("E")) == nil)
+        #expect(model.selectedIndex == 3)
+        #expect(!activated)
+        #expect(model.searchText == "Match")
+    }
+
     @Test @MainActor func overviewFavoriteFilterFollowsConfiguredShortcut() throws {
         let store = KeyboardShortcutStore.shared
         let definition = try #require(KeyboardShortcutCatalog.definition(withID: "history.filterFavorites"))
@@ -408,15 +444,21 @@ struct FoilExposeShortcutTests {
         #expect(FoilExposeShortcut.key(forIndex: 9) == "0")
     }
 
-    @Test func indicesTenThroughThirtyFiveMapToLetters() {
-        #expect(FoilExposeShortcut.key(forIndex: 10) == "A")
-        #expect(FoilExposeShortcut.key(forIndex: 11) == "B")
-        #expect(FoilExposeShortcut.key(forIndex: 17) == "H")
-        #expect(FoilExposeShortcut.key(forIndex: 35) == "Z")
+    @Test func indicesTenThroughTwentyNineMapToLettersSkippingNavigationKeys() {
+        #expect(FoilExposeShortcut.key(forIndex: 10) == "C")
+        #expect(FoilExposeShortcut.key(forIndex: 11) == "D")
+        #expect(FoilExposeShortcut.key(forIndex: 17) == "L")
+        #expect(FoilExposeShortcut.key(forIndex: 19) == "O")
+        #expect(FoilExposeShortcut.key(forIndex: 20) == "Q")
+        #expect(FoilExposeShortcut.key(forIndex: 29) == "Z")
+        for index in 10..<30 {
+            let key = FoilExposeShortcut.key(forIndex: index)?.lowercased() ?? ""
+            #expect(!FoilExposeShortcut.reservedLetters.contains(key))
+        }
     }
 
-    @Test func indexThirtySixAndBeyondHaveNoShortcut() {
-        #expect(FoilExposeShortcut.key(forIndex: 36) == nil)
+    @Test func indexThirtyAndBeyondHaveNoShortcut() {
+        #expect(FoilExposeShortcut.key(forIndex: 30) == nil)
         #expect(FoilExposeShortcut.key(forIndex: 100) == nil)
     }
 
@@ -426,8 +468,8 @@ struct FoilExposeShortcutTests {
     }
 
     @Test func allAssignedShortcutsAreUnique() {
-        let keys = (0..<36).compactMap { FoilExposeShortcut.key(forIndex: $0) }
-        #expect(keys.count == 36)
-        #expect(Set(keys).count == 36)
+        let keys = (0..<30).compactMap { FoilExposeShortcut.key(forIndex: $0) }
+        #expect(keys.count == 30)
+        #expect(Set(keys).count == 30)
     }
 }

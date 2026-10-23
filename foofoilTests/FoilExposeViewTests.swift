@@ -179,4 +179,64 @@ struct FoilExposeViewTests {
         #expect(collection.item(at: IndexPath(item: 0, section: 0)) === before)
         #expect(model.columnCount == 5)
     }
+
+    @Test func partiallyVisibleSelectionScrollsFullyIntoView() throws {
+        let items = (0..<12).map { index in
+            FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: false, title: "Open \(index)",
+                           symbolName: "doc", contentKind: .text, thumbnailPath: nil)
+        }
+        let model = FoilExposeModel(items: items, historyItems: [], fileSearch: { _, _ in },
+                                    cancelFiles: {}, cameraAvailable: { false }, musicEnabled: { false })
+        let grid = FoilExposeGrid(model: model)
+        grid.frame = NSRect(x: 0, y: 0, width: 1240, height: 420)
+        grid.update(model: model)
+        let collection = try #require(grid.documentView as? NSCollectionView)
+        // 无窗口的测试宿主不会触发 AppKit 的文档尺寸更新，手动同步为布局内容高度。
+        func layoutContent() {
+            collection.layoutSubtreeIfNeeded()
+            collection.frame = NSRect(origin: .zero,
+                                      size: collection.collectionViewLayout?.collectionViewContentSize ?? .zero)
+            grid.reflectScrolledClipView(grid.contentView)
+        }
+        layoutContent()
+        let first = try #require(collection.layoutAttributesForItem(at: IndexPath(item: 0, section: 0)))
+        let last = try #require(collection.layoutAttributesForItem(at: IndexPath(item: 10, section: 0)))
+
+        // 顶部只露出卡片底部 20pt：向上导航时也要滚到完整可见。
+        model.selectedIndex = 1
+        grid.update(model: model)
+        layoutContent()
+        grid.contentView.scroll(to: NSPoint(x: 0, y: first.frame.maxY - 20))
+        grid.reflectScrolledClipView(grid.contentView)
+        #expect(!grid.documentVisibleRect.contains(first.frame))
+        model.selectedIndex = 0
+        grid.update(model: model)
+        layoutContent()
+        #expect(grid.documentVisibleRect.contains(first.frame))
+
+        // 底部只露出卡片顶部 20pt：同样滚到完整可见。
+        model.selectedIndex = 9
+        grid.update(model: model)
+        layoutContent()
+        grid.contentView.scroll(to: NSPoint(x: 0, y: last.frame.minY - (grid.contentSize.height - 20)))
+        grid.reflectScrolledClipView(grid.contentView)
+        #expect(!grid.documentVisibleRect.contains(last.frame))
+        model.selectedIndex = 10
+        grid.update(model: model)
+        layoutContent()
+        #expect(grid.documentVisibleRect.contains(last.frame))
+
+        // 高亮已在第一项但卡片被滚出视口时，继续按上键（高亮不移动）也要滚回完整可见。
+        model.selectedIndex = 0
+        grid.update(model: model)
+        layoutContent()
+        grid.contentView.scroll(to: NSPoint(x: 0, y: first.frame.maxY - 20))
+        grid.reflectScrolledClipView(grid.contentView)
+        #expect(!grid.documentVisibleRect.contains(first.frame))
+        model.moveSelection(.up)
+        #expect(model.selectedIndex == 0)
+        grid.update(model: model)
+        layoutContent()
+        #expect(grid.documentVisibleRect.contains(first.frame))
+    }
 }

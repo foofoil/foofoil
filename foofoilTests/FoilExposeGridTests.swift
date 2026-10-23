@@ -39,4 +39,40 @@ struct FoilExposeGridTests {
             }
         }
     }
+
+    @Test func visibleSelectionDoesNotScroll() {
+        let visible = NSRect(x: 0, y: 100, width: 1000, height: 500)
+        let frame = NSRect(x: 0, y: 150, width: 200, height: 244)
+        #expect(FoilExposeGridScrollTarget.originY(itemFrame: frame, visibleRect: visible, maximum: 900) == nil)
+    }
+
+    @Test func partiallyVisibleSelectionScrollsMinimallyToItsEdge() {
+        let visible = NSRect(x: 0, y: 100, width: 1000, height: 500)
+        // 顶部被裁：把卡片顶边对齐视口顶部。
+        let clippedTop = NSRect(x: 0, y: 40, width: 200, height: 244)
+        #expect(FoilExposeGridScrollTarget.originY(itemFrame: clippedTop, visibleRect: visible, maximum: 900) == 40)
+        // 底部被裁：把卡片底边对齐视口底部。
+        let clippedBottom = NSRect(x: 0, y: 500, width: 200, height: 244)
+        #expect(FoilExposeGridScrollTarget.originY(itemFrame: clippedBottom, visibleRect: visible, maximum: 900) == 244)
+    }
+
+    @Test func offscreenSelectionCentersAndClampsToContent() {
+        let visible = NSRect(x: 0, y: 100, width: 1000, height: 500)
+        let above = NSRect(x: 0, y: -200, width: 200, height: 244)
+        #expect(FoilExposeGridScrollTarget.originY(itemFrame: above, visibleRect: visible, maximum: 900) == 0)
+        let below = NSRect(x: 0, y: 900, width: 200, height: 244)
+        #expect(FoilExposeGridScrollTarget.originY(itemFrame: below, visibleRect: visible, maximum: 900) == 772)
+        #expect(FoilExposeGridScrollTarget.originY(itemFrame: below, visibleRect: visible, maximum: 300) == 300)
+    }
+
+    @Test func pageScrollPrefersFirstFullyVisibleCandidate() {
+        let visible = NSRect(x: 0, y: 100, width: 1000, height: 500)
+        let clipped = (index: 0, frame: NSRect(x: 0, y: 40, width: 200, height: 244))
+        let fullyVisible = (index: 5, frame: NSRect(x: 0, y: 150, width: 200, height: 244))
+        let below = (index: 10, frame: NSRect(x: 0, y: 700, width: 200, height: 244))
+        #expect(FoilExposeGridPageSelection.firstIndex(candidates: [clipped, fullyVisible, below], visibleRect: visible) == 5)
+        // 没有完整可见项时退回第一个相交项。
+        #expect(FoilExposeGridPageSelection.firstIndex(candidates: [clipped, below], visibleRect: visible) == 0)
+        #expect(FoilExposeGridPageSelection.firstIndex(candidates: [], visibleRect: visible) == nil)
+    }
 }

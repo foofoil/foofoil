@@ -75,7 +75,7 @@ These default shortcuts cover distinctive features and everyday actions. Except 
 
 Incognito foils stay out of history and are not restored after quitting. The system Share menu also offers Incognito Foil. An slashed-footprints badge marks incognito foils in Exposé.
 
-The overview shortcut also works while another app is active. Within the overview, ⇧⌘V still opens clipboard content. The first 36 items have fixed labels 1–9, 0, A–Z in list order; scrolling does not renumber them. Use Control + a label for direct selection; ⌃P / ⌃N / ⌃F / ⌃B retain navigation priority.
+The overview shortcut also works while another app is active. Within the overview, ⇧⌘V still opens clipboard content. The first 30 items have fixed labels 1–9, 0, then A–Z with the navigation letters A/E/P/N/F/B skipped (C, D, G, H, I, J, K, L, M, O, Q–Z) in list order; scrolling does not renumber them. Use Control + a label for direct selection; ⌃P / ⌃N / ⌃F / ⌃B retain navigation priority, and ⌃A / ⌃E move the highlight to the start / end of the current row.
 
 In the overview, use arrow keys to select a foil, Return to switch to it, `/` to search, and Esc to leave search or dismiss the overview. The positioning keys follow three keyboard rows: Q/W/E for the top, A/S/D for the middle, and Z/X/C for the bottom of the screen. ⌘H hides only the active foil; select it in the overview to show it again. ⇧⌘H hides the entire app; switch back to foofoil to restore it. Hiding keeps content open and audio playing.
 

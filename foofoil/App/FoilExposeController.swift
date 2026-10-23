@@ -9,13 +9,24 @@ import AppKit
 import Carbon.HIToolbox
 import Combine
 
-/// 索引到数字/字母快捷键的纯函数映射：0-9 → 1-9、0，10-35 → A-Z，36 起没有可用键（仍可点击选择）。
+/// 索引到数字/字母快捷键的纯函数映射：0-9 → 1-9、0，其后按 A-Z 顺序取字母。
+/// 方向导航占用的 Control 键（⌃P/⌃N/⌃F/⌃B）和行首/行尾（⌃A/⌃E）不再分配给编号，
+/// 因此共 10 + 20 = 30 项有可用键，31 项起只能点击选择。
 enum FoilExposeShortcut {
+    /// 已分配给总览导航的 Control 字母，编号跳过它们以免直选抢走导航键。
+    static let reservedLetters: Set<String> = ["a", "b", "e", "f", "n", "p"]
+
+    /// 可供编号的字母键：A-Z 中移除导航保留字母，保持原字母顺序。
+    static let letters: [String] = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        .filter { !reservedLetters.contains(String($0).lowercased()) }
+        .map(String.init)
+
     static func key(forIndex index: Int) -> String? {
         guard index >= 0 else { return nil }
         if index < 10 { return String((index + 1) % 10) }
-        guard index < 36 else { return nil }
-        return String(UnicodeScalar(65 + (index - 10))!)
+        let letterIndex = index - 10
+        guard letters.indices.contains(letterIndex) else { return nil }
+        return letters[letterIndex]
     }
 }
 
@@ -142,6 +153,8 @@ final class FoilExposeModel: ObservableObject {
     let clipboardContent: ClipboardOpenableContent?
     /// 当前键盘高亮的条目下标（对应 currentItems）；默认高亮第一项。
     @Published var selectedIndex: Int = 0
+    /// 键盘移动高亮的请求序号：即使已到边界不移动，视图也据此把选中项完整滚入可见区域。
+    @Published private(set) var selectionRevealRequest: UInt64 = 0
 
     @Published var activeScope: SearchScope? = nil {
         didSet {
@@ -632,6 +645,8 @@ final class FoilExposeModel: ObservableObject {
     }
 
     func moveSelection(_ direction: FoilExposeMoveDirection) {
+        // 边界处高亮不移动也要请求一次完整可见，顶部/底部被裁的选中卡片才能滚回视口。
+        selectionRevealRequest &+= 1
         guard !navigationRows.isEmpty else { return }
         if direction == .up || direction == .down {
             let rows = navigationRows
@@ -670,12 +685,14 @@ final class FoilExposeModel: ObservableObject {
 
     /// 行首、行尾沿用分区布局，文件卡片使用紧凑网格的列数。
     func moveSelectionToRowStart() {
+        selectionRevealRequest &+= 1
         if let row = navigationRows.first(where: { $0.contains(selectedIndex) }), let first = row.first {
             selectedIndex = first
         }
     }
 
     func moveSelectionToRowEnd() {
+        selectionRevealRequest &+= 1
         if let row = navigationRows.first(where: { $0.contains(selectedIndex) }), let last = row.last {
             selectedIndex = last
         }
@@ -1289,7 +1306,7 @@ final class FoilExposeController {
                 model.clearActiveScope()
                 return nil
             }
-            // ⌃P/N/F/B 优先移动高亮，其余 ⌃ + 编号/字母仍可直选。
+            // ⌃P/N/F/B 优先移动高亮，⌃A/⌃E 跳到行首/行尾，其余 ⌃ + 编号/字母仍可直选。
             if hasControl {
                 if model.isPickingScope {
                     if key == "n" || event.keyCode == 45 {
@@ -1302,6 +1319,8 @@ final class FoilExposeController {
                     }
                 }
                 switch key {
+                case "a": model.moveSelectionToRowStart(); return nil
+                case "e": model.moveSelectionToRowEnd(); return nil
                 case "p": model.moveSelection(.up); return nil
                 case "n": model.moveSelection(.down); return nil
                 case "f": model.moveSelection(.right); return nil
