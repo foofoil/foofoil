@@ -80,6 +80,8 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         scopeButton.perform = { [weak self] in self?.model.clearActiveScope(); self?.focusSearch() }
         scopeButton.setAccessibilityLabel(NSLocalizedString("Clear Search Scope", comment: ""))
         clipboardButton.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
+        clipboardButton.allowsKeyboardFocus = true
+        clipboardButton.focusRingType = .none
         clipboardButton.textOpacity = 0.88
         clipboardButton.font = .systemFont(ofSize: 13, weight: .medium)
         clipboardButton.setAccessibilityIdentifier("expose.clipboard")
@@ -160,11 +162,17 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         hint.isHidden = model.isChoosingScope
         clipboardButton.isHidden = model.clipboardContent == nil
         if let content = model.clipboardContent {
-            let title = String(format: NSLocalizedString("Open Clipboard Item Format", comment: ""), content.localizedName)
-            let shortcut = KeyboardShortcutStore.shared.shortcut(for: KeyboardShortcutCatalog.openClipboardContent)?.displayString
+            let title = model.isOptionPressed
+                ? NSLocalizedString("Open Clipboard Incognito", comment: "")
+                : String(format: NSLocalizedString("Open Clipboard Item Format", comment: ""), content.localizedName)
+            let shortcut = (model.isOptionPressed
+                ? KeyboardShortcutStore.shared.incognitoShortcut(forID: "file.openClipboardContent")
+                : KeyboardShortcutStore.shared.shortcut(for: KeyboardShortcutCatalog.openClipboardContent))?.displayString
             clipboardButton.title = title
             clipboardButton.shortcutText = shortcut
         }
+        clipboardButton.isEmphasized = model.isClipboardFocused
+        if model.isClipboardFocused { view.window?.makeFirstResponder(clipboardButton) }
         updateCategories()
         updateScopes()
         updateToast()
@@ -175,6 +183,10 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
             lastFocusRequest = model.searchFieldFocusRequest
             focusSearch()
         }
+        searchBackground.layer?.borderWidth = model.isClipboardFocused ? 1 : 2
+        searchBackground.layer?.borderColor = NSColor.white.withAlphaComponent(model.isClipboardFocused ? 0.32 : 0.85).cgColor
+        clipboardButton.layer?.borderWidth = model.isClipboardFocused ? 2 : 1
+        clipboardButton.layer?.borderColor = NSColor.white.withAlphaComponent(model.isClipboardFocused ? 0.85 : 0.3).cgColor
     }
 
     private func updateCategories() {
@@ -215,7 +227,7 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
     }
 
     private func updateScopes() {
-        scopePicker.isHidden = !model.isChoosingScope
+        scopePicker.isHidden = !model.isChoosingScope || model.isClipboardFocused
         let scopes = model.filteredScopes
         let signature = scopes.map { $0.id }
             + [model.directAction?.id ?? "-", String(model.highlightedScopeIndex), String(model.isChoosingScope)]
@@ -311,11 +323,15 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
     override func viewDidLayout() {
         super.viewDidLayout()
         let width = view.bounds.width
-        let scopeWidth: CGFloat = scopeButton.isHidden ? 0 : min(180, scopeButton.intrinsicContentSize.width)
-        // 标题移除后搜索框可以更宽，并在窗口内保持居中。
-        let searchWidth = max(120, min(760, width - 40))
-        let left = max(20, (width - searchWidth) / 2)
+        // 按钮随内容变化，但最多占顶部可用宽度的一半；搜索框吸收剩余空间。
+        let rowWidth = max(0, min(1000, width - 40))
+        let buttonWidth = clipboardButton.isHidden ? 0 : min(clipboardButton.intrinsicContentSize.width, rowWidth * 0.5)
+        let gap: CGFloat = clipboardButton.isHidden ? 0 : 12
+        let searchWidth = max(0, rowWidth - buttonWidth - gap)
+        let left = (width - rowWidth) / 2
+        let scopeWidth: CGFloat = scopeButton.isHidden ? 0 : min(180, max(0, searchWidth - 100), scopeButton.intrinsicContentSize.width)
         searchBackground.frame = NSRect(x: left, y: 30, width: searchWidth, height: 32)
+        clipboardButton.frame = NSRect(x: left + searchWidth + gap, y: 30, width: buttonWidth, height: 32)
         searchIcon.frame = NSRect(x: 12, y: 10, width: 12, height: 12)
         scopeButton.frame = NSRect(x: 31, y: 3, width: scopeWidth, height: 26)
         // 按原生单行文本的实际高度居中，让占位文字、光标和编辑文字共用同一基线。
@@ -323,13 +339,7 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         searchField.frame = NSRect(x: 31 + scopeWidth, y: (32 - fieldHeight) / 2,
                                    width: max(20, searchBackground.bounds.width - scopeWidth - 43), height: fieldHeight)
         hint.frame = NSRect(x: 20, y: 70, width: max(0, width - 40), height: 20)
-        var top: CGFloat = 106
-        if !clipboardButton.isHidden {
-            let size = clipboardButton.intrinsicContentSize
-            let inset = FoilExposeGridMetrics(width: width, compact: false).inset
-            clipboardButton.frame = NSRect(x: max(inset, width - inset - size.width), y: top, width: size.width, height: 32)
-            top += 44
-        }
+        let top: CGFloat = 106
         grid.frame = NSRect(x: 0, y: top, width: width, height: max(0, view.bounds.height - top))
         let pickerSize = NSSize(width: scopePickerWidth, height: scopePicker.arrangedSubviews.reduce(12) {
             $0 + max(16, $1.intrinsicContentSize.height) + 2
@@ -340,9 +350,13 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         toast.frame = NSRect(x: (width - toastSize.width) / 2, y: 10, width: toastSize.width, height: toastSize.height)
     }
 
+    func controlTextDidBeginEditing(_ obj: Notification) { model.isClipboardFocused = false }
     func controlTextDidChange(_ obj: Notification) { model.searchText = searchField.stringValue }
-    func controlTextDidEndEditing(_ obj: Notification) { model.requestSearchFieldFocus() }
+    func controlTextDidEndEditing(_ obj: Notification) {
+        if !model.isClipboardFocused { model.requestSearchFieldFocus() }
+    }
     private func focusSearch() {
+        model.isClipboardFocused = false
         guard let window = view.window else { return }
         if let editor = searchField.currentEditor(), window.firstResponder === editor { return }
         window.makeFirstResponder(searchField)
@@ -368,7 +382,8 @@ private final class ExposeActionButton: NSButton {
     }
     var perform: (() -> Void)?
     var isEmphasized = false { didSet { updateStyle() } }
-    override var acceptsFirstResponder: Bool { false }
+    var allowsKeyboardFocus = false
+    override var acceptsFirstResponder: Bool { allowsKeyboardFocus }
     init() {
         super.init(frame: .zero)
         bezelStyle = .recessed
@@ -393,6 +408,9 @@ private final class ExposeActionButton: NSButton {
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSBezierPath(rect: bounds).addClip()
         // NSButton 的默认 imageLeading 会贴住边缘，显式绘制内边距但保留原生点击和菜单行为。
         let color = NSColor.white.withAlphaComponent(isHighlighted ? 1 : (isEmphasized ? 0.95 : textOpacity))
         var x: CGFloat = 9
@@ -403,7 +421,13 @@ private final class ExposeActionButton: NSButton {
             x += 19
         }
         let text = NSAttributedString(string: title, attributes: [.font: font ?? NSFont.systemFont(ofSize: 12), .foregroundColor: color])
-        text.draw(at: NSPoint(x: x, y: (bounds.height - text.size().height) / 2))
+        let keyWidth = shortcutText.map { ($0 as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .bold)]).width + 29 } ?? 9
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byTruncatingTail
+        let fitted = NSMutableAttributedString(attributedString: text)
+        fitted.addAttribute(.paragraphStyle, value: paragraph, range: NSRange(location: 0, length: fitted.length))
+        fitted.draw(in: NSRect(x: x, y: (bounds.height - text.size().height) / 2,
+                              width: max(0, bounds.width - x - keyWidth), height: text.size().height))
         if let shortcutText {
             let key = NSAttributedString(string: shortcutText, attributes: [.font: NSFont.systemFont(ofSize: 11, weight: .bold), .foregroundColor: color])
             let rect = NSRect(x: bounds.width - key.size().width - 19, y: (bounds.height - 22) / 2, width: key.size().width + 10, height: 22)

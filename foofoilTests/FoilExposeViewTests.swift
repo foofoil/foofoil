@@ -41,7 +41,18 @@ struct FoilExposeViewTests {
         controller.view.frame = NSRect(x: 0, y: 0, width: 1240, height: 900)
         controller.synchronize()
         let clipboard = try #require(descendants(controller.view).first { $0.accessibilityIdentifier() == "expose.clipboard" })
-        #expect(abs(clipboard.frame.maxX - 1196) < 0.5)
+        #expect(abs(clipboard.frame.maxX - 1120) < 0.5)
+        let search = try #require(controller.searchField.superview)
+        #expect(search.frame.midY == clipboard.frame.midY)
+        #expect(search.frame.maxX < clipboard.frame.minX)
+        for width in [420.0, 600.0, 1240.0] {
+            controller.view.frame.size.width = width
+            controller.model.isOptionPressed.toggle()
+            controller.synchronize()
+            #expect(clipboard.frame.maxX <= width - 20)
+            #expect(search.frame.maxX < clipboard.frame.minX)
+            #expect(search.frame.width > 0)
+        }
         let field = controller.searchField
         #expect(abs(field.frame.midY - 16) < 0.5)
         #expect(field.frame.minX >= 31)

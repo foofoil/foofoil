@@ -40,6 +40,14 @@ struct FoilExposeGridTests {
         }
     }
 
+    @Test func firstRowRevealsHeadingEvenWhenCardIsFullyVisible() {
+        let frame = NSRect(x: 240, y: 50, width: 200, height: 244)
+        let visible = NSRect(x: 0, y: 30, width: 1000, height: 500)
+        #expect(FoilExposeGridScrollTarget.originY(itemFrame: frame, visibleRect: visible, maximum: 900, revealTop: true) == 0)
+        #expect(FoilExposeGridScrollTarget.originY(itemFrame: frame, visibleRect: visible, maximum: 900) == nil)
+        #expect(FoilExposeGridScrollTarget.originY(itemFrame: frame, visibleRect: NSRect(x: 0, y: 0, width: 1000, height: 500), maximum: 900, revealTop: true) == nil)
+    }
+
     @Test func visibleSelectionDoesNotScroll() {
         let visible = NSRect(x: 0, y: 100, width: 1000, height: 500)
         let frame = NSRect(x: 0, y: 150, width: 200, height: 244)

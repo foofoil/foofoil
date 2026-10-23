@@ -11,6 +11,31 @@ import Testing
 
 @Suite(.sharedApplicationState)
 struct FoilExposeShortcutTests {
+    @Test @MainActor func tabFocusesClipboardAndReturnUsesOptionState() throws {
+        let controller = FoilExposeController.shared
+        let previous = controller.model
+        let model = FoilExposeModel(items: [], historyItems: [], clipboardContent: .init(.image),
+                                   fileSearch: { _, _ in }, cancelFiles: {}, musicEnabled: { false })
+        controller.model = model
+        defer { controller.model = previous }
+        var opened: [Bool] = []
+        model.onOpenClipboard = { opened.append(model.isOptionPressed) }
+        func press(_ code: UInt16, option: Bool = false) throws {
+            let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
+                modifierFlags: option ? .option : [], timestamp: 0, windowNumber: 0, context: nil,
+                characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code))
+            #expect(controller.handleKeyEvent(event) == nil)
+        }
+        try press(48)
+        #expect(model.isClipboardFocused)
+        #expect(model.highlightedItem == nil)
+        try press(36)
+        try press(36, option: true)
+        #expect(opened == [false, true])
+        try press(48)
+        #expect(!model.isClipboardFocused)
+    }
+
     @Test @MainActor func controlNavigationMovesHighlightBeforeLetterSelection() throws {
         let controller = FoilExposeController.shared
         let previousModel = controller.model

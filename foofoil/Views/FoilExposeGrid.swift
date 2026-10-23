@@ -21,7 +21,8 @@ struct FoilExposeGridMetrics {
 
 /// 选中项的滚动策略：完全可见不动；只露出一部分时最小滚动到完整可见；完全在视口外时居中。
 enum FoilExposeGridScrollTarget {
-    static func originY(itemFrame: NSRect, visibleRect: NSRect, maximum: CGFloat) -> CGFloat? {
+    static func originY(itemFrame: NSRect, visibleRect: NSRect, maximum: CGFloat, revealTop: Bool = false) -> CGFloat? {
+        if revealTop { return visibleRect.minY > 0 ? 0 : nil }
         guard !visibleRect.contains(itemFrame) else { return nil }
         let target: CGFloat
         if itemFrame.intersects(visibleRect) {
@@ -216,8 +217,9 @@ final class FoilExposeGrid: NSScrollView {
                    let y = FoilExposeGridScrollTarget.originY(
                        itemFrame: frame,
                        visibleRect: scroll.documentVisibleRect,
-                       maximum: max(0, collection.bounds.height - scroll.contentSize.height)) {
-                    // 卡片露出一部分时也要滚到完整可见，否则顶部/底部会留下被裁掉的一角。
+                       maximum: max(0, collection.bounds.height - scroll.contentSize.height),
+                       revealTop: previousRevealRequest != model.selectionRevealRequest && model.isSelectionInFirstRow) {
+                    // 键盘导航到第一行时露出顶部标题；其余位置只确保卡片完整可见。
                     scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.minX, y: y))
                     scroll.reflectScrolledClipView(scroll.contentView)
                 }
@@ -226,7 +228,7 @@ final class FoilExposeGrid: NSScrollView {
                 guard let path = collection.indexPath(for: item), sections.indices.contains(path.section),
                       sections[path.section].entries.indices.contains(path.item) else { continue }
                 let entry = sections[path.section].entries[path.item]
-                item.card.setHighlighted(entry.index == model.selectedIndex)
+                item.card.setHighlighted(!model.isClipboardFocused && entry.index == model.selectedIndex)
             }
             previousSelection = model.selectedIndex
             previousRevealRequest = model.selectionRevealRequest
@@ -269,7 +271,7 @@ final class FoilExposeGrid: NSScrollView {
             let entry = section.entries[indexPath.item]
             item.card.configure(foil: entry.foil, title: entry.title, subtitle: entry.subtitle, symbol: entry.symbol,
                                 compact: section.compact, shortcut: entry.foil == nil ? nil : entry.index.flatMap { FoilExposeShortcut.key(forIndex: $0) },
-                                highlighted: entry.index == model.selectedIndex, action: entry.action, model: model)
+                                highlighted: !model.isClipboardFocused && entry.index == model.selectedIndex, action: entry.action, model: model)
             return item
         }
         func collectionView(_ collectionView: NSCollectionView, viewForSupplementaryElementOfKind kind: NSCollectionView.SupplementaryElementKind, at indexPath: IndexPath) -> NSView {
@@ -605,21 +607,30 @@ private final class ExposeNativeCard: NSView {
         dashedBorder.strokeColor = NSColor.white.withAlphaComponent(highlighted ? 0.85 : (hovered ? 0.5 : 0.24)).cgColor
         dashedBorder.lineWidth = highlighted ? 2 : 1
         setAccessibilitySelected(highlighted)
-        // 保持与原版相同的强调尺寸，不触发集合视图布局重排。
-        let scale = action != nil && (hovered || highlighted) ? 1.03 : 1.0
-        let previous = layer?.presentation()?.value(forKeyPath: "transform.scale") as? Double ?? 1
+        updateEmphasisTransform(animated: animated)
+    }
+
+    private func updateEmphasisTransform(animated: Bool) {
+        guard let layer else { return }
+        let scale: CGFloat = action != nil && (hovered || highlighted) ? 1.03 : 1.0
+        // AppKit 管理图层锚点；以平移补偿缩放，让卡片中心固定，也避免修改锚点干扰集合布局。
+        let offsetX = bounds.width * (0.5 - layer.anchorPoint.x) * (1 - scale)
+        let offsetY = bounds.height * (0.5 - layer.anchorPoint.y) * (1 - scale)
+        let transform = CGAffineTransform(a: scale, b: 0, c: 0, d: scale, tx: offsetX, ty: offsetY)
+        let previous = layer.presentation()?.transform ?? layer.transform
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        layer?.setAffineTransform(CGAffineTransform(scaleX: scale, y: scale))
+        layer.setAffineTransform(transform)
         CATransaction.commit()
         if animated {
-            let animation = CASpringAnimation(keyPath: "transform.scale")
-            animation.fromValue = previous
-            animation.toValue = scale
+            // 缩放和平移共用弹簧进度，动画途中也始终围绕中心。
+            let animation = CASpringAnimation(keyPath: "transform")
+            animation.fromValue = NSValue(caTransform3D: previous)
+            animation.toValue = NSValue(caTransform3D: layer.transform)
             animation.stiffness = 200
             animation.damping = 25
             animation.duration = 0.35
-            layer?.add(animation, forKey: "expose-emphasis")
+            layer.add(animation, forKey: "expose-emphasis")
         }
     }
     override func layout() {
@@ -661,6 +672,7 @@ private final class ExposeNativeCard: NSView {
         }
         subtitleLabel.frame = NSRect(x: 50, y: 31, width: max(0, bounds.width - 65), height: 16)
         CATransaction.commit()
+        updateEmphasisTransform(animated: false)
     }
     private func updatePlayback(_ playing: Bool) {
         playback.isHidden = !playing

@@ -149,8 +149,9 @@ Editing shortcuts apply to text fields or selectable content, depending on focus
 
 ## Inside Foil Overview
 
+- Moving the keyboard highlight to the top row scrolls the list to the top, revealing its heading.
 - Arrow keys select; ↑ / ↓ move between visual rows using the cards’ left edges for alignment; Return activates the selected foil or opens the selected Spotlight file. Spotlight file results support the same arrow-key navigation. Control + number or letter selects numbered items directly, including offscreen items. The first 30 items are numbered 1–9, 0, then A–Z with the navigation letters A/E/P/N/F/B skipped (C, D, G, H, I, J, K, L, M, O, Q–Z) in list order; scrolling does not change their numbers.
-- Tab switches the highlight between the first open foil and the first history result, keeping search focused. Empty sections are skipped; scope selection and input method composition keep their existing Tab behavior.
+- Tab switches focus between the input and the clipboard button. With the clipboard button focused, result highlights disappear and Return opens the clipboard content. Hold Option to open incognito and show its shortcut. Input method composition retains Tab.
 - ⌃P / ⌃N / ⌃F / ⌃B move the highlight up / down / right / left, taking priority over letter selection while keeping search focused.
 - ⌃A / ⌃E move the highlight to the start / end of the current row, keeping search focused.
 - Search is shown and focused automatically and stays active; type `/` to choose a search scope.

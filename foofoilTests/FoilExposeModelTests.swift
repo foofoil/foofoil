@@ -345,6 +345,25 @@ struct FoilExposeModelTests {
         #expect(model.selectedIndex == 3)
     }
 
+    @Test func upwardNavigationRecognizesEveryColumnInFirstRow() {
+        let model = makeModel(openCount: 8, historyCount: 2)
+        model.columnCount = 4
+        for column in 0..<4 {
+            model.selectedIndex = 4 + column
+            #expect(!model.isSelectionInFirstRow)
+            model.moveSelection(.up)
+            #expect(model.selectedIndex == column)
+            #expect(model.isSelectionInFirstRow)
+            model.moveSelection(.up)
+            #expect(model.isSelectionInFirstRow)
+        }
+        let historyOnly = makeModel(openCount: 0, historyCount: 6)
+        historyOnly.columnCount = 4
+        historyOnly.selectedIndex = 5
+        historyOnly.moveSelection(.up)
+        #expect(historyOnly.isSelectionInFirstRow)
+    }
+
     @Test func navigationRequestsRevealEvenWhenHighlightStaysAtBoundary() {
         let model = makeModel(historyCount: 0)
         model.columnCount = 4

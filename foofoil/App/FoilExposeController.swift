@@ -153,6 +153,8 @@ final class FoilExposeModel: ObservableObject {
     let clipboardContent: ClipboardOpenableContent?
     /// 当前键盘高亮的条目下标（对应 currentItems）；默认高亮第一项。
     @Published var selectedIndex: Int = 0
+    @Published var isClipboardFocused = false
+    @Published var isOptionPressed = false
     /// 键盘移动高亮的请求序号：即使已到边界不移动，视图也据此把选中项完整滚入可见区域。
     @Published private(set) var selectionRevealRequest: UInt64 = 0
 
@@ -468,6 +470,7 @@ final class FoilExposeModel: ObservableObject {
 
     /// 高亮条目：越界时回退到第一项。
     var highlightedItem: FoilExposeItem? {
+        guard !isClipboardFocused else { return nil }
         let items = currentItems
         return items.indices.contains(selectedIndex) ? items[selectedIndex] : nil
     }
@@ -494,6 +497,7 @@ final class FoilExposeModel: ObservableObject {
 
     /// 请求视图把第一响应者交给搜索输入框；面板刚成为 key window 时补一次聚焦。
     func requestSearchFieldFocus() {
+        isClipboardFocused = false
         searchFieldFocusRequest &+= 1
     }
 
@@ -697,6 +701,11 @@ final class FoilExposeModel: ObservableObject {
         }
         let delta = direction == .left ? -1 : 1
         selectedIndex = indices[min(max(0, position + delta), indices.count - 1)]
+    }
+
+    /// 顶部一行的任意列都应连同最顶端标题一起显示。
+    var isSelectionInFirstRow: Bool {
+        navigationRows.first?.contains(selectedIndex) == true
     }
 
     /// 分区各自从左起排满一行；不使用受滚动和高亮动画影响的卡片坐标。
@@ -911,7 +920,7 @@ final class FoilExposeController {
         model.onOpenFile = { [weak self] url in self?.openFile(url) }
         model.onOpenURL = { [weak self] url in self?.openWebURL(url) }
         model.onEnableFileSearch = { [weak self] in self?.enableFileSearch() }
-        model.onOpenClipboard = { [weak self] in self?.openClipboard() }
+        model.onOpenClipboard = { [weak self, weak model] in self?.openClipboard(isIncognito: model?.isOptionPressed == true) }
         model.onClearHistory = { [weak self] category in self?.confirmClearHistory(category) }
         model.onClearHistoryItem = { [weak self] item in self?.clearHistoryItem(item) }
         model.onTogglePinned = { [weak self] item in
@@ -1270,13 +1279,15 @@ final class FoilExposeController {
     }
 
     private func installKeyMonitor() {
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             self?.handleKeyEvent(event)
         }
     }
 
     func handleKeyEvent(_ event: NSEvent) -> NSEvent? {
         guard let model else { return event }
+        model.isOptionPressed = event.modifierFlags.contains(.option)
+        if event.type == .flagsChanged { return event }
         // 系统面板（文件选择、授权）接管期间把按键交回系统，避免误触覆盖层。
         if isPresentingSystemUI || panels.contains(where: { $0.attachedSheet != nil }) { return event }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -1331,6 +1342,10 @@ final class FoilExposeController {
                 return event
             }
             // 带 ⌥ 的按键放行给菜单快捷键（如再次触发的 ⌥⇧⎋）。
+            if model.isClipboardFocused, !hasCommand, !hasControl, [36, 76].contains(event.keyCode) {
+                model.onOpenClipboard()
+                return nil
+            }
             if hasOption {
                 return event
             }
@@ -1381,13 +1396,13 @@ final class FoilExposeController {
                 return nil
             }
             switch event.keyCode {
-            case 48: // Tab：输入法和下拉框优先，其余情况切换箔片分区
-                if model.isSearching, isComposing { return event }
-                if model.isChoosingScope {
-                    model.selectHighlightedScope()
-                    return nil
+            case 48: // 输入法组合时保留 Tab，其余情况切换顶部控件焦点。
+                if isComposing { return event }
+                if model.isClipboardFocused {
+                    model.requestSearchFieldFocus()
+                } else if model.clipboardContent != nil {
+                    model.isClipboardFocused = true
                 }
-                model.switchFoilSection()
                 return nil
             case 116, 121: // PageUp / PageDown：整页滚动
                 model.requestPageScroll(direction: event.keyCode == 116 ? .up : .down)

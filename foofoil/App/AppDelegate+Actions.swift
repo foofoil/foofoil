@@ -1184,18 +1184,34 @@ nonisolated struct ClipboardOpenableContent: Equatable {
         self.fileExtension = fileExtension
     }
 
-    /// 单文件提示使用实际文件名；截断主体时保留完整扩展名和 Unicode 字符。
-    static func abbreviatedFileName(_ name: String, limit: Int = 40) -> String {
-        guard name.count > limit else { return name }
+    /// 主文件名最多显示 8 个中文或 16 个英文字符；混排按中文占两个单位计算，扩展名不计入预算。
+    static func abbreviatedFileName(_ name: String) -> String {
         let ext = (name as NSString).pathExtension
         let suffix = ext.isEmpty ? "" : "." + ext
         let stem = suffix.isEmpty ? name : String(name.dropLast(suffix.count))
-        return String(stem.prefix(max(0, limit - suffix.count - 1))) + "…" + suffix
+        var prefix = ""
+        var units = 0
+        for character in stem {
+            let isHan = character.unicodeScalars.contains { scalar in
+                switch scalar.value {
+                case 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF,
+                     0x20000...0x2FA1F, 0x30000...0x323AF: return true
+                default: return false
+                }
+            }
+            units += isHan ? 2 : 1
+            guard units <= 16 else { return prefix + "…" + suffix }
+            prefix.append(character)
+        }
+        return name
     }
 
     /// 单文件显示文件名，其他内容继续使用本地化类型名。
     var localizedName: String {
-        if let fileName { return Self.abbreviatedFileName(fileName) }
+        if let fileName {
+            return String(format: NSLocalizedString("Clipboard Quoted Filename Format", comment: ""),
+                          Self.abbreviatedFileName(fileName))
+        }
         let base = kind.localizedName
         guard let fileExtension, !fileExtension.isEmpty else { return base }
         return String(

@@ -153,16 +153,19 @@ struct ClipboardOpenableContentTests {
     @Test func singleFileHintUsesNameWithoutType() throws {
         let directory = try makeTempDirectory()
         let url = try makeFile("report.txt", contents: Data("hello".utf8), in: directory)
-        #expect(ClipboardOpenableContent.forFileURLs([url])?.localizedName == "report.txt")
+        #expect(ClipboardOpenableContent.forFileURLs([url])?.localizedName == "“report.txt”")
     }
 
     @Test func longFileNamesKeepExtensionWithinLimit() {
         let name = String(repeating: "文", count: 50) + ".PDF"
         let abbreviated = ClipboardOpenableContent.abbreviatedFileName(name)
-        #expect(abbreviated.count == 40)
-        #expect(abbreviated.hasSuffix("….PDF"))
+        #expect(abbreviated == String(repeating: "文", count: 8) + "….PDF")
         #expect(ClipboardOpenableContent.abbreviatedFileName("report.pdf") == "report.pdf")
-        #expect(ClipboardOpenableContent.abbreviatedFileName(String(repeating: "a", count: 50)).count == 40)
+        #expect(ClipboardOpenableContent.abbreviatedFileName(String(repeating: "a", count: 50)) == String(repeating: "a", count: 16) + "…")
+        #expect(ClipboardOpenableContent.abbreviatedFileName("一二三四五六七八.pdf") == "一二三四五六七八.pdf")
+        #expect(ClipboardOpenableContent.abbreviatedFileName("abcdefghijklmnop.markdown") == "abcdefghijklmnop.markdown")
+        #expect(ClipboardOpenableContent.abbreviatedFileName("一二三四abcdefghZ.PDF") == "一二三四abcdefgh….PDF")
+        #expect(ClipboardOpenableContent.abbreviatedFileName("👨‍👩‍👧‍👦report.pdf") == "👨‍👩‍👧‍👦report.pdf")
     }
 
     @Test func sameExtensionAudioListKeepsExtension() throws {
