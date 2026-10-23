@@ -8,7 +8,6 @@
 import AppKit
 import Carbon.HIToolbox
 import Combine
-import SwiftUI
 
 /// 索引到数字/字母快捷键的纯函数映射：0-9 → 1-9、0，10-35 → A-Z，36 起没有可用键（仍可点击选择）。
 enum FoilExposeShortcut {
@@ -257,7 +256,7 @@ final class FoilExposeModel: ObservableObject {
     @Published private(set) var musicError: String?
     @Published private(set) var isMusicSearchEnabled = false
     @Published private(set) var isMusicAuthorized = false
-    /// 网格实际列数，由面板视图从卡片外框推导回填，供上下移动跨行使用。
+    /// 网格实际列数，由原生网格按可用宽度计算，供上下移动跨行使用。
     var columnCount: Int = 4
     var musicColumnCount: Int = 3
     var onSelect: (FoilExposeItem) -> Void = { _ in }
@@ -982,7 +981,7 @@ final class FoilExposeController {
         return String(fingerprint.dropFirst(5))
     }
 
-    private static func makePanel(for screen: NSScreen, model: FoilExposeModel) -> FoilExposePanel {
+    static func makePanel(for screen: NSScreen, model: FoilExposeModel) -> FoilExposePanel {
         let panel = FoilExposePanel(
             contentRect: screen.frame,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -997,7 +996,10 @@ final class FoilExposeController {
         panel.isReleasedWhenClosed = false
         panel.isExcludedFromWindowsMenu = true
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-        panel.contentView = NSHostingView(rootView: FoilExposeView(model: model))
+        let controller = FoilExposeViewController(model: model)
+        // 在交给面板前确定屏幕内容尺寸，避免原生控制器初始为零尺寸。
+        controller.view.frame = NSRect(origin: .zero, size: screen.frame.size)
+        panel.contentViewController = controller
         return panel
     }
 
@@ -1186,6 +1188,10 @@ final class FoilExposeController {
         if isPresentingSystemUI { return event }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let key = event.charactersIgnoringModifiers?.lowercased()
+        if KeyboardShortcutStore.shared.matches(event, identifier: "window.showAllFoils") {
+            if !event.isARepeat { toggle() }
+            return nil
+        }
             let hasCommand = modifiers.contains(.command)
             let hasOption = modifiers.contains(.option)
             let hasControl = modifiers.contains(.control)
