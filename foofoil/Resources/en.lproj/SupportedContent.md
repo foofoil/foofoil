@@ -47,6 +47,9 @@ Source files with a recognized extension or file name, such as .swift, .kt, .zig
 
 Markdown task lists display read-only checkboxes that reflect the source document. They cannot be toggled in the preview.
 
+
+⌘F searches the current document, web page, or retained terminal output. EPUB searches all chapters. ⌘G / ⇧⌘G moves between matches; Return / ⇧Return does the same while the search field is focused. Esc closes the search. In Quick Look documents, search opens the system-generated HTML/PDF preview where available; if a PowerPoint preview has no searchable text, its text is shown by slide. Scanned image-only pages have no searchable text.
+
 ## Audio and Video
 
 | Type | Common formats | Notes |

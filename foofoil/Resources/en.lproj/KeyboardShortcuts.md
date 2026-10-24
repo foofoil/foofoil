@@ -143,6 +143,11 @@ History → Favorite Current Foil toggles the current foil’s favorite status u
 | Undo / Redo | ⌘Z / ⇧⌘Z |
 | Cut / Copy / Paste | ⌘X / ⌘C / ⌘V |
 | Select all | ⌘A |
+| Search current foil’s content | ⌘F |
+| Next / previous content match | ⌘G / ⇧⌘G |
+| Next / previous match while the search field is focused | Return / ⇧Return |
+| Search sidebar list / EPUB table of contents | ⇧⌘F |
+| Close content search | Esc |
 | Close Foil Information | Esc |
 
 Editing shortcuts apply to text fields or selectable content, depending on focus and content type. Hiding keeps foils open and audio playing.
@@ -175,3 +180,5 @@ In archive foils, Save As exports the selected file, directory, or root. The arc
 
 
 Window positioning and Move to Next Screen shortcuts also work while the terminal has focus, including custom bindings. When a terminal has focus, Ctrl+A/E/P/N and other control keys go to the Shell/TUI. ⌘C/⌘V copy and paste; content zoom adjusts terminal font size. Hold ⌘ and drag to move the terminal window without selecting text. Document Style adjusts terminal themes, background and text colors, fonts, and size, using the same monospaced font filter as code foils.
+
+Content search appears at the top of the reading area without resizing it. EPUB searches the entire book. Search terms are highlighted; set the highlight color in Document Style or save it with a custom theme. The EPUB sidebar’s “Search table of contents” searches directory titles only.

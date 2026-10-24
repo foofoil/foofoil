@@ -81,6 +81,8 @@ In the overview, use arrow keys to select a foil, Return to switch to it, `/` to
 
 Visit **Settings → Keyboard Shortcuts** for all configurable commands: search by name, scope, or key combination, change a shortcut, or restore its default. The global **Open Clipboard Content** command has no default shortcut; assign one there if needed. Opening shortcuts automatically gain an incognito variant with Option; Option is reserved for this purpose. ⌥⌘V always opens clipboard content incognito. Standard menu shortcuts such as Hide and New are outside this configuration list. The menu bar shows the shortcuts currently in effect.
 
+Content search: ⌘F searches the current foil, ⌘G / ⇧⌘G moves between matches, and Esc closes search. EPUB searches the whole book; ⇧⌘F searches its table of contents. Set search highlight colors in Document Style.
+
 ## Open from Finder with a Keyboard Shortcut
 
 Move foofoil to Applications and launch it once. Select files or folders in Finder, then choose **Finder → Services → Open in foofoil** to open them in new foils. Multiple selections are supported; folders use the same scanning and grouping behavior as drag and drop.
