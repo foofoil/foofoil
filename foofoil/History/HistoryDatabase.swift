@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 nonisolated final class HistoryDatabase {
-    static let schemaVersion = 26
+    static let schemaVersion = 27
 
     private let queue = DispatchQueue(label: "com.foofoil.history.database", qos: .utility)
     private var connection: OpaquePointer?
@@ -102,7 +102,7 @@ nonisolated final class HistoryDatabase {
                         id, content_kind, display_title, original_filename, image_path, text_path,
                         web_url, actual_web_url, image_source, inline_text, is_pinned, opacity,
                         window_frame, show_border, image_scale, text_font_size, is_markdown_preview,
-                        svg_color, background_color_hex, text_color_hex,
+                        svg_color, background_color_hex, text_color_hex, search_highlight_hex,
                         document_font_name, document_line_spacing, document_paragraph_spacing, document_theme_id,
                         created_at, updated_at, last_opened_at,
                         source_fingerprint, index_status, index_version, video_looping, video_bookmark,
@@ -112,7 +112,7 @@ nonisolated final class HistoryDatabase {
                         document_zoom, document_scroll_file, document_scroll_fraction, text_fingerprint,
                         image_ocr_text, image_has_subject, image_subject_path, apple_music_reference, subtitle_associations, custom_title, archive_source,
                         show_code_line_numbers, read_only_presentation, history_is_pinned, terminal_configuration, terminal_scrollback
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -125,6 +125,7 @@ nonisolated final class HistoryDatabase {
                         is_markdown_preview=excluded.is_markdown_preview, svg_color=excluded.svg_color,
                         background_color_hex=excluded.background_color_hex,
                         text_color_hex=excluded.text_color_hex,
+                        search_highlight_hex=excluded.search_highlight_hex,
                         document_font_name=excluded.document_font_name,
                         document_line_spacing=excluded.document_line_spacing,
                         document_paragraph_spacing=excluded.document_paragraph_spacing,
@@ -159,7 +160,7 @@ nonisolated final class HistoryDatabase {
                         config.imageSource?.rawValue, config.text, config.isPinned, config.opacity,
                         config.windowFrame, config.showBorder, config.imageScale, config.textFontSize,
                         config.isMarkdownPreview, config.svgColor, config.backgroundColorHex,
-                        config.textColorHex,
+                        config.textColorHex, config.searchHighlightHex,
                         config.documentFontName, config.documentLineSpacing, config.documentParagraphSpacing,
                         config.documentThemeId,
                         createdAt, now, now, config.sourceFingerprint, 0, 1, config.mediaPlaybackMode.sqliteValue,
@@ -486,6 +487,7 @@ nonisolated final class HistoryDatabase {
         try addColumnIfMissing("document_scroll_fraction", definition: "document_scroll_fraction REAL")
         // v13 无排版文档内容的文字颜色与字体选择；旧记录沿用跟随系统、通道默认字体。
         try addColumnIfMissing("text_color_hex", definition: "text_color_hex TEXT")
+        try addColumnIfMissing("search_highlight_hex", definition: "search_highlight_hex TEXT")
         try addColumnIfMissing("document_font", definition: "document_font TEXT NOT NULL DEFAULT 'system'")
         // v14 文档样式面板：字体名（PostScript）、行间距倍数、段落间距倍数；
         // v13 的 document_font 曾存 3 个预设枚举值，已不再写入，读取时忽略。
@@ -737,6 +739,7 @@ nonisolated final class HistoryDatabase {
                     svgColor: optionalText(statement, columns["svg_color"]!),
                     backgroundColorHex: optionalText(statement, columns["background_color_hex"]!),
                     textColorHex: columns["text_color_hex"].flatMap { optionalText(statement, $0) },
+                    searchHighlightHex: columns["search_highlight_hex"].flatMap { optionalText(statement, $0) },
                     documentFontName: columns["document_font_name"].flatMap { optionalText(statement, $0) },
                     documentLineSpacing: columns["document_line_spacing"].flatMap { optionalReal(statement, $0) },
                     documentParagraphSpacing: columns["document_paragraph_spacing"].flatMap { optionalReal(statement, $0) },

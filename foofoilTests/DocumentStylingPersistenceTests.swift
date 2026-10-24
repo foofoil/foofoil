@@ -23,6 +23,7 @@ struct DocumentStylingPersistenceTests {
             text: "正文",
             backgroundColorHex: "#F5EFE0",
             textColorHex: "#123456",
+            searchHighlightHex: "#ABCDEF",
             documentFontName: "Menlo-Regular",
             documentLineSpacing: 1.6,
             documentParagraphSpacing: 0.8
@@ -33,6 +34,7 @@ struct DocumentStylingPersistenceTests {
         let loaded = try #require(try database.config(id: config.id))
         #expect(loaded.backgroundColorHex == "#F5EFE0")
         #expect(loaded.textColorHex == "#123456")
+        #expect(loaded.searchHighlightHex == "#ABCDEF")
         #expect(loaded.documentFontName == "Menlo-Regular")
         #expect(loaded.documentLineSpacing == 1.6)
         #expect(loaded.documentParagraphSpacing == 0.8)
@@ -48,6 +50,7 @@ struct DocumentStylingPersistenceTests {
             text: "正文",
             backgroundColorHex: "#F5EFE0",
             textColorHex: "#123456",
+            searchHighlightHex: "#ABCDEF",
             documentFontName: "Menlo-Regular",
             documentLineSpacing: 1.7,
             documentParagraphSpacing: 0.5
@@ -56,6 +59,7 @@ struct DocumentStylingPersistenceTests {
 
         #expect(state.backgroundColorHex == "#F5EFE0")
         #expect(state.textColorHex == "#123456")
+        #expect(state.searchHighlightHex == "#ABCDEF")
         #expect(state.documentFontName == "Menlo-Regular")
         #expect(state.documentLineSpacing == 1.7)
         #expect(state.documentParagraphSpacing == 0.5)
@@ -70,6 +74,7 @@ struct DocumentStylingPersistenceTests {
             id: UUID(),
             text: "正文",
             textColorHex: "#123456",
+            searchHighlightHex: "#ABCDEF",
             documentFontName: "Songti SC",
             documentLineSpacing: 2.0
         )

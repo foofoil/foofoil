@@ -145,6 +145,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     /// 用户选择的窗体与 PDF 共用背景色；为空时使用各自的系统默认背景。
     public var backgroundColorHex: String?
     /// 无排版文档内容的文字颜色；为空时文字跟随系统外观。
+    public var searchHighlightHex: String?
     public var textColorHex: String?
     /// 无排版文档内容的字体（PostScript 名）；为空时沿用通道默认字体。
     public var documentFontName: String?
@@ -227,6 +228,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         svgColor: String? = nil,
         backgroundColorHex: String? = nil,
         textColorHex: String? = nil,
+        searchHighlightHex: String? = nil,
         documentFontName: String? = nil,
         documentLineSpacing: Double? = nil,
         documentParagraphSpacing: Double? = nil,
@@ -282,6 +284,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.svgColor = svgColor
         self.backgroundColorHex = backgroundColorHex
         self.textColorHex = textColorHex
+        self.searchHighlightHex = searchHighlightHex
         self.documentFontName = documentFontName
         self.documentLineSpacing = documentLineSpacing
         self.documentParagraphSpacing = documentParagraphSpacing
@@ -320,7 +323,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case terminalConfiguration, terminalScrollback
-        case historyIsPinned, isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource, showCodeLineNumbers, readOnlyPresentation
+        case historyIsPinned, isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, searchHighlightHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource, showCodeLineNumbers, readOnlyPresentation
     }
 
     public init(from decoder: Decoder) throws {
@@ -346,6 +349,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         svgColor = try container.decodeIfPresent(String.self, forKey: .svgColor)
         backgroundColorHex = try container.decodeIfPresent(String.self, forKey: .backgroundColorHex)
         textColorHex = try container.decodeIfPresent(String.self, forKey: .textColorHex)
+        searchHighlightHex = try container.decodeIfPresent(String.self, forKey: .searchHighlightHex)
         documentFontName = try container.decodeIfPresent(String.self, forKey: .documentFontName)
         documentLineSpacing = try container.decodeIfPresent(Double.self, forKey: .documentLineSpacing)
         documentParagraphSpacing = try container.decodeIfPresent(Double.self, forKey: .documentParagraphSpacing)

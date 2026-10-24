@@ -156,7 +156,7 @@ struct NavigatorPanelView: View {
 
     /// 列表项超过阈值时才显示搜索入口；标题栏右侧按钮点击后进入搜索状态。
     private func canSearch(_ contribution: NavigatorContribution) -> Bool {
-        contribution.items.count > AppState.navigatorSearchMinimumItemCount
+        (appState.isExtensionDocument && !contribution.items.isEmpty) || contribution.items.count > AppState.navigatorSearchMinimumItemCount
     }
 
     private var navigatorSearchButton: some View {
@@ -170,8 +170,8 @@ struct NavigatorPanelView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(NSLocalizedString("Search List", comment: ""))
-        .accessibilityLabel(NSLocalizedString("Search List", comment: ""))
+        .help(NSLocalizedString(appState.isExtensionDocument ? "Search Table of Contents" : "Search List", comment: ""))
+        .accessibilityLabel(NSLocalizedString(appState.isExtensionDocument ? "Search Table of Contents" : "Search List", comment: ""))
     }
 
     /// 搜索栏：关键字输入 + 上一个/下一个定位；没有匹配时定位按钮禁用。
@@ -182,14 +182,14 @@ struct NavigatorPanelView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             TextField(
-                NSLocalizedString("Search List", comment: ""),
+                NSLocalizedString(appState.isExtensionDocument ? "Search Table of Contents" : "Search List", comment: ""),
                 text: $appState.navigatorSearchQuery
             )
             .textFieldStyle(.plain)
             .font(.caption)
             .focused($isSearchFieldFocused)
             .onSubmit { appState.openNavigatorSearchMatch() }
-            .accessibilityLabel(NSLocalizedString("Search List", comment: ""))
+            .accessibilityLabel(NSLocalizedString(appState.isExtensionDocument ? "Search Table of Contents" : "Search List", comment: ""))
 
             Button {
                 appState.advanceNavigatorSearchMatch(delta: -1)

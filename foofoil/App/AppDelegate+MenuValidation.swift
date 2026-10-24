@@ -209,7 +209,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         setMenuItem(
             withAction: #selector(documentStyleAction),
             in: menu,
-            isHidden: !(appState.isVideoDocument || appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling)
+            isHidden: !(appState.isVideoDocument || appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling || appState.supportsContentSearch)
         )
 
         setMenuItem(withAction: #selector(toggleCodeLineNumbersAction), in: menu, isHidden: appState.codeLanguageID == nil)
@@ -313,7 +313,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         if menuItem.action == #selector(documentStyleAction) {
             guard let appState = activeReadingState else { return false }
             menuItem.title = NSLocalizedString(appState.isVideoDocument ? "Subtitle Style" : "Document Style", comment: "")
-            return appState.isVideoDocument || appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling
+            return appState.isVideoDocument || appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling || appState.supportsContentSearch
         }
 
         if menuItem.action == #selector(toggleCodeLineNumbersAction) {
@@ -433,6 +433,11 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             return activeReadingState?.supportsItemNavigation == true
         }
 
+        if menuItem.action == #selector(findContentAction) { return activeReadingState?.supportsContentSearch == true }
+        if menuItem.action == #selector(findContentNextAction) || menuItem.action == #selector(findContentPreviousAction) {
+            guard let search = activeReadingState?.contentSearch else { return false }
+            return search.isPresented && search.count > 0 && !search.isSearching
+        }
         if menuItem.action == #selector(findNavigatorAction) {
             return activeAppState?.canSearchActiveNavigator == true
         }

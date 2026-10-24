@@ -61,6 +61,10 @@ extension AppState {
         return !isBlank
     }
 
+    var resolvedSearchHighlightHex: String {
+        searchHighlightHex ?? DocumentThemeCatalog.defaultTheme.highlightHex(isDark: Self.isDarkMode())
+    }
+
     /// 文档内容背景色（十六进制）；非文档箔为 nil，避免把整窗外观当成背景作用对象。
     var contentBackgroundHex: String? {
         supportsContentBackgroundColor ? backgroundColorHex : nil
@@ -125,6 +129,7 @@ extension AppState {
             documentLineSpacing = typography.lineSpacing
             documentParagraphSpacing = typography.paragraphSpacing
         }
+        searchHighlightHex = theme.highlightHex(isDark: isDark)
         documentThemeId = theme.id
         isApplyingThemeColors = false
     }
@@ -136,7 +141,7 @@ extension AppState {
 
     /// 新打开的文档默认采用素笺；已有主题（含“无”）或手动色彩保持用户选择。
     func applyDefaultDocumentThemeIfNeeded() {
-        guard supportsContentBackgroundColor || supportsDocumentTextStyling,
+        guard supportsContentBackgroundColor || supportsDocumentTextStyling || supportsContentSearch,
               documentThemeId == nil, backgroundColorHex == nil, textColorHex == nil else { return }
         applyDocumentTheme(DocumentThemeCatalog.defaultTheme, isDark: Self.isDarkMode())
     }

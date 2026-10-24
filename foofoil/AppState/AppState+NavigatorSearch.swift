@@ -25,6 +25,7 @@ extension AppState {
 
     var canSearchActiveNavigator: Bool {
         isNavigatorSearchActive
+            || (isExtensionDocument && !(activeNavigatorContribution?.items.isEmpty ?? true))
             || (activeNavigatorContribution?.items.count ?? 0) > Self.navigatorSearchMinimumItemCount
     }
 
@@ -48,12 +49,12 @@ extension AppState {
     /// 进入搜索并聚焦输入框；没有可搜索列表时不改变状态。
     func beginNavigatorSearch() {
         guard navigatorPanelVisibilityMode != .hidden,
-              (activeNavigatorContribution?.items.count ?? 0) > Self.navigatorSearchMinimumItemCount else { return }
+              canSearchActiveNavigator else { return }
         isNavigatorSearchActive = true
         navigatorSearchFocusRequest &+= 1
     }
 
-    /// ⌘F：未进入搜索时先进入，已进入时把焦点移回输入框。
+    /// ⇧⌘F：未进入搜索时先进入，已进入时把焦点移回输入框。
     func focusNavigatorSearch() {
         if isNavigatorSearchActive {
             navigatorSearchFocusRequest &+= 1
@@ -136,13 +137,13 @@ extension AppState {
         )
     }
 
-    /// ⌘F 进入/聚焦搜索，⌘G 下一个，⇧⌘G 上一个；由窗口与面板在菜单匹配前调用。
+    /// ⇧⌘F 进入/聚焦搜索，⌘G 下一个，⇧⌘G 上一个；由窗口与面板在菜单匹配前调用。
     @discardableResult
     func handleNavigatorSearchKey(_ event: NSEvent) -> Bool {
         guard event.type == .keyDown else { return false }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         guard let key = event.charactersIgnoringModifiers?.lowercased() else { return false }
-        if modifiers == .command, key == "f" {
+        if modifiers == [.command, .shift], key == "f" {
             guard canSearchActiveNavigator else { return false }
             focusNavigatorSearch()
             return true

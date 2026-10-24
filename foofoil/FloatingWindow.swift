@@ -203,7 +203,11 @@ public class FloatingWindow: NSWindow {
             switch event.type {
             case .mouseEntered, .mouseMoved, .mouseExited, .cursorUpdate, .flagsChanged:
                 if !modifiers.contains(.command) {
-                    _ = updateEdgeResizeCursor(at: convertPoint(fromScreen: NSEvent.mouseLocation))
+                    let point = convertPoint(fromScreen: NSEvent.mouseLocation)
+                    if !updateEdgeResizeCursor(at: point),
+                       let state = (windowController as? FloatingWindowController)?.appState {
+                        state.readingState.contentSearch.cursor(at: point, in: self)?.set()
+                    }
                 }
             default:
                 break
@@ -282,6 +286,7 @@ public class FloatingWindow: NSWindow {
            let controller = self.windowController as? FloatingWindowController,
            controller.appState.verticalArrowsScrollContent,
            !controller.appState.isNavigatorSearchActive,
+           !controller.appState.readingState.contentSearch.isPresented,
            KeyboardShortcut.effectiveModifiers(for: event).isEmpty,
            event.keyCode == 125 || event.keyCode == 126 {
             scrollReadOnlyContent(by: event.keyCode == 125 ? 1 : -1, isExtensionDocument: controller.appState.readingState.isExtensionDocument)
@@ -702,6 +707,9 @@ public class FloatingWindow: NSWindow {
 
     // 重写 performKeyEquivalent(with:)：默认键位下保留既有的窗口直属处理；改键后的可配置命令统一走主菜单。
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if let controller = windowController as? FloatingWindowController,
+           controller.appState.handleContentSearchKey(event) { return true }
+
         if event.modifierFlags.contains(.control), !event.modifierFlags.contains(.command),
            let session = (windowController as? FloatingWindowController)?.appState.terminalSession,
            firstResponder === session.view {

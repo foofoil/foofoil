@@ -74,6 +74,7 @@ final class NavigatorPanel: NSWindow {
 
     /// 菜单快捷键匹配前先处理列表导航与搜索键，避免被 PDF 翻页等菜单项吞掉。
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if navigationState?.handleContentSearchKey(event) == true { return true }
         if handleKeyDown?(event) == true { return true }
         return super.performKeyEquivalent(with: event)
     }

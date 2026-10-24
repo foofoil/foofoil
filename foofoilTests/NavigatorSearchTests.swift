@@ -174,7 +174,7 @@ struct NavigatorSearchTests {
 
     @Test func commandShortcutsEnterAndCycleMatches() throws {
         let state = makeState(titles: (0..<13).map { "Track \($0)" })
-        #expect(state.handleNavigatorSearchKey(try keyEvent("f", modifiers: .command)))
+        #expect(state.handleNavigatorSearchKey(try keyEvent("f", modifiers: [.command, .shift])))
         #expect(state.isNavigatorSearchActive)
 
         state.navigatorSearchQuery = "track"
@@ -186,7 +186,7 @@ struct NavigatorSearchTests {
 
     @Test func commandShortcutIsRejectedWithoutSearchableList() throws {
         let state = makeState(titles: (0..<12).map { "Track \($0)" })
-        #expect(!state.handleNavigatorSearchKey(try keyEvent("f", modifiers: .command)))
+        #expect(!state.handleNavigatorSearchKey(try keyEvent("f", modifiers: [.command, .shift])))
         #expect(!state.isNavigatorSearchActive)
     }
 }

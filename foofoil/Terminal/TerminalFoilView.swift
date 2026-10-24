@@ -4,16 +4,24 @@ import SwiftTerm
 struct TerminalFoilView: View {
     @ObservedObject var session: TerminalSession
     @ObservedObject var appState: AppState
+    @ObservedObject private var search: FoilContentSearch
+
+    init(session: TerminalSession, appState: AppState) {
+        self.session = session; self.appState = appState; self.search = appState.contentSearch
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if let previous = session.previousOutput {
-                TerminalPreviousOutputView(previousOutput: previous, showsNewSession: session.state != .waiting,
+                TerminalPreviousOutputView(search: appState.contentSearch, isHidden: $session.isPreviousOutputHidden, previousOutput: previous, showsNewSession: session.state != .waiting,
                     onClear: { appState.clearPreviousTerminalOutput() })
                     .id(session.id)
+                    // 历史记录的标题及关闭按钮必须位于搜索栏下方。
+                    .padding(.top, search.isPresented && !session.isPreviousOutputHidden ? 40 : 0)
             }
             if session.state != .waiting {
                 TerminalSurface(session: session, font: appState.documentFont(size: CGFloat(appState.textFontSize)),
-                    foregroundColor: appState.documentTextColor, backgroundColor: appState.contentBackgroundColor)
+                    foregroundColor: appState.documentTextColor, backgroundColor: appState.contentBackgroundColor, isSearching: search.isPresented && (session.previousOutput == nil || session.isPreviousOutputHidden))
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             switch session.state {
@@ -43,12 +51,14 @@ struct TerminalFoilView: View {
 }
 
 private struct TerminalPreviousOutputView: View {
+    @ObservedObject var search: FoilContentSearch
+    @Binding var isHidden: Bool
+    @State private var expandedBeforeSearch = false
     let previousOutput: String
     let showsNewSession: Bool
     let onClear: () -> Void
     @State private var confirmsClear = false
     @State private var isExpanded = false
-    @State private var isHidden = false
     @State private var preparedOutput: AttributedString?
 
     var body: some View {
@@ -76,6 +86,7 @@ private struct TerminalPreviousOutputView: View {
                     Button {
                         // 仅隐藏当前视图；会话快照仍保留，下次从历史打开时重新显示。
                         isHidden = true
+                        search.refreshSurface()
                     } label: {
                         Image(systemName: "xmark")
                     }
@@ -86,11 +97,7 @@ private struct TerminalPreviousOutputView: View {
                 if isExpanded {
                     Group {
                         if let preparedOutput {
-                            ScrollView {
-                                Text(preparedOutput).font(.system(.caption, design: .monospaced))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .textSelection(.enabled)
-                            }
+                            ReadOnlyTextView(text: String(preparedOutput.characters), font: .monospacedSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular), textColor: nil, lineHeightMultiple: nil, paragraphSpacingMultiple: nil)
                         } else {
                             ProgressView("Loading...").controlSize(.small)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -107,6 +114,10 @@ private struct TerminalPreviousOutputView: View {
                 }
             }
             .padding(8)
+            .onChange(of: search.isPresented, initial: true) { _, active in
+                if active { expandedBeforeSearch = isExpanded; isExpanded = true }
+                else { isExpanded = expandedBeforeSearch }
+            }
             .alert("Clear Previous Terminal Output", isPresented: $confirmsClear) {
                 Button("Clear Previous Terminal Output Confirm", role: .destructive) { onClear() }
                 Button("Cancel", role: .cancel) { }
@@ -127,14 +138,44 @@ private struct TerminalSurface: NSViewRepresentable {
     let font: NSFont
     let foregroundColor: NSColor?
     let backgroundColor: NSColor?
-    func makeNSView(context: Context) -> FoilTerminalView {
-        let view = session.view
-        DispatchQueue.main.async { view.window?.makeFirstResponder(view) }
-        return view
+    let isSearching: Bool
+    func makeNSView(context: Context) -> TerminalSearchViewport {
+        let container = TerminalSearchViewport(terminal: session.view)
+        if !isSearching { DispatchQueue.main.async { session.view.window?.makeFirstResponder(session.view) } }
+        return container
     }
-    func updateNSView(_ view: FoilTerminalView, context: Context) {
-        view.applyDocumentStyle(font: font, foregroundColor: foregroundColor, backgroundColor: backgroundColor)
+    func updateNSView(_ view: TerminalSearchViewport, context: Context) {
+        session.view.applyDocumentStyle(font: font, foregroundColor: foregroundColor, backgroundColor: backgroundColor)
+        view.searchInset = isSearching ? 40 : 0
     }
+}
+
+/// 只裁切可见区域，不改终端画布尺寸；搜索条出现不会改变 PTY 行列数或触发输出重排。
+final class TerminalSearchViewport: NSView {
+    let terminal: FoilTerminalView
+    private let clip = NSClipView()
+    private var appliedSearchInset: CGFloat = 0
+    var searchInset: CGFloat = 0 { didSet { if oldValue != searchInset { needsLayout = true } } }
+    init(terminal: FoilTerminalView) {
+        self.terminal = terminal
+        super.init(frame: terminal.frame)
+        clip.drawsBackground = false
+        terminal.autoresizingMask = []
+        clip.documentView = terminal
+        addSubview(clip)
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    override func layout() {
+        super.layout()
+        let previousOrigin = clip.bounds.origin
+        clip.frame = NSRect(x: 0, y: 0, width: bounds.width, height: max(1, bounds.height - searchInset))
+        terminal.frame = NSRect(origin: .zero, size: bounds.size)
+        // 只在进入搜索时对齐顶部；后续布局保留定位结果，避免把底部匹配重新裁掉。
+        let y = appliedSearchInset == 0 && searchInset > 0 ? searchInset : previousOrigin.y
+        appliedSearchInset = searchInset
+        clip.scroll(to: NSPoint(x: 0, y: min(max(0, terminal.frame.height - clip.bounds.height), max(0, y))))
+    }
+
 }
 
 extension AppState {

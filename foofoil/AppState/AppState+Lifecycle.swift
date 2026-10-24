@@ -61,6 +61,8 @@ extension AppState {
             // 重置按新窗口处理：空白箔无默认主题，旧自选颜色、主题与字体不带到新空白箔。
             self.backgroundColorHex = nil
             self.textColorHex = nil
+            self.searchHighlightHex = nil
+            self.contentSearch.reset()
             self.documentThemeId = nil
             self.documentFontName = nil
             self.documentLineSpacing = nil

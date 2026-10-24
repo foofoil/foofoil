@@ -26,6 +26,9 @@ public struct DocumentTheme: Identifiable, Codable, Equatable {
     public let usesDefaultBackground: Bool?
     public let usesDefaultText: Bool?
 
+    public let lightHighlightHex: String?
+    public let darkHighlightHex: String?
+
     public let lightBackgroundHex: String
     public let lightTextHex: String
 
@@ -40,10 +43,14 @@ public struct DocumentTheme: Identifiable, Codable, Equatable {
         lightTextHex: String,
         darkBackgroundHex: String,
         darkTextHex: String,
+        lightHighlightHex: String? = nil,
+        darkHighlightHex: String? = nil,
         typography: DocumentThemeTypography? = nil,
         usesDefaultBackground: Bool? = nil,
         usesDefaultText: Bool? = nil
     ) {
+        self.lightHighlightHex = lightHighlightHex
+        self.darkHighlightHex = darkHighlightHex
         self.usesDefaultBackground = usesDefaultBackground
         self.usesDefaultText = usesDefaultText
         self.typography = typography
@@ -64,6 +71,18 @@ public struct DocumentTheme: Identifiable, Codable, Equatable {
     /// 根据外观判定返回文字前景色（十六进制）
     public func textHex(isDark: Bool) -> String {
         isDark ? darkTextHex : lightTextHex
+    }
+
+    public func highlightHex(isDark: Bool) -> String {
+        if let color = isDark ? darkHighlightHex : lightHighlightHex { return color }
+        // 预设高亮与纸面色调配对，深色外观保留文字对比。
+        switch id {
+        case "parchment": return isDark ? "#806329" : "#F2D886"
+        case "bamboo": return isDark ? "#466C39" : "#BDDB9B"
+        case "dusk": return isDark ? "#87505C" : "#F4B7B4"
+        case "mist": return isDark ? "#3D6584" : "#ACD5F2"
+        default: return isDark ? "#806A22" : "#FFE08A"
+        }
     }
 
     /// 根据外观返回 SwiftUI 背景色
@@ -188,6 +207,7 @@ public final class DocumentThemeCatalog: ObservableObject {
         name: String,
         currentBackgroundHex: String?,
         currentTextHex: String?,
+        currentHighlightHex: String? = nil,
         isCurrentlyDark: Bool,
         typography: DocumentThemeTypography? = nil,
         replacing id: String? = nil
@@ -224,6 +244,8 @@ public final class DocumentThemeCatalog: ObservableObject {
             lightTextHex: lightFg,
             darkBackgroundHex: darkBg,
             darkTextHex: darkFg,
+            lightHighlightHex: isCurrentlyDark ? currentHighlightHex.flatMap(DocumentColorAdapter.mirroredHex) : currentHighlightHex,
+            darkHighlightHex: isCurrentlyDark ? currentHighlightHex : currentHighlightHex.flatMap(DocumentColorAdapter.mirroredHex),
             typography: typography,
             usesDefaultBackground: currentBackgroundHex == nil,
             usesDefaultText: currentTextHex == nil

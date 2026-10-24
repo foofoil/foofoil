@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WebKit
 
 /// 轻量 CSV 解析器，支持双引号、转义双引号与引号内换行。
 public enum CSVParser {
@@ -71,46 +72,41 @@ public struct CSVTableView: View {
     }
 
     public var body: some View {
-        ScrollView([.horizontal, .vertical]) {
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(Array(rows.enumerated()), id: \.offset) { rowIndex, row in
-                    HStack(spacing: 0) {
-                        ForEach(0..<columnCount, id: \.self) { columnIndex in
-                            CSVTableCell(
-                                value: columnIndex < row.count ? row[columnIndex] : "",
-                                isHeader: rowIndex == 0,
-                                width: cellWidth,
-                                fontSize: fontSize
-                            )
-                        }
-                    }
-                }
-            }
-            .padding(12)
-        }
+        CSVWebTable(rows: rows, columnCount: columnCount, cellWidth: cellWidth, fontSize: fontSize)
     }
 }
 
-private struct CSVTableCell: View {
-    let value: String
-    let isHeader: Bool
-    let width: CGFloat
+private struct CSVWebTable: NSViewRepresentable {
+    let rows: [[String]]
+    let columnCount: Int
+    let cellWidth: CGFloat
     let fontSize: CGFloat
-
-    var body: some View {
-        Text(value)
-            .font(.system(size: fontSize, weight: isHeader ? .semibold : .regular))
-            .foregroundStyle(.primary)
-            .lineLimit(nil)
-            .textSelection(.enabled)
-            .frame(width: width, alignment: .leading)
-            .frame(minHeight: max(30, fontSize + 16), alignment: .leading)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(isHeader ? Color.primary.opacity(0.12) : Color.clear)
-            .overlay(
-                Rectangle()
-                    .stroke(Color.primary.opacity(0.16), lineWidth: 0.5)
-            )
+    @Environment(\.colorScheme) private var colorScheme
+    func makeCoordinator() -> Coordinator { Coordinator() }
+    func makeNSView(context: Context) -> WKWebView {
+        let view = WKWebView(frame: .zero, configuration: ExtensionDocumentWebViewFactory.makeConfiguration())
+        view.setValue(false, forKey: "drawsBackground")
+        return view
     }
+    func updateNSView(_ view: WKWebView, context: Context) {
+        func escape(_ value: String) -> String {
+            value.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;").replacingOccurrences(of: "\"", with: "&quot;")
+        }
+        let body = rows.enumerated().map { rowIndex, row in
+            "<tr>" + (0..<columnCount).map { col in
+                let tag = rowIndex == 0 ? "th" : "td"
+                return "<\(tag)>\(escape(col < row.count ? row[col] : ""))</\(tag)>"
+            }.joined() + "</tr>"
+        }.joined()
+        let html = """
+        <!doctype html><html><head><meta charset="utf-8"><style>
+        :root{color-scheme:\(colorScheme == .dark ? "dark" : "light");}body{margin:12px;background:transparent;color:CanvasText;font: \(fontSize)px -apple-system;}
+        table{border-collapse:collapse;table-layout:fixed;}td,th{box-sizing:content-box;min-width:\(cellWidth)px;max-width:\(cellWidth)px;width:\(cellWidth)px;min-height:30px;padding:5px 8px;border:0.5px solid color-mix(in srgb,CanvasText 16%,transparent);text-align:left;white-space:pre-wrap;overflow-wrap:anywhere;}th{font-weight:600;background:color-mix(in srgb,CanvasText 12%,transparent);}
+        </style></head><body><table>\(body)</table></body></html>
+        """
+        guard context.coordinator.html != html else { return }
+        context.coordinator.html = html
+        view.loadHTMLString(html, baseURL: nil)
+    }
+    final class Coordinator { var html = "" }
 }

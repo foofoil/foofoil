@@ -980,7 +980,7 @@ extension AppDelegate {
             SubtitleStylePanelController.shared.show(for: appState)
             return
         }
-        guard appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling else { return }
+        guard appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling || appState.supportsContentSearch else { return }
         DocumentStylePanelController.shared.show(for: appState)
     }
 
@@ -1007,6 +1007,10 @@ extension AppDelegate {
     @objc func nextFileListItemAction() {
         activeReadingState?.activateAdjacentFileListItem(delta: 1)
     }
+
+    @objc func findContentAction() { activeReadingState?.contentSearch.open() }
+    @objc func findContentNextAction() { activeReadingState?.contentSearch.advance(1) }
+    @objc func findContentPreviousAction() { activeReadingState?.contentSearch.advance(-1) }
 
     @objc func findNavigatorAction() {
         activeAppState?.focusNavigatorSearch()

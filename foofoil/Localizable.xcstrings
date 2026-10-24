@@ -1317,8 +1317,18 @@
     },
     "Shortcut Follows Global": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Follows the global shortcut; edit it in Global." } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "跟随全局快捷键，请在全局快捷键中修改。" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Follows the global shortcut; edit it in Global."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟随全局快捷键，请在全局快捷键中修改。"
+          }
+        }
       }
     },
     "Open Clipboard Incognito": {
@@ -9486,14 +9496,34 @@
     },
     "Clear Terminal Content": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Clear Terminal Content" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "清空终端内容" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear Terminal Content"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清空终端内容"
+          }
+        }
       }
     },
     "Shortcut Scope Terminal": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Terminal foils only" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "仅终端箔" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal foils only"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅终端箔"
+          }
+        }
       }
     },
     "Reset to Blank Foil": {
@@ -12920,6 +12950,150 @@
           "stringUnit": {
             "state": "translated",
             "value": "清除搜索范围"
+          }
+        }
+      }
+    },
+    "Search Highlight Color": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search highlight color"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索高亮色"
+          }
+        }
+      }
+    },
+    "Search Table of Contents": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search table of contents"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索目录"
+          }
+        }
+      }
+    },
+    "Search Body": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search body text"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索正文"
+          }
+        }
+      }
+    },
+    "Search Page": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search page"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索页面"
+          }
+        }
+      }
+    },
+    "Search Output": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search output"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索输出"
+          }
+        }
+      }
+    },
+    "Searching Content": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Searching…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索中…"
+          }
+        }
+      }
+    },
+    "Content Search Failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not search this content"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法搜索此内容"
+          }
+        }
+      }
+    },
+    "No Matches": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matches"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无匹配"
+          }
+        }
+      }
+    },
+    "Search Match Count": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search matches"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索匹配数量"
           }
         }
       }

@@ -105,6 +105,7 @@ extension AppState {
             self.svgColor = config.svgColor
             self.backgroundColorHex = config.backgroundColorHex
             self.textColorHex = config.textColorHex
+            self.searchHighlightHex = config.searchHighlightHex
             self.documentThemeId = config.documentThemeId
             self.documentFontName = config.documentFontName
             self.documentLineSpacing = config.documentLineSpacing
@@ -277,6 +278,7 @@ extension AppState {
                 svgColor: svgColor,
                 backgroundColorHex: backgroundColorHex,
                 textColorHex: textColorHex,
+                searchHighlightHex: searchHighlightHex,
                 documentFontName: documentFontName,
                 documentLineSpacing: documentLineSpacing,
                 documentParagraphSpacing: documentParagraphSpacing,

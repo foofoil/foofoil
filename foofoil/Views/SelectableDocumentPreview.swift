@@ -5,6 +5,7 @@ import AppKit
 struct SelectableDocumentPreview: View {
     let url: URL
     let shouldHideBorder: Bool
+    var search: FoilContentSearch? = nil
     @State private var document: NSAttributedString?
 
     static func supports(_ url: URL) -> Bool {
@@ -16,7 +17,9 @@ struct SelectableDocumentPreview: View {
             if let document {
                 DocumentTextPreview(document: document)
             } else {
-                QuickLookModeView(url: url, shouldHideBorder: shouldHideBorder)
+                if let search {
+                    SearchableQuickLookView(url: url, shouldHideBorder: shouldHideBorder, search: search)
+                } else { QuickLookModeView(url: url, shouldHideBorder: shouldHideBorder) }
             }
         }
         .task(id: url) {

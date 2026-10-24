@@ -1,4 +1,5 @@
 import AppKit
+import CoreText
 import SwiftTerm
 import Combine
 import Darwin
@@ -10,6 +11,8 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
     let id = UUID().uuidString
     let configuration: TerminalLaunchConfiguration
     @Published private(set) var previousOutput: String?
+    /// 只影响本次会话的展示及搜索范围；隐藏不删除持久化的历史快照。
+    @Published var isPreviousOutputHidden = false
     var onOutputSnapshotChanged: (() -> Void)?
     /// Shell 自行结束后通知宿主；宿主据此关闭箔片，不再停留在已结束界面。
     var onSessionEnded: (() -> Void)?
@@ -222,6 +225,120 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
 }
 
 final class FoilTerminalView: LocalProcessTerminalView {
+    struct SearchSpan { let row: Int; let columns: Range<Int> }
+    struct SearchMatch {
+        let spans: [SearchSpan]
+        var row: Int { spans.first?.row ?? 0 }
+    }
+    private var searchOverlay: TerminalSearchOverlay?
+    var searchHighlights: [SearchMatch] = [] {
+        didSet {
+            if searchOverlay == nil, !searchHighlights.isEmpty {
+                let overlay = TerminalSearchOverlay(frame: NSRect(origin: .zero, size: bounds.size))
+                overlay.terminalView = self
+                overlay.autoresizingMask = [.width, .height]
+                addSubview(overlay)
+                searchOverlay = overlay
+            }
+            searchOverlay?.needsDisplay = true
+        }
+    }
+
+    // SwiftTerm 滚动时只重绘终端本身；子视图必须同步失效，不能沿用上一屏的高亮。
+    override var needsDisplay: Bool {
+        didSet { if needsDisplay { searchOverlay?.needsDisplay = true } }
+    }
+    override func setNeedsDisplay(_ invalidRect: NSRect) {
+        super.setNeedsDisplay(invalidRect)
+        searchOverlay?.needsDisplay = true
+    }
+    private var searchCurrent = 0
+    private var searchColor = NSColor.systemYellow
+    private var searchRowCount = 0
+
+    /// 按实际单元格映射 UTF-16 偏移，保留中文宽字符与组合字符的列位置。
+    func updateSearch(query: String, color: NSColor) {
+        let terminal = getTerminal()
+        let rows = String(decoding: terminal.getBufferAsData(), as: UTF8.self).split(separator: "\n", omittingEmptySubsequences: false)
+        searchRowCount = max(0, rows.count - 1)
+        searchColor = color
+        var text = ""
+        var cells: [(row: Int, start: Int, end: Int)] = []
+        for row in 0..<searchRowCount {
+            if row > 0 {
+                // 复用终端自己的复制语义辨别软换行，长关键字跨屏幕行时仍只算一条。
+                let boundary = terminal.getText(start: Position(col: terminal.cols, row: row - 1), end: Position(col: 0, row: row))
+                if boundary.contains("\n") || rows[row].isEmpty {
+                    text += "\n"; cells.append((row: row, start: 0, end: 0))
+                }
+            }
+            var rowText = ""
+            var rowCells: [(row: Int, start: Int, end: Int)] = []
+            var meaningfulLength = 0
+            for col in 0..<terminal.cols {
+                let cell = terminal.buffer.getChar(atBufferRelative: Position(col: col, row: row))
+                guard cell.width > 0 else { continue }
+                let character = terminal.getCharacter(for: cell)
+                let value = character == "\0" ? " " : String(character)
+                rowText += value
+                rowCells += Array(repeating: (row: row, start: col, end: col + Int(cell.width)), count: value.utf16.count)
+                if character != "\0" { meaningfulLength = rowCells.count }
+            }
+            text += (rowText as NSString).substring(to: meaningfulLength)
+            cells += rowCells.prefix(meaningfulLength)
+        }
+        var matches: [SearchMatch] = []
+        for range in FoilContentSearch.ranges(in: text, query: query) where NSMaxRange(range) <= cells.count {
+            var spans: [SearchSpan] = []
+            for cell in cells[range.location..<NSMaxRange(range)] where cell.end > cell.start {
+                if let last = spans.last, last.row == cell.row {
+                    spans[spans.count - 1] = SearchSpan(row: cell.row, columns: last.columns.lowerBound..<cell.end)
+                } else { spans.append(SearchSpan(row: cell.row, columns: cell.start..<cell.end)) }
+            }
+            if !spans.isEmpty { matches.append(SearchMatch(spans: spans)) }
+        }
+        searchHighlights = matches
+    }
+
+    func revealSearchMatch(_ index: Int) {
+        guard searchHighlights.indices.contains(index) else { return }
+        searchCurrent = index
+        let terminal = getTerminal()
+        let maxScroll = max(0, searchRowCount - terminal.rows)
+        if maxScroll > 0 { scroll(toPosition: Double(max(0, searchHighlights[index].row - terminal.rows / 3)) / Double(maxScroll)) }
+        if let clip = superview as? NSClipView {
+            let rect = searchHighlightRect(for: searchHighlights[index].spans[0])
+            let maximum = max(0, bounds.height - clip.bounds.height)
+            clip.scroll(to: NSPoint(x: 0, y: min(maximum, max(0, rect.midY - clip.bounds.height / 2))))
+        }
+        needsDisplay = true
+    }
+
+    /// 与 SwiftTerm 的绘制使用同一套单元格度量及缓冲区行偏移。
+    func searchHighlightRect(for span: SearchSpan) -> NSRect {
+        let width = max(1, font.advancement(forGlyph: font.glyph(withName: "W")).width)
+        let height = max(1, ceil(CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)))
+        let row = span.row - getTerminal().getTopVisibleRow()
+        return NSRect(x: CGFloat(span.columns.lowerBound) * width,
+                      y: frame.height - CGFloat(row + 1) * height,
+                      width: CGFloat(span.columns.count) * width, height: height)
+    }
+
+    fileprivate func drawSearchHighlights(in overlay: NSView) {
+        guard !searchHighlights.isEmpty else { return }
+        let terminal = getTerminal()
+        for (index, match) in searchHighlights.enumerated() {
+            for span in match.spans {
+                let row = span.row - terminal.getTopVisibleRow()
+                guard row >= 0, row < terminal.rows else { continue }
+                let rect = overlay.convert(searchHighlightRect(for: span), from: self)
+                searchColor.withAlphaComponent(index == searchCurrent ? 0.55 : 0.12).setFill()
+                rect.fill(using: .sourceOver)
+                if index == searchCurrent { searchColor.setStroke(); NSBezierPath(rect: rect.insetBy(dx: 0.5, dy: 0.5)).stroke() }
+            }
+        }
+    }
+
     var outputDidChange: (() -> Void)?
 
     override func dataReceived(slice: ArraySlice<UInt8>) {
@@ -285,4 +402,11 @@ final class FoilTerminalView: LocalProcessTerminalView {
         }
         return super.performKeyEquivalent(with: event)
     }
+}
+
+/// 搜索覆盖层不接受鼠标事件，也不改变终端的选择、输入或缓冲区属性。
+private final class TerminalSearchOverlay: NSView {
+    weak var terminalView: FoilTerminalView?
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func draw(_ dirtyRect: NSRect) { terminalView?.drawSearchHighlights(in: self) }
 }

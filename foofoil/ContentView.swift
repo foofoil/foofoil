@@ -130,11 +130,11 @@ struct FoilContentView: View {
                         PPTXModeView(appState: appState, url: url)
                             .id(appState.contentReloadRevision)
                     } else if SelectableDocumentPreview.supports(url) {
-                        SelectableDocumentPreview(url: url, shouldHideBorder: shouldHideBorder)
+                        SelectableDocumentPreview(url: url, shouldHideBorder: shouldHideBorder, search: appState.contentSearch)
                             .id(appState.contentReloadRevision)
                             .clipShape(RoundedRectangle(cornerRadius: shouldHideBorder ? 0 : 8, style: .continuous))
                     } else {
-                        QuickLookModeView(url: url, shouldHideBorder: shouldHideBorder)
+                        SearchableQuickLookView(url: url, shouldHideBorder: shouldHideBorder, search: appState.contentSearch)
                             .id(appState.contentReloadRevision)
                             .clipShape(RoundedRectangle(cornerRadius: shouldHideBorder ? 0 : 8, style: .continuous))
                     }
@@ -160,6 +160,25 @@ struct FoilContentView: View {
                         .transition(.opacity)
                 } else if let imageURL = appState.imageURL, let nsImage = appState.loadImage(from: imageURL) {
                     ImageModeView(appState: appState, nsImage: nsImage, shouldHideBorder: shouldHideBorder)
+                        // 双击只作用于图片正文，避免外层手势延迟搜索栏等控件的单击。
+                        // 图片模式下：有边框时鼠标双击作用改为和cmd.一样，无边框时双击作用改为和cmd=一样（放大）
+                        .onTapGesture(count: 2) {
+                            if appState.usesImagePresentation && !appState.isQuickLookDocument {
+                                if appState.effectiveShowBorder {
+                                    NotificationCenter.default.post(
+                                        name: .shouldFitImageToWindowWidth,
+                                        object: nil,
+                                        userInfo: ["id": appState.id]
+                                    )
+                                } else {
+                                    NotificationCenter.default.post(
+                                        name: .shouldZoomIn,
+                                        object: nil,
+                                        userInfo: ["id": appState.id]
+                                    )
+                                }
+                            }
+                        }
                         .id(appState.agentOwnership.map { $0.boardID + ":" + (appState.agentKind?.rawValue ?? "") } ?? appState.fileList?.currentID ?? imageURL.path)
                         .id(appState.contentReloadRevision)
                         .transition(.opacity)
@@ -191,6 +210,11 @@ struct FoilContentView: View {
                 }
             }
             .background(FoilCaptureArea(id: appState.id))
+            .overlay(alignment: .top) {
+                FoilSearchBar(search: appState.contentSearch,
+                              placeholder: appState.terminalConfiguration != nil ? "Search Output" : appState.webURL != nil ? "Search Page" : "Search Body")
+                    .opacity(windowState.isCapturingContentImage ? 0 : 1)
+            }
             .padding(contentPadding)
             // 嵌平“始终显示”时侧边栏以分栏形式挤占内容空间而不是盖在内容上；
             // 悬停模式侧边栏覆盖内容，内容保持原位。拖拽调宽时跟随指针即时变化不动画。
@@ -214,6 +238,7 @@ struct FoilContentView: View {
 
         }
         .frame(minWidth: minimumWidth, minHeight: minimumLength)
+        .background(FoilSearchProbe(appState: appState))
         // Finder 文件由 FloatingWindow 直接读取粘贴板，确保多选批次不会被 SwiftUI 拆丢。
         // 增加高精细度细微边框，且拖拽时显示蓝色高亮边框
         .overlay(
@@ -261,24 +286,6 @@ struct FoilContentView: View {
             }
             pdfPageIndicatorDismissTask = dismissTask
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2, execute: dismissTask)
-        }
-        // 图片模式下：有边框时鼠标双击作用改为和cmd.一样，无边框时双击作用改为和cmd=一样（放大）
-        .onTapGesture(count: 2) {
-            if appState.usesImagePresentation && !appState.isQuickLookDocument {
-                if appState.effectiveShowBorder {
-                    NotificationCenter.default.post(
-                        name: .shouldFitImageToWindowWidth,
-                        object: nil,
-                        userInfo: ["id": appState.id]
-                    )
-                } else {
-                    NotificationCenter.default.post(
-                        name: .shouldZoomIn,
-                        object: nil,
-                        userInfo: ["id": appState.id]
-                    )
-                }
-            }
         }
         // 图片模式继续由 ImageModeView 自己处理捏合缩放；音视频及其余模式仅缩放窗口，不改变内容字号或网页倍率。
         .simultaneousGesture(

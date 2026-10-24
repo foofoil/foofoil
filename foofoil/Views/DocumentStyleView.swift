@@ -32,7 +32,7 @@ struct DocumentStyleView: View {
     var body: some View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 16) {
-                if appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling {
+                if appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling || appState.supportsContentSearch {
                     themeSection
                 }
 
@@ -43,6 +43,19 @@ struct DocumentStyleView: View {
                             statusText: backgroundStatusText,
                             isDefault: isBackgroundDefault,
                             reset: { appState.resetBackgroundColorToDefault(isDark: colorScheme == .dark) }
+                        )
+                    }
+                }
+
+                if appState.supportsContentSearch {
+                    section(NSLocalizedString("Search Highlight Color", comment: "")) {
+                        colorRow(
+                            color: Binding(get: { Color(nsColor: NSColor(hex: appState.resolvedSearchHighlightHex) ?? .systemYellow) },
+                                           set: { appState.searchHighlightHex = Self.hex(from: $0) }),
+                            statusText: NSLocalizedString("Search Highlight Color", comment: ""),
+                            isDefault: appState.searchHighlightHex == DocumentThemeCatalog.defaultTheme.highlightHex(isDark: colorScheme == .dark),
+                            reset: { appState.searchHighlightHex = DocumentThemeCatalog.defaultTheme.highlightHex(isDark: colorScheme == .dark) },
+                            supportsOpacity: false
                         )
                     }
                 }
@@ -185,7 +198,7 @@ struct DocumentStyleView: View {
                 Button("Replace with Current Style") {
                     let updated = themeCatalog.addCustomTheme(name: theme.name,
                         currentBackgroundHex: appState.backgroundColorHex,
-                        currentTextHex: appState.textColorHex, isCurrentlyDark: colorScheme == .dark,
+                        currentTextHex: appState.textColorHex, currentHighlightHex: appState.resolvedSearchHighlightHex, isCurrentlyDark: colorScheme == .dark,
                         typography: appState.currentThemeTypography, replacing: theme.id)
                     appState.applyDocumentTheme(updated, isDark: colorScheme == .dark)
                 }
@@ -226,7 +239,7 @@ struct DocumentStyleView: View {
                     let created = themeCatalog.addCustomTheme(
                         name: newThemeName,
                         currentBackgroundHex: appState.backgroundColorHex,
-                        currentTextHex: appState.textColorHex,
+                        currentTextHex: appState.textColorHex, currentHighlightHex: appState.resolvedSearchHighlightHex,
                         isCurrentlyDark: colorScheme == .dark,
                         typography: appState.currentThemeTypography,
                         replacing: replacementThemeID.isEmpty ? nil : replacementThemeID
@@ -385,10 +398,11 @@ struct DocumentStyleView: View {
         color: Binding<Color>,
         statusText: String,
         isDefault: Bool,
-        reset: @escaping () -> Void
+        reset: @escaping () -> Void,
+        supportsOpacity: Bool = true
     ) -> some View {
         HStack(spacing: 8) {
-            ColorPicker(NSLocalizedString("Color", comment: ""), selection: color, supportsOpacity: true)
+            ColorPicker(NSLocalizedString("Color", comment: ""), selection: color, supportsOpacity: supportsOpacity)
                 .labelsHidden()
             Text(statusText)
                 .font(.caption)

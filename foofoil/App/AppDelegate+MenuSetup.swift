@@ -761,7 +761,7 @@ extension AppDelegate {
             }
             appendExtractTextMenu(to: menu)
             appendExtractImageSubjectMenu(to: menu)
-            appendNavigatorFindMenu(to: menu)
+            appendFindMenu(to: menu)
             return
         }
 
@@ -813,7 +813,7 @@ extension AppDelegate {
 
         appendExtractTextMenu(to: menu)
         appendExtractImageSubjectMenu(to: menu)
-        appendNavigatorFindMenu(to: menu)
+        appendFindMenu(to: menu)
     }
 
     /// “提取文字”在编辑菜单与右键菜单共用；由 validateMenuItem 按图片内容启用或禁用，禁用时仍显示。
@@ -878,14 +878,14 @@ extension AppDelegate {
     }
 
     /// 列表超过阈值时提供查找定位：⌘F 进入/聚焦，⌘G / ⇧⌘G 循环定位匹配标题。
-    private func appendNavigatorFindMenu(to menu: NSMenu) {
-        guard activeAppState?.canSearchActiveNavigator == true else { return }
+    private func appendFindMenu(to menu: NSMenu) {
+        guard activeReadingState?.supportsContentSearch == true || activeAppState?.canSearchActiveNavigator == true else { return }
         menu.addItem(NSMenuItem.separator())
 
         let submenu = NSMenu(title: NSLocalizedString("Find", comment: ""))
         let findItem = NSMenuItem(
             title: NSLocalizedString("Find", comment: ""),
-            action: #selector(findNavigatorAction),
+            action: #selector(findContentAction),
             keyEquivalent: "f"
         )
         findItem.withSymbol("magnifyingglass")
@@ -894,7 +894,7 @@ extension AppDelegate {
 
         let findNextItem = NSMenuItem(
             title: NSLocalizedString("Find Next", comment: ""),
-            action: #selector(findNavigatorNextAction),
+            action: #selector(findContentNextAction),
             keyEquivalent: "g"
         )
         findNextItem.withSymbol("chevron.down")
@@ -903,13 +903,20 @@ extension AppDelegate {
 
         let findPreviousItem = NSMenuItem(
             title: NSLocalizedString("Find Previous", comment: ""),
-            action: #selector(findNavigatorPreviousAction),
+            action: #selector(findContentPreviousAction),
             keyEquivalent: "g"
         )
         findPreviousItem.withSymbol("chevron.up")
         findPreviousItem.keyEquivalentModifierMask = [.command, .shift]
         findPreviousItem.target = self
         submenu.addItem(findPreviousItem)
+
+        if activeAppState?.canSearchActiveNavigator == true {
+            let directoryItem = NSMenuItem(title: NSLocalizedString(activeAppState?.isExtensionDocument == true ? "Search Table of Contents" : "Search List", comment: ""), action: #selector(findNavigatorAction), keyEquivalent: "f")
+            directoryItem.keyEquivalentModifierMask = [.command, .shift]
+            directoryItem.target = self
+            submenu.addItem(directoryItem)
+        }
 
         let findMenuItem = NSMenuItem(title: NSLocalizedString("Find", comment: ""), action: nil, keyEquivalent: "")
         findMenuItem.submenu = submenu

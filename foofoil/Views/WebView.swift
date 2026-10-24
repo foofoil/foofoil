@@ -46,7 +46,10 @@ struct WebView: NSViewRepresentable {
             )
         )
 
+        WebSearchFrames.install(on: configuration, handler: context.coordinator.searchFrames)
         let webView = NonMenuWebView(frame: .zero, configuration: configuration)
+        context.coordinator.searchFrames.webView = webView
+        context.coordinator.searchFrames.search = appState.contentSearch
         webView.appState = appState
         webView.setValue(false, forKey: "drawsBackground") // 保持背景处理灵活性
         webView.pageZoom = CGFloat(zoom)
@@ -57,6 +60,7 @@ struct WebView: NSViewRepresentable {
     }
 
     static func dismantleNSView(_ nsView: WKWebView, coordinator: Coordinator) {
+        nsView.configuration.userContentController.removeScriptMessageHandler(forName: WebSearchFrames.handlerName, contentWorld: .defaultClient)
         nsView.configuration.userContentController.removeScriptMessageHandler(
             forName: Coordinator.editableFocusHandlerName
         )
@@ -102,6 +106,7 @@ struct WebView: NSViewRepresentable {
             report(document.activeElement);
         })();
         """
+        let searchFrames = WebSearchFrames()
         var parent: WebView
         var lastLoadedURL: URL?
         /// 上一次注入到页面的背景色；导航后 DOM 重置，didFinish 会无条件重注入。
@@ -257,6 +262,7 @@ struct WebView: NSViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            parent.appState.contentSearch.resetWebFrames(webView: webView)
             DispatchQueue.main.async {
                 self.parent.loadError = nil
                 self.parent.isLoading = true

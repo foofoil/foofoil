@@ -124,12 +124,14 @@ struct PPTXModeView: View {
     nonisolated static let minimumWindowWidth: CGFloat = 180
     @ObservedObject var appState: AppState
     let url: URL
+    @ObservedObject private var search: FoilContentSearch
     @ObservedObject private var controller: PPTXNavigationController
 
     init(appState: AppState, url: URL) {
         self.appState = appState
         self.url = url
         self.controller = appState.pptxNavigationController
+        self.search = appState.contentSearch
     }
 
     var body: some View {
@@ -137,7 +139,9 @@ struct PPTXModeView: View {
             GeometryReader { proxy in
                 let size = Self.fittedSlideSize(in: proxy.size, slide: controller.slideSize)
                 Group {
-                    if let previewURL = controller.previewURL {
+                    if search.isPresented {
+                        SearchableQuickLookView(url: url, search: search)
+                    } else if let previewURL = controller.previewURL {
                         PPTXPreviewView(url: previewURL)
                     } else if controller.failed {
                         QuickLookModeView(url: url)
