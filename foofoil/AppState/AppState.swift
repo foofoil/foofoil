@@ -28,7 +28,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     let subtitles = VideoSubtitleController()
     let toast = FoilToastCenter()
     /// 无痕属性属于窗口，内容替换或重置时仍保留；不写入持久配置。
-    public let isIncognito: Bool
+    @Published public internal(set) var isIncognito: Bool
     public var id: UUID {
         didSet { if id != oldValue { toast.dismiss() } }
     }

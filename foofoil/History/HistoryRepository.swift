@@ -88,6 +88,14 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
         defer { mutationLock.unlock() }
         return deletedIDs.contains(id)
     }
+
+    /// 用户显式把同一无痕箔转回普通箔时，允许它重新建立历史。
+    func allowUpsertAfterDeletion(id: UUID) {
+        mutationLock.lock()
+        defer { mutationLock.unlock() }
+        deletedIDs.remove(id)
+    }
+
     public func rename(id: UUID, title: String) { try? database?.rename(id: id, title: title) }
     public var searchDatabaseSize: Int64 { database?.searchDatabaseSize() ?? 0 }
 

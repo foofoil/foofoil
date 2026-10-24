@@ -65,6 +65,102 @@
         }
       }
     },
+    "Toggle Incognito Mode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toggle Incognito Mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换无痕模式"
+          }
+        }
+      }
+    },
+    "Convert to Incognito Foil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Convert to Incognito Foil"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "转为无痕箔"
+          }
+        }
+      }
+    },
+    "Convert to Regular Foil": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Convert to Regular Foil"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "转为普通箔"
+          }
+        }
+      }
+    },
+    "Converted to Incognito Foil Toast": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Converted to an incognito foil; history deleted"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已转为无痕箔，历史记录已删除"
+          }
+        }
+      }
+    },
+    "Converted to Regular Foil Toast": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Converted to a regular foil"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已转为普通箔"
+          }
+        }
+      }
+    },
+    "Favorited Foil Cannot Become Incognito": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A favorited foil can’t become incognito. Remove it from favorites first."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已收藏的箔不能转为无痕箔，请先取消收藏。"
+          }
+        }
+      }
+    },
     "Image Copied Toast": {
       "localizations": {
         "en": {

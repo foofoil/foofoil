@@ -240,6 +240,11 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         if menuItem.action == #selector(toggleCurrentFoilFavoriteAction) {
             return updateCurrentFoilFavoriteMenuItem(menuItem)
         }
+        if menuItem.action == #selector(toggleCurrentFoilIncognitoAction) {
+            guard let state = activeAppState else { return false }
+            menuItem.title = NSLocalizedString(state.isIncognito ? "Convert to Regular Foil" : "Convert to Incognito Foil", comment: "")
+            return true
+        }
         if menuItem.action == #selector(showFoilInformationAction) {
             return activeWindowController?.window?.isVisible == true
                 && activeWindowController?.window?.attachedSheet == nil

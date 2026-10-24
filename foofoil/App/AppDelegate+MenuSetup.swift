@@ -104,6 +104,13 @@ extension AppDelegate {
         privateItem.target = self
         fileMenu.addItem(privateItem)
 
+        let toggleIncognitoItem = NSMenuItem(title: NSLocalizedString("Convert to Incognito Foil", comment: ""), action: #selector(toggleCurrentFoilIncognitoAction), keyEquivalent: "\u{1B}")
+        toggleIncognitoItem.keyEquivalentModifierMask = [.option, .shift]
+        toggleIncognitoItem.representedObject = "file.toggleIncognito"
+        toggleIncognitoItem.withSymbol("arrow.left.arrow.right")
+        toggleIncognitoItem.target = self
+        fileMenu.addItem(toggleIncognitoItem)
+
         fileMenu.addItem(NSMenuItem.separator())
 
         let quickOpenItem = NSMenuItem(title: NSLocalizedString("Search History Menu Item", comment: ""), action: #selector(showHistorySearchAction), keyEquivalent: "p")

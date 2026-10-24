@@ -203,11 +203,65 @@ struct IncognitoFoilTests {
         #expect(HistoryRepository.shared.config(id: normal.appState.id) != nil)
     }
 
+    @Test func conversionDeletesHistoryAndCanRoundTrip() {
+        let state = AppState()
+        state.openText("Convert me to incognito", isMarkdown: false)
+        let id = state.id
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        #expect(HistoryRepository.shared.config(id: id) != nil)
+
+        #expect(state.toggleIncognitoMode())
+        #expect(state.isIncognito)
+        #expect(HistoryRepository.shared.config(id: id) == nil)
+        #expect(state.toast.message?.text == NSLocalizedString("Converted to Incognito Foil Toast", comment: ""))
+        state.saveState()
+        #expect(HistoryRepository.shared.config(id: id) == nil)
+
+        #expect(state.toggleIncognitoMode())
+        #expect(!state.isIncognito)
+        #expect(HistoryRepository.shared.config(id: id)?.text == "Convert me to incognito")
+        #expect(state.toast.message?.text == NSLocalizedString("Converted to Regular Foil Toast", comment: ""))
+    }
+
+    @Test func incognitoConversionStartsHistoryForExistingContent() {
+        let state = AppState(isIncognito: true)
+        state.openText("Make me ordinary", isMarkdown: false)
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        #expect(HistoryRepository.shared.config(id: state.id) == nil)
+
+        #expect(state.toggleIncognitoMode())
+        #expect(!state.isIncognito)
+        #expect(HistoryRepository.shared.config(id: state.id)?.text == "Make me ordinary")
+    }
+
+    @Test func favoritedFoilCannotConvertToIncognito() {
+        let state = AppState()
+        state.openText("Keep this favorite", isMarkdown: false)
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        #expect(HistoryManager.shared.setPinned(id: state.id, pinned: true))
+
+        #expect(!state.toggleIncognitoMode())
+        #expect(!state.isIncognito)
+        #expect(HistoryRepository.shared.config(id: state.id)?.historyIsPinned == true)
+        #expect(state.toast.message?.text == NSLocalizedString("Favorited Foil Cannot Become Incognito", comment: ""))
+    }
+
+    @Test func blankFoilCanConvertInEitherDirection() {
+        let state = AppState()
+        #expect(state.toggleIncognitoMode())
+        #expect(state.isIncognito && state.isBlank)
+        #expect(state.toggleIncognitoMode())
+        #expect(!state.isIncognito && state.isBlank)
+    }
+
     @Test func incognitoShortcutDefaults() throws {
         let newFoil = try #require(KeyboardShortcutCatalog.definition(withID: "file.newIncognito")?.defaultShortcut)
+        let toggle = try #require(KeyboardShortcutCatalog.definition(withID: "file.toggleIncognito")?.defaultShortcut)
         let clipboard = try #require(KeyboardShortcutCatalog.definition(withID: "file.openClipboardIncognito")?.defaultShortcut)
         #expect(newFoil.keyEquivalent == "n")
         #expect(newFoil.modifiers == [.command, .shift])
+        #expect(toggle.keyEquivalent == "\u{1B}")
+        #expect(toggle.modifiers == [.option, .shift])
         #expect(clipboard.keyEquivalent == "v")
         #expect(clipboard.modifiers == [.command, .option])
     }

@@ -150,6 +150,11 @@ extension AppDelegate {
         updateHistoryMenu()
     }
 
+    @objc func toggleCurrentFoilIncognitoAction() {
+        guard let state = activeAppState else { return }
+        if state.toggleIncognitoMode() { updateHistoryMenu() }
+    }
+
     @objc func showHistorySearchAction() {
         NSApp.activate(ignoringOtherApps: true)
         HistorySearchWindowController.shared.show()
