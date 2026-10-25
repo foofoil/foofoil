@@ -79,7 +79,7 @@ nonisolated enum DirectFilePathResolver {
                 result.append(character)
                 continue
             }
-            if next.isWhitespace || next == "\\" || next == "\"" || next == "'" {
+            if next.isWhitespace || "\\\"'~()[]{}<>|&;*$`!? #".contains(next) {
                 result.append(next)
             } else {
                 result.append(character)

@@ -19,6 +19,19 @@ struct DirectFilePathTests {
         #expect(condition(), "Search did not reach expected state")
     }
 
+    @Test func shellEscapedICloudPath() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let folder = root.appendingPathComponent("Mobile Documents/com~apple~CloudDocs/book/rust")
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = folder.appendingPathComponent("Rust_编程语言（第3版）.epub")
+        try Data().write(to: file)
+        let escaped = file.path.replacingOccurrences(of: " ", with: "\\ ")
+            .replacingOccurrences(of: "~", with: "\\~")
+        #expect(DirectFilePathResolver.resolve(escaped)?.url == file)
+        #expect(DirectFilePathResolver.pathString(from: "'/tmp/literal\\~.txt'") == "/tmp/literal\\~.txt")
+    }
+
     @Test func resolvesQuotedAndEscapedExistingPaths() throws {
         let directory = try temporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
