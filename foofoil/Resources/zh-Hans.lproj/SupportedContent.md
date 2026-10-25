@@ -117,6 +117,8 @@ Apple Music 资料库默认关闭。在「设置 → 类型 → 音频与视频�
 
 ⇧⌘S 另存源文件，或包含编辑结果的完整当前文本／Markdown 源码。EPUB 保存原 EPUB 文件；网页保存为 `.webarchive` 网页归档。摄像头、CUE 曲目、SACD ISO 和 Apple Music 不提供另存为。空箔禁用两项命令。
 
+Markdown 的“另存为…”可选择 Markdown 或 HTML 格式。HTML 导出带基本样式的 UTF-8 文档，不内嵌关联资源。
+
 ## 压缩包
 
 APK、JAR/WAR/EAR、CBZ/CBR/CB7/CBT 漫画包和 KRA 工程默认以包的形式打开，沿用同一棵目录树和文件预览。Android 二进制 XML、DEX 等编译资源不提供反编译；漫画包显示内部文件，不另设漫画阅读器。

@@ -9,6 +9,26 @@ import ImageIO
 
 @Suite(.sharedApplicationState, .serialized) @MainActor
 struct ContentSavingTests {
+    @Test func markdownSaveFormatAndHTMLDocument() {
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = "Chapter.md"
+        let options = ContentMarkdownSaveOptions(panel: panel)
+        #expect(!options.savesHTML)
+        options.selector.selectItem(at: 1)
+        options.formatChanged()
+        #expect(panel.nameFieldStringValue == "Chapter.html")
+        #expect(panel.allowedContentTypes == [.html])
+        let html = ContentMarkdownSaveOptions.html("# 标题\n\n**Bold**\n\n- [x] Done\n\n<script>alert(1)</script>")
+        #expect(html.contains("<meta charset=\"utf-8\">"))
+        #expect(html.contains("<h1>标题</h1>"))
+        #expect(html.contains("<strong>Bold</strong>"))
+        #expect(html.contains("checkbox"))
+        #expect(!html.contains("<script>"))
+        options.selector.selectItem(at: 0)
+        options.formatChanged()
+        #expect(panel.nameFieldStringValue == "Chapter.md")
+    }
+
     @Test func clipboardSaveAsUsesImageExportWithoutSourceFile() throws {
         let state = AppState()
         state.imageURL = URL(fileURLWithPath: "/missing/clipboard-image.png")

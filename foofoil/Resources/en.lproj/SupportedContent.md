@@ -115,6 +115,8 @@ Video history thumbnails use the midpoint of the video to avoid opening black or
 
 ⇧⌘S saves the source file, or the complete current text/Markdown source including edits. EPUB saves the original EPUB file; websites save a `.webarchive`. Camera, CUE tracks, SACD ISO, and Apple Music do not provide Save As. Both commands are disabled for blank foils.
 
+Markdown “Save As…” offers Markdown and HTML formats. HTML exports a UTF-8 document with basic styling; linked resources are not embedded.
+
 ## Archives
 
 APK, JAR/WAR/EAR, CBZ/CBR/CB7/CBT comic archives, and KRA projects open as packages using the same archive tree and previews. Compiled resources (such as Android binary XML and DEX) are not decompiled. Comic archives show their files rather than a dedicated comic reader.

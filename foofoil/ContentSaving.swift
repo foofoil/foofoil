@@ -101,6 +101,46 @@ nonisolated enum ContentImageFormat: String, CaseIterable, Sendable {
     }
 }
 
+/// Markdown 保存仍默认源格式；选择 HTML 时生成独立的 UTF-8 文档。
+@MainActor final class ContentMarkdownSaveOptions: NSObject {
+    private weak var panel: NSSavePanel?
+    let selector = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 230, height: 30), pullsDown: false)
+    var savesHTML: Bool { selector.indexOfSelectedItem == 1 }
+
+    init(panel: NSSavePanel) {
+        self.panel = panel
+        super.init()
+        selector.addItems(withTitles: ["Markdown (.md)", "HTML (.html)"])
+        selector.setAccessibilityLabel(NSLocalizedString("Document Format", comment: ""))
+        selector.target = self
+        selector.action = #selector(formatChanged)
+        let row = NSStackView(views: [NSTextField(labelWithString: NSLocalizedString("Document Format", comment: "")), selector])
+        row.spacing = 8
+        row.edgeInsets = NSEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
+        row.frame = NSRect(x: 0, y: 0, width: 380, height: 64)
+        panel.accessoryView = row
+        panel.allowsOtherFileTypes = false
+    }
+
+    @objc func formatChanged() {
+        guard let panel else { return }
+        let stem = (panel.nameFieldStringValue as NSString).deletingPathExtension
+        panel.allowedContentTypes = [savesHTML ? .html : UTType(filenameExtension: "md") ?? .plainText]
+        panel.nameFieldStringValue = stem + (savesHTML ? ".html" : ".md")
+    }
+
+    nonisolated static func html(_ markdown: String) -> String {
+        """
+        <!doctype html>
+        <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>:root{color-scheme:light dark}body{font:16px -apple-system,BlinkMacSystemFont,sans-serif;line-height:1.6;max-width:900px;margin:auto;padding:32px;overflow-wrap:anywhere}pre{padding:16px;overflow:auto;border:1px solid GrayText;border-radius:8px}code{font-family:ui-monospace,monospace}table{border-collapse:collapse}th,td{border:1px solid GrayText;padding:6px 12px}img{max-width:100%}blockquote{border-left:3px solid GrayText;margin-left:0;padding-left:16px}</style>
+        </head><body>
+        \(AppState.cmarkToHTML(markdown))
+        </body></html>
+        """
+    }
+}
+
 /// 冻结源文件或正文，面板打开后切换内容不影响保存对象。
 nonisolated enum ContentSavePayload: Sendable {
     case file(URL)
@@ -251,13 +291,22 @@ extension AppDelegate {
         case .archive, .webArchive:
             panel.nameFieldStringValue = ((name ?? "Untitled") as NSString).deletingPathExtension + ".webarchive"
         }
+        let markdownOptions: ContentMarkdownSaveOptions?
+        if case .text(_, markdown: true) = content {
+            markdownOptions = ContentMarkdownSaveOptions(panel: panel)
+        } else { markdownOptions = nil }
         panel.begin { [weak self] response in
             guard response == .OK, let destination = panel.url else { return }
+            let savesHTML = markdownOptions?.savesHTML == true
             let accessed = destination.startAccessingSecurityScopedResource()
             Task { @MainActor in
                 defer { if accessed { destination.stopAccessingSecurityScopedResource() } }
                 do {
-                    try await Task.detached(priority: .userInitiated) { try content.write(to: destination) }.value
+                    try await Task.detached(priority: .userInitiated) {
+                        if savesHTML, case .text(let markdown, _) = content {
+                            try ContentMarkdownSaveOptions.html(markdown).write(to: destination, atomically: true, encoding: .utf8)
+                        } else { try content.write(to: destination) }
+                    }.value
                 } catch { self?.showSaveErrorAlert(error) }
             }
         }

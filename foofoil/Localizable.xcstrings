@@ -13225,6 +13225,22 @@
           }
         }
       }
+    },
+    "Document Format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Format:"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "格式："
+          }
+        }
+      }
     }
   },
   "version": "1.0"
