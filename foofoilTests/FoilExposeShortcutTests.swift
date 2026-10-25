@@ -155,9 +155,11 @@ struct FoilExposeShortcutTests {
                                          characters: key, charactersIgnoringModifiers: key, isARepeat: repeating, keyCode: code))
         }
         for key in ["d", "e", "i"] { #expect(controller.handleKeyEvent(try event(key)) == nil) }
-        #expect(controller.handleKeyEvent(try event("\u{8}", modifiers: [], code: 51)) == nil)
+        #expect(controller.handleKeyEvent(try event("\u{8}", modifiers: [], code: 51)) != nil)
+        #expect(actions == ["favorite", "rename", "info"])
+        #expect(controller.handleKeyEvent(try event("\u{8}", code: 51)) == nil)
         #expect(actions == ["favorite", "rename", "info", "delete"])
-        _ = controller.handleKeyEvent(try event("\u{8}", modifiers: [], code: 51, repeating: true))
+        _ = controller.handleKeyEvent(try event("\u{8}", code: 51, repeating: true))
         #expect(actions.count == 4)
         model.searchText = "/"
         #expect(controller.handleKeyEvent(try event("e")) != nil)

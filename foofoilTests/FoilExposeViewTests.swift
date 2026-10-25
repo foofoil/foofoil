@@ -166,7 +166,7 @@ struct FoilExposeViewTests {
         #expect(info.keyEquivalent == "i")
         let delete = try #require(menu.items.first { $0.title == NSLocalizedString("Delete History Record", comment: "") })
         #expect(delete.keyEquivalent == "\u{8}")
-        #expect(delete.keyEquivalentModifierMask.isEmpty)
+        #expect(delete.keyEquivalentModifierMask == .command)
         #expect(delete.attributedTitle == nil)
         for item in [favorite, rename, info, delete] {
             #expect(item.image != nil)

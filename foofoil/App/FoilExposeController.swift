@@ -1317,7 +1317,7 @@ final class FoilExposeController {
                     if key == "e", item.canRenameTitle { model.onRenameItem(item); return nil }
                     if key == "i" { model.onShowInformation(item); return nil }
                 }
-                if event.keyCode == 51, modifiers.intersection([.command, .shift, .option, .control]).isEmpty {
+                if event.keyCode == 51, modifiers.intersection([.command, .shift, .option, .control]) == .command {
                     if !event.isARepeat { model.onClearHistoryItem(item) }
                     return nil
                 }
