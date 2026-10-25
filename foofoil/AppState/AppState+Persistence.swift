@@ -187,6 +187,10 @@ extension AppState {
             } else if config.sourceFingerprint == SupportedContentOverview.sourceFingerprint {
                 self.textURL = nil
                 self.text = SupportedContentOverview.markdown()
+            } else if config.sourceFingerprint == FoilCommandsOverview.sourceFingerprint {
+                self.textURL = nil
+                self.text = FoilCommandsOverview.markdown()
+                self.originalImageName = NSLocalizedString("Foil Commands Overview", comment: "") + ".md"
             } else if let path = config.textPath {
                 let url = URL(fileURLWithPath: path)
                 retainFileAccess(to: url)

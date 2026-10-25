@@ -701,6 +701,10 @@ extension AppDelegate {
         fileTypesOverviewItem.target = self
         fileTypesOverviewItem.withSymbol("doc.on.doc")
         helpMenu.addItem(fileTypesOverviewItem)
+        let commandsOverviewItem = NSMenuItem(title: NSLocalizedString("Foil Commands Overview", comment: ""), action: #selector(showFoilCommandsOverviewAction), keyEquivalent: "")
+        commandsOverviewItem.target = self
+        commandsOverviewItem.withSymbol("terminal")
+        helpMenu.addItem(commandsOverviewItem)
         helpMenu.addItem(.separator())
         helpMenu.addItem(withTitle: String(format: NSLocalizedString("About %@", comment: ""), appName), action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
             .withSymbol("info.circle")

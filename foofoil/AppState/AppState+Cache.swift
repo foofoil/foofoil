@@ -40,7 +40,8 @@ extension AppState {
             guard !agentReadOnly else { return }
             guard (!text.isEmpty || textURL != nil), imageURL == nil, webURL == nil, extensionSession == nil,
                   sourceFingerprint != KeyboardShortcutsOverview.sourceFingerprint,
-                  sourceFingerprint != SupportedContentOverview.sourceFingerprint else { return }
+                  sourceFingerprint != SupportedContentOverview.sourceFingerprint,
+                  sourceFingerprint != FoilCommandsOverview.sourceFingerprint else { return }
             if textURL == nil, createIfNeeded {
                 textURL = managedBodyURL(extension: isMarkdownPreview && isMarkdownDocument ? "md" : "txt")
             }

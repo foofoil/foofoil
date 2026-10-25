@@ -37,6 +37,15 @@ extension AppDelegate {
         presentClipboardTarget(target)
     }
 
+    @objc func showFoilCommandsOverviewAction() {
+        if activateOpenHelpDocument(sourceFingerprint: FoilCommandsOverview.sourceFingerprint,
+                                    titleKey: "Foil Commands Overview",
+                                    markdown: FoilCommandsOverview.markdown()) { return }
+        let target = clipboardContentTarget()
+        target.state.openFoilCommandsOverview()
+        presentClipboardTarget(target)
+    }
+
     @objc func showSupportedContentOverviewAction() {
         if activateOpenHelpDocument(sourceFingerprint: SupportedContentOverview.sourceFingerprint,
                                     titleKey: "Supported Content Overview",

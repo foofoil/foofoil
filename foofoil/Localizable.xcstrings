@@ -12507,6 +12507,22 @@
         }
       }
     },
+    "Foil Commands Overview": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foil Command Reference"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foil 终端命令一览"
+          }
+        }
+      }
+    },
     "Agent CLI Help": {
       "localizations": {
         "en": {
