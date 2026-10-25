@@ -1,6 +1,21 @@
 import SwiftUI
 import QuickLookUI
 
+/// Icon Composer 的远程预览会吞掉鼠标事件；静态图标由宿主直接承接拖窗。
+final class FoilQuickLookPreviewView: QLPreviewView {
+    var dragsWindow = false
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard let hit = super.hitTest(point) else { return nil }
+        return dragsWindow ? self : hit
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if dragsWindow { window?.performDrag(with: event) }
+        else { super.mouseDown(with: event) }
+    }
+}
+
 /// 每个浮箔独立持有预览视图，不使用全局 Quick Look 面板。
 struct QuickLookModeView: NSViewRepresentable {
     let url: URL
@@ -8,7 +23,8 @@ struct QuickLookModeView: NSViewRepresentable {
     var shouldHideBorder: Bool = true
 
     func makeNSView(context: Context) -> QLPreviewView {
-        let view = QLPreviewView(frame: .zero, style: .normal)!
+        let view = FoilQuickLookPreviewView(frame: .zero, style: .normal)!
+        view.dragsWindow = url.pathExtension.lowercased() == "icon"
         view.shouldCloseWithWindow = false
         view.autostarts = false
         view.previewItem = url as NSURL
@@ -17,6 +33,7 @@ struct QuickLookModeView: NSViewRepresentable {
     }
 
     func updateNSView(_ view: QLPreviewView, context: Context) {
+        (view as? FoilQuickLookPreviewView)?.dragsWindow = url.pathExtension.lowercased() == "icon"
         if view.previewItem?.previewItemURL != url {
             view.previewItem = url as NSURL
         }

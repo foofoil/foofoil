@@ -1,10 +1,22 @@
 import AppKit
+import QuickLookUI
 import Testing
 @testable import foofoil
 
 @MainActor
 @Suite(.sharedApplicationState)
 struct QuickLookTests {
+    @Test func iconPreviewOwnsMouseHitForWindowDragging() throws {
+        let view = try #require(FoilQuickLookPreviewView(frame: NSRect(x: 0, y: 0, width: 300, height: 200), style: .normal))
+        let content = NSView(frame: view.bounds)
+        view.addSubview(content)
+        view.dragsWindow = true
+        #expect(view.hitTest(NSPoint(x: 100, y: 100)) === view)
+        view.dragsWindow = false
+        #expect(view.hitTest(NSPoint(x: 100, y: 100)) === content)
+        #expect(view.hitTest(NSPoint(x: -1, y: -1)) == nil)
+    }
+
     @Test(arguments: ["docx", "xlsx", "pptx", "rtf"])
     func opensAndRestoresFallbackDocument(_ ext: String) throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
