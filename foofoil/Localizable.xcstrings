@@ -1,6 +1,38 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Show Terminal History": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show Terminal History"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示终端历史记录"
+          }
+        }
+      }
+    },
+    "Hide Terminal History": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide Terminal History"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏终端历史记录"
+          }
+        }
+      }
+    },
     "Clipboard Quoted Filename Format": {
       "localizations": {
         "en": {

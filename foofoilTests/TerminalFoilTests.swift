@@ -12,6 +12,23 @@ struct TerminalFoilTests {
         @objc func move(_ sender: Any?) { invoked = true }
     }
 
+    @Test func historyMenuCanRestoreHiddenOutput() {
+        let state = AppState(isIncognito: true)
+        state.terminalSession = TerminalSession(configuration: .init(), previousOutput: "retained output")
+        let controller = FloatingWindowController(appState: state)
+        let delegate = AppDelegate()
+        delegate.windowControllers = [controller]
+        delegate.activeWindowProvider = { controller.window }
+        let item = NSMenuItem(title: "", action: #selector(AppDelegate.toggleTerminalHistoryAction), keyEquivalent: "")
+        #expect(delegate.validateMenuItem(item))
+        delegate.toggleTerminalHistoryAction()
+        #expect(state.terminalSession?.isPreviousOutputHidden == true)
+        delegate.toggleTerminalHistoryAction()
+        #expect(state.terminalSession?.isPreviousOutputHidden == false)
+        state.terminalSession?.clearPreviousOutput()
+        #expect(!delegate.validateMenuItem(item))
+    }
+
     @Test func menuShortcutsReachMenuWithTerminalFocus() throws {
         _ = NSApplication.shared
         let previousMenu = NSApp.mainMenu

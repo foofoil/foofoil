@@ -311,6 +311,13 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             return activeReadingState?.isVideoDocument == true
         }
 
+        if menuItem.action == #selector(toggleTerminalHistoryAction) {
+            let session = activeReadingState?.terminalSession
+            menuItem.title = NSLocalizedString(session?.isPreviousOutputHidden == true
+                ? "Show Terminal History" : "Hide Terminal History", comment: "")
+            return session?.previousOutput != nil
+        }
+
         if menuItem.action == #selector(clearTerminalContentAction) {
             return activeReadingState?.terminalSession != nil
         }

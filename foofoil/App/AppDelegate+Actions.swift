@@ -731,6 +731,13 @@ extension AppDelegate {
         SettingsStore.shared.navigatorPanelSide = next
     }
 
+    @objc func toggleTerminalHistoryAction() {
+        guard let state = activeReadingState, let session = state.terminalSession,
+              session.previousOutput != nil else { return }
+        session.isPreviousOutputHidden.toggle()
+        state.contentSearch.refreshSurface()
+    }
+
     @objc func clearTerminalContentAction() {
         guard let state = activeReadingState, let session = state.terminalSession else { return }
         session.clearContent()

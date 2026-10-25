@@ -458,6 +458,11 @@ extension AppDelegate {
         reloadPageItem.target = self
         viewMenu.addItem(reloadPageItem)
 
+        let terminalHistoryItem = NSMenuItem(title: NSLocalizedString("Hide Terminal History", comment: ""), action: #selector(toggleTerminalHistoryAction), keyEquivalent: "")
+        terminalHistoryItem.withSymbol("clock.arrow.circlepath")
+        terminalHistoryItem.target = self
+        viewMenu.addItem(terminalHistoryItem)
+
         let clearTerminalItem = NSMenuItem(title: NSLocalizedString("Clear Terminal Content", comment: ""), action: #selector(clearTerminalContentAction), keyEquivalent: "")
         clearTerminalItem.withSymbol("clear")
         clearTerminalItem.representedObject = "terminal.clear"
