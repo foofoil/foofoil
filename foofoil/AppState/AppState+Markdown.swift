@@ -78,6 +78,7 @@ extension AppState {
                 clearMarkdownOutline()
             }
 
+            let linkBaseURL = textURL?.deletingLastPathComponent() ?? URL(string: "foofoil-markdown:///")!
             let textToRender = self.text
             let fontSize = self.textFontSize
             // 在主线程捕获当前外观，避免后台任务无法正确获取有效外观
@@ -302,7 +303,7 @@ extension AppState {
                     if let data = htmlContent.data(using: .utf8),
                        let attr = try? NSAttributedString(
                            data: data,
-                           options: [.documentType: NSAttributedString.DocumentType.html, .characterEncoding: String.Encoding.utf8.rawValue],
+                           options: [.documentType: NSAttributedString.DocumentType.html, .characterEncoding: String.Encoding.utf8.rawValue, .baseURL: linkBaseURL],
                            documentAttributes: nil
                        ) {
                         // 已取消则跳过后续昂贵的样式应用，避免过期结果占用主线程。
@@ -1392,5 +1393,28 @@ extension AppState {
                 attributed.deleteCharacters(in: NSRange(location: paragraph.location, length: range.location - paragraph.location))
             }
         }
+    }
+}
+
+// Markdown 链接只在新的无痕箔中打开，不改变原文档或写入普通历史。
+extension AppState {
+    nonisolated static func markdownLinkTarget(_ url: URL) -> URL? {
+        if url.isFileURL {
+            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .isPackageKey]),
+                  values.isRegularFile == true || values.isPackage == true else { return nil }
+            return url.standardizedFileURL
+        }
+        guard ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+              let host = url.host, !host.isEmpty else { return nil }
+        return url
+    }
+
+    func openMarkdownLink(_ url: URL) {
+        guard let target = Self.markdownLinkTarget(url),
+              let delegate = NSApp.delegate as? AppDelegate else { return }
+        let state = AppState(isIncognito: true)
+        if target.isFileURL { state.openFile(url: target) }
+        else { state.openWeb(url: target) }
+        delegate.showNewWindow(with: state)
     }
 }

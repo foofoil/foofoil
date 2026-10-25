@@ -71,6 +71,7 @@ struct TextEditorModeView: View {
                                 attributedText: appState.renderedMarkdown,
                                 calculatedHeight: $textHeight,
                                 taskSource: appState.renderedMarkdownSource,
+                                onOpenLink: { appState.openMarkdownLink($0) },
                                 scrollRequest: appState.markdownScrollRequest,
                                 onVisibleLocationChange: { appState.markdownVisibleLocationDidChange($0, settledLocation: $1) }
                             )

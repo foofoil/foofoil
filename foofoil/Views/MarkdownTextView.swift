@@ -371,6 +371,7 @@ struct MarkdownTextView: NSViewRepresentable {
     let attributedText: NSAttributedString
     @Binding var calculatedHeight: CGFloat
     var taskSource: String = ""
+    var onOpenLink: (URL) -> Void = { _ in }
     var scrollRequest: MarkdownScrollRequest?
     /// 滚动时回传两个字符位置：可视区顶部，以及再往上 `headingSettleDistance` 处的位置。
     /// 目录向下切换需要后者也越过标题，避免标题刚滚过顶部就频繁切换。
@@ -396,6 +397,7 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.autoresizingMask = .width
         textView.drawsBackground = false
         textView.backgroundColor = .clear
+        textView.delegate = context.coordinator
         textView.isEditable = false
         textView.isSelectable = true
         // 文档留白随内容滚动；窗口缩放热区由外层布局单独预留。
@@ -464,7 +466,7 @@ struct MarkdownTextView: NSViewRepresentable {
         Coordinator(self)
     }
 
-    class Coordinator: NSObject {
+    class Coordinator: NSObject, NSTextViewDelegate {
         var parent: MarkdownTextView
         /// 已执行过的目录滚动请求；updateNSView 每次刷新都会调用，避免重复滚动。
         var handledScrollRequestID: UInt64 = 0
@@ -478,6 +480,14 @@ struct MarkdownTextView: NSViewRepresentable {
 
         deinit {
             if let scrollObserver { NotificationCenter.default.removeObserver(scrollObserver) }
+        }
+
+        func textView(_ textView: NSTextView, clickedOnLink link: Any, at charIndex: Int) -> Bool {
+            if let url = link as? URL ?? (link as? String).flatMap(URL.init(string:)) {
+                parent.onOpenLink(url)
+            }
+            // 所有链接由宿主处理，避免 NSTextView 默认交给外部应用。
+            return true
         }
 
         func observeScroll(of scrollView: NSScrollView) {
