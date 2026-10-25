@@ -459,6 +459,7 @@ extension AppDelegate {
         viewMenu.addItem(reloadPageItem)
 
         let clearTerminalItem = NSMenuItem(title: NSLocalizedString("Clear Terminal Content", comment: ""), action: #selector(clearTerminalContentAction), keyEquivalent: "")
+        clearTerminalItem.withSymbol("clear")
         clearTerminalItem.representedObject = "terminal.clear"
         clearTerminalItem.target = self
         viewMenu.addItem(clearTerminalItem)
