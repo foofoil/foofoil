@@ -64,6 +64,7 @@ extension AppState {
             self.searchHighlightHex = nil
             self.contentSearch.reset()
             self.documentThemeId = nil
+            self.documentAppearance = .system
             self.documentFontName = nil
             self.documentLineSpacing = nil
             self.documentParagraphSpacing = nil

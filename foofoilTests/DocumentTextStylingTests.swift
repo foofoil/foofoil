@@ -56,6 +56,22 @@ struct DocumentTextStylingTests {
         #expect(!body.font.isFixedPitch, "未自选字体却用了等宽字体：\(body.font.fontName)")
     }
 
+    /// “无”主题的系统文字颜色也按文档固定外观渲染，而不是继续读取系统外观。
+    @Test func markdownPreviewUsesFixedDocumentAppearanceForSystemText() async throws {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.originalImageName = "notes.md"
+        state.text = "正文段落"
+        let none = try #require(DocumentThemeCatalog.shared.theme(for: "none"))
+        state.applyDocumentTheme(none, isDark: false)
+        state.selectDocumentAppearance(.dark, systemIsDark: false)
+        state.isMarkdownPreview = true
+
+        #expect(await waitForRenderedColor(state, "#F0F3F6"), "固定暗色未使用暗色系统文字配色")
+        state.selectDocumentAppearance(.light, systemIsDark: false)
+        #expect(await waitForRenderedColor(state, "#24292F"), "固定亮色未使用亮色系统文字配色")
+    }
+
     /// 面板选中的字体名要真的落到渲染与注入上。
     @Test func catalogResolvesChosenFont() throws {
         let size: CGFloat = 16

@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 nonisolated final class HistoryDatabase {
-    static let schemaVersion = 27
+    static let schemaVersion = 28
 
     private let queue = DispatchQueue(label: "com.foofoil.history.database", qos: .utility)
     private var connection: OpaquePointer?
@@ -111,8 +111,9 @@ nonisolated final class HistoryDatabase {
                         navigator_panel_visibility, navigator_panel_width, file_list,
                         document_zoom, document_scroll_file, document_scroll_fraction, text_fingerprint,
                         image_ocr_text, image_has_subject, image_subject_path, apple_music_reference, subtitle_associations, custom_title, archive_source,
-                        show_code_line_numbers, read_only_presentation, history_is_pinned, terminal_configuration, terminal_scrollback
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        show_code_line_numbers, read_only_presentation, history_is_pinned, terminal_configuration, terminal_scrollback,
+                        document_appearance
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -153,7 +154,8 @@ nonisolated final class HistoryDatabase {
                         show_code_line_numbers=excluded.show_code_line_numbers,
                         read_only_presentation=excluded.read_only_presentation,
                         terminal_configuration=excluded.terminal_configuration,
-                        terminal_scrollback=excluded.terminal_scrollback
+                        terminal_scrollback=excluded.terminal_scrollback,
+                        document_appearance=excluded.document_appearance
                     """, bindings: [
                         config.id.uuidString, kind.rawValue, title, config.originalImageName,
                         config.imagePath, config.textPath, config.webURLString, config.actualWebURLString,
@@ -183,7 +185,8 @@ nonisolated final class HistoryDatabase {
                         try config.archiveSource.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
                         config.showCodeLineNumbers, config.readOnlyPresentation, config.historyIsPinned,
                         try config.terminalConfiguration.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
-                        config.terminalScrollback
+                        config.terminalScrollback,
+                        config.documentAppearance.rawValue
                     ])
 
                 let metadata = (
@@ -498,6 +501,8 @@ nonisolated final class HistoryDatabase {
         try addColumnIfMissing("text_fingerprint", definition: "text_fingerprint TEXT")
         // v16 文档样式面板：选中的主题 ID；为空表示自定义或未选中主题。
         try addColumnIfMissing("document_theme_id", definition: "document_theme_id TEXT")
+        // v28 每个箔可固定文档亮暗外观；旧记录与新建箔默认跟随系统。
+        try addColumnIfMissing("document_appearance", definition: "document_appearance TEXT NOT NULL DEFAULT 'system'")
         // v17 图片派生内容缓存：OCR 文字与主体抠图结果随历史持久化，重开历史时无需重跑 Vision。
         try addColumnIfMissing("image_ocr_text", definition: "image_ocr_text TEXT")
         try addColumnIfMissing("image_has_subject", definition: "image_has_subject INTEGER")
@@ -744,6 +749,8 @@ nonisolated final class HistoryDatabase {
                     documentLineSpacing: columns["document_line_spacing"].flatMap { optionalReal(statement, $0) },
                     documentParagraphSpacing: columns["document_paragraph_spacing"].flatMap { optionalReal(statement, $0) },
                     documentThemeId: columns["document_theme_id"].flatMap { optionalText(statement, $0) },
+                    documentAppearance: columns["document_appearance"].flatMap { optionalText(statement, $0) }
+                        .flatMap(DocumentAppearanceMode.init(rawValue:)) ?? .system,
                     textPath: optionalText(statement, columns["text_path"]!),
                     contentKind: kind,
                     sourceFingerprint: optionalText(statement, columns["source_fingerprint"]!),

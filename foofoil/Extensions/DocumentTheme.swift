@@ -9,6 +9,45 @@ import AppKit
 import Combine
 import SwiftUI
 
+/// 单个文档箔的外观偏好；默认跟随系统，固定亮暗仅覆盖当前箔而不改变应用设置。
+public enum DocumentAppearanceMode: String, Codable, CaseIterable {
+    case system
+    case light
+    case dark
+
+    public var colorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
+        }
+    }
+
+    var nsAppearance: NSAppearance? {
+        switch self {
+        case .system: nil
+        case .light: NSAppearance(named: .aqua)
+        case .dark: NSAppearance(named: .darkAqua)
+        }
+    }
+
+    public func isDark(systemIsDark: Bool) -> Bool {
+        switch self {
+        case .system: systemIsDark
+        case .light: false
+        case .dark: true
+        }
+    }
+
+    var localizationKey: String {
+        switch self {
+        case .system: "Document Appearance Follow System"
+        case .light: "Document Appearance Light"
+        case .dark: "Document Appearance Dark"
+        }
+    }
+}
+
 /// 自建主题保存排版参数，包括仍沿用默认值的字体和间距。
 public struct DocumentThemeTypography: Codable, Equatable {
     public var fontName: String?

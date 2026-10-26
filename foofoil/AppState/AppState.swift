@@ -331,6 +331,13 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         }
     }
 
+    /// 当前箔的文档外观；默认跟随系统，固定亮暗随历史恢复。
+    @Published public var documentAppearance: DocumentAppearanceMode {
+        didSet {
+            saveState()
+        }
+    }
+
     /// 无排版文档内容的字体（PostScript 名）；为空时沿用各通道自己的默认字体。
     @Published public var documentFontName: String? {
         didSet {
@@ -460,7 +467,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
             // 空白箔在用户首次输入内容时成为文档类型，此时自动应用默认文档样式（素笺）。
             if oldValue.isEmpty && !text.isEmpty && !isBatchUpdating {
                 if documentThemeId == nil && backgroundColorHex == nil && textColorHex == nil {
-                    applyDocumentTheme(DocumentThemeCatalog.defaultTheme, isDark: Self.isDarkMode())
+                    applyDocumentTheme(DocumentThemeCatalog.defaultTheme, isDark: documentUsesDarkAppearance)
                 }
             } else if text.isEmpty && textURL == nil && imageURL == nil && webURL == nil && extensionSession == nil {
                 if documentThemeId == DocumentThemeCatalog.defaultThemeId {
@@ -731,6 +738,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.backgroundColorHex = nil
         self.textColorHex = nil
         self.documentThemeId = nil
+        self.documentAppearance = .system
         self.documentFontName = nil
         self.documentLineSpacing = nil
         self.documentParagraphSpacing = nil

@@ -289,6 +289,8 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         super.init(window: window)
 
         window.delegate = self
+        // 固定文档外观同时覆盖窗口的 NSAppearance，保证系统文字、滚动条等与正文一致。
+        window.appearance = appState.readingState.documentAppearance.nsAppearance
 
         // 尝试恢复上次保存的窗口位置与大小
         if let savedFrame = appState.windowFrame {
@@ -408,6 +410,15 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
     private func setupBindings() {
         guard let window = window else { return }
+
+        // 跟随系统时恢复继承应用外观；固定亮暗只覆盖当前箔及其目录伴随窗口。
+        contentPublisher(\.$documentAppearance)
+            .removeDuplicates()
+            .sink { [weak self, weak window] mode in
+                window?.appearance = mode.nsAppearance
+                if let window { self?.navigatorPanelController.synchronizeAppearance(with: window) }
+            }
+            .store(in: &cancellables)
 
         // 空箔与内容箔切换时同步最小尺寸；延后读取，避开 @Published 写入前的通知时机。
         appState.objectWillChange

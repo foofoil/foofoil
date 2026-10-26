@@ -61,8 +61,21 @@ extension AppState {
         return !isBlank
     }
 
+    /// 文档实际使用的暗色状态；固定外观优先，跟随系统时才读取应用当前外观。
+    var documentUsesDarkAppearance: Bool {
+        documentAppearance.isDark(systemIsDark: Self.isDarkMode())
+    }
+
     var resolvedSearchHighlightHex: String {
-        searchHighlightHex ?? DocumentThemeCatalog.defaultTheme.highlightHex(isDark: Self.isDarkMode())
+        searchHighlightHex ?? DocumentThemeCatalog.defaultTheme.highlightHex(isDark: documentUsesDarkAppearance)
+    }
+
+    /// 用户主动切换外观时立即解析主题和自定义颜色；窗口系统外观由窗口控制器同步。
+    func selectDocumentAppearance(_ mode: DocumentAppearanceMode, systemIsDark: Bool) {
+        guard documentAppearance != mode else { return }
+        documentAppearance = mode
+        adaptDocumentColorsForAppearanceChange(toDarkAppearance: mode.isDark(systemIsDark: systemIsDark))
+        refreshMarkdownRendering()
     }
 
     /// 文档内容背景色（十六进制）；非文档箔为 nil，避免把整窗外观当成背景作用对象。
@@ -75,7 +88,7 @@ extension AppState {
         contentBackgroundHex.flatMap(NSColor.init(hex:))
     }
 
-    /// 无排版文档的文字颜色（十六进制）；未选择或不是文档内容时为 nil，文字跟随系统外观。
+    /// 无排版文档的文字颜色（十六进制）；未选择或不是文档内容时为 nil，文字跟随文档实际外观。
     var documentTextColorHex: String? {
         supportsDocumentTextStyling ? textColorHex : nil
     }
@@ -143,7 +156,7 @@ extension AppState {
     func applyDefaultDocumentThemeIfNeeded() {
         guard supportsContentBackgroundColor || supportsDocumentTextStyling || supportsContentSearch,
               documentThemeId == nil, backgroundColorHex == nil, textColorHex == nil else { return }
-        applyDocumentTheme(DocumentThemeCatalog.defaultTheme, isDark: Self.isDarkMode())
+        applyDocumentTheme(DocumentThemeCatalog.defaultTheme, isDark: documentUsesDarkAppearance)
     }
 
     /// 将背景色恢复为默认样式（素笺）；若此时文字颜色亦为默认值（或不支持文字样式），则同步恢复默认主题。
@@ -176,11 +189,15 @@ extension AppState {
         }
     }
 
-    /// 系统明暗切换后，若选中了主题则切为该主题对应明暗版本的预设色彩；
-    /// 否则把与目标主题明显不符的自选颜色换成同色相的深浅版本：
-    /// 背景色要配合当前主题（深色主题配深色背景），文字颜色相反（深色主题配浅色文字），
-    /// 让内容始终可读；中间色与已相符的颜色保持不变。
+    /// 系统明暗切换只影响“跟随系统”的箔；固定亮暗的文档保留当前主题版本与自定义颜色。
     func adaptDocumentColorsToAppearanceChange(toDarkAppearance isDark: Bool) {
+        guard documentAppearance == .system else { return }
+        adaptDocumentColorsForAppearanceChange(toDarkAppearance: isDark)
+    }
+
+    /// 若选中了主题则切为该主题对应明暗版本的预设色彩；否则适配明显不符目标外观的自选颜色。
+    /// 背景色配合目标外观，文字颜色取反向对比；中间色与已相符的颜色保持不变。
+    private func adaptDocumentColorsForAppearanceChange(toDarkAppearance isDark: Bool) {
         if let themeId = documentThemeId, let theme = DocumentThemeCatalog.shared.theme(for: themeId) {
             applyDocumentTheme(theme, isDark: isDark, applyTypography: false)
             return

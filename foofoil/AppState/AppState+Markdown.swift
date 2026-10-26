@@ -81,8 +81,8 @@ extension AppState {
             let linkBaseURL = textURL?.deletingLastPathComponent() ?? URL(string: "foofoil-markdown:///")!
             let textToRender = self.text
             let fontSize = self.textFontSize
-            // 在主线程捕获当前外观，避免后台任务无法正确获取有效外观
-            let isDark = Self.isDarkMode()
+            // 在主线程捕获文档实际外观，避免后台任务无法正确获取有效外观。
+            let isDark = documentUsesDarkAppearance
             // 自选文字颜色与字体同样在主线程捕获，供后台渲染生成 CSS
             let customTextColorHex = self.documentTextColorHex
             let customFontFamily = self.documentFontFamily

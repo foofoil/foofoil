@@ -107,6 +107,7 @@ extension AppState {
             self.textColorHex = config.textColorHex
             self.searchHighlightHex = config.searchHighlightHex
             self.documentThemeId = config.documentThemeId
+            self.documentAppearance = config.documentAppearance
             self.documentFontName = config.documentFontName
             self.documentLineSpacing = config.documentLineSpacing
             self.documentParagraphSpacing = config.documentParagraphSpacing
@@ -213,6 +214,10 @@ extension AppState {
             }
             self.appleMusicReference = config.appleMusicReference
             if let source = config.archiveSource, !source.volumes.isEmpty { restoreArchive(source) }
+            // 跟随系统的历史恢复时按当前系统重新解析颜色；固定外观则保留已保存的主题版本。
+            if documentAppearance == .system {
+                adaptDocumentColorsToAppearanceChange(toDarkAppearance: Self.isDarkMode())
+            }
             return true
         }
 
@@ -287,6 +292,7 @@ extension AppState {
                 documentLineSpacing: documentLineSpacing,
                 documentParagraphSpacing: documentParagraphSpacing,
                 documentThemeId: documentThemeId,
+                documentAppearance: documentAppearance,
                 textPath: textURL?.path,
                 contentKind: terminalConfiguration != nil ? .terminal : appleMusicReference != nil ? .audio : isVideoDocument ? .video : isQuickLookDocument ? .quickLook : HistoryContentKind.infer(from: WindowConfig(
                     id: id,

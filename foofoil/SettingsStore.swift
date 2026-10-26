@@ -155,6 +155,8 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     public var documentParagraphSpacing: Double?
     /// 文档样式选中的主题 ID；为空表示自定义或未选中主题。
     public var documentThemeId: String?
+    /// 当前箔的文档外观偏好；默认跟随系统。
+    public var documentAppearance: DocumentAppearanceMode
     public var textPath: String?
     /// SQLite 历史记录保存的真实内容类型；旧 DTO 解码时允许为空并按来源推断。
     public var contentKind: HistoryContentKind?
@@ -233,6 +235,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         documentLineSpacing: Double? = nil,
         documentParagraphSpacing: Double? = nil,
         documentThemeId: String? = nil,
+        documentAppearance: DocumentAppearanceMode = .system,
         textPath: String? = nil,
         contentKind: HistoryContentKind? = nil,
         sourceFingerprint: String? = nil,
@@ -289,6 +292,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.documentLineSpacing = documentLineSpacing
         self.documentParagraphSpacing = documentParagraphSpacing
         self.documentThemeId = documentThemeId
+        self.documentAppearance = documentAppearance
         self.textPath = textPath
         self.contentKind = contentKind
         self.sourceFingerprint = sourceFingerprint
@@ -323,7 +327,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case terminalConfiguration, terminalScrollback
-        case historyIsPinned, isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, searchHighlightHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource, showCodeLineNumbers, readOnlyPresentation
+        case historyIsPinned, isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, searchHighlightHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, documentAppearance, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource, showCodeLineNumbers, readOnlyPresentation
     }
 
     public init(from decoder: Decoder) throws {
@@ -354,6 +358,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         documentLineSpacing = try container.decodeIfPresent(Double.self, forKey: .documentLineSpacing)
         documentParagraphSpacing = try container.decodeIfPresent(Double.self, forKey: .documentParagraphSpacing)
         documentThemeId = try container.decodeIfPresent(String.self, forKey: .documentThemeId)
+        documentAppearance = try container.decodeIfPresent(DocumentAppearanceMode.self, forKey: .documentAppearance) ?? .system
         textPath = try container.decodeIfPresent(String.self, forKey: .textPath)
         contentKind = try container.decodeIfPresent(HistoryContentKind.self, forKey: .contentKind)
         sourceFingerprint = try container.decodeIfPresent(String.self, forKey: .sourceFingerprint)

@@ -259,7 +259,7 @@ struct FoilContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.18), value: pdfPageIndicator)
-        // 系统明暗切换后，把与目标主题明显不符的自定义背景色、文字颜色换成同色相的深浅版本。
+        // 系统明暗切换后，仅为跟随系统的文档切换主题版本或适配自定义颜色；固定亮暗保持不变。
         .onChange(of: colorScheme) { _, newScheme in
             appState.adaptDocumentColorsToAppearanceChange(toDarkAppearance: newScheme == .dark)
         }

@@ -78,8 +78,10 @@ final class DocumentStyleUITests: XCTestCase {
         // 菜单项标题带省略号，窗口标题同键；用前缀匹配避免受省略号影响。
         let panel = app.windows.matching(NSPredicate(format: "title BEGINSWITH %@", "Document Style")).element(boundBy: 0)
         XCTAssertTrue(panel.waitForExistence(timeout: 10), "文档样式面板未打开")
-        // 文本箔的背景、字体、行距、段距四段都渲染出来。
-        XCTAssertTrue(panel.staticTexts["Background Color"].waitForExistence(timeout: 5))
+        // 文本箔的外观、背景、字体、行距、段距都渲染出来。
+        XCTAssertTrue(panel.staticTexts["Appearance"].waitForExistence(timeout: 5))
+        XCTAssertTrue(panel.segmentedControls["documentAppearancePicker"].exists)
+        XCTAssertTrue(panel.staticTexts["Background Color"].exists)
         XCTAssertTrue(panel.staticTexts["Font"].exists)
         XCTAssertTrue(panel.staticTexts["Line Spacing"].exists)
         XCTAssertTrue(panel.staticTexts["Paragraph Spacing"].exists)

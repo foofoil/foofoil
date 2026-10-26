@@ -26,7 +26,8 @@ struct DocumentStylingPersistenceTests {
             searchHighlightHex: "#ABCDEF",
             documentFontName: "Menlo-Regular",
             documentLineSpacing: 1.6,
-            documentParagraphSpacing: 0.8
+            documentParagraphSpacing: 0.8,
+            documentAppearance: .dark
         )
 
         let database = try HistoryDatabase(databaseURL: databaseURL)
@@ -38,6 +39,7 @@ struct DocumentStylingPersistenceTests {
         #expect(loaded.documentFontName == "Menlo-Regular")
         #expect(loaded.documentLineSpacing == 1.6)
         #expect(loaded.documentParagraphSpacing == 0.8)
+        #expect(loaded.documentAppearance == .dark)
     }
 
     /// 载入历史时样式一起回到箔上。
@@ -53,7 +55,8 @@ struct DocumentStylingPersistenceTests {
             searchHighlightHex: "#ABCDEF",
             documentFontName: "Menlo-Regular",
             documentLineSpacing: 1.7,
-            documentParagraphSpacing: 0.5
+            documentParagraphSpacing: 0.5,
+            documentAppearance: .light
         )
         state.loadConfig(config)
 
@@ -63,9 +66,10 @@ struct DocumentStylingPersistenceTests {
         #expect(state.documentFontName == "Menlo-Regular")
         #expect(state.documentLineSpacing == 1.7)
         #expect(state.documentParagraphSpacing == 0.5)
+        #expect(state.documentAppearance == .light)
     }
 
-    /// 模拟旧库：去掉两个新列后重开，迁移应补回列并回到默认值，随后仍可正常写入。
+    /// 模拟旧库：去掉新增样式列后重开，迁移应补回列并回到默认值，随后仍可正常写入。
     @Test func legacyDatabaseGainsStylingColumns() throws {
         let directory = try makeTemporaryDirectory()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -76,7 +80,8 @@ struct DocumentStylingPersistenceTests {
             textColorHex: "#123456",
             searchHighlightHex: "#ABCDEF",
             documentFontName: "Songti SC",
-            documentLineSpacing: 2.0
+            documentLineSpacing: 2.0,
+            documentAppearance: .dark
         )
 
         let database = try HistoryDatabase(databaseURL: databaseURL)
@@ -84,18 +89,21 @@ struct DocumentStylingPersistenceTests {
         try dropColumn("text_color_hex", from: databaseURL)
         try dropColumn("document_font_name", from: databaseURL)
         try dropColumn("document_line_spacing", from: databaseURL)
+        try dropColumn("document_appearance", from: databaseURL)
 
         let migrated = try HistoryDatabase(databaseURL: databaseURL)
         let legacy = try #require(try migrated.config(id: config.id))
         #expect(legacy.textColorHex == nil, "补列后应回到默认值")
         #expect(legacy.documentFontName == nil)
         #expect(legacy.documentLineSpacing == nil)
+        #expect(legacy.documentAppearance == .system)
 
         try migrated.upsert(config)
         let rewritten = try #require(try migrated.config(id: config.id))
         #expect(rewritten.textColorHex == "#123456")
         #expect(rewritten.documentFontName == "Songti SC")
         #expect(rewritten.documentLineSpacing == 2.0)
+        #expect(rewritten.documentAppearance == .dark)
     }
 
     private func makeTemporaryDirectory() throws -> URL {

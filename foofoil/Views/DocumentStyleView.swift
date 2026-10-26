@@ -8,7 +8,7 @@
 import AppKit
 import SwiftUI
 
-/// 文档样式面板内容：背景颜色（所有文档箔）+ 文字颜色、字体、行间距、段落间距（无排版文档内容）。
+/// 文档样式面板内容：外观与主题、背景颜色（所有文档箔）+ 文字颜色、字体、行间距、段落间距（无排版文档内容）。
 /// 改动直接写进当前箔的 AppState，随历史一起保存；`nil` 表示沿用该通道自己的默认样式。
 struct DocumentStyleView: View {
     @ObservedObject var appState: AppState
@@ -29,10 +29,20 @@ struct DocumentStyleView: View {
     private let lineHeightRange: ClosedRange<Double> = 0.8...2.6
     private let paragraphSpacingRange: ClosedRange<Double> = 0...2.0
 
+    /// 样式面板自身跟随系统；主题预览、取色默认值与保存操作使用文档实际外观。
+    private var documentColorScheme: ColorScheme {
+        appState.documentAppearance.colorScheme ?? colorScheme
+    }
+
+    private var isDocumentDark: Bool {
+        appState.documentAppearance.isDark(systemIsDark: colorScheme == .dark)
+    }
+
     var body: some View {
         ScrollView(.vertical) {
             VStack(alignment: .leading, spacing: 16) {
                 if appState.supportsContentBackgroundColor || appState.supportsDocumentTextStyling || appState.supportsContentSearch {
+                    appearanceSection
                     themeSection
                 }
 
@@ -42,7 +52,7 @@ struct DocumentStyleView: View {
                             color: backgroundBinding,
                             statusText: backgroundStatusText,
                             isDefault: isBackgroundDefault,
-                            reset: { appState.resetBackgroundColorToDefault(isDark: colorScheme == .dark) }
+                            reset: { appState.resetBackgroundColorToDefault(isDark: isDocumentDark) }
                         )
                     }
                 }
@@ -53,8 +63,8 @@ struct DocumentStyleView: View {
                             color: Binding(get: { Color(nsColor: NSColor(hex: appState.resolvedSearchHighlightHex) ?? .systemYellow) },
                                            set: { appState.searchHighlightHex = Self.hex(from: $0) }),
                             statusText: NSLocalizedString("Search Highlight Color", comment: ""),
-                            isDefault: appState.searchHighlightHex == DocumentThemeCatalog.defaultTheme.highlightHex(isDark: colorScheme == .dark),
-                            reset: { appState.searchHighlightHex = DocumentThemeCatalog.defaultTheme.highlightHex(isDark: colorScheme == .dark) },
+                            isDefault: appState.searchHighlightHex == DocumentThemeCatalog.defaultTheme.highlightHex(isDark: isDocumentDark),
+                            reset: { appState.searchHighlightHex = DocumentThemeCatalog.defaultTheme.highlightHex(isDark: isDocumentDark) },
                             supportsOpacity: false
                         )
                     }
@@ -66,7 +76,7 @@ struct DocumentStyleView: View {
                             color: textColorBinding,
                             statusText: textStatusText,
                             isDefault: isTextDefault,
-                            reset: { appState.resetTextColorToDefault(isDark: colorScheme == .dark) }
+                            reset: { appState.resetTextColorToDefault(isDark: isDocumentDark) }
                         )
                     }
 
@@ -110,7 +120,14 @@ struct DocumentStyleView: View {
         }
     }
 
-    // MARK: - 主题
+    // MARK: - 外观与主题
+
+    private var appearanceSection: some View {
+        section(NSLocalizedString("Document Appearance", comment: "")) {
+            DocumentAppearanceSegmentedControl(selection: appearanceBinding)
+                .frame(maxWidth: .infinity)
+        }
+    }
 
     private var themeSection: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -147,7 +164,7 @@ struct DocumentStyleView: View {
     }
 
     private func themeCard(_ theme: DocumentTheme) -> some View {
-        let isDark = colorScheme == .dark
+        let isDark = isDocumentDark
         let isSelected = appState.documentThemeId == theme.id
         let bg = theme.backgroundColor(isDark: isDark)
         let fg = theme.textColor(isDark: isDark)
@@ -167,6 +184,7 @@ struct DocumentStyleView: View {
                         .foregroundStyle(fg)
                 }
                 .frame(width: 24, height: 24)
+                .environment(\.colorScheme, documentColorScheme)
 
                 Text(theme.displayName)
                     .font(.system(size: 12, weight: isSelected ? .medium : .regular))
@@ -198,9 +216,9 @@ struct DocumentStyleView: View {
                 Button("Replace with Current Style") {
                     let updated = themeCatalog.addCustomTheme(name: theme.name,
                         currentBackgroundHex: appState.backgroundColorHex,
-                        currentTextHex: appState.textColorHex, currentHighlightHex: appState.resolvedSearchHighlightHex, isCurrentlyDark: colorScheme == .dark,
+                        currentTextHex: appState.textColorHex, currentHighlightHex: appState.resolvedSearchHighlightHex, isCurrentlyDark: isDocumentDark,
                         typography: appState.currentThemeTypography, replacing: theme.id)
-                    appState.applyDocumentTheme(updated, isDark: colorScheme == .dark)
+                    appState.applyDocumentTheme(updated, isDark: isDocumentDark)
                 }
                 Button(role: .destructive) {
                     if appState.documentThemeId == theme.id {
@@ -240,11 +258,11 @@ struct DocumentStyleView: View {
                         name: newThemeName,
                         currentBackgroundHex: appState.backgroundColorHex,
                         currentTextHex: appState.textColorHex, currentHighlightHex: appState.resolvedSearchHighlightHex,
-                        isCurrentlyDark: colorScheme == .dark,
+                        isCurrentlyDark: isDocumentDark,
                         typography: appState.currentThemeTypography,
                         replacing: replacementThemeID.isEmpty ? nil : replacementThemeID
                     )
-                    appState.applyDocumentTheme(created, isDark: colorScheme == .dark)
+                    appState.applyDocumentTheme(created, isDark: isDocumentDark)
                     isShowingSaveThemePopover = false
                 }
                 .keyboardShortcut(.defaultAction)
@@ -363,13 +381,13 @@ struct DocumentStyleView: View {
     // MARK: - 颜色与间距
 
     private var isBackgroundDefault: Bool {
-        let defBg = DocumentThemeCatalog.defaultTheme.backgroundHex(isDark: colorScheme == .dark)
+        let defBg = DocumentThemeCatalog.defaultTheme.backgroundHex(isDark: isDocumentDark)
         return appState.documentThemeId == DocumentThemeCatalog.defaultThemeId
             || appState.backgroundColorHex?.uppercased() == defBg.uppercased()
     }
 
     private var isTextDefault: Bool {
-        let defFg = DocumentThemeCatalog.defaultTheme.textHex(isDark: colorScheme == .dark)
+        let defFg = DocumentThemeCatalog.defaultTheme.textHex(isDark: isDocumentDark)
         return appState.documentThemeId == DocumentThemeCatalog.defaultThemeId
             || appState.textColorHex?.uppercased() == defFg.uppercased()
     }
@@ -460,11 +478,18 @@ struct DocumentStyleView: View {
 
     // MARK: - 绑定
 
+    private var appearanceBinding: Binding<DocumentAppearanceMode> {
+        Binding(
+            get: { appState.documentAppearance },
+            set: { appState.selectDocumentAppearance($0, systemIsDark: colorScheme == .dark) }
+        )
+    }
+
     private var backgroundBinding: Binding<Color> {
         Binding(
             get: {
                 appState.contentBackgroundColor.map(Color.init(nsColor:))
-                    ?? Color(nsColor: .windowBackgroundColor)
+                    ?? documentSystemColor(.windowBackgroundColor)
             },
             set: { appState.backgroundColorHex = Self.hex(from: $0) }
         )
@@ -474,7 +499,7 @@ struct DocumentStyleView: View {
         Binding(
             get: {
                 appState.documentTextColor.map(Color.init(nsColor:))
-                    ?? Color(nsColor: .labelColor)
+                    ?? documentSystemColor(.labelColor)
             },
             set: { appState.textColorHex = Self.hex(from: $0) }
         )
@@ -493,6 +518,18 @@ struct DocumentStyleView: View {
             get: { appState.documentFontName ?? selectedFamilyMembers.first?.postScriptName ?? "" },
             set: { appState.documentFontName = $0.isEmpty ? nil : $0 }
         )
+    }
+
+    /// 面板与文档外观不同时，先把动态系统色按文档外观解析，避免透明主题的取色器显示反相颜色。
+    private func documentSystemColor(_ color: NSColor) -> Color {
+        guard let appearance = appState.documentAppearance.nsAppearance else {
+            return Color(nsColor: color)
+        }
+        var resolved = color
+        appearance.performAsCurrentDrawingAppearance {
+            resolved = color.usingColorSpace(.sRGB) ?? color
+        }
+        return Color(nsColor: resolved)
     }
 
     private static func hex(from color: Color) -> String? {
@@ -558,5 +595,63 @@ struct DocumentStyleView: View {
             return
         }
         appState.documentFontName = family.members.first?.postScriptName
+    }
+}
+
+/// SwiftUI 分段 Picker 在 macOS 不呈现 Label 图标；原生分段控件显式设置图文，确保亮暗图标可见。
+struct DocumentAppearanceSegmentedControl: NSViewRepresentable {
+    @Binding var selection: DocumentAppearanceMode
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    func makeNSView(context: Context) -> NSSegmentedControl {
+        let control = NSSegmentedControl(
+            labels: DocumentAppearanceMode.allCases.map { _ in "" },
+            trackingMode: .selectOne,
+            target: context.coordinator,
+            action: #selector(Coordinator.selectionChanged(_:))
+        )
+        control.segmentDistribution = .fill
+        control.setAccessibilityIdentifier("documentAppearancePicker")
+        control.setAccessibilityLabel(NSLocalizedString("Document Appearance", comment: ""))
+        configure(control)
+        return control
+    }
+
+    func updateNSView(_ control: NSSegmentedControl, context: Context) {
+        context.coordinator.parent = self
+        configure(control)
+    }
+
+    private func configure(_ control: NSSegmentedControl) {
+        for (index, mode) in DocumentAppearanceMode.allCases.enumerated() {
+            let title = NSLocalizedString(mode.localizationKey, comment: "")
+            control.setLabel(title, forSegment: index)
+            let symbolName: String? = switch mode {
+            case .system: nil
+            case .light: "sun.max"
+            case .dark: "moon"
+            }
+            let image = symbolName.flatMap { NSImage(systemSymbolName: $0, accessibilityDescription: title) }
+            image?.isTemplate = true
+            control.setImage(image, forSegment: index)
+        }
+        control.selectedSegment = DocumentAppearanceMode.allCases.firstIndex(of: selection) ?? 0
+    }
+
+    final class Coordinator: NSObject {
+        var parent: DocumentAppearanceSegmentedControl
+
+        init(_ parent: DocumentAppearanceSegmentedControl) {
+            self.parent = parent
+        }
+
+        @objc func selectionChanged(_ sender: NSSegmentedControl) {
+            let modes = DocumentAppearanceMode.allCases
+            guard modes.indices.contains(sender.selectedSegment) else { return }
+            parent.selection = modes[sender.selectedSegment]
+        }
     }
 }

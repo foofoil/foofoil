@@ -7,6 +7,7 @@
 
 import AppKit
 import Foundation
+import SwiftUI
 import Testing
 @testable import foofoil
 
@@ -156,6 +157,128 @@ struct DocumentThemeTests {
         #expect(state.textColorHex == dusk.lightTextHex)
     }
 
+    /// 默认跟随系统；固定亮暗使用主题对应版本且不被系统切换改写，恢复跟随后立即按当前系统解析。
+    @Test func documentAppearanceControlsThemeVariantsAndSystemChanges() throws {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.text = "正文"
+        #expect(state.documentAppearance == .system)
+
+        let dusk = try #require(DocumentThemeCatalog.shared.theme(for: "dusk"))
+        state.applyDocumentTheme(dusk, isDark: false)
+
+        state.selectDocumentAppearance(.dark, systemIsDark: false)
+        #expect(state.documentAppearance == .dark)
+        #expect(state.backgroundColorHex == dusk.darkBackgroundHex)
+        #expect(state.textColorHex == dusk.darkTextHex)
+        state.adaptDocumentColorsToAppearanceChange(toDarkAppearance: false)
+        #expect(state.backgroundColorHex == dusk.darkBackgroundHex, "固定暗色不应被系统亮色切换覆盖")
+
+        state.selectDocumentAppearance(.light, systemIsDark: true)
+        #expect(state.backgroundColorHex == dusk.lightBackgroundHex)
+        #expect(state.textColorHex == dusk.lightTextHex)
+        state.adaptDocumentColorsToAppearanceChange(toDarkAppearance: true)
+        #expect(state.backgroundColorHex == dusk.lightBackgroundHex, "固定亮色不应被系统暗色切换覆盖")
+
+        state.selectDocumentAppearance(.system, systemIsDark: true)
+        #expect(state.backgroundColorHex == dusk.darkBackgroundHex)
+        state.adaptDocumentColorsToAppearanceChange(toDarkAppearance: false)
+        #expect(state.backgroundColorHex == dusk.lightBackgroundHex)
+    }
+
+    /// 没有选中主题的自定义颜色在固定外观下同样不响应系统明暗切换。
+    @Test func fixedDocumentAppearancePreservesCustomColorsOnSystemChanges() throws {
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        state.text = "正文"
+        state.backgroundColorHex = "#F5EFE0"
+        state.textColorHex = "#1C1C1E"
+        state.selectDocumentAppearance(.dark, systemIsDark: false)
+        let darkBackground = state.backgroundColorHex
+        let darkText = state.textColorHex
+
+        state.adaptDocumentColorsToAppearanceChange(toDarkAppearance: false)
+        #expect(state.backgroundColorHex == darkBackground)
+        #expect(state.textColorHex == darkText)
+        #expect(state.documentThemeId == nil)
+    }
+
+    /// 跟随系统的历史在亮色系统中恢复亮色主题；固定暗色历史不受当前系统外观影响。
+    @Test func restoringHistoryResolvesSystemAppearanceAgainstCurrentSystem() throws {
+        let previousAppearance = NSApp.appearance
+        NSApp.appearance = NSAppearance(named: .aqua)
+        defer { NSApp.appearance = previousAppearance }
+
+        let dusk = try #require(DocumentThemeCatalog.shared.theme(for: "dusk"))
+        let state = AppState()
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        var config = WindowConfig(
+            id: state.id,
+            text: "正文",
+            backgroundColorHex: dusk.darkBackgroundHex,
+            textColorHex: dusk.darkTextHex,
+            documentThemeId: dusk.id,
+            documentAppearance: .system
+        )
+        state.loadConfig(config)
+        #expect(state.backgroundColorHex == dusk.lightBackgroundHex)
+        #expect(state.textColorHex == dusk.lightTextHex)
+
+        config.documentAppearance = .dark
+        config.backgroundColorHex = dusk.darkBackgroundHex
+        config.textColorHex = dusk.darkTextHex
+        state.loadConfig(config)
+        #expect(state.backgroundColorHex == dusk.darkBackgroundHex)
+        #expect(state.textColorHex == dusk.darkTextHex)
+    }
+
+    /// 固定外观同时驱动 NSWindow，保证动态系统色与正文配色一致；跟随系统时恢复继承。
+    @Test func documentAppearanceDrivesWindowAppearance() {
+        let state = AppState(isIncognito: true)
+        let controller = FloatingWindowController(appState: state)
+        defer { controller.close() }
+        #expect(controller.window?.appearance == nil)
+
+        state.selectDocumentAppearance(.dark, systemIsDark: false)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        #expect(controller.window?.appearance?.name == .darkAqua)
+        #expect(controller.window?.contentView?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua)
+
+        state.selectDocumentAppearance(.light, systemIsDark: true)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        #expect(controller.window?.appearance?.name == .aqua)
+        #expect(controller.window?.contentView?.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]) == .aqua)
+
+        state.selectDocumentAppearance(.system, systemIsDark: false)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+        #expect(controller.window?.appearance == nil)
+    }
+
+    /// 原生外观分段控件必须实际持有亮暗图标，避免 SwiftUI Label 图标被静默丢弃。
+    @Test func appearanceSegmentedControlContainsLightAndDarkIcons() throws {
+        let hosting = NSHostingView(rootView: DocumentAppearanceSegmentedControl(selection: .constant(.system)))
+        hosting.frame = NSRect(x: 0, y: 0, width: 380, height: 32)
+        hosting.layoutSubtreeIfNeeded()
+
+        func findSegmentedControl(in view: NSView) -> NSSegmentedControl? {
+            if let control = view as? NSSegmentedControl { return control }
+            for subview in view.subviews {
+                if let control = findSegmentedControl(in: subview) { return control }
+            }
+            return nil
+        }
+
+        let control = try #require(findSegmentedControl(in: hosting))
+        #expect(control.segmentCount == 3)
+        #expect(control.selectedSegment == 0)
+        #expect(control.image(forSegment: 0) == nil)
+        #expect(control.label(forSegment: 0)?.isEmpty == false)
+        #expect(control.image(forSegment: 1)?.isTemplate == true)
+        #expect(control.image(forSegment: 2)?.isTemplate == true)
+        #expect(control.label(forSegment: 1)?.isEmpty == false)
+        #expect(control.label(forSegment: 2)?.isEmpty == false)
+    }
+
     /// 用户自建主题的保存、明暗成对推导、持久化与删除。
     @Test func customThemeCreationPersistenceAndDeletion() throws {
         let catalog = DocumentThemeCatalog.shared
@@ -264,10 +387,13 @@ struct DocumentThemeTests {
         state.text = "正文"
         let parchment = try #require(DocumentThemeCatalog.shared.theme(for: "parchment"))
         state.applyDocumentTheme(parchment, isDark: false)
+        state.selectDocumentAppearance(.dark, systemIsDark: false)
         #expect(state.documentThemeId == "parchment")
+        #expect(state.documentAppearance == .dark)
 
         state.resetContent()
         #expect(state.isBlank)
+        #expect(state.documentAppearance == .system)
         #expect(!state.supportsContentBackgroundColor)
         #expect(!state.supportsDocumentTextStyling)
         #expect(state.documentThemeId == nil)
