@@ -2692,13 +2692,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Note"
+            "value": "Text"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "便签"
+            "value": "文本"
           }
         }
       }
@@ -3117,13 +3117,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Notes"
+            "value": "Text"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "便签"
+            "value": "文本"
           }
         }
       }

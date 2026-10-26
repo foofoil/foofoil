@@ -17,7 +17,6 @@ struct BlankStateTipCarousel: View {
     private var tips: [String] {
         [
             NSLocalizedString("Tip: Drop image, PDF, or Markdown", comment: ""),
-            NSLocalizedString("Tip: Type directly to write a note", comment: ""),
             NSLocalizedString("Tip: Hold Command while dragging to move the window", comment: ""),
             NSLocalizedString("Tip: Try a two-finger pinch", comment: "")
         ] + [

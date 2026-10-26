@@ -112,8 +112,8 @@ struct FileReferenceLifecycleTests {
         }
         ContentCache.shared.flushBodyWrites()
         #expect(state.toConfig().isClipboardContent)
-        #expect(!state.isReadOnlyTextFile)
-        #expect(!state.verticalArrowsScrollContent)
+        #expect(state.isReadOnlyTextFile)
+        #expect(state.verticalArrowsScrollContent)
         #expect(FoilInformation.sourceURL(for: state.toConfig()) == nil)
         state.text = "edited"
         state.saveState()

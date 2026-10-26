@@ -193,7 +193,7 @@ struct FoilContentView: View {
                         .transition(.opacity)
                 } else {
                     // 文字模式
-                    TextEditorModeView(appState: appState)
+                    TextContentView(appState: appState)
                         .transition(.opacity)
                 }
             }

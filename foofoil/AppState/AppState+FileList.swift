@@ -579,7 +579,7 @@ extension AppState {
         if let preview = archiveSession?.preview { return preview.verticalArrowsScrollContent }
         if isExtensionDocument { return true }
         if isMarkdownPreview && isMarkdownDocument && !text.isEmpty { return true }
-        return isReadOnlyTextFile && !isMarkdownDocument
+        return isReadOnlyTextFile
     }
 
     func activateAdjacentFileListItem(delta: Int, wraps: Bool = false) {

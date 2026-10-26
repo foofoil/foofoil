@@ -1,5 +1,5 @@
 //
-//  TextEditorModeView.swift
+//  TextContentView.swift
 //  foofoil
 //
 //  Created by tolg on 2026/7/10.
@@ -7,8 +7,9 @@
 
 import SwiftUI
 
-struct TextEditorModeView: View {
+struct TextContentView: View {
     @ObservedObject var appState: AppState
+    @StateObject private var search = HistorySearchWindowController(embedded: true)
     @ObservedObject private var historyManager = HistoryManager.shared
     @State private var shortcutRevision = 0
     @State private var textHeight: CGFloat = 68 // 动态高度，初始为单行行高加上下文档内边距
@@ -28,7 +29,7 @@ struct TextEditorModeView: View {
     @State private var codePreviewFailed = false
     @Environment(\.colorScheme) private var colorScheme
 
-    /// 文本通道（编辑、只读、Markdown）共用的字体：跟随箔的文档字体与字号。
+    /// 文本通道（只读文本、Markdown）共用的字体：跟随箔的文档字体与字号。
     private var documentTextFont: NSFont {
         appState.documentFont(size: CGFloat(appState.textFontSize))
     }
@@ -59,14 +60,17 @@ struct TextEditorModeView: View {
             } else {
                 let isBlank = appState.isBlank
                 let showTipsAndHistory = geometry.size.height >= 140 && appState.canOpenRecentHistory
-                let showsIncognitoOverlay = isBlank && appState.isIncognito
+                let isSearching = !search.model.query.isEmpty || search.model.activeScope != nil
+                let showsIncognitoOverlay = isBlank && appState.isIncognito && !isSearching
 
                 VStack(alignment: .leading, spacing: 0) {
                     ZStack(alignment: .topLeading) {
                         // 文本留白在可滚动文档内；剩余区域为真实窗口背景，用原生手势移动窗口。
                         WindowDragArea()
 
-                        if appState.isMarkdownPreview && appState.isMarkdownDocument && !appState.text.isEmpty {
+                        if isBlank {
+                            HistorySearchView(model: search.model, embedded: true)
+                        } else if appState.isMarkdownPreview && appState.isMarkdownDocument && !appState.text.isEmpty {
                             MarkdownTextView(
                                 attributedText: appState.renderedMarkdown,
                                 calculatedHeight: $textHeight,
@@ -78,7 +82,7 @@ struct TextEditorModeView: View {
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 // 整个滚动视图避开四边缩放热区，滚动条首尾也不会触发角部缩放。
                                 .padding(appState.isFullScreen ? 0 : FloatingWindow.resizeHitThickness + 1)
-                        } else if appState.agentReadOnly || appState.isArchivePreview || (appState.isReadOnlyTextFile && !appState.isMarkdownDocument) {
+                        } else {
                             // 已识别语言的代码优先用 WebKit 语法着色；超限、未识别或失败时回退原生只读视图。
                             if let languageID = appState.webCodePreviewLanguageID, !codePreviewFailed, !appState.agentReadOnly {
                                 ReadOnlyCodeView(
@@ -99,26 +103,11 @@ struct TextEditorModeView: View {
                                 )
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                             }
-                        } else {
-                            CustomTextEditor(
-                                text: $appState.text,
-                                calculatedHeight: $textHeight,
-                                fontSize: appState.textFontSize,
-                                font: documentTextFont,
-                                textColor: appState.documentTextColor,
-                                lineHeightMultiple: appState.documentLineHeightMultiple,
-                                paragraphSpacingMultiple: appState.documentParagraphSpacingMultiple,
-                                shouldMaintainFocus: isBlank
-                            )
-                                .frame(
-                                    maxWidth: .infinity,
-                                    maxHeight: appState.text.isEmpty ? nil : .infinity
-                                )
-                                .frame(height: appState.text.isEmpty ? min(textHeight, geometry.size.height) : nil)
                         }
                     }
+                    .frame(maxHeight: isBlank && !isSearching ? 74 : .infinity)
 
-                    if isBlank && showTipsAndHistory {
+                    if isBlank && !isSearching && showTipsAndHistory {
                         if appState.isTemporaryIncognito {
                             // 临时无痕图标占用走马灯区域，避免压住底部打开提示。
                             GeometryReader { proxy in
@@ -134,18 +123,18 @@ struct TextEditorModeView: View {
                                 // 不接收鼠标事件，保留窗口背景的拖拽行为和输入焦点。
                                 .allowsHitTesting(false)
                         }
-                    } else {
+                    } else if !isSearching {
                         // 剩余区域保持为窗口背景，以支持拖动。
                         Spacer(minLength: 0)
                     }
 
-                    if isBlank && geometry.size.height >= 140 {
+                    if isBlank && !isSearching && geometry.size.height >= 140 {
                         BlankOpenButtons(appState: appState)
                             .padding(.horizontal, 16)
                             .padding(.bottom, appState.isIncognito ? 16 : 18)
                     }
 
-                    if isBlank && showTipsAndHistory {
+                    if isBlank && !isSearching && showTipsAndHistory {
                         VStack(alignment: .leading, spacing: 0) {
                             ScrollView(.horizontal, showsIndicators: false) {
                                 HStack(alignment: .top, spacing: 12) {
@@ -301,6 +290,17 @@ struct TextEditorModeView: View {
                 }
             }
         }
+        .onAppear {
+            if appState.isBlank { search.beginEmbeddedSearch(target: appState) }
+        }
+        .onChange(of: appState.isBlank) { _, blank in
+            search.endEmbeddedSearch()
+            if blank { search.beginEmbeddedSearch(target: appState) }
+        }
+        .onChange(of: appState.isIncognito) { _, _ in
+            search.configureOpening(isIncognito: appState.isIncognito, target: appState)
+        }
+        .onDisappear { search.endEmbeddedSearch() }
         .onReceive(NotificationCenter.default.publisher(for: .keyboardShortcutsDidChange)) { _ in
             shortcutRevision += 1
         }

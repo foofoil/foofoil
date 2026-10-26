@@ -178,17 +178,18 @@ struct DocumentTextSpacingTests {
         )
     }
 
-    /// 编辑通道：宿主视图把自选行距/段距落到 NSTextView 的默认段落样式上，取消后又回到默认。
-    @Test func editableTextViewAppliesCustomSpacing() async throws {
+    /// 只读文本：宿主视图应用自选行距/段距，取消后回到默认。
+    @Test func clipboardTextViewIsReadOnlyAndAppliesCustomSpacing() async throws {
         let state = AppState()
         defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
 
         state.text = "正文段落"
 
-        let hosting = NSHostingView(rootView: TextEditorModeView(appState: state))
+        let hosting = NSHostingView(rootView: TextContentView(appState: state))
         hosting.frame = NSRect(x: 0, y: 0, width: 400, height: 400)
         hosting.layoutSubtreeIfNeeded()
-        let textView = try #require(firstTextView(in: hosting), "编辑器未生成 NSTextView")
+        let textView = try #require(firstTextView(in: hosting), "正文未生成 NSTextView")
+        #expect(!textView.isEditable)
 
         // 未自选时不写入任何行距/段距，保持 NSTextView 自身默认。
         #expect((textView.defaultParagraphStyle?.lineHeightMultiple ?? 0) == 0)
@@ -198,7 +199,7 @@ struct DocumentTextSpacingTests {
         state.documentParagraphSpacing = 1.5
         let styled = try #require(
             await waitForDefaultParagraphStyle(textView, lineHeightMultiple: 1.8),
-            "改行距后编辑器未更新段落样式"
+            "改行距后正文未更新段落样式"
         )
         #expect(abs(styled.lineHeightMultiple - 1.8) < 0.001, "行距未生效：\(styled.lineHeightMultiple)")
         #expect(
@@ -235,7 +236,7 @@ struct DocumentTextSpacingTests {
         state.isMarkdownPreview = true
 
         // 真实视图负责把「行距变了」转成重渲染；关掉视图这条链路就不存在。
-        let hosting = NSHostingView(rootView: TextEditorModeView(appState: state))
+        let hosting = NSHostingView(rootView: TextContentView(appState: state))
         hosting.frame = NSRect(x: 0, y: 0, width: 400, height: 400)
         hosting.layoutSubtreeIfNeeded()
         #expect(await waitForRenderedMarkdown(state).length > 0, "预览未完成首次渲染")
@@ -289,7 +290,7 @@ struct DocumentTextSpacingTests {
         state.documentLineSpacing = 1.8
         state.documentParagraphSpacing = 1.5
 
-        let hosting = NSHostingView(rootView: TextEditorModeView(appState: state))
+        let hosting = NSHostingView(rootView: TextContentView(appState: state))
         hosting.frame = NSRect(x: 0, y: 0, width: 400, height: 400)
         hosting.layoutSubtreeIfNeeded()
         let textView = try #require(firstTextView(in: hosting), "只读通道未生成 NSTextView")

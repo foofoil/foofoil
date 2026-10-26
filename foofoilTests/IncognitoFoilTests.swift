@@ -110,7 +110,7 @@ struct IncognitoFoilTests {
     /// 将实际空箔视图的两种外观附在测试结果中，供视觉检查。
     @Test(arguments: [ColorScheme.light, .dark])
     func renderIncognitoEmptyState(colorScheme: ColorScheme) async throws {
-        let view = NSHostingView(rootView: TextEditorModeView(appState: AppState(isIncognito: true))
+        let view = NSHostingView(rootView: TextContentView(appState: AppState(isIncognito: true))
             .environment(\.colorScheme, colorScheme)
             .background(colorScheme == .dark ? Color(white: 0.15) : Color(white: 0.93)))
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 400, height: 400),

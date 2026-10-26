@@ -114,7 +114,7 @@ extension AppDelegate {
         fileMenu.addItem(NSMenuItem.separator())
 
         let quickOpenItem = NSMenuItem(title: NSLocalizedString("Search History Menu Item", comment: ""), action: #selector(showHistorySearchAction), keyEquivalent: "p")
-        quickOpenItem.withSymbol("magnifyingglass")
+        quickOpenItem.withSymbol("bolt")
         quickOpenItem.representedObject = "history.search"
         quickOpenItem.target = self
         fileMenu.addItem(quickOpenItem)

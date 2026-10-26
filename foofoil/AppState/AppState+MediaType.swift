@@ -17,9 +17,7 @@ import FoofoilExtensionKit
 
 extension AppState {
         var isReadOnlyTextFile: Bool {
-            if agentReadOnly { return true }
-            guard let textURL else { return false }
-            return !Self.isManagedCacheURL(textURL)
+            !text.isEmpty || textURL != nil
         }
 
         public var isSVG: Bool {

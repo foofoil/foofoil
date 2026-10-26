@@ -20,10 +20,10 @@
 | 网址 | “文件 → 打开网址…”{{openURLShortcut}} | 将网页放在箔片中浏览 |
 | 摄像头 | “文件 → 打开摄像头”{{openCameraShortcut}} | 实时查看摄像头画面 |
 | 剪贴板图片 | 复制图片后，选择“打开剪贴板内容”{{openClipboardShortcut}} | 将图片打开为箔片 |
-| 剪贴板文字 | 复制一段文字后，选择“打开剪贴板内容”{{openClipboardShortcut}} | 查看或编辑文字；Markdown 和 HTML 内容会自动识别并预览 |
+| 剪贴板文字 | 复制一段文字后，选择“打开剪贴板内容”{{openClipboardShortcut}} | 只读查看文字；Markdown 和 HTML 内容会自动识别并预览 |
 | 剪贴板网址、文件或文件夹 | 复制后，选择“打开剪贴板内容”{{openClipboardShortcut}} | 打开对应的网页或本地内容 |
 
-也可以直接在空白箔中输入文字，记一条便签。
+文字与 Markdown 源码均为只读。空箔顶部输入框提供快速打开搜索；输入后，下方提示、打开按钮与历史记录替换为搜索结果，清空后恢复。
 
 ## 图片
 
@@ -115,7 +115,7 @@ Apple Music 资料库默认关闭。在「设置 → 类型 → 音频与视频�
 
 ⌘S 打开“保存内容图片”，将当前可见内容保存为图片，默认 HEIC，可选 PNG 或 JPG。文档（含文本、Markdown、PDF、EPUB 与 Quick Look 预览）保存当前正文视口，保留滚动位置、缩放与背景，不包含窗口边框及导航控件。视频、摄像头、网页沿用原有截图方式。音频保存当前显示的封面图；没有封面时禁用。
 
-⇧⌘S 另存源文件，或包含编辑结果的完整当前文本／Markdown 源码。EPUB 保存原 EPUB 文件；网页保存为 `.webarchive` 网页归档。摄像头、CUE 曲目、SACD ISO 和 Apple Music 不提供另存为。空箔禁用两项命令。
+⇧⌘S 另存源文件，或完整当前文本／Markdown 源码。EPUB 保存原 EPUB 文件；网页保存为 `.webarchive` 网页归档。摄像头、CUE 曲目、SACD ISO 和 Apple Music 不提供另存为。空箔禁用两项命令。
 
 Markdown 的“另存为…”可选择 Markdown 或 HTML 格式。HTML 导出带基本样式的 UTF-8 文档，不内嵌关联资源。
 

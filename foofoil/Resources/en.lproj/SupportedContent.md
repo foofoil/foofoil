@@ -20,10 +20,10 @@ Ordinary opening actions only reuse ordinary blank foils; incognito opening crea
 | URLs | File → Open URL…{{openURLShortcut}} | Browse a web page in a foil |
 | Cameras | File → Open Camera{{openCameraShortcut}} | View a live camera feed |
 | Clipboard images | Copy an image, then choose Open Clipboard Content{{openClipboardShortcut}} | Open the image in a foil |
-| Clipboard text | Copy a passage, then choose Open Clipboard Content{{openClipboardShortcut}} | Read or edit text; Markdown and HTML are automatically recognized and previewed |
+| Clipboard text | Copy a passage, then choose Open Clipboard Content{{openClipboardShortcut}} | Read-only text; Markdown and HTML are automatically recognized and previewed |
 | Clipboard URLs, files, or folders | Copy them, then choose Open Clipboard Content{{openClipboardShortcut}} | Open the corresponding web page or local content |
 
-You can also type directly into a blank foil to write a note.
+All text and Markdown source is read-only. Type in a blank foil to search with Quick Open; results replace tips, open buttons, and recent history until the query is cleared.
 
 ## Images
 
@@ -113,7 +113,7 @@ Video history thumbnails use the midpoint of the video to avoid opening black or
 
 ⌘S opens “Save Content Image” to save an image of the current visible content (HEIC by default, with PNG and JPG choices). Documents (including text, Markdown, PDF, EPUB, and Quick Look previews) save the visible viewport, with its current scroll position, zoom, and background, excluding window borders and navigation controls. Videos, camera, and websites retain their existing capture behavior. Audio saves the displayed cover image; unavailable when there is no cover.
 
-⇧⌘S saves the source file, or the complete current text/Markdown source including edits. EPUB saves the original EPUB file; websites save a `.webarchive`. Camera, CUE tracks, SACD ISO, and Apple Music do not provide Save As. Both commands are disabled for blank foils.
+⇧⌘S saves the source file, or the complete current text/Markdown source as displayed. EPUB saves the original EPUB file; websites save a `.webarchive`. Camera, CUE tracks, SACD ISO, and Apple Music do not provide Save As. Both commands are disabled for blank foils.
 
 Markdown “Save As…” offers Markdown and HTML formats. HTML exports a UTF-8 document with basic styling; linked resources are not embedded.
 

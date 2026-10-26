@@ -141,7 +141,7 @@ struct DocumentTextStylingTests {
         state.isMarkdownPreview = true
 
         // 真实视图负责把「颜色变了」转成重渲染；关掉视图这条链路就不存在。
-        let hosting = NSHostingView(rootView: TextEditorModeView(appState: state))
+        let hosting = NSHostingView(rootView: TextContentView(appState: state))
         hosting.frame = NSRect(x: 0, y: 0, width: 400, height: 400)
         hosting.layoutSubtreeIfNeeded()
         #expect(await waitForRenderedColor(state, "#123456"), "预览未按自选颜色渲染")

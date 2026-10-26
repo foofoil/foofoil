@@ -8,11 +8,20 @@ final class HistorySearchPanel: NSPanel {
     override var canBecomeKey: Bool { true }
 
     override func sendEvent(_ event: NSEvent) {
-        guard event.type == .keyDown, let model = searchModel else { super.sendEvent(event); return }
-        let hasMarkedText = (firstResponder as? NSTextView)?.hasMarkedText() ?? false
-        if hasMarkedText { super.sendEvent(event); return }
-        if event.keyCode == 53 { dismissSearch?(); return }
-        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "w" { dismissSearch?(); return }
+        guard let model = searchModel,
+              Self.handleSearchKey(event, model: model, dismiss: { self.dismissSearch?() }) else {
+            super.sendEvent(event)
+            return
+        }
+    }
+
+    /// 两种搜索入口共用按键路由，并保留输入法组合输入。
+    static func handleSearchKey(_ event: NSEvent, model: HistorySearchViewModel, dismiss: () -> Void) -> Bool {
+        guard event.type == .keyDown else { return false }
+        let hasMarkedText = (event.window?.firstResponder as? NSTextView)?.hasMarkedText() ?? false
+        if hasMarkedText { return false }
+        if event.keyCode == 53 { dismiss(); return true }
+        if event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "w" { dismiss(); return true }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let isControlOnly = modifiers.contains(.control) && !modifiers.contains(.command) && !modifiers.contains(.option)
         let keyChar = event.charactersIgnoringModifiers?.lowercased()
@@ -21,30 +30,34 @@ final class HistorySearchPanel: NSPanel {
         if model.isPickingScope {
             if event.keyCode == 36 || event.keyCode == 76 || event.keyCode == 48 {
                 model.selectHighlightedScope()
-                return
+                return true
             }
             if isDown {
                 model.moveScopeSelection(by: 1)
-                return
+                return true
             }
             if isUp {
                 model.moveScopeSelection(by: -1)
-                return
+                return true
             }
         }
         if event.keyCode == 51 && model.query.isEmpty && model.activeScope != nil {
             model.clearActiveScope()
-            return
+            return true
         }
-        if isDown { model.moveSelection(by: 1); return }
-        if isUp { model.moveSelection(by: -1); return }
-        if (event.keyCode == 36 || event.keyCode == 76) && !hasMarkedText { model.openSelected(); return }
-        super.sendEvent(event)
+        if isDown { model.moveSelection(by: 1); return true }
+        if isUp { model.moveSelection(by: -1); return true }
+        if (event.keyCode == 36 || event.keyCode == 76) && !hasMarkedText { model.openSelected(); return true }
+        return false
     }
 }
 
 @MainActor
-final class HistorySearchWindowController: NSWindowController, NSWindowDelegate {
+final class HistorySearchWindowController: ObservableObject {
+    let window: NSWindow?
+    private var windowDelegate: HistorySearchWindowDelegate?
+    private let embedded: Bool
+    private var keyMonitor: Any?
     static let shared = HistorySearchWindowController()
     let model = HistorySearchViewModel()
     private(set) var openingIsIncognito = false
@@ -54,26 +67,33 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
     private var isOpeningFile = false
     private var openingTask: Task<Void, Never>?
 
-    private init() {
-        let panel = HistorySearchPanel(
+    init(embedded: Bool = false) {
+        self.embedded = embedded
+        let panel = embedded ? nil : HistorySearchPanel(
             contentRect: NSRect(x: 0, y: 0, width: 620, height: 74),
             styleMask: [.borderless, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
-        panel.isFloatingPanel = true
-        panel.level = .floating
-        panel.backgroundColor = .clear
-        panel.isOpaque = false
-        panel.hasShadow = true
-        panel.hidesOnDeactivate = true
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        panel.isMovableByWindowBackground = true
-        panel.searchModel = model
-        panel.contentViewController = NSHostingController(rootView: HistorySearchView(model: model))
-        super.init(window: panel)
-        panel.delegate = self
-        panel.dismissSearch = { [weak self] in self?.dismiss() }
+        if let panel {
+            panel.isFloatingPanel = true
+            panel.level = .floating
+            panel.backgroundColor = .clear
+            panel.isOpaque = false
+            panel.hasShadow = true
+            panel.hidesOnDeactivate = true
+            panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+            panel.isMovableByWindowBackground = true
+            panel.searchModel = model
+            panel.contentViewController = NSHostingController(rootView: HistorySearchView(model: model))
+        }
+        window = panel
+        if let panel {
+            let delegate = HistorySearchWindowDelegate(owner: self)
+            windowDelegate = delegate
+            panel.delegate = delegate
+        }
+        panel?.dismissSearch = { [weak self] in self?.dismiss() }
         model.enableFileSearch = { [weak self] in self?.enableFileSearch() }
         model.openMusicLink = { [weak self] url in (NSApp.delegate as? AppDelegate)?.openAppleMusicLink(url, isIncognito: self?.openingIsIncognito == true) }
         model.openMusic = { [weak self] item in (NSApp.delegate as? AppDelegate)?.openAppleMusic(item, isIncognito: self?.openingIsIncognito == true) }
@@ -117,11 +137,33 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
             } else { delegate.openWebURLInPreferredWindow(url) }
         }
         sizeCancellable = model.objectWillChange.sink { [weak self] _ in
-            self?.scheduleResizeToFit()
+            self?.objectWillChange.send()
+            if self?.embedded == false { self?.scheduleResizeToFit() }
         }
     }
 
-    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    /// 空箔沿用面板的模型与打开流程，搜索文字不进入正文或历史。
+    func beginEmbeddedSearch(target: AppState) {
+        configureOpening(isIncognito: target.isIncognito, target: target)
+        model.reset()
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak target] event in
+            guard let self, let target, target.isBlank,
+                  let window = event.window as? FloatingWindow, (window.windowController as? FloatingWindowController)?.appState === target,
+                  (window.firstResponder as? NSTextView)?.isEditable == true else { return event }
+            if event.modifierFlags.contains(.command) { return event }
+            return HistorySearchPanel.handleSearchKey(event, model: self.model, dismiss: {
+                self.model.reset()
+            }) ? nil : event
+        }
+    }
+
+    func endEmbeddedSearch() {
+        if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
+        keyMonitor = nil
+        openingTarget = nil
+        dismiss()
+    }
 
     func show(isIncognito: Bool = false, target: AppState? = nil) {
         configureOpening(isIncognito: isIncognito, target: target)
@@ -199,6 +241,10 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
 
     func dismiss() {
         openingTask?.cancel()
+        if embedded, openingTarget?.isBlank == true {
+            model.reset()
+            return
+        }
         model.stop()
         // 搜索面板是单例；关闭后释放来源箔，避免额外保留无痕会话。
         openingTarget = nil
@@ -266,7 +312,7 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
 
     private func restoreSearch() {
         NSApp.activate(ignoringOtherApps: true)
-        window?.makeKeyAndOrderFront(nil)
+        if !embedded { window?.makeKeyAndOrderFront(nil) }
         model.resume()
     }
 
@@ -308,5 +354,19 @@ final class HistorySearchWindowController: NSWindowController, NSWindowDelegate 
         // 系统授权面板接管焦点时保留待打开操作，其余隐藏路径正常取消查询。
         if isOpeningFile { model.stop(); window?.orderOut(nil) }
         else { dismiss() }
+    }
+}
+
+/// AppKit 只持有轻量代理；搜索模型由 Swift 对象释放，避免 Objective-C 析构跨越 actor 生命周期。
+@MainActor
+private final class HistorySearchWindowDelegate: NSObject, NSWindowDelegate {
+    weak var owner: HistorySearchWindowController?
+
+    init(owner: HistorySearchWindowController) {
+        self.owner = owner
+    }
+
+    func windowDidResignKey(_ notification: Notification) {
+        owner?.windowDidResignKey(notification)
     }
 }

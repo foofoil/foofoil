@@ -5,7 +5,7 @@
 
 [简体中文](README.zh-CN.md)
 
-foofoil is a lightweight reference app for macOS that keeps images, videos, audio, documents, notes, and web content visible in minimal floating windows — called foils — while you work.
+foofoil is a lightweight reference app for macOS that keeps images, videos, audio, documents, text, and web content visible in minimal floating windows — called foils — while you work.
 
 The name **foofoil** combines *foo* — the familiar placeholder for anything or arbitrary content — with *foil*, a thin sheet that carries whatever you put on it. It reflects a simple idea: whatever the content is, keep it lightweight and right where you need it.
 
@@ -43,7 +43,7 @@ Launch foofoil and then use any of these methods:
 - Choose **File > Open** (<kbd>⌘ O</kbd>) to open a local file.
 - Choose **File > Open URL** (<kbd>⌘ L</kbd>) to display a web page.
 - Choose **File > Open Clipboard Content** (<kbd>⇧ ⌘ V</kbd>) to open copied files, folders, images, URLs, or text as foils; an empty foil is reused when available, otherwise a new window is created.
-- Start typing in an empty window to use it as a note.
+- Type in an empty window to search with Quick Open. All text is read-only.
 
 Right-click a window to access the most relevant actions for its current content.
 

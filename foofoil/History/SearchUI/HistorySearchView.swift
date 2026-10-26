@@ -2,12 +2,13 @@ import SwiftUI
 
 struct HistorySearchView: View {
     @ObservedObject var model: HistorySearchViewModel
+    var embedded = false
     @FocusState private var focused: Bool
 
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Image(systemName: model.mode == .url ? "globe" : "magnifyingglass").font(.title2).foregroundStyle(.secondary)
+                Image(systemName: model.mode == .url ? "globe" : "bolt").font(.title2).foregroundStyle(.secondary)
                 if let scope = model.activeScope {
                     HStack(spacing: 5) {
                         Image(systemName: scope.symbolName)
@@ -189,7 +190,7 @@ struct HistorySearchView: View {
                                         .onTapGesture { model.openURLResult() }
                                 }
                             }
-                        }.frame(maxHeight: 560).padding(8)
+                        }.frame(maxHeight: embedded ? .infinity : 560).padding(8)
                         .onChange(of: model.selectedID) { _, id in
                             if let id { proxy.scrollTo(id) }
                         }
@@ -202,13 +203,13 @@ struct HistorySearchView: View {
                 }
             }
             // ⌘P 面板只提供开启文件搜索的入口；关闭文件搜索在设置中完成。
-            if model.musicLink == nil, model.mode == .history, model.resultFilter.includesFiles, !model.isFileSearchEnabled {
+            if (!embedded || !model.query.isEmpty || model.activeScope != nil), model.musicLink == nil, model.mode == .history, model.resultFilter.includesFiles, !model.isFileSearchEnabled {
                 HStack {
                     Button(NSLocalizedString("Enable File Search", comment: "")) { model.enableFileSearch?() }
                     Spacer()
                 }.font(.caption).padding(.horizontal, 18).padding(.bottom, 12)
             }
-            if (model.musicLink != nil || (model.mode == .history && (model.resultFilter == .all || model.resultFilter.musicCategory != nil) && model.isMusicSearchEnabled)), !model.isMusicAuthorized {
+            if (!embedded || !model.query.isEmpty || model.activeScope != nil), (model.musicLink != nil || (model.mode == .history && (model.resultFilter == .all || model.resultFilter.musicCategory != nil) && model.isMusicSearchEnabled)), !model.isMusicAuthorized {
                 HStack {
                     Button(NSLocalizedString(model.musicLink == nil ? "Music Enable Search" : "Music Authorize", comment: "")) { model.enableMusicSearch?() }
                     Spacer()
@@ -218,9 +219,9 @@ struct HistorySearchView: View {
                 Text(error).foregroundStyle(.secondary).padding(12)
             }
         }
-        .frame(width: 620)
-        .fixedSize(horizontal: false, vertical: true)
-        .background(.ultraThinMaterial)
+        .frame(width: embedded ? nil : 620)
+        .fixedSize(horizontal: false, vertical: !embedded)
+        .background { if !embedded { Rectangle().fill(.ultraThinMaterial) } }
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .foilToast(model.toast)
         .onAppear {

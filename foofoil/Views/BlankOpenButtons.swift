@@ -26,7 +26,7 @@ struct BlankOpenButtons: View {
             result.append(Item(title: "Open Camera", symbol: "web.camera.fill", selector: #selector(AppDelegate.openCameraAction), shortcutID: "file.openCamera"))
         }
         result.append(Item(title: "Open Clipboard Content", symbol: "doc.on.clipboard", selector: #selector(AppDelegate.openClipboardContentAction), shortcutID: "file.openClipboardContent"))
-        result.append(Item(title: "Search History Menu Item", symbol: "magnifyingglass", selector: #selector(AppDelegate.showHistorySearchAction), shortcutID: "history.search"))
+        result.append(Item(title: "Foil Overview", symbol: "rectangle.grid.2x2", selector: #selector(AppDelegate.showAllFoilsAction), shortcutID: "window.showAllFoils"))
         return result
     }
 
@@ -34,7 +34,7 @@ struct BlankOpenButtons: View {
 
     private func shortcut(for item: Item) -> String? {
         guard let id = item.shortcutID else { return nil }
-        let shortcut = opensIncognito
+        let shortcut = opensIncognito && IncognitoOpening.titles[id] != nil
             ? KeyboardShortcutStore.shared.incognitoShortcut(forID: id)
             : KeyboardShortcutStore.shared.shortcut(forID: id)
         return shortcut?.displayString
@@ -72,13 +72,17 @@ struct BlankOpenButtons: View {
                         if !isDisabled(item), let shortcut = shortcut(for: item) {
                             HStack(spacing: 3) {
                                 ForEach(Array(shortcut.enumerated()), id: \.offset) { _, key in
-                                    Text(String(key))
+                                    Text(key == "⎋" ? "esc" : String(key))
                                         .font(.system(size: 10, weight: .medium, design: .monospaced))
+                                        .fixedSize(horizontal: true, vertical: false)
+                                        .padding(.horizontal, key == "⎋" ? 4 : 0)
                                         .frame(minWidth: 16, minHeight: 18)
                                         .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
                                         .overlay(RoundedRectangle(cornerRadius: 4).stroke(.secondary.opacity(0.25)))
                                 }
                             }
+                            // 键帽保持完整宽度，空间不足时只压缩左侧说明文字。
+                            .fixedSize(horizontal: true, vertical: false)
                         }
                     }
                 }
@@ -160,12 +164,8 @@ struct BlankOpenButtons: View {
         case 3:
             delegate.openTerminal(isIncognito: opensIncognito)
         default:
-            if items[index].selector == #selector(AppDelegate.showHistorySearchAction) {
-                if let temporaryTarget {
-                    HistorySearchWindowController.shared.show(isIncognito: true)
-                } else {
-                    HistorySearchWindowController.shared.show(isIncognito: opensIncognito, target: appState)
-                }
+            if items[index].selector == #selector(AppDelegate.showAllFoilsAction) {
+                delegate.showAllFoilsAction()
             } else if items[index].selector == #selector(AppDelegate.openCameraAction) {
                 if appState.isTemporaryIncognito {
                     delegate.openCamera(isIncognito: true)
