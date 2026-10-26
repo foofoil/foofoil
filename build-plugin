@@ -11,14 +11,32 @@ BUNDLE_PATH="$OUTPUT_ROOT/Video.foofoilextension"
 
 "$SCRIPT_DIR/scripts/build-ffmpeg"
 
-SWIFTPM_MODULECACHE_OVERRIDE="$BUILD_ROOT/module-cache" \
-CLANG_MODULE_CACHE_PATH="$BUILD_ROOT/clang-cache" \
-swift build \
-    --package-path "$SCRIPT_DIR" \
-    --disable-sandbox \
-    --scratch-path "$BUILD_ROOT" \
-    --configuration "$CONFIGURATION" \
-    --product VideoExtensionRuntime
+BUILD_LOG=$(mktemp "${TMPDIR:-/tmp}/foofoil-video-build.XXXXXX")
+trap 'rm -f "$BUILD_LOG"' EXIT
+
+build_runtime() {
+    SWIFTPM_MODULECACHE_OVERRIDE="$BUILD_ROOT/module-cache" \
+    CLANG_MODULE_CACHE_PATH="$BUILD_ROOT/clang-cache" \
+    swift build \
+        --package-path "$SCRIPT_DIR" \
+        --disable-sandbox \
+        --scratch-path "$BUILD_ROOT" \
+        --configuration "$CONFIGURATION" \
+        --product VideoExtensionRuntime
+}
+
+if build_runtime 2>&1 | tee "$BUILD_LOG"; then
+    :
+else
+    BUILD_RESULT=$?
+    # 临时目录被部分清理后，SwiftBuild 可能仍复用缺失的任务上下文；仅对此错误重建一次。
+    if ! grep -Fq 'failed to deserialize Info.plist task context: No such file or directory (2)' "$BUILD_LOG"; then
+        exit "$BUILD_RESULT"
+    fi
+    print -u2 "SwiftBuild Info.plist task context is missing; cleaning video build products and retrying once."
+    swift package --package-path "$SCRIPT_DIR" --scratch-path "$BUILD_ROOT" clean
+    build_runtime
+fi
 
 BIN_PATH=$(swift build \
     --package-path "$SCRIPT_DIR" \
