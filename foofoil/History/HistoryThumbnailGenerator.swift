@@ -10,6 +10,7 @@ import AppKit
 import AVFoundation
 import PDFKit
 import ImageIO
+import QuickLookThumbnailing
 
 /// 历史记录缩略图生成器，支持将图片与 PDF 生成为正方形的 HEIC 缩略图
 public enum HistoryThumbnailGenerator {
@@ -87,6 +88,35 @@ public enum HistoryThumbnailGenerator {
                 finalImage = cropAndResize(cgImage, to: Self.pixelSize)
             }
 
+        case .quickLook:
+            // Quick Look 的内容缩略图来自系统预览服务；不能截取远程视图的图层。
+            // 仅在后台索引队列等待，Finder 图标在主线程获取并完整居中保留。
+            let semaphore = DispatchSemaphore(value: 0)
+            var previewImage: CGImage?
+            Task {
+                let request = QLThumbnailGenerator.Request(
+                    fileAt: url,
+                    size: CGSize(width: Self.decodePixelSize, height: Self.decodePixelSize),
+                    scale: 1,
+                    representationTypes: .thumbnail
+                )
+                if let representation = try? await QLThumbnailGenerator.shared.generateBestRepresentation(for: request),
+                   representation.type == .thumbnail {
+                    previewImage = representation.cgImage
+                }
+                semaphore.signal()
+            }
+            semaphore.wait()
+            if let previewImage {
+                finalImage = cropAndResize(previewImage, to: Self.pixelSize)
+            } else {
+                finalImage = DispatchQueue.main.sync {
+                    let icon = NSWorkspace.shared.icon(forFile: url.path)
+                    var rect = CGRect(x: 0, y: 0, width: Self.pixelSize, height: Self.pixelSize)
+                    return icon.cgImage(forProposedRect: &rect, context: nil, hints: nil)
+                }.flatMap { fitFileIcon($0) }
+            }
+
         case .audio:
             // 用户拖入替换的封面优先于内嵌/同目录封面
             if let customCoverURL,
@@ -108,6 +138,24 @@ public enum HistoryThumbnailGenerator {
 
         guard let image = finalImage else { return false }
         return write(image, to: destinationURL)
+    }
+
+    /// Finder 图标保留透明边缘和完整轮廓；HEIC 使用白色底板。
+    nonisolated private static func fitFileIcon(_ image: CGImage) -> CGImage? {
+        let size = Self.pixelSize
+        guard let context = CGContext(data: nil, width: size, height: size,
+                                      bitsPerComponent: 8, bytesPerRow: 0,
+                                      space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
+        context.setFillColor(CGColor(gray: 1, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: size, height: size))
+        let scale = Double(size) * 0.8 / Double(max(image.width, image.height))
+        let width = Double(image.width) * scale
+        let height = Double(image.height) * scale
+        context.interpolationQuality = .high
+        context.draw(image, in: CGRect(x: (Double(size) - width) / 2,
+                                      y: (Double(size) - height) / 2, width: width, height: height))
+        return context.makeImage()
     }
 
     /// 远程音乐封面仅解码缩略尺寸，并沿用历史统一的正方形 HEIC 缓存。

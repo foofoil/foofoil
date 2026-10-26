@@ -24,6 +24,10 @@ public final class HistoryManager: ObservableObject {
         self.cacheDirectories = cacheDirectories
         refresh()
         contentCache.recoverOrphanBodies()
+        // 旧历史没有 Quick Look 缩略图；后台补齐并沿用现有路径去重。
+        for config in repository.recent(limit: Int.max) where config.contentKind == .quickLook {
+            ContentIndexCoordinator.shared.schedule(config: config)
+        }
     }
 
     public func refresh() {

@@ -19,7 +19,7 @@ public final class ContentIndexCoordinator: @unchecked Sendable {
     /// - Parameter force: 为 true 时忽略同路径去重，强制重建缩略图并重跑索引（如同目录封面经授权后才可用）。
     public func schedule(config: WindowConfig, force: Bool = false) {
         let kind = config.contentKind ?? HistoryContentKind.infer(from: config)
-        guard kind == .image || kind == .pdf || kind == .video || kind == .audio else { return }
+        guard kind == .image || kind == .pdf || kind == .video || kind == .audio || kind == .quickLook else { return }
         // 扩展音频列表没有 imagePath，用列表首项文件兜底。
         guard let path = config.imagePath ?? config.fileList?.items.first?.path else { return }
         // 多分区音频的缩略图来自各分区封面，只随分区集合变化重建，切歌不必重拼宫格；
@@ -93,7 +93,7 @@ public final class ContentIndexCoordinator: @unchecked Sendable {
                     if !text.isEmpty {
                         HistoryRepository.shared.replaceChunks(historyID: config.id, chunkKind: 2, chunks: [(text, nil)])
                     }
-                } else if kind != .video {
+                } else if kind == .pdf || kind == .image {
                     let chunks: [(String, Int?)]
                     if kind == .pdf {
                         chunks = try PDFTextIndexer.extract(url: source.url) { operation?.isCancelled ?? true }
