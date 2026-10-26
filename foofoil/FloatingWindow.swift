@@ -184,6 +184,7 @@ public class FloatingWindow: NSWindow {
 
     public override func sendEvent(_ event: NSEvent) {
         let modifiers = KeyboardShortcut.effectiveModifiers(for: event)
+        if event.type == .keyDown, handleIncognitoShortcut(event) { return }
         // 三指序列期间不把同一动作解释为正文滚动或网页后退。
         if threeFingerWindowDrag.isTracking, event.type == .scrollWheel || event.type == .swipe { return }
         if event.type == .leftMouseDown { resetWindowDragTouches() }
@@ -707,6 +708,7 @@ public class FloatingWindow: NSWindow {
 
     // 重写 performKeyEquivalent(with:)：默认键位下保留既有的窗口直属处理；改键后的可配置命令统一走主菜单。
     public override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if handleIncognitoShortcut(event) { return true }
         if let controller = windowController as? FloatingWindowController,
            controller.appState.handleContentSearchKey(event) { return true }
 
@@ -815,6 +817,19 @@ public class FloatingWindow: NSWindow {
 
         return super.performKeyEquivalent(with: event)
     }
+
+    /// Option-Esc 可能先被文本补全或终端消费，必须在送入内容控件前处理当前配置。
+    func handleIncognitoShortcut(_ event: NSEvent) -> Bool {
+        guard event.type == .keyDown,
+              KeyboardShortcutStore.shared.matches(event, identifier: "file.toggleIncognito"),
+              let controller = windowController as? FloatingWindowController else { return false }
+        guard attachedSheet == nil else { return true }
+        if !event.isARepeat, controller.appState.toggleIncognitoMode() {
+            (NSApp.delegate as? AppDelegate)?.updateHistoryMenu()
+        }
+        return true
+    }
+
 
 
 }

@@ -26,6 +26,7 @@ final class NavigatorPanel: NSWindow {
     }
 
     override func sendEvent(_ event: NSEvent) {
+        if (parent as? FloatingWindow)?.handleIncognitoShortcut(event) == true { return }
         if let foil = parent as? FloatingWindow {
             // 三指移箔期间不让侧栏列表同时滚动；普通双指滚动仍按原路径派发。
             if foil.isTrackingWindowDragTouches, event.type == .scrollWheel || event.type == .swipe { return }
@@ -74,6 +75,7 @@ final class NavigatorPanel: NSWindow {
 
     /// 菜单快捷键匹配前先处理列表导航与搜索键，避免被 PDF 翻页等菜单项吞掉。
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if (parent as? FloatingWindow)?.handleIncognitoShortcut(event) == true { return true }
         if navigationState?.handleContentSearchKey(event) == true { return true }
         if handleKeyDown?(event) == true { return true }
         return super.performKeyEquivalent(with: event)

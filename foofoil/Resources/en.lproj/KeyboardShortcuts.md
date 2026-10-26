@@ -182,3 +182,5 @@ In archive foils, Save As exports the selected file, directory, or root. The arc
 Window positioning and Move to Next Screen shortcuts also work while the terminal has focus, including custom bindings. When a terminal has focus, Ctrl+A/E/P/N and other control keys go to the Shell/TUI. ⌘C/⌘V copy and paste; content zoom adjusts terminal font size. Hold ⌘ and drag to move the terminal window without selecting text. Document Style adjusts terminal themes, background and text colors, fonts, and size, using the same monospaced font filter as code foils.
 
 Content search appears at the top of the reading area without resizing it. EPUB searches the entire book. Search terms are highlighted; set the highlight color in Document Style or save it with a custom theme. The EPUB sidebar’s “Search table of contents” searches directory titles only.
+
+The incognito toggle works while the text editor, Markdown preview, terminal, or attached navigator has focus. Holding the key does not toggle repeatedly; an open sheet keeps ownership of its input.
