@@ -340,10 +340,32 @@ final class FoilTerminalView: LocalProcessTerminalView {
     }
 
     var outputDidChange: (() -> Void)?
+    private var keyboardProtocol = TerminalKeyboardProtocol()
 
     override func dataReceived(slice: ArraySlice<UInt8>) {
-        super.dataReceived(slice: slice)
+        // 协商序列不能交给 SwiftTerm 当成恢复光标；响应仍经同一 PTY 返回给前台程序。
+        for output in keyboardProtocol.receive(slice) {
+            switch output {
+            case .display(let bytes): super.dataReceived(slice: bytes[...])
+            case .reply(let text): send(txt: text)
+            }
+        }
         outputDidChange?()
+    }
+
+    /// SwiftTerm 的 keyDown 不是 open；窗口在终端持有焦点时统一从此入口分发。
+    func handleTerminalKeyDown(with event: NSEvent) {
+        if let encoded = keyboardProtocol.encoding(for: event, optionAsMetaKey: optionAsMetaKey), !hasMarkedText() {
+            selectNone()
+            send(txt: encoded)
+        } else {
+            super.keyDown(with: event)
+        }
+    }
+
+    override func processTerminated(_ source: LocalProcess, exitCode: Int32?) {
+        keyboardProtocol = TerminalKeyboardProtocol()
+        super.processTerminated(source, exitCode: exitCode)
     }
     private var documentForegroundColor: NSColor?
     private var documentBackgroundColor: NSColor?
@@ -397,7 +419,7 @@ final class FoilTerminalView: LocalProcessTerminalView {
     /// 控制键及终端编辑快捷键先于应用菜单处理；常规 Command 菜单仍保留。
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if event.modifierFlags.contains(.control), !event.modifierFlags.contains(.command) {
-            keyDown(with: event)
+            handleTerminalKeyDown(with: event)
             return true
         }
         return super.performKeyEquivalent(with: event)

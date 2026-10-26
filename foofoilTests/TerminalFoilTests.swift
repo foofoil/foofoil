@@ -63,6 +63,49 @@ struct TerminalFoilTests {
         }
     }
 
+    @Test(arguments: [false, true])
+    func negotiatedControlKeysReachPTYAndRestoreLegacyInput(enhanced: Bool) async throws {
+        let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let captured = root.appendingPathComponent("keys")
+        let restored = root.appendingPathComponent("restored")
+        let expected = enhanced ? "\u{1b}[109;5u\r\u{1b}[120;5um\u{1b}[105;5u\t" : "\r\r\u{18}m\t\t"
+        let enable = enhanced ? "\\033[>1u" : ""
+        let state = AppState(isIncognito: true)
+        state.prepareTerminal(.init(shellPath: "/bin/zsh", workingDirectory: root.path,
+            environment: ["ZDOTDIR": root.path, "HISTFILE": "/dev/null"],
+            startupCommands: "stty raw -echo; printf '\(enable)KEYBOARD_READY'; dd bs=1 count=\(expected.utf8.count) > \(TerminalBootstrap.quote(captured.path)) 2>/dev/null; printf '\\033[<uKEYBOARD_RESTORED'; dd bs=1 count=2 > \(TerminalBootstrap.quote(restored.path)) 2>/dev/null; stty sane"), start: false)
+        let controller = FloatingWindowController(appState: state)
+        let session = try #require(state.terminalSession)
+        defer { session.stop(); controller.closeWithoutTerminalPrompt() }
+        let window = try #require(controller.window)
+        window.contentView = session.view
+        window.makeFirstResponder(session.view)
+        session.start()
+        func screenContains(_ text: String) -> Bool {
+            String(decoding: session.view.getTerminal().getBufferAsData(), as: UTF8.self).contains(text)
+        }
+        try await waitFor { screenContains("KEYBOARD_READY") }
+        func send(_ key: String, code: UInt16, control: Bool = false) throws {
+            let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
+                modifierFlags: control ? .control : [], timestamp: ProcessInfo.processInfo.systemUptime,
+                windowNumber: window.windowNumber, context: nil, characters: key,
+                charactersIgnoringModifiers: key, isARepeat: false, keyCode: code))
+            window.sendEvent(event)
+        }
+        try send("m", code: 46, control: true)
+        try send("\r", code: 36)
+        try send("x", code: 7, control: true)
+        try send("m", code: 46)
+        try send("i", code: 34, control: true)
+        try send("\t", code: 48)
+        try await waitFor { screenContains("KEYBOARD_RESTORED") }
+        #expect(try Data(contentsOf: captured) == Data(expected.utf8))
+        try send("m", code: 46, control: true)
+        try send("\r", code: 36)
+        try await waitFor { (try? Data(contentsOf: restored).count) == 2 }
+        #expect(try Data(contentsOf: restored) == Data([13, 13]))
+    }
+
     @Test func clearContentRemovesScreenScrollbackAndPreviousSessionWithoutReplacingSession() throws {
         let session = TerminalSession(configuration: .init(), previousOutput: "previous session marker")
         let view = session.view

@@ -273,6 +273,13 @@ public class FloatingWindow: NSWindow {
         if event.type == .keyDown,
            (windowController as? FloatingWindowController)?.appState.terminalConfiguration != nil,
            !modifiers.contains(.command) {
+            if let session = (windowController as? FloatingWindowController)?.appState.terminalSession,
+               firstResponder === session.view {
+                // Control 窗口布局键仍优先，其余输入统一经过终端的协商编码入口。
+                if modifiers.contains(.control) { _ = performKeyEquivalent(with: event) }
+                else { session.view.handleTerminalKeyDown(with: event) }
+                return
+            }
             super.sendEvent(event)
             return
         }
@@ -721,7 +728,7 @@ public class FloatingWindow: NSWindow {
             }), NSApplication.shared.mainMenu?.performKeyEquivalent(with: event) == true {
                 return true
             }
-            session.view.keyDown(with: event)
+            session.view.handleTerminalKeyDown(with: event)
             return true
         }
         // 列表切项必须赶在主菜单匹配 PDF 翻页方向键之前处理。
