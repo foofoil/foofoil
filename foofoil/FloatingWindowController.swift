@@ -1004,6 +1004,16 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             }
             .store(in: &cancellables)
 
+        // 应用失活时箔片和目录面板可能先后 resignKey；不必等下一次指针事件，立即收起 hover 侧栏。
+        NotificationCenter.default.publisher(for: NSApplication.didResignActiveNotification)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.appState.isNavigatorPanelHovered = false
+                self.appState.isNavigatorEdgeHovered = false
+                self.updateNavigatorPanelVisibility()
+            }
+            .store(in: &cancellables)
+
         updateNavigatorPanelVisibility()
     }
 
@@ -1015,10 +1025,27 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         if appState.navigatorPanelVisibilityMode == .hidden { return false }
         // 调宽期间拖拽指针会随边缘移出面板，悬停判定会瞬时为 false；强制保持显示。
         if appState.isAdjustingNavigatorPanelWidth { return true }
-        return appState.isNavigatorPanelExplicitlyVisible
-            || appState.isNavigatorPanelHovered
+        if appState.isNavigatorPanelExplicitlyVisible || appState.isNavigatorSearchActive { return true }
+        // 后台箔不因指针掠过而展开侧栏；焦点转交给自己的目录面板时仍算激活。
+        guard isNavigatorHoverActive else { return false }
+        return appState.isNavigatorPanelHovered
             || appState.isNavigatorEdgeHovered
-            || appState.isNavigatorSearchActive
+    }
+
+    /// 只有获得键盘焦点的箔才响应 hover；目录面板取 key 时视为同一激活单元。
+    private var isNavigatorHoverActive: Bool {
+        guard let window else { return false }
+        return window.isKeyWindow || navigatorPanelController.window?.isKeyWindow == true
+    }
+
+    private func resetNavigatorHoverIfNeeded() {
+        if appState.isNavigatorEdgeHovered || appState.isNavigatorPanelHovered {
+            appState.isNavigatorEdgeHovered = false
+            appState.isNavigatorPanelHovered = false
+            updateNavigatorPanelVisibility()
+        } else {
+            updateNavigatorHoverMonitors()
+        }
     }
 
     /// 全屏覆盖层下，指针落在导航栏区域内时 ⌘+滚轮改宽度而不是缩放箔片。
@@ -1223,14 +1250,24 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     func refreshNavigatorHoverFromPointer(windowPoint: NSPoint? = nil, screenPoint: NSPoint? = nil) {
         guard !NSApp.isHidden else { return }
         refreshWindowHoverFromPointer(windowPoint: windowPoint, screenPoint: screenPoint)
-        guard let window, !appState.navigatorContributions.isEmpty else {
-            if appState.isNavigatorEdgeHovered || appState.isNavigatorPanelHovered {
-                appState.isNavigatorEdgeHovered = false
-                appState.isNavigatorPanelHovered = false
-                updateNavigatorPanelVisibility()
-            } else {
-                updateNavigatorHoverMonitors()
+        let resolvedScreenPoint = screenPoint
+            ?? windowPoint.flatMap { point in
+                window.map { $0.convertToScreen(NSRect(origin: point, size: .zero)).origin }
             }
+        // 导航侧栏的资格判定可以提前返回，但音频控制条仍需按指针位置统一推导显隐。
+        defer {
+            if appState.readingState.isAudioDocument {
+                // 音频播放中从目录面板移出时没有箔窗事件可触发隐藏，由这里统一推导显隐。
+                updateAudioPlaybackControlsVisibility(screenPoint: resolvedScreenPoint)
+            }
+        }
+        // 背景箔的 tracking area 始终活跃；只有当前箔（或它自己的目录面板）获得键盘焦点时才响应 hover。
+        guard isNavigatorHoverActive else {
+            resetNavigatorHoverIfNeeded()
+            return
+        }
+        guard let window, !appState.navigatorContributions.isEmpty else {
+            resetNavigatorHoverIfNeeded()
             return
         }
 
@@ -1279,12 +1316,6 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             } else {
                 updateNavigatorHoverMonitors()
             }
-        }
-        if appState.readingState.isAudioDocument {
-            // 音频播放中从目录面板移出时没有箔窗事件可触发隐藏，由这里统一推导显隐。
-            let resolvedScreenPoint = screenPoint
-                ?? windowPoint.map { window.convertToScreen(NSRect(origin: $0, size: .zero)).origin }
-            updateAudioPlaybackControlsVisibility(screenPoint: resolvedScreenPoint)
         }
     }
 
@@ -1974,6 +2005,14 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     public func windowDidResignKey(_ notification: Notification) {
         appState.isCommandKeyPressed = false
         appState.isOptionKeyPressed = false
+        // 焦点转给其他箔或应用时收起 hover 侧栏；转给自己的目录面板则保持。
+        // key window 的切换顺序不固定，延后一拍再确认面板是否接手了焦点。
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.navigatorPanelController.window?.isKeyWindow != true else { return }
+            self.appState.isNavigatorPanelHovered = false
+            self.appState.isNavigatorEdgeHovered = false
+            self.updateNavigatorPanelVisibility()
+        }
     }
 
     public func windowWillEnterFullScreen(_ notification: Notification) {
