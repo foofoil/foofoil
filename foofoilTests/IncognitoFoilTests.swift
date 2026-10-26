@@ -261,7 +261,7 @@ struct IncognitoFoilTests {
         #expect(newFoil.keyEquivalent == "n")
         #expect(newFoil.modifiers == [.command, .shift])
         #expect(toggle.keyEquivalent == "\u{1B}")
-        #expect(toggle.modifiers == [.option, .shift])
+        #expect(toggle.modifiers == [.option])
         #expect(clipboard.keyEquivalent == "v")
         #expect(clipboard.modifiers == [.command, .option])
     }

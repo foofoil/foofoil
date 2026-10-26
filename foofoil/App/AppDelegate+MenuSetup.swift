@@ -105,7 +105,7 @@ extension AppDelegate {
         fileMenu.addItem(privateItem)
 
         let toggleIncognitoItem = NSMenuItem(title: NSLocalizedString("Convert to Incognito Foil", comment: ""), action: #selector(toggleCurrentFoilIncognitoAction), keyEquivalent: "\u{1B}")
-        toggleIncognitoItem.keyEquivalentModifierMask = [.option, .shift]
+        toggleIncognitoItem.keyEquivalentModifierMask = [.option]
         toggleIncognitoItem.representedObject = "file.toggleIncognito"
         toggleIncognitoItem.withSymbol("arrow.left.arrow.right")
         toggleIncognitoItem.target = self

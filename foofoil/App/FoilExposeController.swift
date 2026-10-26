@@ -1337,11 +1337,11 @@ final class FoilExposeController {
                 self.dismiss()
                 return event
             }
-            // 其余带命令修饰键的按键放行，让菜单快捷键（含再次触发的 ⌃⇧⎋ / ⌥⇧⎋）继续工作。
+            // 其余带命令修饰键的按键放行，让菜单快捷键（含再次触发的 ⌃⇧⎋ / ⌥⎋）继续工作。
             if hasCommand {
                 return event
             }
-            // 带 ⌥ 的按键放行给菜单快捷键（如再次触发的 ⌥⇧⎋）。
+            // 带 ⌥ 的按键放行给菜单快捷键（如再次触发的 ⌥⎋）。
             if model.isClipboardFocused, !hasCommand, !hasControl, [36, 76].contains(event.keyCode) {
                 model.onOpenClipboard()
                 return nil
