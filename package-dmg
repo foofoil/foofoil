@@ -184,7 +184,7 @@ for def in "${EXTENSION_DEFS[@]}"; do
         exit 1
     fi
     print "Building plugin $bundle ($config) from $root"
-    "$source_root/build-plugin" "$PLUGINS_ROOT" - "$config" >/dev/null
+    "$source_root/build-plugin" "$PLUGINS_ROOT" - "$config"
     rm -rf "$APP_PATH/Contents/PlugIns/$bundle"
     ditto "$PLUGINS_ROOT/$bundle" "$APP_PATH/Contents/PlugIns/$bundle"
 done
