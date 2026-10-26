@@ -55,7 +55,7 @@ nonisolated enum NavigatorPanelMetrics {
     /// 面板横向可见宽度低于此比例（即被推出屏幕超过 1/3）时视为超界，可自动换边。
     static let autoSwapMinVisibleRatio: CGFloat = 2.0 / 3.0
 
-    /// 面板被推出屏幕超过 1/3、且挂到另一侧后能完整放进某块屏幕可见区域时，
+    /// 面板被推出屏幕超过 1/3、且挂到另一侧后横向能完整放进屏幕可见区域时，
     /// 返回换边目标；否则返回 nil。纯几何判定，供窗口移动时调用与单元测试。
     static func autoSwapTargetSide(
         current: NavigatorPanelSide,
@@ -63,7 +63,7 @@ nonisolated enum NavigatorPanelMetrics {
         windowFrame: NSRect,
         screenVisibleFrames: [NSRect]
     ) -> NavigatorPanelSide? {
-        let visibleWidth = screenVisibleFrames.reduce(CGFloat(0)) { $0 + panelFrame.intersection($1).width }
+        let visibleWidth = horizontallyVisibleWidth(of: panelFrame, in: screenVisibleFrames)
         guard visibleWidth < panelFrame.width * autoSwapMinVisibleRatio else { return nil }
 
         let gap = CGFloat(attachmentGap)
@@ -84,8 +84,24 @@ nonisolated enum NavigatorPanelMetrics {
                 height: panelFrame.height
             )
         }
-        guard screenVisibleFrames.contains(where: { $0.contains(candidateFrame) }) else { return nil }
+        guard horizontallyVisibleWidth(of: candidateFrame, in: screenVisibleFrames) >= candidateFrame.width - 0.5 else { return nil }
         return current == .left ? .right : .left
+    }
+
+    /// 只检查横向裁切；顶部菜单栏、底部 Dock 不应阻止横向换边。
+    /// 合并屏幕交集，避免镜像或重叠屏幕重复计入可见宽度。
+    private static func horizontallyVisibleWidth(of frame: NSRect, in screens: [NSRect]) -> CGFloat {
+        let intervals = screens.filter { $0.maxY > frame.minY && $0.minY < frame.maxY }
+            .map { (max(frame.minX, $0.minX), min(frame.maxX, $0.maxX)) }
+            .filter { $0.1 > $0.0 }
+            .sorted { $0.0 < $1.0 }
+        var end = frame.minX
+        var width: CGFloat = 0
+        for (lower, upper) in intervals {
+            width += max(0, upper - max(lower, end))
+            end = max(end, upper)
+        }
+        return width
     }
 
     /// 嵌平悬停模式的显隐几何：`triggered` 表示指针处于“唤出/保持”区域

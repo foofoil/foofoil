@@ -1232,6 +1232,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         if shouldShowNavigatorPanel {
             pendingNavigatorPanelHide?.cancel()
             pendingNavigatorPanelHide = nil
+            autoSwapNavigatorSideIfNeeded()
             navigatorPanelController.show(attachedTo: window)
             updateNavigatorHoverMonitors()
             return
@@ -2200,39 +2201,32 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         scheduleWindowFrameSave()
     }
 
-    /// 一次超界自动换边是否已发生；面板重新完整可见后解除，允许下一次超界再换。
-    private var hasAutoSwappedNavigatorSideForClip = false
-
-    /// 拖动箔片把面板推出屏幕超过 1/3 且另一侧放得下时自动换边一次；
-    /// 换边锁避免拖动过程中两侧来回跳。新侧经 navigatorPanelSide 的 didSet 持久化，
-    /// 之后移回原位也不会自动切回。
+    /// 根据主窗口推导挂靠位置，不读取可能被 AppKit 移动或尚未同步的子窗口 frame。
+    /// 另一侧必须横向完整可见，因此换边后不会立即反向触发。
     func autoSwapNavigatorSideIfNeeded() {
         guard !appState.isFullScreen,
               !isTransitioningFullScreen,
-              navigatorPanelController.isVisible,
-              let window,
-              let panel = navigatorPanelController.window else { return }
-
-        let panelFrame = panel.frame
-        let screenVisibleFrames = NSScreen.screens.map(\.visibleFrame)
-        let visibleWidth = screenVisibleFrames.reduce(CGFloat(0)) { $0 + panelFrame.intersection($1).width }
-        if visibleWidth >= panelFrame.width {
-            hasAutoSwappedNavigatorSideForClip = false
-        }
-        guard !hasAutoSwappedNavigatorSideForClip,
-              let target = NavigatorPanelMetrics.autoSwapTargetSide(
-                current: appState.navigatorPanelSide,
-                panelFrame: panelFrame,
-                windowFrame: window.frame,
-                screenVisibleFrames: screenVisibleFrames
-              ) else { return }
-
-        hasAutoSwappedNavigatorSideForClip = true
+              !appState.navigatorContributions.isEmpty,
+              appState.navigatorPanelVisibilityMode != .hidden,
+              let window else { return }
+        let width = CGFloat(NavigatorPanelMetrics.clampWidth(appState.navigatorPanelWidth))
+        let gap = CGFloat(NavigatorPanelMetrics.attachmentGap)
+        let x = appState.navigatorPanelSide == .left
+            ? window.frame.minX - width - gap : window.frame.maxX + gap
+        let panelFrame = NSRect(x: x, y: window.frame.minY, width: width, height: window.frame.height)
+        guard let target = NavigatorPanelMetrics.autoSwapTargetSide(
+            current: appState.navigatorPanelSide,
+            panelFrame: panelFrame,
+            windowFrame: window.frame,
+            screenVisibleFrames: NSScreen.screens.map(\.visibleFrame)
+        ) else { return }
         appState.navigatorPanelSide = target
+        navigatorPanelController.updateFrame(relativeTo: window)
         SettingsStore.shared.navigatorPanelSide = target
     }
 
     public func windowDidResize(_ notification: Notification) {
+        autoSwapNavigatorSideIfNeeded()
         if !appState.isFullScreen, let window { navigatorPanelController.updateFrame(relativeTo: window) }
         guard !isLiveResizing else { return }
         scheduleWindowFrameSave()

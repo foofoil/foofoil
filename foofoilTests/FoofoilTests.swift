@@ -2564,6 +2564,27 @@ struct FoofoilTests {
         ) == nil)
     }
 
+    @Test func navigatorAutoSwapIgnoresVerticalClippingAndDoesNotBounce() {
+        let screen = NSRect(x: 0, y: 40, width: 1000, height: 740)
+        let window = NSRect(x: 50, y: 0, width: 300, height: 800)
+        let left = NSRect(x: -158, y: 0, width: 200, height: 800)
+        let right = NSRect(x: 358, y: 0, width: 200, height: 800)
+        #expect(NavigatorPanelMetrics.autoSwapTargetSide(
+            current: .left, panelFrame: left, windowFrame: window,
+            screenVisibleFrames: [screen, screen]
+        ) == .right)
+        #expect(NavigatorPanelMetrics.autoSwapTargetSide(
+            current: .right, panelFrame: right, windowFrame: window,
+            screenVisibleFrames: [screen]
+        ) == nil)
+        let mirroredWindow = NSRect(x: 650, y: 0, width: 300, height: 800)
+        #expect(NavigatorPanelMetrics.autoSwapTargetSide(
+            current: .right,
+            panelFrame: NSRect(x: 958, y: 0, width: 200, height: 800),
+            windowFrame: mirroredWindow, screenVisibleFrames: [screen]
+        ) == .left)
+    }
+
     @Test func fileListKeyDownNavigatesAdjacentItems() throws {
         let first = try writeTestPNG(name: "key-a.png")
         let second = try writeTestPNG(name: "key-b.png")
