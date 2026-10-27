@@ -112,6 +112,49 @@ struct ClipboardHistorySearchTests {
         #expect(search.entries.count == 1 && search.entries.first?.isCurrentClipboard == true)
     }
 
+    @Test func cachedResultsRemainUsableWhileRefreshIsPending() async throws {
+        actor Gate {
+            let result: ClipboardHistorySnapshot
+            private var continuation: CheckedContinuation<ClipboardHistorySnapshot, Never>?
+            private var finished = false
+            init(_ result: ClipboardHistorySnapshot) { self.result = result }
+            func wait() async -> ClipboardHistorySnapshot {
+                if finished { return result }
+                return await withCheckedContinuation { continuation = $0 }
+            }
+            func finish() { finished = true; continuation?.resume(returning: result); continuation = nil }
+        }
+        let cached = entry("cached", "Cached body"), fresh = entry("fresh", "Fresh body")
+        let gate = Gate(.init(access: .available, entries: [fresh]))
+        let search = ClipboardHistorySearch(load: { await gate.wait() }, currentContent: { nil },
+                                            cachedLoad: { .init(access: .available, entries: [cached]) })
+        defer { search.stop() }
+        search.search("")
+        for _ in 0..<100 {
+            if search.entries.map(\.id) == ["cached"] { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(search.isLoading && search.entries.map(\.id) == ["cached"])
+        search.search("Cached")
+        #expect(search.entries.map(\.id) == ["cached"])
+        await gate.finish()
+        try await waitForLoad(search)
+        #expect(search.entries.isEmpty)
+        search.search("Fresh")
+        #expect(search.entries.map(\.id) == ["fresh"])
+    }
+
+    @Test func unauthorizedCacheNeverExposesPreviousHistory() async throws {
+        let cached = entry("cached", "Previously authorized")
+        let search = ClipboardHistorySearch(load: { .init(access: .needsAuthorization, entries: []) },
+                                            currentContent: { nil },
+                                            cachedLoad: { .init(access: .needsAuthorization, entries: [cached]) })
+        defer { search.stop() }
+        search.search("")
+        try await waitForLoad(search)
+        #expect(search.access == .needsAuthorization && search.entries.isEmpty)
+    }
+
     /// 构造最小 dbStr + 未压缩 LZ4 帧，验证字段恢复及损坏边界；不读取用户历史。
     @Test func nativeStoreRestoresTextAndRejectsTruncatedPages() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -161,6 +204,47 @@ struct ClipboardHistorySearchTests {
         #expect(records.count == 1)
         #expect(records.first?.identifier == "fixture-id")
         #expect(records.first?.text == String(repeating: "Full body ", count: 40))
+        #expect(reader.decodedPageCount == 1)
+        #expect(try reader.read(directory: directory).first?.identifier == "fixture-id")
+        #expect(reader.decodedPageCount == 0)
+
+        // 新增无关页，再只修改该页：剪贴板所在页无需再次解压。
+        database.append(Data(count: 4096))
+        var unrelatedFrame = frame
+        let domainRange = try #require(unrelatedFrame.range(of: Data("com.apple.spotlight.pasteboard.text".utf8)))
+        unrelatedFrame[domainRange.lowerBound] = Character("x").asciiValue!
+        database.replaceSubrange(4104..<4108, with: word(2))
+        database.replaceSubrange(4140..<4144, with: word(3))
+        for (offset, value) in [(12296, 20 + unrelatedFrame.count), (12300, 0x1009), (12304, 20 + payload.count)] {
+            database.replaceSubrange(offset..<(offset + 4), with: word(value))
+        }
+        database.replaceSubrange(12308..<(12308 + unrelatedFrame.count), with: unrelatedFrame)
+        try database.write(to: url)
+        #expect(try reader.read(directory: directory).count == 1)
+        #expect(reader.decodedPageCount == 1)
+        let unrelatedTitle = try #require(database.range(of: Data("Short title".utf8), in: 12308..<database.count))
+        database.replaceSubrange(unrelatedTitle, with: Data("Other title".utf8))
+        try database.write(to: url)
+        #expect(try reader.read(directory: directory).first?.title == "Short title")
+        #expect(reader.decodedPageCount == 1)
+
+        // 映射表变更必须使页缓存失效，哪怕压缩页字节没有变化。
+        let propertiesURL = directory.appendingPathComponent("dbStr-1.map.data")
+        let originalProperties = try Data(contentsOf: propertiesURL)
+        var changedProperties = originalProperties
+        let domainKey = try #require(changedProperties.range(of: Data("_kMDItemDomainIdentifier".utf8)))
+        changedProperties[domainKey.lowerBound] = Character("X").asciiValue!
+        try changedProperties.write(to: propertiesURL)
+        #expect(try reader.read(directory: directory).isEmpty)
+        #expect(reader.decodedPageCount == 2)
+        try originalProperties.write(to: propertiesURL)
+        #expect(try reader.read(directory: directory).count == 1)
+
+        // 页从活动 map 移除后，不得从上一轮缓存中复活。
+        database.replaceSubrange(4104..<4108, with: word(0))
+        try database.write(to: url)
+        #expect(try reader.read(directory: directory).isEmpty)
+        database.replaceSubrange(4104..<4108, with: word(1))
         try database.prefix(8300).write(to: url)
         #expect(throws: (any Error).self) { var broken = SpotlightClipboardStore(); _ = try broken.read(directory: directory) }
     }

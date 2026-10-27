@@ -67,11 +67,12 @@ actor ClipboardHistoryReader {
     static let shared = ClipboardHistoryReader()
     private var cachedStamp = ""
     private var cached: [ClipboardSearchEntry] = []
+    private var store = SpotlightClipboardStore()
     func read() async -> ClipboardHistorySnapshot {
         let root = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Metadata/CoreSpotlight")
         do { _ = try FileManager.default.contentsOfDirectory(atPath: root.path) }
         catch {
-            cached = []; cachedStamp = ""
+            cached = []; cachedStamp = ""; store = SpotlightClipboardStore()
             let code = (error as NSError).code
             return .init(access: code == NSFileReadNoPermissionError ? .needsAuthorization : .unavailable, entries: [])
         }
@@ -83,7 +84,6 @@ actor ClipboardHistoryReader {
                 return "\(name):\(values.contentModificationDate?.timeIntervalSince1970 ?? 0):\(values.fileSize ?? 0)"
             }.joined(separator: "|")
             if stamp != cachedStamp {
-                var store = SpotlightClipboardStore()
                 let records = try store.read(directory: directory)
                 var unique: [String: ClipboardSearchEntry] = [:]
                 for record in records {
@@ -106,18 +106,32 @@ actor ClipboardHistoryReader {
                 cached = unique.values.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date > $1.date }
                 cachedStamp = stamp
             }
-            // 缓存中也应用系统的保留时长，避免索引尚未清理时显示已过期条目。
-            let preferences = UserDefaults(suiteName: "com.apple.Spotlight")
-            if preferences?.object(forKey: "PasteboardHistoryEnabled") != nil, preferences?.bool(forKey: "PasteboardHistoryEnabled") == false {
-                return .init(access: .available, entries: [])
-            }
-            let timeout = preferences?.object(forKey: "PasteboardHistoryTimeout").flatMap { ($0 as? NSNumber)?.doubleValue } ?? 28800
-            let threshold = Date().addingTimeInterval(-(timeout > 0 ? timeout : 28800))
-            return .init(access: .available, entries: cached.filter { $0.date >= threshold })
+            return currentSnapshot()
         } catch {
             return .init(access: (error as NSError).code == NSFileReadNoPermissionError ? .needsAuthorization : .unavailable, entries: [])
         }
     }
+    /// 显示旧快照前重新检查权限和保留时长，撤销授权后不会继续展示缓存内容。
+    func cachedSnapshot() async -> ClipboardHistorySnapshot? {
+        guard !cachedStamp.isEmpty else { return nil }
+        let root = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Metadata/CoreSpotlight")
+        do { _ = try FileManager.default.contentsOfDirectory(atPath: root.path) }
+        catch {
+            cached = []; cachedStamp = ""; store = SpotlightClipboardStore()
+            return .init(access: (error as NSError).code == NSFileReadNoPermissionError ? .needsAuthorization : .unavailable, entries: [])
+        }
+        return currentSnapshot()
+    }
+    private func currentSnapshot() -> ClipboardHistorySnapshot {
+        let preferences = UserDefaults(suiteName: "com.apple.Spotlight")
+        if preferences?.object(forKey: "PasteboardHistoryEnabled") != nil, preferences?.bool(forKey: "PasteboardHistoryEnabled") == false {
+            return .init(access: .available, entries: [])
+        }
+        let timeout = preferences?.object(forKey: "PasteboardHistoryTimeout").flatMap { ($0 as? NSNumber)?.doubleValue } ?? 28800
+        let threshold = Date().addingTimeInterval(-(timeout > 0 ? timeout : 28800))
+        return .init(access: .available, entries: cached.filter { $0.date >= threshold })
+    }
+
 }
 
 @MainActor
@@ -134,9 +148,15 @@ final class ClipboardHistorySearch: ObservableObject {
     private var activation: AnyCancellable?
     private let load: @Sendable () async -> ClipboardHistorySnapshot
     private let currentContent: @MainActor () -> ClipboardSearchEntry?
-    init(load: @escaping @Sendable () async -> ClipboardHistorySnapshot = { await ClipboardHistoryReader.shared.read() },
-         currentContent: @escaping @MainActor () -> ClipboardSearchEntry? = { .current() }) {
-        self.load = load; self.currentContent = currentContent
+    private let cachedLoad: @Sendable () async -> ClipboardHistorySnapshot?
+    init(load: (@Sendable () async -> ClipboardHistorySnapshot)? = nil,
+         currentContent: @escaping @MainActor () -> ClipboardSearchEntry? = { .current() },
+         cachedLoad: (@Sendable () async -> ClipboardHistorySnapshot?)? = nil) {
+        self.load = load ?? { await ClipboardHistoryReader.shared.read() }
+        if let cachedLoad { self.cachedLoad = cachedLoad }
+        else if load == nil { self.cachedLoad = { await ClipboardHistoryReader.shared.cachedSnapshot() } }
+        else { self.cachedLoad = { nil } }
+        self.currentContent = currentContent
         activation = NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
             .sink { [weak self] _ in
                 MainActor.assumeIsolated { if self?.active == true { self?.refresh() } }
@@ -151,7 +171,11 @@ final class ClipboardHistorySearch: ObservableObject {
         current = currentContent()
         filter()
         isLoading = true
-        task = Task { [weak self, load] in
+        task = Task { [weak self, load, cachedLoad] in
+            if let cached = await cachedLoad() {
+                guard let self, !Task.isCancelled, self.active else { return }
+                self.access = cached.access; self.snapshot = cached.entries; self.filter()
+            }
             let result = await load()
             guard let self, !Task.isCancelled, self.active else { return }
             self.access = result.access
