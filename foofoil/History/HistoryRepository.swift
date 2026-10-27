@@ -40,6 +40,10 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
         catch { NSLog("最近历史读取失败：%@", error.localizedDescription); return [] }
     }
 
+    func untitledTerminalCandidates() -> [WindowConfig] {
+        (try? database?.untitledTerminalCandidates()) ?? []
+    }
+
     public func config(id: UUID) -> WindowConfig? {
         guard let database else { return nil }
         return try? database.config(id: id)

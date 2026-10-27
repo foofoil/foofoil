@@ -542,7 +542,11 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     }
 
     public var historyMenuDisplayName: String {
-        if terminalConfiguration != nil { return customTitle ?? NSLocalizedString("Terminal", comment: "") }
+        if let terminalConfiguration {
+            if let customTitle = FileListState.normalizedTitle(customTitle) { return customTitle }
+            return String(format: NSLocalizedString("Terminal Directory Title Format", comment: "Automatic history title for an untitled terminal; %@ is its working directory."),
+                          terminalConfiguration.abbreviatedWorkingDirectory)
+        }
         if let fileList, fileList.isPresentable {
             return fileList.historyDisplayTitle
         }

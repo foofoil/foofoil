@@ -17,15 +17,22 @@ final class ApplicationControlService {
     }
 
     func createTerminal(_ configuration: TerminalLaunchConfiguration, title: String? = nil, incognito: Bool = false, reuseBlankWindow: Bool = false) throws -> FloatingWindowController {
+        let normalizedTitle = FileListState.normalizedTitle(title)
         let blank = reuseBlankWindow ? delegate.blankWindowController(isIncognito: incognito) : nil
         guard blank != nil || delegate.windowControllers.count < 96 else { throw AgentFailure("WINDOW_LIMIT") }
         // 在建窗之前验证配置和工作目录；不执行脚本。
         let validation = try TerminalBootstrap(configuration: configuration, terminalID: "validation")
         validation.cleanup()
+        // 自动标题的终端按历史身份重开；自定义标题或无痕创建始终保留独立记录。
+        if normalizedTitle == nil, !incognito,
+           let history = Self.reusableTerminalHistory(in: HistoryRepository.shared.untitledTerminalCandidates(), for: configuration),
+           let controller = delegate.openHistoryConfig(config: history, id: history.id, reuseBlankWindow: reuseBlankWindow) {
+            return controller
+        }
         // 菜单打开沿用普通内容的空箔选择规则；CLI 的 create 仍明确创建新箔。
         let state = blank?.appState ?? AppState(isIncognito: incognito)
         if blank != nil { state.resetContent() }
-        state.customTitle = FileListState.normalizedTitle(title)
+        state.customTitle = normalizedTitle
         state.prepareTerminal(configuration, start: true)
         if let blank {
             delegate.activateWindow(blank)
@@ -38,6 +45,17 @@ final class ApplicationControlService {
         if !NSApp.isHidden { controller.showWindow(nil) }
         state.saveState()
         return controller
+    }
+
+    static func reusableTerminalHistory(in configs: [WindowConfig], for configuration: TerminalLaunchConfiguration) -> WindowConfig? {
+        let directory = configuration.resolvedWorkingDirectory
+        return configs.first { config in
+            guard FileListState.normalizedTitle(config.customTitle) == nil,
+                  let candidate = config.terminalConfiguration else { return false }
+            return candidate.resolvedWorkingDirectory == directory
+                && candidate.environment == configuration.environment
+                && candidate.startupCommands == configuration.startupCommands
+        }
     }
 
     func execute(_ request: AgentRequest, response: inout AgentResponse) throws {

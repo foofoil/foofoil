@@ -12658,6 +12658,23 @@
         }
       }
     },
+    "Terminal Directory Title Format": {
+      "comment": "Automatic history title for an untitled terminal; %@ is its working directory.",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terminal (%@)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "终端（%@）"
+          }
+        }
+      }
+    },
     "Terminal Ready": {
       "localizations": {
         "en": {

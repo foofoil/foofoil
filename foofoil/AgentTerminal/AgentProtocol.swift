@@ -68,6 +68,15 @@ nonisolated public struct TerminalLaunchConfiguration: Codable, Sendable, Equata
         self.shellPath = shellPath; self.workingDirectory = workingDirectory
         self.environment = environment; self.startupCommands = startupCommands
     }
+
+    /// 启动与历史复用共用标准化目录，使 ~、尾斜杠和等价的相对分量不制造不同身份。
+    var resolvedWorkingDirectory: String {
+        NSString(string: workingDirectory ?? FileManager.default.homeDirectoryForCurrentUser.path).standardizingPath
+    }
+
+    var abbreviatedWorkingDirectory: String {
+        (resolvedWorkingDirectory as NSString).abbreviatingWithTildeInPath
+    }
 }
 
 nonisolated struct ControlWindow: Codable, Sendable {

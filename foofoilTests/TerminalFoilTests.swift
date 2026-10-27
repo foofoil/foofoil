@@ -505,6 +505,61 @@ struct TerminalFoilTests {
         #expect(TerminalConfigurationField.environment.value(in: .init(environment: ["B": "2", "A": "1"])) == "A=1\nB=2")
     }
 
+    @Test func untitledTerminalHistoryTitleUsesAbbreviatedDirectory() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let format = NSLocalizedString("Terminal Directory Title Format", comment: "")
+        let homeConfig = WindowConfig(id: UUID(), terminalConfiguration: .init())
+        #expect(homeConfig.historyMenuDisplayName == String(format: format, "~"))
+        let nestedConfig = WindowConfig(id: UUID(), terminalConfiguration: .init(workingDirectory: home + "/Documents/"))
+        #expect(nestedConfig.historyMenuDisplayName == String(format: format, "~/Documents"))
+        let namedConfig = WindowConfig(id: UUID(), customTitle: "Build", terminalConfiguration: .init(workingDirectory: home))
+        #expect(namedConfig.historyMenuDisplayName == "Build")
+    }
+
+    @Test func terminalHistoryReuseMatchesOnlyAutomaticTitleAndSameLaunchInputs() {
+        let base = TerminalLaunchConfiguration(shellPath: "/bin/zsh", workingDirectory: "/tmp/foofoil-reuse",
+            environment: ["A": "1"], startupCommands: "printf ready")
+        let named = WindowConfig(id: UUID(), customTitle: "Named", terminalConfiguration: base)
+        var environmentConfiguration = base
+        environmentConfiguration.environment["A"] = "2"
+        let differentEnvironment = WindowConfig(id: UUID(), terminalConfiguration: environmentConfiguration)
+        var scriptConfiguration = base
+        scriptConfiguration.startupCommands = "printf different"
+        let differentScript = WindowConfig(id: UUID(), terminalConfiguration: scriptConfiguration)
+        let equivalent = WindowConfig(id: UUID(), terminalConfiguration: .init(shellPath: "/bin/bash",
+            workingDirectory: "/tmp/foofoil-reuse/../foofoil-reuse/", environment: base.environment,
+            startupCommands: base.startupCommands))
+        #expect(ApplicationControlService.reusableTerminalHistory(in: [named, differentEnvironment, differentScript, equivalent], for: base)?.id == equivalent.id)
+        #expect(ApplicationControlService.reusableTerminalHistory(in: [named, differentEnvironment, differentScript], for: base) == nil)
+    }
+
+    @Test func untitledCreationReopensSameHistoryRecord() async throws {
+        let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let delegate = AppDelegate()
+        var historyIDs = Set<UUID>()
+        defer {
+            for controller in delegate.windowControllers { controller.closeWithoutTerminalPrompt() }
+            _ = HistoryRepository.shared.remove(ids: historyIDs)
+        }
+        let configuration = TerminalLaunchConfiguration(shellPath: "/bin/zsh", workingDirectory: root.path,
+            environment: ["ZDOTDIR": root.path, "HISTFILE": "/dev/null"])
+        let original = try delegate.applicationControl.createTerminal(configuration, title: " \n ")
+        historyIDs.insert(original.appState.id)
+        #expect(original.appState.customTitle == nil)
+        original.appState.terminalSession?.view.feed(text: "terminal history reuse marker\r\n")
+        original.appState.saveState()
+        await original.appState.terminalSession?.stop().value
+
+        let reopened = try delegate.applicationControl.createTerminal(configuration, title: nil)
+        historyIDs.insert(reopened.appState.id)
+        #expect(reopened !== original)
+        #expect(reopened.appState.id == original.appState.id)
+        #expect(reopened.appState.customTitle == nil)
+        #expect(reopened.appState.terminalSession?.previousOutput?.contains("terminal history reuse marker") == true)
+        #expect(HistoryRepository.shared.recent(limit: Int.max).filter { $0.id == original.appState.id }.count == 1)
+        await reopened.appState.terminalSession?.stop().value
+    }
+
     @Test func menuOpenReusesBlankThenCreatesWithoutReplacingContent() throws {
         let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let delegate = AppDelegate()

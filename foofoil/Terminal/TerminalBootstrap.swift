@@ -19,8 +19,7 @@ nonisolated struct TerminalBootstrap {
                   key.range(of: "^[A-Za-z_][A-Za-z0-9_]*$", options: .regularExpression) != nil
                     && !key.hasPrefix("FOOFOIL_") && !value.contains("\0") && value.utf8.count <= 8192
               }) else { throw AgentFailure("INVALID_ARGUMENTS") }
-        workingDirectory = (configuration.workingDirectory.map { NSString(string: $0).expandingTildeInPath }
-            ?? FileManager.default.homeDirectoryForCurrentUser.path)
+        workingDirectory = configuration.resolvedWorkingDirectory
         var isDirectory: ObjCBool = false
         guard workingDirectory.hasPrefix("/"), FileManager.default.fileExists(atPath: workingDirectory, isDirectory: &isDirectory), isDirectory.boolValue,
               FileManager.default.isReadableFile(atPath: workingDirectory) else { throw AgentFailure("WORKING_DIRECTORY_UNAVAILABLE") }

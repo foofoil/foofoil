@@ -180,13 +180,17 @@ extension AppDelegate {
         HistorySearchWindowController.shared.dismiss()
     }
 
-    func openHistoryConfig(config: WindowConfig, id: UUID) {
-        let musicController = config.appleMusicReference == nil ? nil : windowControllers.first { $0.appState.appleMusicReference != nil && !$0.appState.isIncognito }
-        if let controller = musicController ?? availableBlankWindowController {
+    @discardableResult
+    func openHistoryConfig(config: WindowConfig, id: UUID, reuseBlankWindow: Bool = true) -> FloatingWindowController? {
+        let musicController = !reuseBlankWindow || config.appleMusicReference == nil ? nil : windowControllers.first { $0.appState.appleMusicReference != nil && !$0.appState.isIncognito }
+        let blankController = reuseBlankWindow ? availableBlankWindowController : nil
+        let controller: FloatingWindowController
+        if let existing = musicController ?? blankController {
+            controller = existing
             controller.appState.saveState()
             guard controller.appState.loadConfig(config) else {
                 HistorySearchWindowController.shared.dismiss()
-                return
+                return nil
             }
             controller.appState.startTerminalForExplicitOpen()
             activateWindow(controller)
@@ -194,9 +198,9 @@ extension AppDelegate {
             let state = AppState()
             guard state.loadConfig(config) else {
                 HistorySearchWindowController.shared.dismiss()
-                return
+                return nil
             }
-            let controller = FloatingWindowController(appState: state)
+            controller = FloatingWindowController(appState: state)
             if config.windowFrame == nil { controller.window?.center() }
             addWindowController(controller)
             state.startTerminalForExplicitOpen()
@@ -205,6 +209,7 @@ extension AppDelegate {
         HistoryRepository.shared.touch(id: id)
         HistoryManager.shared.refresh()
         HistorySearchWindowController.shared.dismiss()
+        return controller
     }
 
     @objc func openHistoryItemAction(_ sender: NSMenuItem) {
