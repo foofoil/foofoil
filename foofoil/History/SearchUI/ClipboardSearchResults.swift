@@ -12,8 +12,8 @@ struct ClipboardSearchResults: View {
                         ForEach(search.entries) { entry in
                             HStack(spacing: 4) {
                                 Button { open(entry) } label: {
-                                    HStack(alignment: .top, spacing: 10) {
-                                        Image(systemName: entry.symbolName).frame(width: 20)
+                                    HStack(alignment: .center, spacing: 10) {
+                                        ClipboardEntryArtwork(entry: entry).frame(width: 44, height: 44).accessibilityHidden(true)
                                         VStack(alignment: .leading, spacing: 3) {
                                             Text(entry.title).lineLimit(1).truncationMode(.tail)
                                             Text(entry.searchText).font(.caption).foregroundStyle(.secondary).lineLimit(2)

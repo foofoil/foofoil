@@ -41,6 +41,8 @@ struct FoilExposeViewTests {
         let copy = try #require(descendants(cell.view).compactMap { $0 as? NSButton }.first { $0.accessibilityLabel() == NSLocalizedString("Clipboard History Copy", comment: "") })
         #expect(!copy.isHidden && copy.isEnabled)
         let card = try #require(copy.superview)
+        let artwork = try #require(descendants(card).compactMap { $0 as? ClipboardEntryArtworkView }.first)
+        #expect(!artwork.isHidden && artwork.frame.size == NSSize(width: 44, height: 44))
         #expect(card.hitTest(card.convert(NSPoint(x: copy.frame.midX, y: copy.frame.midY), to: card.superview)) === copy)
         let titles = descendants(card).compactMap { $0 as? NSTextField }.filter { $0.stringValue == entry.title }
         #expect(titles.count == 1 && titles.first?.maximumNumberOfLines == 1)

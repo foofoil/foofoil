@@ -160,3 +160,5 @@ The penultimate icon in a blank foil toggles the current foil between normal and
 Choose **Clipboard** from `/` in Quick Open, blank foils, or Overview, then type to search. Without Full Disk Access, results contain only the current clipboard and an authorization button. Enable foofoil in System Settings → Privacy & Security → Full Disk Access; return to retry, or reopen foofoil if required. With access, search reads Spotlight’s existing clipboard history without changing the system clipboard.
 
 Clipboard result titles use one line. Older items have a copy icon on the right; clicking it copies the saved content to the system clipboard without opening a foil. The current clipboard item has no copy icon.
+
+Clipboard images show thumbnails, while other content uses larger type icons. When the source app is known and installed, its icon appears at the lower-right corner.

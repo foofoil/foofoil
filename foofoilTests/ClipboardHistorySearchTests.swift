@@ -167,7 +167,7 @@ struct ClipboardHistorySearchTests {
             return Data([0xc0 | UInt8(value >> 16), UInt8(truncatingIfNeeded: value >> 8), UInt8(truncatingIfNeeded: value)])
         }
         func string(_ value: String) -> Data { let data = Data(value.utf8) + Data([0]); return integer(data.count) + data }
-        let keys = ["_kMDItemDomainIdentifier", "_kMDItemExternalID", "kMDItemTitle", "kMDItemDescription", "kMDItemContentCreationDate", "kMDItemContentType"]
+        let keys = ["_kMDItemDomainIdentifier", "_kMDItemExternalID", "kMDItemTitle", "kMDItemDescription", "kMDItemContentCreationDate", "kMDItemContentType", "kMDItemRelatedAppBundleIdentifier"]
         for number in [1, 2, 4, 5] {
             var data = Data([0, 0]), offsets = word(0)
             if number == 1 {
@@ -189,6 +189,7 @@ struct ClipboardHistorySearchTests {
         let seconds = Date().timeIntervalSinceReferenceDate.bitPattern
         body += Data([1]) + Data((0..<8).map { UInt8(truncatingIfNeeded: seconds >> ($0 * 8)) })
         body += Data([1]) + string("public.utf8-plain-text")
+        body += Data([1]) + string("com.apple.TextEdit")
         let payload = word(body.count) + body
         let frame = Data("bv4-".utf8) + word(payload.count) + payload + Data("bv4$".utf8)
         var database = Data(count: 3 * 4096)
@@ -203,6 +204,7 @@ struct ClipboardHistorySearchTests {
         let records = try reader.read(directory: directory)
         #expect(records.count == 1)
         #expect(records.first?.identifier == "fixture-id")
+        #expect(records.first?.sourceBundleIdentifier == "com.apple.TextEdit")
         #expect(records.first?.text == String(repeating: "Full body ", count: 40))
         #expect(reader.decodedPageCount == 1)
         #expect(try reader.read(directory: directory).first?.identifier == "fixture-id")

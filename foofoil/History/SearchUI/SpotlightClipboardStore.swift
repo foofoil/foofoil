@@ -12,6 +12,7 @@ nonisolated struct SpotlightClipboardRecord: Sendable {
     let attachments: [String]
     let contentType: String
     let date: Date
+    var sourceBundleIdentifier: String? = nil
 }
 
 nonisolated struct SpotlightClipboardStore {
@@ -244,7 +245,7 @@ nonisolated struct SpotlightClipboardStore {
         cursor = attributes
         propertyID = 0
         var fields: [String: Value] = [:]
-        let needed: Set<String> = ["_kMDItemExternalID", "kMDItemTitle", "kMDItemDescription", "kMDItemAttachmentPaths", "kMDItemContentType", "kMDItemContentCreationDate"]
+        let needed: Set<String> = ["_kMDItemExternalID", "kMDItemTitle", "kMDItemDescription", "kMDItemAttachmentPaths", "kMDItemContentType", "kMDItemContentCreationDate", "kMDItemRelatedAppBundleIdentifier"]
         while cursor.remaining > 0 {
             let delta = try cursor.size()
             guard delta > 0, propertyID <= Int.max - delta, let property = properties[propertyID + delta] else { throw ReadError.invalidData }
@@ -258,7 +259,8 @@ nonisolated struct SpotlightClipboardStore {
         return SpotlightClipboardRecord(identifier: identifier, title: fields["kMDItemTitle"]?.strings.first ?? "",
                                         text: fields["kMDItemDescription"]?.strings.first,
                                         attachments: fields["kMDItemAttachmentPaths"]?.strings ?? [],
-                                        contentType: fields["kMDItemContentType"]?.strings.first ?? "", date: date)
+                                        contentType: fields["kMDItemContentType"]?.strings.first ?? "", date: date,
+                                        sourceBundleIdentifier: fields["kMDItemRelatedAppBundleIdentifier"]?.strings.first)
     }
     private static func decompress(_ data: Data, expected: Int) throws -> Data {
         guard !data.isEmpty, expected > 0, expected <= 32 * 1024 * 1024 else { throw ReadError.invalidData }

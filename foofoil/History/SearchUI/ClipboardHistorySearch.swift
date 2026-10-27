@@ -12,6 +12,7 @@ nonisolated struct ClipboardSearchEntry: Identifiable, Sendable, Equatable {
     let searchText: String
     let content: Content
     let date: Date
+    var sourceBundleIdentifier: String? = nil
     var isCurrentClipboard = false
     var canCopy: Bool { if case .unavailable = content { false } else { true } }
     var imageFilenameExtension: String? {
@@ -100,7 +101,7 @@ actor ClipboardHistoryReader {
                     else { content = .unavailable }
                     let entry = ClipboardSearchEntry(id: record.identifier, title: record.title,
                                                      searchText: record.title + "\n" + (record.text ?? "") + "\n" + urls.map(\.lastPathComponent).joined(separator: " "),
-                                                     content: content, date: record.date)
+                                                     content: content, date: record.date, sourceBundleIdentifier: record.sourceBundleIdentifier)
                     if unique[entry.id].map({ $0.date < entry.date }) ?? true { unique[entry.id] = entry }
                 }
                 cached = unique.values.sorted { $0.date == $1.date ? $0.id < $1.id : $0.date > $1.date }

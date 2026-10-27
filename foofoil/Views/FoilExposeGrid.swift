@@ -96,7 +96,7 @@ final class FoilExposeGrid: NSScrollView {
             var key: String {
                 // 更新只随模型变化执行；滚动不会重新生成或比较这些数据。
                 [foil?.id.uuidString ?? "", title, subtitle, symbol, foil?.thumbnailPath ?? "",
-                 foil?.bodyPreview ?? "", String(foil?.historyIsPinned ?? false), String(foil?.isClipboardContent ?? false), String(foil?.clipboardEntry?.isCurrentClipboard ?? false),
+                 foil?.bodyPreview ?? "", String(foil?.historyIsPinned ?? false), String(foil?.isClipboardContent ?? false), String(foil?.clipboardEntry?.isCurrentClipboard ?? false), foil?.clipboardEntry?.sourceBundleIdentifier ?? "",
                  String(foil?.controller?.appState.isIncognito ?? false), String(foil?.hasHistoryRecord ?? false),
                  String(foil?.canRenameTitle ?? false), String(foil?.isHistoryEntry ?? false), String(index ?? -1)].joined(separator: "\u{1F}")
             }
@@ -462,6 +462,7 @@ private final class ExposeNativeCard: NSView {
     private let badge = NSTextField(labelWithString: "")
     private let clipboardIcon = NSImageView()
     private let copyButton = NSButton()
+    private let clipboardArtwork = ClipboardEntryArtworkView()
     private let dashedBorder = CAShapeLayer()
     private let playback = CALayer()
     private var playbackSubscription: AnyCancellable?
@@ -542,6 +543,9 @@ private final class ExposeNativeCard: NSView {
         copyButton.target = self; copyButton.action = #selector(copyClipboardEntry)
         copyButton.isHidden = true
         addSubview(copyButton)
+        clipboardArtwork.appearance = NSAppearance(named: .darkAqua)
+        clipboardArtwork.isHidden = true
+        addSubview(clipboardArtwork)
         addSubview(clipboardIcon)
         addSubview(titleLabel)
         addSubview(subtitleLabel)
@@ -556,6 +560,7 @@ private final class ExposeNativeCard: NSView {
         loadTask?.cancel(); loadTask = nil
         imageSubscription = nil; loader = nil
         action = nil; foil = nil; model = nil
+        clipboardArtwork.prepareForReuse(); clipboardArtwork.isHidden = true
         playbackSubscription = nil
         updatePlayback(false)
         imageLayer.contents = nil
@@ -588,7 +593,10 @@ private final class ExposeNativeCard: NSView {
         ])
         preview.isHidden = compact || preview.stringValue.isEmpty
         icon.image = NSImage(systemSymbolName: foil?.isNewFoil == true ? "plus" : symbol, accessibilityDescription: nil)
-        icon.isHidden = !compact && !preview.isHidden
+        icon.isHidden = foil?.clipboardEntry != nil || (!compact && !preview.isHidden)
+        if let entry = foil?.clipboardEntry {
+            clipboardArtwork.isHidden = false; clipboardArtwork.configure(entry)
+        }
         typeIcon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
         typeIcon.isHidden = compact || foil?.isNewFoil != false
         if symbol == AppleMusicReference.symbolName {
@@ -671,6 +679,8 @@ private final class ExposeNativeCard: NSView {
         dashedBorder.path = CGPath(roundedRect: thumbnail.bounds.insetBy(dx: 1, dy: 1), cornerWidth: 10, cornerHeight: 10, transform: nil)
         playback.frame = NSRect(x: (thumbnail.bounds.width - 32) / 2, y: (thumbnail.bounds.height - 24) / 2, width: 32, height: 24)
         preview.frame = NSRect(x: 12, y: 12, width: max(0, side - 24), height: max(0, min(side - 24, 152)))
+        clipboardArtwork.frame = NSRect(x: 8, y: 7, width: 44, height: 44)
+        let artworkInset: CGFloat = clipboardArtwork.isHidden ? 0 : 12
         icon.frame = compact ? NSRect(x: 10, y: 14, width: 30, height: 30)
             : NSRect(x: (side - 44) / 2, y: (side - 44) / 2, width: 44, height: 44)
         if !compact, foil?.contentKind == .camera {
@@ -684,7 +694,7 @@ private final class ExposeNativeCard: NSView {
         copyButton.frame = NSRect(x: bounds.width - 34, y: 15, width: 26, height: 26)
         badge.frame = compact ? NSRect(x: bounds.width - badgeWidth - 8 - copyInset, y: 19, width: badgeWidth, height: 20)
             : NSRect(x: 7, y: 7, width: badgeWidth, height: 22)
-        titleLabel.frame = compact ? NSRect(x: 50, y: subtitleLabel.isHidden ? 19 : 10, width: max(0, bounds.width - 100 - copyInset), height: 20)
+        titleLabel.frame = compact ? NSRect(x: 50 + artworkInset, y: subtitleLabel.isHidden ? 19 : 10, width: max(0, bounds.width - 100 - copyInset - artworkInset), height: 20)
             : NSRect(x: 0, y: side + 8, width: bounds.width, height: 18)
         if !compact {
             let clipboardWidth: CGFloat = clipboardIcon.isHidden ? 0 : 18
@@ -699,7 +709,7 @@ private final class ExposeNativeCard: NSView {
         if isNotice {
             titleLabel.frame = NSRect(x: 10, y: 19, width: max(0, bounds.width - 20), height: 20)
         }
-        subtitleLabel.frame = NSRect(x: 50, y: 31, width: max(0, bounds.width - 65 - copyInset), height: 16)
+        subtitleLabel.frame = NSRect(x: 50 + artworkInset, y: 31, width: max(0, bounds.width - 65 - copyInset - artworkInset), height: 16)
         CATransaction.commit()
         updateEmphasisTransform(animated: false)
     }
