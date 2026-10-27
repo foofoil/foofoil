@@ -1,6 +1,10 @@
 # Supported Content
 
-In Quick Open and Exposé, the `/` list ends with Terminal and Camera. Selecting Terminal opens its configuration dialog; selecting Camera opens the camera immediately.
+Blank foils show “What would you like to open? Type here.” followed by the `/` keycap and More options; Quick Open and Exposé retain their full search hints. All three share the `/` options. Disabled local file search hides File and Folder; either disabled Apple Music library or music search hides music categories. Enable buttons update the menu immediately. The Apple Music enable action turns on both library and search settings. An active blank foil keeps the search field focused; system sheets retain their own focus.
+
+Spotlight file search is on by default and can be turned off in Settings → General → Search. When off, search results still offer Enable File Search. Searching does not require selecting the home folder; opening protected files may require macOS authorization.
+
+The ungrouped `/` list offers History, File, Folder, URL, Terminal, Camera, and Clipboard, followed by enabled Apple Music Albums, Playlists, and Songs at the end. URL enters URL input mode. Clipboard shows its content type or filename and the input keyword `clipboard`, and is disabled when nothing can be opened. Terminal opens configuration; Camera opens immediately.
 
 Local files are referenced directly, with bookmarks tracking renames and moves when possible. History keeps no body copy of an original file, and deleting history never deletes that original. Clipboard text, Markdown, HTML, and image data are saved automatically and can be restored from history, marked “From Clipboard,” without Save As. Copied files still reference their originals; copied URLs and image addresses open as URLs without automatic downloading.
 
@@ -148,3 +152,7 @@ Terminal programs can opt in to Kitty keyboard disambiguation (flag 1) to distin
 Use `foil list --scope all`, `reveal`, `hide`, `inspect`, `set` and `close --scope all` for general windows, and `foil terminal create` for terminals. Existing `show FILE`, `update` and default `list/close` retain their owned read-only Agent presentation scope.
 
 Terminal creation and reopening a closed terminal start immediately with its saved optional environment and startup script. Revealing a running terminal keeps its session. Automatic app restoration waits for user activation. Ordinary terminals retain up to 500 lines / 128 KiB of read-only previous output; incognito terminals do not persist output.
+
+Blank foils show a one-line clipboard button below the opening icons, with a filename or content type that fills the available width. Its shortcut stays fully visible and follows normal or incognito mode. The button is hidden when the clipboard has nothing to open.
+
+The penultimate icon in a blank foil toggles the current foil between normal and incognito mode; Overview remains last. In an incognito foil it shows “Exit Incognito Mode” with a shoeprints icon. Its shortcut hint writes Escape as “esc”.

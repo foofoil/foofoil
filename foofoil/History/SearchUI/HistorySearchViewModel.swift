@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import AppKit
 
 enum HistorySearchMode {
     case history
@@ -45,7 +46,7 @@ final class HistorySearchViewModel: ObservableObject {
     }
 
     var availableScopes: [SearchScope] {
-        SearchScope.availableScopes(musicLibraryEnabled: musicLibraryEnabled())
+        SearchScope.availableScopes(musicLibraryEnabled: musicLibraryEnabled(), fileSearchEnabled: LocalFileSearchSettings.shared.isEnabled, musicSearchEnabled: musicEnabled())
     }
 
     var filteredScopes: [SearchScope] {
@@ -66,9 +67,34 @@ final class HistorySearchViewModel: ObservableObject {
         selectScope(filteredScopes[index])
     }
 
+    @Published private(set) var scopeClipboardContent: ClipboardOpenableContent?
+    private let clipboardContentProvider: @MainActor () -> ClipboardOpenableContent?
+
+    func isScopeEnabled(_ scope: SearchScope) -> Bool {
+        scope != .clipboard || scopeClipboardContent != nil
+    }
+
+    func scopeTitle(_ scope: SearchScope) -> String {
+        if scope == .clipboard, let content = scopeClipboardContent {
+            return content.openingTitle(isIncognito: opensIncognito)
+        }
+        return scope.displayName
+    }
+
     var openCommand: ((SearchScope) -> Void)?
+    var canMaintainInputFocus: () -> Bool = { false }
 
     func selectScope(_ scope: SearchScope) {
+        guard isScopeEnabled(scope) else { return }
+        if scope == .url {
+            reset(mode: .url)
+            return
+        }
+        if scope.enableFeatureIfNeeded() {
+            highlightedScopeIndex = 0
+            objectWillChange.send()
+            return
+        }
         // 打开命令直接执行，不切换为搜索范围。
         if scope.isOpeningCommand {
             openCommand?(scope)
@@ -171,7 +197,9 @@ final class HistorySearchViewModel: ObservableObject {
          resolveMusicLink: @escaping @MainActor (AppleMusicLink) async throws -> AppleMusicLibraryItem = { try await AppleMusicLibrary.shared.resolve($0) },
          musicAuthorized: @escaping @MainActor () -> Bool = { AppleMusicLibrary.shared.isAuthorized },
          musicEnabled: @escaping @MainActor () -> Bool = { SettingsStore.shared.appleMusicSearchEnabled },
-         musicLibraryEnabled: @escaping @MainActor () -> Bool = { SettingsStore.shared.appleMusicLibraryEnabled }) {
+         musicLibraryEnabled: @escaping @MainActor () -> Bool = { SettingsStore.shared.appleMusicLibraryEnabled },
+         clipboardContentProvider: @escaping @MainActor () -> ClipboardOpenableContent? = { (NSApp.delegate as? AppDelegate)?.clipboardOpenableContent() }) {
+        self.clipboardContentProvider = clipboardContentProvider
         self.musicLibraryEnabled = musicLibraryEnabled
         self.resolveMusicLink = resolveMusicLink
         self.musicSearch = { term, filter in
@@ -281,6 +309,13 @@ final class HistorySearchViewModel: ObservableObject {
     var resultCount: Int { itemIDs.count }
     var selectedIndex: Int? { selectedID.flatMap { itemIDs.firstIndex(of: $0) } }
 
+    /// 空箔重新激活时保留当前查询和选区，不执行全选。
+    func focusInput() {
+        if isPickingScope { scopeClipboardContent = clipboardContentProvider() }
+        shouldSelectAll = false
+        focusRequest += 1
+    }
+
     func reset(mode: HistorySearchMode = .history, initialQuery: String? = nil) {
         stop()
         isResetting = true
@@ -383,6 +418,7 @@ final class HistorySearchViewModel: ObservableObject {
         fileStatus = nil; openError = nil
         userMovedSelection = false
         if isPickingScope {
+            scopeClipboardContent = clipboardContentProvider()
             selectedID = nil
             return
         }

@@ -186,7 +186,7 @@ final class FoilExposeModel: ObservableObject {
     }
 
     var availableScopes: [SearchScope] {
-        SearchScope.availableScopes(musicLibraryEnabled: SettingsStore.shared.appleMusicLibraryEnabled)
+        SearchScope.availableScopes(musicLibraryEnabled: SettingsStore.shared.appleMusicLibraryEnabled, fileSearchEnabled: LocalFileSearchSettings.shared.isEnabled, musicSearchEnabled: SettingsStore.shared.appleMusicSearchEnabled)
     }
 
     var filteredScopes: [SearchScope] {
@@ -215,7 +215,24 @@ final class FoilExposeModel: ObservableObject {
     /// 直接输入的网址：由控制器收起覆盖层并在空白箔中打开。
     var onOpenURL: (URL) -> Void = { _ in }
 
+    func isScopeEnabled(_ scope: SearchScope) -> Bool {
+        scope != .clipboard || clipboardContent != nil
+    }
+
+    func scopeTitle(_ scope: SearchScope) -> String {
+        if scope == .clipboard, let content = clipboardContent {
+            return content.openingTitle(isIncognito: isOptionPressed)
+        }
+        return scope.displayName
+    }
+
     func selectScope(_ scope: SearchScope) {
+        guard isScopeEnabled(scope) else { return }
+        if scope.enableFeatureIfNeeded() {
+            highlightedScopeIndex = 0
+            objectWillChange.send()
+            return
+        }
         // 打开命令直接执行，不切换为搜索范围。
         if scope.isOpeningCommand {
             onOpenCommand?(scope)
@@ -326,6 +343,7 @@ final class FoilExposeModel: ObservableObject {
     private var musicGeneration = 0
     private var musicIDs: [String: UUID] = [:]
     private var musicSettingsCancellable: AnyCancellable?
+    private var fileSettingsCancellable: AnyCancellable?
     private var isStopped = false
 
     init(items: [FoilExposeItem],
@@ -361,10 +379,18 @@ final class FoilExposeModel: ObservableObject {
             }
         }
         self.cancelFiles = cancelFiles ?? { service.cancel() }
+        fileSettingsCancellable = NotificationCenter.default.publisher(for: .localFileSearchDidChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, !self.isStopped else { return }
+                self.objectWillChange.send()
+                self.restartFileSearch()
+            }
         musicSettingsCancellable = NotificationCenter.default.publisher(for: .appleMusicSearchDidChange)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 guard let self, !self.isStopped else { return }
+                self.objectWillChange.send()
                 if !self.musicEnabled() && self.resultFilter.musicCategory != nil {
                     self.activeScope = nil
                     self.resultFilter = .all
@@ -908,11 +934,16 @@ final class FoilExposeController {
             historyItems: Self.collectHistoryItems(),
             clipboardContent: appDelegate.clipboardOpenableContent()
         )
-        model.onOpenCommand = { [weak self] scope in
+        model.onOpenCommand = { [weak self, weak model] scope in
+            if scope == .clipboard {
+                self?.openClipboard(isIncognito: model?.isOptionPressed == true)
+                return
+            }
             self?.dismiss()
             NSApp.activate(ignoringOtherApps: true)
             let delegate = NSApp.delegate as? AppDelegate
-            if scope == .terminal { delegate?.openTerminal(isIncognito: false) }
+            if scope == .url { delegate?.openWebURLAction() }
+            else if scope == .terminal { delegate?.openTerminal(isIncognito: false) }
             else if scope == .camera { delegate?.openCameraAction() }
         }
         model.onSelect = { [weak self] item in self?.select(item) }

@@ -1,5 +1,6 @@
 import AppKit
 import Combine
+import SwiftUI
 
 /// 总览使用原生视图树；共享业务模型，滚动不向模型发布几何状态。
 final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
@@ -7,6 +8,7 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
     let searchField = NSTextField()
     private let hint = NSTextField(labelWithString: NSLocalizedString("Search Foils Hint", comment: ""))
     private let searchBackground = NSView()
+    private let searchPrompt = QuickOpenPromptHostingView(rootView: QuickOpenSearchPrompt(musicLibraryEnabled: false))
     private let searchIcon = NSImageView()
     private let scopeButton = ExposeActionButton()
     private let clipboardButton = ExposeActionButton()
@@ -77,6 +79,8 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         searchBackground.addSubview(searchIcon)
         searchBackground.addSubview(scopeButton)
         searchBackground.addSubview(searchField)
+        searchPrompt.appearance = NSAppearance(named: .darkAqua)
+        searchBackground.addSubview(searchPrompt)
         scopeButton.perform = { [weak self] in self?.model.clearActiveScope(); self?.focusSearch() }
         scopeButton.setAccessibilityLabel(NSLocalizedString("Clear Search Scope", comment: ""))
         clipboardButton.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
@@ -155,6 +159,10 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         searchField.placeholderString = model.activeScope.map {
             String(format: NSLocalizedString("Search In Scope Placeholder", comment: ""), $0.displayName)
         } ?? NSLocalizedString("Search Foils Placeholder", comment: "")
+        searchPrompt.rootView = QuickOpenSearchPrompt(musicLibraryEnabled: SettingsStore.shared.appleMusicSearchEnabled)
+        searchPrompt.isHidden = !model.searchText.isEmpty || model.activeScope != nil
+        searchField.setAccessibilityLabel(QuickOpenSearchPrompt.title(musicLibraryEnabled: SettingsStore.shared.appleMusicSearchEnabled))
+        if model.activeScope == nil { searchField.placeholderString = "" }
         scopeButton.isHidden = model.activeScope == nil
         scopeButton.title = model.activeScope.map { $0.displayName + "  ×" } ?? ""
         scopeButton.setAccessibilityLabel(NSLocalizedString("Clear Search Scope", comment: ""))
@@ -230,7 +238,7 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         scopePicker.isHidden = !model.isChoosingScope || model.isClipboardFocused
         let scopes = model.filteredScopes
         let signature = scopes.map { $0.id }
-            + [model.directAction?.id ?? "-", String(model.highlightedScopeIndex), String(model.isChoosingScope)]
+            + [model.directAction?.id ?? "-", String(model.highlightedScopeIndex), String(model.isChoosingScope), String(model.isOptionPressed)]
         guard scopeSignature != signature else { return }
         scopeSignature = signature
         scopePicker.arrangedSubviews.forEach { scopePicker.removeArrangedSubview($0); $0.removeFromSuperview() }
@@ -241,7 +249,15 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         }
         for (index, scope) in scopes.enumerated() {
             let button = ExposeActionButton()
-            button.title = scope.displayName + "    " + scope.englishName
+            if scope == .clipboard {
+                let suffix = "    " + scope.englishName
+                let suffixWidth = (suffix as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12, weight: .medium)]).width
+                button.title = fittedTitle(model.scopeTitle(scope), width: scopePickerWidth - 49 - suffixWidth) + suffix
+                button.toolTip = model.scopeTitle(scope)
+            } else {
+                button.title = model.scopeTitle(scope) + (scope.isEnableAction ? "" : "    " + scope.englishName)
+            }
+            button.isEnabled = model.isScopeEnabled(scope)
             button.image = NSImage(systemSymbolName: scope.symbolName, accessibilityDescription: nil)
             button.isEmphasized = index == model.highlightedScopeIndex
             button.perform = { [weak self] in self?.model.selectScope(scope); self?.focusSearch() }
@@ -338,6 +354,7 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         let fieldHeight = ceil(searchField.cell?.cellSize.height ?? 19)
         searchField.frame = NSRect(x: 31 + scopeWidth, y: (32 - fieldHeight) / 2,
                                    width: max(20, searchBackground.bounds.width - scopeWidth - 43), height: fieldHeight)
+        searchPrompt.frame = searchField.frame
         hint.frame = NSRect(x: 20, y: 70, width: max(0, width - 40), height: 20)
         let top: CGFloat = 106
         grid.frame = NSRect(x: 0, y: top, width: width, height: max(0, view.bounds.height - top))

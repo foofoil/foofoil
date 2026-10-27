@@ -14,6 +14,18 @@ import Testing
 /// 文件来源的类型另带扩展名（如 “.flac音频”、“.log文本”）。
 @MainActor
 struct ClipboardOpenableContentTests {
+    @Test func blankFoilClipboardTitleKeepsTheFullNameAndPrivateContext() {
+        var content = ClipboardOpenableContent(.file)
+        let name = "A very long filename that should use the whole available banner width.txt"
+        content.fileName = name
+        let regular = content.openingTitle(isIncognito: false, abbreviatesFileName: false)
+        let incognito = content.openingTitle(isIncognito: true, abbreviatesFileName: false)
+        #expect(regular.contains(name))
+        #expect(incognito.contains(name))
+        #expect(regular != incognito)
+        #expect(!content.localizedName.contains(name))
+    }
+
     private func makeTempDirectory() throws -> URL {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("foofoil-clipboard-type-tests-\(UUID().uuidString)", isDirectory: true)

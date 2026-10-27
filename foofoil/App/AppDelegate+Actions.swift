@@ -1241,6 +1241,17 @@ nonisolated struct ClipboardOpenableContent: Equatable {
         )
     }
 
+    /// 空箔横条使用完整文件名，由实际可用宽度截断，不套用总览的固定字数预算。
+    func openingTitle(isIncognito: Bool, abbreviatesFileName: Bool = true) -> String {
+        let name: String
+        if !abbreviatesFileName, let fileName {
+            name = String(format: NSLocalizedString("Clipboard Quoted Filename Format", comment: ""), fileName)
+        } else {
+            name = localizedName
+        }
+        return String(format: NSLocalizedString(isIncognito ? "Open Clipboard Item Incognito Format" : "Open Clipboard Item Format", comment: ""), name)
+    }
+
     /// 组内文件扩展名一致时返回它（小写）；不一致或没有扩展名时返回 nil。
     nonisolated static func commonExtension(of urls: [URL]) -> String? {
         let extensions = Set(urls.map { $0.pathExtension.lowercased() })

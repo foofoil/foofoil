@@ -250,8 +250,10 @@ struct IncognitoFoilTests {
         let state = AppState()
         #expect(state.toggleIncognitoMode())
         #expect(state.isIncognito && state.isBlank)
+        #expect(state.toast.message == nil)
         #expect(state.toggleIncognitoMode())
         #expect(!state.isIncognito && state.isBlank)
+        #expect(state.toast.message == nil)
     }
 
     @Test func incognitoShortcutDefaults() throws {

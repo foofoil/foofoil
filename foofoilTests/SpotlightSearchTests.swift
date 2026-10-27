@@ -234,12 +234,15 @@ struct SpotlightSearchTests {
         let defaults = try #require(UserDefaults(suiteName: suite))
         defer { defaults.removePersistentDomain(forName: suite) }
         let settings = LocalFileSearchSettings(defaults: defaults)
-        #expect(!settings.isEnabled)
+        #expect(settings.isEnabled)
         settings.isEnabled = true
         #expect(LocalFileSearchSettings(defaults: defaults).isEnabled)
         #expect(defaults.data(forKey: "spotlightSearchHomeBookmark") == nil)
         settings.isEnabled = false
         #expect(!settings.isEnabled)
+        #expect(!LocalFileSearchSettings(defaults: defaults).isEnabled)
+        settings.isEnabled = true
+        #expect(LocalFileSearchSettings(defaults: defaults).isEnabled)
     }
 
 }

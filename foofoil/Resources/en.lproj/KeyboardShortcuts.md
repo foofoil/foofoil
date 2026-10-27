@@ -186,3 +186,7 @@ Content search appears at the top of the reading area without resizing it. EPUB 
 The incognito toggle works while the text editor, Markdown preview, terminal, or attached navigator has focus. Holding the key does not toggle repeatedly; an open sheet keeps ownership of its input.
 
 The search field in a blank foil uses Quick Open: ↑ / ↓ selects, Return opens, Tab confirms a scope, and Esc clears the query. Text and Markdown source are read-only.
+
+An active blank foil keeps its search field focused. After `/`, arrow keys select a search type, action, or an enable option at the bottom; Return confirms and Esc clears while retaining input focus.
+
+The `/ More options` menu includes URL input after Folder and Clipboard after Camera. Return confirms the selection; the three Apple Music categories appear last.

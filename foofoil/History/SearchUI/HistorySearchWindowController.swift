@@ -16,8 +16,12 @@ final class HistorySearchPanel: NSPanel {
     }
 
     /// 两种搜索入口共用按键路由，并保留输入法组合输入。
-    static func handleSearchKey(_ event: NSEvent, model: HistorySearchViewModel, dismiss: () -> Void) -> Bool {
+    static func handleSearchKey(_ event: NSEvent, model: HistorySearchViewModel, preservesIncognitoShortcut: Bool = false, dismiss: () -> Void) -> Bool {
         guard event.type == .keyDown else { return false }
+        // 空箔的无痕切换先交回窗口，避免 ⌥Esc 被当作清空查询。
+        if preservesIncognitoShortcut, KeyboardShortcutStore.shared.matches(event, identifier: "file.toggleIncognito") {
+            return false
+        }
         let hasMarkedText = (event.window?.firstResponder as? NSTextView)?.hasMarkedText() ?? false
         if hasMarkedText { return false }
         if event.keyCode == 53 { dismiss(); return true }
@@ -58,6 +62,7 @@ final class HistorySearchWindowController: ObservableObject {
     private var windowDelegate: HistorySearchWindowDelegate?
     private let embedded: Bool
     private var keyMonitor: Any?
+    private var focusCancellable: AnyCancellable?
     static let shared = HistorySearchWindowController()
     let model = HistorySearchViewModel()
     private(set) var openingIsIncognito = false
@@ -119,8 +124,14 @@ final class HistorySearchWindowController: ObservableObject {
         model.openCommand = { [weak self] scope in
             guard let self, let delegate = NSApp.delegate as? AppDelegate else { return }
             let isIncognito = self.openingIsIncognito
+            let target = self.openingTarget
             self.dismiss()
-            if scope == .terminal {
+            if scope == .clipboard {
+                if let target, let controller = delegate.windowControllers.first(where: { $0.appState === target }) {
+                    delegate.activateWindow(controller)
+                }
+                _ = delegate.openClipboardContentInNewWindow(isIncognito: isIncognito)
+            } else if scope == .terminal {
                 delegate.openTerminal(isIncognito: isIncognito)
             } else if scope == .camera {
                 delegate.openCamera(isIncognito: isIncognito)
@@ -146,13 +157,39 @@ final class HistorySearchWindowController: ObservableObject {
     /// 空箔沿用面板的模型与打开流程，搜索文字不进入正文或历史。
     func beginEmbeddedSearch(target: AppState) {
         configureOpening(isIncognito: target.isIncognito, target: target)
+        model.canMaintainInputFocus = { [weak target] in
+            guard let target, target.isBlank,
+                  let window = NSApp.keyWindow as? FloatingWindow,
+                  (window.windowController as? FloatingWindowController)?.appState === target,
+                  window.attachedSheet == nil else { return false }
+            return true
+        }
         model.reset()
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self, weak target] event in
+        focusCancellable = NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak target] notification in
+                guard let target, target.isBlank,
+                      let window = notification.object as? FloatingWindow,
+                      (window.windowController as? FloatingWindowController)?.appState === target,
+                      window.attachedSheet == nil else { return }
+                self?.model.focusInput()
+            }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .leftMouseUp]) { [weak self, weak target] event in
             guard let self, let target, target.isBlank,
-                  let window = event.window as? FloatingWindow, (window.windowController as? FloatingWindowController)?.appState === target,
-                  (window.firstResponder as? NSTextView)?.isEditable == true else { return event }
+                  let window = event.window as? FloatingWindow,
+                  (window.windowController as? FloatingWindowController)?.appState === target,
+                  window.isKeyWindow, window.attachedSheet == nil else { return event }
+            if event.type == .leftMouseUp {
+                DispatchQueue.main.async { [weak self, weak target, weak window] in
+                    guard target?.isBlank == true, window?.isKeyWindow == true,
+                          window?.attachedSheet == nil else { return }
+                    self?.model.focusInput()
+                }
+                return event
+            }
+            guard (window.firstResponder as? NSTextView)?.isEditable == true else { return event }
             if event.modifierFlags.contains(.command) { return event }
-            return HistorySearchPanel.handleSearchKey(event, model: self.model, dismiss: {
+            return HistorySearchPanel.handleSearchKey(event, model: self.model, preservesIncognitoShortcut: true, dismiss: {
                 self.model.reset()
             }) ? nil : event
         }
@@ -161,6 +198,8 @@ final class HistorySearchWindowController: ObservableObject {
     func endEmbeddedSearch() {
         if let keyMonitor { NSEvent.removeMonitor(keyMonitor) }
         keyMonitor = nil
+        focusCancellable = nil
+        model.canMaintainInputFocus = { false }
         openingTarget = nil
         dismiss()
     }

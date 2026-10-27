@@ -106,6 +106,7 @@ extension AppState {
         /// 在当前窗口内切换无痕状态；普通转无痕同时删除该箔的历史。
         @discardableResult
         func toggleIncognitoMode() -> Bool {
+            let showsConversionToast = !isBlank
             if !isIncognito, HistoryRepository.shared.config(id: id)?.historyIsPinned == true {
                 toast.show(NSLocalizedString("Favorited Foil Cannot Become Incognito", comment: ""), symbolName: "bookmark.fill", duration: .seconds(3))
                 return false
@@ -117,14 +118,18 @@ extension AppState {
                 configureTerminalSnapshotSaving()
                 persistManagedTextIfNeeded(createIfNeeded: true)
                 saveState()
-                toast.show(NSLocalizedString("Converted to Regular Foil Toast", comment: ""), symbolName: "checkmark")
+                if showsConversionToast {
+                    toast.show(NSLocalizedString("Converted to Regular Foil Toast", comment: ""), symbolName: "checkmark")
+                }
             } else {
                 // 先保护仍在窗口中使用的托管正文，再删除历史，避免正文随记录提前回收。
                 saveState()
                 isIncognito = true
                 configureTerminalSnapshotSaving()
                 HistoryManager.shared.removeFromHistory(toConfig())
-                toast.show(NSLocalizedString("Converted to Incognito Foil Toast", comment: ""), usesIncognitoIcon: true)
+                if showsConversionToast {
+                    toast.show(NSLocalizedString("Converted to Incognito Foil Toast", comment: ""), usesIncognitoIcon: true)
+                }
             }
             return true
         }

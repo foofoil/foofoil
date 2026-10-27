@@ -4,6 +4,7 @@ import Testing
 @testable import foofoil
 
 @MainActor
+@Suite(.sharedApplicationState, .serialized)
 struct SearchScopeTests {
     private func eventually(_ condition: () -> Bool) async throws {
         for _ in 0..<200 {
@@ -15,10 +16,10 @@ struct SearchScopeTests {
 
     @Test func scopeAvailabilityFollowsMusicLibrarySetting() {
         let disabledScopes = SearchScope.availableScopes(musicLibraryEnabled: false)
-        #expect(disabledScopes == [.history, .file, .folder, .terminal, .camera])
+        #expect(disabledScopes == [.history, .file, .folder, .url, .terminal, .camera, .clipboard, .enableMusic])
 
         let enabledScopes = SearchScope.availableScopes(musicLibraryEnabled: true)
-        #expect(enabledScopes == [.history, .file, .folder, .album, .playlist, .song, .terminal, .camera])
+        #expect(enabledScopes == [.history, .file, .folder, .url, .terminal, .camera, .clipboard, .album, .playlist, .song])
 
         #expect(SearchScope.history.displayName == "历史")
         #expect(SearchScope.file.displayName == "文件")
@@ -26,6 +27,97 @@ struct SearchScopeTests {
         #expect(SearchScope.album.displayName == "Apple Music 专辑")
         #expect(SearchScope.playlist.displayName == "Apple Music 歌单")
         #expect(SearchScope.song.displayName == "Apple Music 歌曲")
+    }
+
+    @Test func disabledSourcesBecomeEnableActionsAtTheBottom() {
+        #expect(SearchScope.availableScopes(musicLibraryEnabled: false, fileSearchEnabled: false)
+            == [.history, .url, .terminal, .camera, .clipboard, .enableFiles, .enableMusic])
+        #expect(SearchScope.availableScopes(musicLibraryEnabled: true, fileSearchEnabled: false)
+            == [.history, .url, .terminal, .camera, .clipboard, .enableFiles, .album, .playlist, .song])
+    }
+
+    @Test func musicScopesRequireBothSettings() {
+        for library in [false, true] {
+            for search in [false, true] {
+                let scopes = SearchScope.availableScopes(musicLibraryEnabled: library, musicSearchEnabled: search)
+                #expect(scopes.contains(.song) == (library && search))
+                #expect(scopes.contains(.enableMusic) == !(library && search))
+            }
+        }
+    }
+
+    @Test func enablingSourcesKeepsBothSearchMenusOpen() {
+        let files = LocalFileSearchSettings.shared.isEnabled
+        let music = SettingsStore.shared.appleMusicLibraryEnabled
+        let musicSearch = UserDefaults.standard.bool(forKey: "appleMusicSearchEnabled")
+        defer {
+            LocalFileSearchSettings.shared.isEnabled = files
+            SettingsStore.shared.appleMusicSearchEnabled = musicSearch
+            SettingsStore.shared.appleMusicLibraryEnabled = music
+        }
+        for useExpose in [false, true] {
+            LocalFileSearchSettings.shared.isEnabled = false
+            SettingsStore.shared.appleMusicLibraryEnabled = false
+            SettingsStore.shared.appleMusicSearchEnabled = false
+            let quick = HistorySearchViewModel()
+            let expose = FoilExposeModel(items: [], historyItems: [])
+            quick.query = "/"
+            expose.searchText = "/"
+            #expect(quick.filteredScopes == expose.filteredScopes)
+            if useExpose {
+                expose.selectScope(.enableFiles)
+                expose.selectScope(.enableMusic)
+            } else {
+                quick.selectScope(.enableFiles)
+                quick.selectScope(.enableMusic)
+            }
+            #expect(LocalFileSearchSettings.shared.isEnabled)
+            #expect(SettingsStore.shared.appleMusicLibraryEnabled)
+            #expect(SettingsStore.shared.appleMusicSearchEnabled)
+            #expect(quick.isPickingScope && expose.isPickingScope)
+            #expect(quick.availableScopes.contains(.file) && expose.availableScopes.contains(.song))
+            #expect(!quick.availableScopes.contains(.enableFiles))
+            quick.stop()
+            expose.stopFileSearch()
+        }
+    }
+
+    @Test func urlOptionEntersInputAndClipboardUsesOpeningActions() {
+        let quick = HistorySearchViewModel(clipboardContentProvider: { .init(.text) })
+        defer { quick.stop() }
+        quick.query = "/"
+        quick.selectScope(.url)
+        #expect(quick.mode == .url && quick.query.isEmpty && quick.activeScope == nil)
+        quick.reset()
+        quick.query = "/"
+        var quickAction: SearchScope?
+        quick.openCommand = { quickAction = $0 }
+        quick.selectScope(.clipboard)
+        #expect(quickAction == .clipboard && quick.activeScope == nil)
+
+        let expose = FoilExposeModel(items: [], historyItems: [], clipboardContent: .init(.text))
+        defer { expose.stopFileSearch() }
+        var exposeAction: SearchScope?
+        expose.onOpenCommand = { exposeAction = $0 }
+        expose.selectScope(.url)
+        #expect(exposeAction == .url && expose.activeScope == nil)
+        expose.selectScope(.clipboard)
+        #expect(exposeAction == .clipboard && expose.activeScope == nil)
+    }
+
+    @Test func unavailableClipboardCannotExecute() {
+        let quick = HistorySearchViewModel(clipboardContentProvider: { nil })
+        quick.query = "/"
+        defer { quick.stop() }
+        var executed = false
+        quick.openCommand = { _ in executed = true }
+        quick.selectScope(.clipboard)
+        #expect(!executed && !quick.isScopeEnabled(.clipboard))
+        let expose = FoilExposeModel(items: [], historyItems: [])
+        defer { expose.stopFileSearch() }
+        expose.onOpenCommand = { _ in executed = true }
+        expose.selectScope(.clipboard)
+        #expect(!executed && !expose.isScopeEnabled(.clipboard))
     }
 
     @Test func openingCommandsExecuteWithoutActivatingScope() {
@@ -76,7 +168,7 @@ struct SearchScopeTests {
         #expect(allScopes.filter { $0.matches(filter: "wj") } == [.file])
         #expect(allScopes.filter { $0.matches(filter: "ml") } == [.folder])
         #expect(allScopes.filter { $0.matches(filter: "zj") } == [.album])
-        #expect(allScopes.filter { $0.matches(filter: "gd") } == [.playlist, .terminal])
+        #expect(allScopes.filter { $0.matches(filter: "gd") } == [.terminal, .playlist])
         #expect(allScopes.filter { $0.matches(filter: "gq") } == [.song])
 
         // 前缀缩小范围包含多项时保留顺序
@@ -85,6 +177,9 @@ struct SearchScopeTests {
     }
 
     @Test func historySearchScopePickingAndFolderTargetWorkflow() async throws {
+        let previousFileSearch = LocalFileSearchSettings.shared.isEnabled
+        defer { LocalFileSearchSettings.shared.isEnabled = previousFileSearch }
+        LocalFileSearchSettings.shared.isEnabled = true
         var searchedTarget: SpotlightSearchTarget?
         var searchedFileTerm: String?
 
@@ -152,6 +247,9 @@ struct SearchScopeTests {
     }
 
     @Test func exposeScopePickingAndSelectingWorkflow() async throws {
+        let previousFileSearch = LocalFileSearchSettings.shared.isEnabled
+        defer { LocalFileSearchSettings.shared.isEnabled = previousFileSearch }
+        LocalFileSearchSettings.shared.isEnabled = true
         var searchedTarget: SpotlightSearchTarget?
         var searchedFileTerm: String?
 

@@ -8,12 +8,11 @@ struct HistorySearchView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 12) {
-                Image(systemName: model.mode == .url ? "globe" : "bolt").font(.title2).foregroundStyle(.secondary)
                 if let scope = model.activeScope {
                     HStack(spacing: 5) {
                         Image(systemName: scope.symbolName)
                             .font(.system(size: 11))
-                        Text(scope.displayName)
+                        Text(model.scopeTitle(scope))
                             .font(.system(size: 13, weight: .medium))
                         Button {
                             model.clearActiveScope()
@@ -28,52 +27,77 @@ struct HistorySearchView: View {
                     .background(Capsule().fill(Color.accentColor.opacity(0.18)))
                     .foregroundStyle(Color.accentColor)
                 }
-                TextField(placeholder, text: $model.query)
+                TextField(showsQuickOpenPrompt ? "" : placeholder, text: $model.query)
+                    .overlay(alignment: .leading) {
+                        if showsQuickOpenPrompt, model.query.isEmpty {
+                            QuickOpenSearchPrompt(musicLibraryEnabled: SettingsStore.shared.appleMusicSearchEnabled, compact: embedded)
+                                .allowsHitTesting(false)
+                        }
+                    }
                     .textFieldStyle(.plain).font(.title3).focused($focused)
                     .accessibilityLabel(NSLocalizedString("Search History", comment: ""))
+                    .accessibilityHint(QuickOpenSearchPrompt.title(musicLibraryEnabled: SettingsStore.shared.appleMusicSearchEnabled))
+                    .help(QuickOpenSearchPrompt.title(musicLibraryEnabled: SettingsStore.shared.appleMusicSearchEnabled))
                 if model.isSearching { ProgressView().controlSize(.small) }
             }
-            .padding(18)
+            .padding(.horizontal, embedded ? 16 : 18)
+            .padding(.vertical, 18)
 
             if model.isPickingScope {
                 Divider()
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(Array(model.filteredScopes.enumerated()), id: \.element.id) { index, scope in
-                        Button {
-                            model.selectScope(scope)
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: scope.symbolName)
-                                    .font(.body)
-                                    .frame(width: 20)
-                                    .foregroundStyle(index == model.highlightedScopeIndex ? Color.accentColor : .secondary)
-                                Text(scope.displayName)
-                                    .font(.body)
-                                    .foregroundStyle(index == model.highlightedScopeIndex ? Color.accentColor : .primary)
-                                Spacer()
-                                Text(scope.englishName)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 2) {
+                            ForEach(Array(model.filteredScopes.enumerated()), id: \.element.id) { index, scope in
+                                Button {
+                                    model.selectScope(scope)
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: scope.symbolName)
+                                            .font(.body)
+                                            .frame(width: 20)
+                                            .foregroundStyle(index == model.highlightedScopeIndex ? Color.accentColor : .secondary)
+                                        Text(model.scopeTitle(scope))
+                                            .font(.body)
+                                            .lineLimit(1)
+                                            .foregroundStyle(index == model.highlightedScopeIndex ? Color.accentColor : .primary)
+                                        Spacer()
+                                        if !scope.isEnableAction {
+                                            Text(scope.englishName)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                                .fixedSize()
+                                        }
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .contentShape(Rectangle())
+                                }
+                                .id(scope.id)
+                                .disabled(!model.isScopeEnabled(scope))
+                                .opacity(model.isScopeEnabled(scope) ? 1 : 0.45)
+                                .buttonStyle(.plain)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(index == model.highlightedScopeIndex ? Color.accentColor.opacity(0.15) : Color.clear)
+                                )
+                            }
+                            if model.filteredScopes.isEmpty {
+                                Text(NSLocalizedString("No Matching Scopes", comment: ""))
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
+                                    .padding(12)
+                                    .frame(maxWidth: .infinity, alignment: .center)
                             }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                                .fill(index == model.highlightedScopeIndex ? Color.accentColor.opacity(0.15) : Color.clear)
-                        )
+                        .padding(8)
                     }
-                    if model.filteredScopes.isEmpty {
-                        Text(NSLocalizedString("No Matching Scopes", comment: ""))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(12)
-                            .frame(maxWidth: .infinity, alignment: .center)
+                    .frame(maxHeight: min(560, CGFloat(model.filteredScopes.count * 42 + 50)))
+                    .onChange(of: model.highlightedScopeIndex) { _, index in
+                        guard model.filteredScopes.indices.contains(index) else { return }
+                        proxy.scrollTo(model.filteredScopes[index].id)
                     }
                 }
-                .padding(8)
             } else if !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Divider()
                 if let link = model.musicLink {
@@ -203,13 +227,13 @@ struct HistorySearchView: View {
                 }
             }
             // ⌘P 面板只提供开启文件搜索的入口；关闭文件搜索在设置中完成。
-            if (!embedded || !model.query.isEmpty || model.activeScope != nil), model.musicLink == nil, model.mode == .history, model.resultFilter.includesFiles, !model.isFileSearchEnabled {
+            if !model.isPickingScope, (!embedded || !model.query.isEmpty || model.activeScope != nil), model.musicLink == nil, model.mode == .history, model.resultFilter.includesFiles, !model.isFileSearchEnabled {
                 HStack {
                     Button(NSLocalizedString("Enable File Search", comment: "")) { model.enableFileSearch?() }
                     Spacer()
                 }.font(.caption).padding(.horizontal, 18).padding(.bottom, 12)
             }
-            if (!embedded || !model.query.isEmpty || model.activeScope != nil), (model.musicLink != nil || (model.mode == .history && (model.resultFilter == .all || model.resultFilter.musicCategory != nil) && model.isMusicSearchEnabled)), !model.isMusicAuthorized {
+            if !model.isPickingScope, (!embedded || !model.query.isEmpty || model.activeScope != nil), (model.musicLink != nil || (model.mode == .history && (model.resultFilter == .all || model.resultFilter.musicCategory != nil) && model.isMusicSearchEnabled)), !model.isMusicAuthorized {
                 HStack {
                     Button(NSLocalizedString(model.musicLink == nil ? "Music Enable Search" : "Music Authorize", comment: "")) { model.enableMusicSearch?() }
                     Spacer()
@@ -228,9 +252,20 @@ struct HistorySearchView: View {
             focused = true
             triggerSelectAllIfNeeded()
         }
+        .onChange(of: focused) { _, hasFocus in
+            guard embedded, !hasFocus, model.canMaintainInputFocus() else { return }
+            DispatchQueue.main.async {
+                if model.canMaintainInputFocus() { focused = true }
+            }
+        }
         .onChange(of: model.focusRequest) { _, _ in
-            focused = true
-            triggerSelectAllIfNeeded()
+            guard !embedded || model.canMaintainInputFocus() else { return }
+            focused = false
+            DispatchQueue.main.async {
+                guard !embedded || model.canMaintainInputFocus() else { return }
+                focused = true
+                triggerSelectAllIfNeeded()
+            }
         }
     }
 
@@ -247,7 +282,12 @@ struct HistorySearchView: View {
         }
     }
 
+    private var showsQuickOpenPrompt: Bool { model.mode == .history && model.activeScope == nil }
+
     private var placeholder: String {
+        if embedded, model.mode == .history, model.activeScope == nil {
+            return NSLocalizedString("Blank Foil Search Placeholder", comment: "")
+        }
         if model.opensIncognito { return NSLocalizedString("Quick Open Incognito...", comment: "") }
         if let scope = model.activeScope {
             return String(format: NSLocalizedString("Search In Scope Placeholder", comment: ""), scope.displayName)

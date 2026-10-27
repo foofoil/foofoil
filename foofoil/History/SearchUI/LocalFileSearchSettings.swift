@@ -7,7 +7,7 @@ final class LocalFileSearchSettings {
     private let defaults: UserDefaults
     init(defaults: UserDefaults = .standard) { self.defaults = defaults }
     var isEnabled: Bool {
-        get { defaults.bool(forKey: "localFileSearchEnabled") }
+        get { defaults.object(forKey: "localFileSearchEnabled") as? Bool ?? true }
         set {
             defaults.set(newValue, forKey: "localFileSearchEnabled")
             NotificationCenter.default.post(name: .localFileSearchDidChange, object: nil)

@@ -5,7 +5,7 @@ struct BlankOpenButtons: View {
     @ObservedObject var appState: AppState
     @State private var hovered: Int?
     @State private var shortcutRevision = 0
-    @State private var clipboardAvailable = false
+    @State private var clipboardContent: ClipboardOpenableContent?
     @State private var clipboardChangeCount: Int?
 
     private struct Item {
@@ -25,7 +25,7 @@ struct BlankOpenButtons: View {
         if CameraCaptureController.isAvailable {
             result.append(Item(title: "Open Camera", symbol: "web.camera.fill", selector: #selector(AppDelegate.openCameraAction), shortcutID: "file.openCamera"))
         }
-        result.append(Item(title: "Open Clipboard Content", symbol: "doc.on.clipboard", selector: #selector(AppDelegate.openClipboardContentAction), shortcutID: "file.openClipboardContent"))
+        result.append(Item(title: appState.isIncognito ? "Exit Incognito Mode" : "Switch to Incognito Foil", symbol: "", selector: #selector(AppDelegate.toggleCurrentFoilIncognitoAction), shortcutID: "file.toggleIncognito"))
         result.append(Item(title: "Foil Overview", symbol: "rectangle.grid.2x2", selector: #selector(AppDelegate.showAllFoilsAction), shortcutID: "window.showAllFoils"))
         return result
     }
@@ -45,19 +45,11 @@ struct BlankOpenButtons: View {
         return NSLocalizedString(key, comment: "")
     }
 
-    private func isDisabled(_ item: Item) -> Bool {
-        item.shortcutID == "file.openClipboardContent" && !clipboardAvailable
-    }
-
-    private func hint(for item: Item) -> String {
-        isDisabled(item) ? NSLocalizedString("Clipboard Has No Openable Content", comment: "") : title(for: item)
-    }
-
     private func refreshClipboard(force: Bool = false) {
         let count = NSPasteboard.general.changeCount
         guard force || clipboardChangeCount != count else { return }
         clipboardChangeCount = count
-        clipboardAvailable = (NSApp.delegate as? AppDelegate)?.hasOpenableClipboardContent(using: appState) == true
+        clipboardContent = (NSApp.delegate as? AppDelegate)?.clipboardOpenableContent()
     }
 
     var body: some View {
@@ -67,9 +59,9 @@ struct BlankOpenButtons: View {
                 HStack(spacing: 8) {
                     if let hovered, items.indices.contains(hovered) {
                         let item = items[hovered]
-                        Text(hint(for: item))
+                        Text(title(for: item))
                             .lineLimit(1)
-                        if !isDisabled(item), let shortcut = shortcut(for: item) {
+                        if let shortcut = shortcut(for: item) {
                             HStack(spacing: 3) {
                                 ForEach(Array(shortcut.enumerated()), id: \.offset) { _, key in
                                     Text(key == "⎋" ? "esc" : String(key))
@@ -98,26 +90,38 @@ struct BlankOpenButtons: View {
                     // 外层接收悬停，使禁用按钮仍能说明不可用原因。
                     ZStack {
                         Button { open(index) } label: {
-                            Image(systemName: item.symbol)
-                                .font(.system(size: 17))
+                            Group {
+                                if item.selector == #selector(AppDelegate.toggleCurrentFoilIncognitoAction) {
+                                    if appState.isIncognito {
+                                        Image(systemName: "shoeprints.fill")
+                                            .font(.system(size: 17))
+                                    } else {
+                                        Image(nsImage: IncognitoFoilIcon.image)
+                                            .resizable()
+                                            .scaledToFit()
+                                            .frame(width: 20, height: 20)
+                                    }
+                                } else {
+                                    Image(systemName: item.symbol)
+                                        .font(.system(size: 17))
+                                }
+                            }
                                 .frame(maxWidth: .infinity)
                                 .frame(height: 32)
                                 .contentShape(Rectangle())
-                                .background(hovered == index && !isDisabled(item) ? Color.primary.opacity(0.08) : .clear,
+                                .background(hovered == index ? Color.primary.opacity(0.08) : .clear,
                                             in: RoundedRectangle(cornerRadius: 6))
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(.secondary)
-                        .disabled(isDisabled(item))
-                        .opacity(isDisabled(item) ? 0.35 : 1)
                         .accessibilityLabel(Text(title(for: item)))
-                        .accessibilityHint(Text(hint(for: item)))
+                        .accessibilityHint(Text(title(for: item)))
                     }
                     .contentShape(Rectangle())
                     .background {
                         HoverTrackingView { hovering in
                             if hovering {
-                                refreshClipboard(force: true)
+                                refreshClipboard()
                                 hovered = index
                             } else if hovered == index { hovered = nil }
                         }
@@ -125,6 +129,7 @@ struct BlankOpenButtons: View {
                     }
                 }
             }
+            clipboardBanner
         }
         .background(NonMovableBackground())
         .task {
@@ -144,12 +149,54 @@ struct BlankOpenButtons: View {
         }
     }
 
+    private var clipboardShortcut: String? {
+        (opensIncognito
+            ? KeyboardShortcutStore.shared.incognitoShortcut(forID: "file.openClipboardContent")
+            : KeyboardShortcutStore.shared.shortcut(forID: "file.openClipboardContent"))?.displayString
+    }
+
+    @ViewBuilder
+    private var clipboardBanner: some View {
+        if let content = clipboardContent {
+            Button {
+                refreshClipboard(force: true)
+                guard clipboardContent != nil, let delegate = NSApp.delegate as? AppDelegate else { return }
+                if let controller = delegate.windowControllers.first(where: { $0.appState === appState }) {
+                    delegate.activateWindow(controller)
+                }
+                _ = delegate.openClipboardContentInNewWindow(isIncognito: opensIncognito)
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "doc.on.clipboard")
+                    Text(content.openingTitle(isIncognito: opensIncognito, abbreviatesFileName: false))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    if let shortcut = clipboardShortcut {
+                        Text(shortcut)
+                            .font(.system(size: 10, weight: .medium))
+                            .fixedSize()
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 3)
+                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+                    }
+                }
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 10)
+                .frame(height: 34)
+                .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.2)))
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(content.openingTitle(isIncognito: opensIncognito, abbreviatesFileName: false))
+            .accessibilityIdentifier("blank.clipboard")
+            .padding(.bottom, 2)
+        }
+    }
+
     private func open(_ index: Int) {
         guard let delegate = NSApp.delegate as? AppDelegate else { return }
-        if items[index].shortcutID == "file.openClipboardContent" {
-            refreshClipboard(force: true)
-            guard clipboardAvailable else { return }
-        }
         if let controller = delegate.windowControllers.first(where: { $0.appState === appState }) {
             delegate.activateWindow(controller)
         }
@@ -166,6 +213,8 @@ struct BlankOpenButtons: View {
         default:
             if items[index].selector == #selector(AppDelegate.showAllFoilsAction) {
                 delegate.showAllFoilsAction()
+            } else if items[index].selector == #selector(AppDelegate.toggleCurrentFoilIncognitoAction) {
+                if appState.toggleIncognitoMode() { delegate.updateHistoryMenu() }
             } else if items[index].selector == #selector(AppDelegate.openCameraAction) {
                 if appState.isTemporaryIncognito {
                     delegate.openCamera(isIncognito: true)
@@ -173,8 +222,6 @@ struct BlankOpenButtons: View {
                     appState.showBorder = false
                     appState.openCamera()
                 }
-            } else {
-                _ = delegate.openClipboardContentInNewWindow(isIncognito: opensIncognito)
             }
         }
     }
