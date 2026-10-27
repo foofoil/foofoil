@@ -107,7 +107,7 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("file.toggleIncognito", "Toggle Incognito Mode", "\u{1B}", [.option]),
         definition("file.addToList", "Add to List...", nil, []),
         definition("file.share", "Share...", nil, []),
-        definition("file.reset", "Reset to Blank Foil", nil, [])
+        definition("file.reset", "Reset to Blank Foil", "k", [.command, .shift])
     ]
 
     static let go: [KeyboardShortcutDefinition] = [

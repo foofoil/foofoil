@@ -62,6 +62,7 @@ Hi-Fi 当前支持 DSF、raw DFF、未压缩立体声 SACD ISO 和 APE/CUE。DSD
 | 切换当前箔的无痕模式 | <kbd>⌥ Esc</kbd> |
 | 无痕打开剪贴板内容 | <kbd>⌥ ⌘ V</kbd> |
 | 快速打开 | <kbd>⌘ P</kbd> |
+| 重置为空箔 | <kbd>⇧ ⌘ K</kbd> |
 | 隐藏当前活跃箔片 | <kbd>⌘ H</kbd> |
 | 隐藏所有箔片，临时让出工作区 | <kbd>⇧ ⌘ H</kbd> |
 | 提取图片文字（光栅图片） | <kbd>⌘ E</kbd> |

@@ -60,6 +60,7 @@ These default shortcuts cover distinctive features and everyday actions. Except 
 | Toggle the current foil’s incognito mode | <kbd>⌥ Esc</kbd> |
 | Open clipboard incognito | <kbd>⌥ ⌘ V</kbd> |
 | Quick Open | <kbd>⌘ P</kbd> |
+| Reset to blank foil | <kbd>⇧ ⌘ K</kbd> |
 | Hide the active foil | <kbd>⌘ H</kbd> |
 | Hide all foils to clear your workspace temporarily | <kbd>⇧ ⌘ H</kbd> |
 | Extract image text (raster images) | <kbd>⌘ E</kbd> |
