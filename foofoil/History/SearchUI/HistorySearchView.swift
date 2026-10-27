@@ -98,6 +98,9 @@ struct HistorySearchView: View {
                         proxy.scrollTo(model.filteredScopes[index].id)
                     }
                 }
+            } else if model.activeScope == .clipboard {
+                Divider()
+                ClipboardSearchResults(search: model.clipboardSearch, selectedID: model.selectedID) { model.openClipboardEntry?($0) }
             } else if !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Divider()
                 if let link = model.musicLink {
@@ -227,13 +230,13 @@ struct HistorySearchView: View {
                 }
             }
             // ⌘P 面板只提供开启文件搜索的入口；关闭文件搜索在设置中完成。
-            if !model.isPickingScope, (!embedded || !model.query.isEmpty || model.activeScope != nil), model.musicLink == nil, model.mode == .history, model.resultFilter.includesFiles, !model.isFileSearchEnabled {
+            if model.activeScope != .clipboard, !model.isPickingScope, (!embedded || !model.query.isEmpty || model.activeScope != nil), model.musicLink == nil, model.mode == .history, model.resultFilter.includesFiles, !model.isFileSearchEnabled {
                 HStack {
                     Button(NSLocalizedString("Enable File Search", comment: "")) { model.enableFileSearch?() }
                     Spacer()
                 }.font(.caption).padding(.horizontal, 18).padding(.bottom, 12)
             }
-            if !model.isPickingScope, (!embedded || !model.query.isEmpty || model.activeScope != nil), (model.musicLink != nil || (model.mode == .history && (model.resultFilter == .all || model.resultFilter.musicCategory != nil) && model.isMusicSearchEnabled)), !model.isMusicAuthorized {
+            if model.activeScope != .clipboard, !model.isPickingScope, (!embedded || !model.query.isEmpty || model.activeScope != nil), (model.musicLink != nil || (model.mode == .history && (model.resultFilter == .all || model.resultFilter.musicCategory != nil) && model.isMusicSearchEnabled)), !model.isMusicAuthorized {
                 HStack {
                     Button(NSLocalizedString(model.musicLink == nil ? "Music Enable Search" : "Music Authorize", comment: "")) { model.enableMusicSearch?() }
                     Spacer()

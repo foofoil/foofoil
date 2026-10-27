@@ -23,7 +23,7 @@ enum SearchScope: String, CaseIterable, Identifiable, Sendable {
         case .file: return "文件"
         case .folder: return "目录"
         case .url: return NSLocalizedString("Quick Open URL Option", comment: "")
-        case .clipboard: return NSLocalizedString("Open Clipboard Content", comment: "")
+        case .clipboard: return NSLocalizedString("Clipboard Search Scope", comment: "")
         case .album: return "Apple Music 专辑"
         case .playlist: return "Apple Music 歌单"
         case .song: return "Apple Music 歌曲"
@@ -80,14 +80,14 @@ enum SearchScope: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var isOpeningCommand: Bool { self == .terminal || self == .camera || self == .url || self == .clipboard }
+    var isOpeningCommand: Bool { self == .terminal || self == .camera || self == .url }
 
     var isEnableAction: Bool { self == .enableFiles || self == .enableMusic }
 
     static func availableScopes(musicLibraryEnabled: Bool, fileSearchEnabled: Bool = true, musicSearchEnabled: Bool = true) -> [SearchScope] {
-        var scopes: [SearchScope] = [.history]
+        var scopes: [SearchScope] = [.history, .clipboard]
         if fileSearchEnabled { scopes += [.file, .folder] }
-        scopes += [.url, .terminal, .camera, .clipboard]
+        scopes += [.url, .terminal, .camera]
         if !fileSearchEnabled { scopes.append(.enableFiles) }
         if !musicLibraryEnabled || !musicSearchEnabled { scopes.append(.enableMusic) }
         if musicLibraryEnabled && musicSearchEnabled { scopes += [.album, .playlist, .song] }

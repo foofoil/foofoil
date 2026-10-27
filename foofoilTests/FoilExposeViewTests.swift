@@ -15,6 +15,37 @@ struct FoilExposeViewTests {
         [view] + view.subviews.flatMap(descendants)
     }
 
+    @Test func clipboardCopyControlReceivesItsOwnClicks() async throws {
+        let entry = ClipboardSearchEntry(id: "fixture", title: "A long clipboard title\nsecond line",
+                                         searchText: "Searchable body", content: .text("Searchable body"), date: Date())
+        let search = ClipboardHistorySearch(load: { .init(access: .available, entries: [entry]) }, currentContent: { nil })
+        let model = FoilExposeModel(items: [], historyItems: [], fileSearch: { _, _ in },
+                                    cancelFiles: {}, cameraAvailable: { false }, musicEnabled: { false }, clipboardSearch: search)
+        defer { model.stopFileSearch() }
+        model.selectScope(.clipboard)
+        for _ in 0..<100 {
+            if !search.isLoading && model.currentItems.count == 1 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(model.currentItems.count == 1)
+        #expect(model.currentItems.first?.isNewFoil == false)
+        let controller = FoilExposeViewController(model: model)
+        controller.view.frame = NSRect(x: 0, y: 0, width: 1000, height: 700)
+        controller.synchronize()
+        let collection = try #require(descendants(controller.view).compactMap { $0 as? NSCollectionView }.first)
+        let dataSource = try #require(collection.dataSource)
+        // 显式请求卡片，避免离屏 NSCollectionView 尚未实例化可见项。
+        let cell = dataSource.collectionView(collection, itemForRepresentedObjectAt: IndexPath(item: 0, section: 0))
+        cell.view.frame = NSRect(x: 0, y: 0, width: 400, height: 58)
+        cell.view.layoutSubtreeIfNeeded()
+        let copy = try #require(descendants(cell.view).compactMap { $0 as? NSButton }.first { $0.accessibilityLabel() == NSLocalizedString("Clipboard History Copy", comment: "") })
+        #expect(!copy.isHidden && copy.isEnabled)
+        let card = try #require(copy.superview)
+        #expect(card.hitTest(card.convert(NSPoint(x: copy.frame.midX, y: copy.frame.midY), to: card.superview)) === copy)
+        let titles = descendants(card).compactMap { $0 as? NSTextField }.filter { $0.stringValue == entry.title }
+        #expect(titles.count == 1 && titles.first?.maximumNumberOfLines == 1)
+    }
+
     @Test func overviewPanelUsesNativeRendererAndKeepsScreenSize() throws {
         let screen = try #require(NSScreen.main)
         let panel = FoilExposeController.makePanel(for: screen, model: model())
@@ -22,15 +53,15 @@ struct FoilExposeViewTests {
         #expect(panel.frame.size == screen.frame.size)
         #expect(panel.contentView?.frame.size == screen.frame.size)
         #expect(panel.contentViewController is FoilExposeViewController)
-        #expect(!descendants(try #require(panel.contentView)).contains { String(describing: type(of: $0)).contains("Hosting") })
+        #expect(!descendants(try #require(panel.contentView)).contains { String(describing: type(of: $0)).contains("Hosting") && !($0 is QuickOpenPromptHostingView) })
     }
 
-    @Test func overviewHasAnEntirelyNativeViewTree() {
+    @Test func overviewKeepsResultsNativeWithTheSharedSearchPrompt() {
         let controller = FoilExposeViewController(model: model())
         controller.view.frame = NSRect(x: 0, y: 0, width: 1240, height: 900)
         controller.synchronize()
         let views = descendants(controller.view)
-        #expect(!views.contains { String(describing: type(of: $0)).contains("Hosting") })
+        #expect(!views.contains { String(describing: type(of: $0)).contains("Hosting") && !($0 is QuickOpenPromptHostingView) })
         #expect(views.contains { $0 is NSCollectionView })
         #expect(controller.searchField.delegate === controller)
         #expect(controller.searchField.frame.width > 0)

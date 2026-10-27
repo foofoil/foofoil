@@ -87,6 +87,7 @@ struct FoilExposeItem: Identifiable {
     let contentKind: HistoryContentKind
     let thumbnailPath: String?
     /// 历史配置记录的外部源文件路径；用于让 Spotlight 文件结果避开已展示的同一文件。
+    var clipboardEntry: ClipboardSearchEntry? = nil
     var isClipboardContent: Bool = false
     var sourcePath: String? = nil
     /// 文档型箔片（笔记/文本/Markdown/CSV）的截断正文，供缩略图位置直接展示内容；其余类型为 nil。
@@ -97,13 +98,13 @@ struct FoilExposeItem: Identifiable {
     var hasHistoryRecord: Bool = false
 
     var canRenameTitle: Bool {
-        allowsTitleEditing && contentKind != .camera && !isNewFoil && musicItem == nil
+        allowsTitleEditing && contentKind != .camera && !isNewFoil && musicItem == nil && clipboardEntry == nil
     }
 
     var requiresHistoryClearConfirmation: Bool { isHistoryEntry && historyIsPinned }
 
     var window: NSWindow? { controller?.window }
-    var isNewFoil: Bool { controller == nil && !isHistoryEntry && musicItem == nil && id != Self.cameraCommandID }
+    var isNewFoil: Bool { controller == nil && !isHistoryEntry && musicItem == nil && clipboardEntry == nil && id != Self.cameraCommandID }
 
     /// 文档型条目的正文预览：跳过首尾空白后截取开头；空白正文与非文档类型返回 nil，卡片回退到类型图标。
     static func makeBodyPreview(kind: HistoryContentKind, text: String) -> String? {
@@ -131,6 +132,10 @@ struct FoilExposePageScrollRequest: Equatable {
 @MainActor
 final class FoilExposeModel: ObservableObject {
     let toast = FoilToastCenter()
+    let clipboardSearch: ClipboardHistorySearch
+    private var clipboardCancellable: AnyCancellable?
+    private var clipboardIDs: [String: UUID] = [:]
+    private var clipboardItems: [FoilExposeItem] = []
     /// 打开的箔片条目。
     @Published private(set) var items: [FoilExposeItem]
     /// 历史记录条目。
@@ -215,16 +220,9 @@ final class FoilExposeModel: ObservableObject {
     /// 直接输入的网址：由控制器收起覆盖层并在空白箔中打开。
     var onOpenURL: (URL) -> Void = { _ in }
 
-    func isScopeEnabled(_ scope: SearchScope) -> Bool {
-        scope != .clipboard || clipboardContent != nil
-    }
+    func isScopeEnabled(_ scope: SearchScope) -> Bool { true }
 
-    func scopeTitle(_ scope: SearchScope) -> String {
-        if scope == .clipboard, let content = clipboardContent {
-            return content.openingTitle(isIncognito: isOptionPressed)
-        }
-        return scope.displayName
-    }
+    func scopeTitle(_ scope: SearchScope) -> String { scope.displayName }
 
     func selectScope(_ scope: SearchScope) {
         guard isScopeEnabled(scope) else { return }
@@ -258,6 +256,9 @@ final class FoilExposeModel: ObservableObject {
         resultFilter = .all
         highlightedScopeIndex = 0
         selectedIndex = 0
+        clipboardSearch.stop()
+        scheduleFileSearch()
+        scheduleMusicSearch()
     }
 
     /// 搜索关键字；输入时即时过滤。
@@ -282,6 +283,8 @@ final class FoilExposeModel: ObservableObject {
             normalizeHistoryCategory()
             scheduleFileSearch()
             scheduleMusicSearch()
+            if activeScope == .clipboard { clipboardSearch.search(searchText) }
+            else { clipboardSearch.stop() }
         }
     }
     /// 总览始终接收搜索输入，编号直选统一使用 Control 修饰键。
@@ -355,7 +358,9 @@ final class FoilExposeModel: ObservableObject {
          cameraAvailable: @escaping () -> Bool = { CameraCaptureController.isAvailable },
          musicSearch: (@MainActor (String) async throws -> [AppleMusicLibraryItem])? = nil,
          musicAuthorized: @escaping @MainActor () -> Bool = { AppleMusicLibrary.shared.isAuthorized },
-         musicEnabled: @escaping @MainActor () -> Bool = { SettingsStore.shared.appleMusicSearchEnabled }) {
+         musicEnabled: @escaping @MainActor () -> Bool = { SettingsStore.shared.appleMusicSearchEnabled },
+         clipboardSearch: ClipboardHistorySearch? = nil) {
+        self.clipboardSearch = clipboardSearch ?? ClipboardHistorySearch()
         self.cameraAvailable = cameraAvailable
         self.musicSearch = { term, filter in
             if let musicSearch { return .init(items: try await musicSearch(term)) }
@@ -368,6 +373,7 @@ final class FoilExposeModel: ObservableObject {
         self.items = items
         self.historyItems = historyItems
         self.clipboardContent = clipboardContent
+
         let service = SpotlightFileSearch()
         if let targetFileSearch {
             self.fileSearch = targetFileSearch
@@ -379,6 +385,20 @@ final class FoilExposeModel: ObservableObject {
             }
         }
         self.cancelFiles = cancelFiles ?? { service.cancel() }
+        clipboardCancellable = self.clipboardSearch.objectWillChange.receive(on: DispatchQueue.main).sink { [weak self] _ in
+            guard let self else { return }
+            self.clipboardItems = self.clipboardSearch.entries.map { entry in
+                let id = self.clipboardIDs[entry.id] ?? UUID()
+                self.clipboardIDs[entry.id] = id
+                var item = FoilExposeItem(id: id, controller: nil, isHistoryEntry: false, title: entry.title,
+                                          symbolName: entry.symbolName, contentKind: .note, thumbnailPath: nil)
+                item.clipboardEntry = entry; item.isClipboardContent = true
+                if case .text(let text) = entry.content { item.bodyPreview = FoilExposeItem.makeBodyPreview(kind: .note, text: text) }
+                return item
+            }
+            self.selectedIndex = min(self.selectedIndex, max(0, self.clipboardItems.count - 1))
+            self.objectWillChange.send()
+        }
         fileSettingsCancellable = NotificationCenter.default.publisher(for: .localFileSearchDidChange)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -469,7 +489,7 @@ final class FoilExposeModel: ObservableObject {
     }
 
     var showsHistorySection: Bool {
-        (searchQuery.isEmpty || resultFilter == .all || resultFilter == .history)
+        activeScope != .clipboard && (searchQuery.isEmpty || resultFilter == .all || resultFilter == .history)
     }
 
     private var matchedFoilItems: [FoilExposeItem] {
@@ -481,12 +501,14 @@ final class FoilExposeModel: ObservableObject {
 
     /// 总览搜索中文件与各音乐分组各自独立展示，没有跨来源的总数上限；只有已打开与历史条目列表封顶 maximum。
     var currentItems: [FoilExposeItem] {
+        if activeScope == .clipboard { return clipboardItems }
         guard !searchQuery.isEmpty else { return matchedFoilItems }
         return Array(matchedFoilItems.prefix(SearchResultLimits.maximum)) + visibleMusicItems
     }
     var visibleFiles: [SpotlightFileResult] { Array(files.prefix(fileDisplayCount)) }
     var displayedResultCount: Int { currentItems.count + visibleFiles.count }
     var showsResultLimitNotice: Bool {
+        if activeScope == .clipboard { return false }
         let foilsTruncated = matchedFoilItems.count > SearchResultLimits.maximum
         let hasExtra = visibleFiles.count < files.count
             || AppleMusicSearchCategory.allCases.contains { resultFilter.includes($0) && (musicDisplayCount(in: $0) < musicItems(in: $0).count || musicHasMoreCategories.contains($0)) }
@@ -537,8 +559,8 @@ final class FoilExposeModel: ObservableObject {
     }
 
     /// 关键字非空时才呈现 Spotlight 文件结果区；空关键字不展示、不查询。
-    var showsFileResults: Bool { !searchQuery.isEmpty && resultFilter.includesFiles }
-    var showsMusicResults: Bool { !searchQuery.isEmpty && isMusicSearchEnabled && (resultFilter == .all || resultFilter.musicCategory != nil) }
+    var showsFileResults: Bool { activeScope != .clipboard && !searchQuery.isEmpty && resultFilter.includesFiles }
+    var showsMusicResults: Bool { activeScope != .clipboard && !searchQuery.isEmpty && isMusicSearchEnabled && (resultFilter == .all || resultFilter.musicCategory != nil) }
     func musicItems(in category: AppleMusicSearchCategory) -> [FoilExposeItem] {
         musicItems.filter { $0.musicItem?.searchCategory == category }
     }
@@ -585,7 +607,7 @@ final class FoilExposeModel: ObservableObject {
             selectedIndex = min(selectedIndex, max(0, currentItems.count - 1))
         }
         let query = searchQuery
-        guard !isStopped, !isPickingScope, (resultFilter == .all || resultFilter.musicCategory != nil), !query.isEmpty, isMusicSearchEnabled, isMusicAuthorized else { return }
+        guard activeScope != .clipboard, !isStopped, !isPickingScope, (resultFilter == .all || resultFilter.musicCategory != nil), !query.isEmpty, isMusicSearchEnabled, isMusicAuthorized else { return }
         isMusicSearching = true
         musicTask = Task { [weak self] in
             do {
@@ -625,7 +647,7 @@ final class FoilExposeModel: ObservableObject {
         fileSearchNotice = nil
         fileDisplayCount = SearchResultLimits.overviewGroupInitial
         let query = searchQuery
-        guard !isPickingScope, !query.isEmpty && resultFilter.includesFiles else {
+        guard activeScope != .clipboard, !isPickingScope, !query.isEmpty && resultFilter.includesFiles else {
             cancelFiles()
             rawFiles = []
             files = []
@@ -672,6 +694,7 @@ final class FoilExposeModel: ObservableObject {
 
     /// 覆盖层关闭时停止查询并释放主目录访问。
     func stopFileSearch() {
+        clipboardSearch.stop()
         isStopped = true
         musicTask?.cancel()
         musicTask = nil
@@ -738,7 +761,7 @@ final class FoilExposeModel: ObservableObject {
     private var navigationRows: [[Int]] {
         let items = currentItems
         let groups: [([Int], Int)] = [
-            (items.indices.filter { !items[$0].isHistoryEntry && items[$0].musicItem == nil }, columnCount),
+            (items.indices.filter { !items[$0].isHistoryEntry && items[$0].musicItem == nil }, activeScope == .clipboard ? musicColumnCount : columnCount),
             (items.indices.filter { items[$0].isHistoryEntry }, columnCount)
         ] + [(fileSelectionIndices, musicColumnCount)] + AppleMusicSearchCategory.allCases.map { category in
             (items.indices.filter { items[$0].musicItem?.searchCategory == category }, musicColumnCount)
@@ -946,7 +969,12 @@ final class FoilExposeController {
             else if scope == .terminal { delegate?.openTerminal(isIncognito: false) }
             else if scope == .camera { delegate?.openCameraAction() }
         }
-        model.onSelect = { [weak self] item in self?.select(item) }
+        model.onSelect = { [weak self, weak model] item in
+            if let entry = item.clipboardEntry {
+                if (NSApp.delegate as? AppDelegate)?.openClipboardSearchEntry(entry, isIncognito: model?.isOptionPressed == true) == true { self?.dismiss() }
+                else { model?.fileSearchNotice = NSLocalizedString("Clipboard History Open Failed", comment: "") }
+            } else { self?.select(item) }
+        }
         model.onDismiss = { [weak self] in self?.dismiss() }
         model.onOpenFile = { [weak self] url in self?.openFile(url) }
         model.onOpenURL = { [weak self] url in self?.openWebURL(url) }

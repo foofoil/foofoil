@@ -4,7 +4,7 @@ Blank foils show “What would you like to open? Type here.” followed by the `
 
 Spotlight file search is on by default and can be turned off in Settings → General → Search. When off, search results still offer Enable File Search. Searching does not require selecting the home folder; opening protected files may require macOS authorization.
 
-The ungrouped `/` list offers History, File, Folder, URL, Terminal, Camera, and Clipboard, followed by enabled Apple Music Albums, Playlists, and Songs at the end. URL enters URL input mode. Clipboard shows its content type or filename and the input keyword `clipboard`, and is disabled when nothing can be opened. Terminal opens configuration; Camera opens immediately.
+The ungrouped `/` list offers History, Clipboard, File, Folder, URL, Terminal, and Camera, followed by enabled Apple Music Albums, Playlists, and Songs at the end. URL enters URL input mode. Clipboard has a fixed title and the input keyword `clipboard`; selecting it enters a searchable clipboard scope, available even when the clipboard is empty. Terminal opens configuration; Camera opens immediately.
 
 Local files are referenced directly, with bookmarks tracking renames and moves when possible. History keeps no body copy of an original file, and deleting history never deletes that original. Clipboard text, Markdown, HTML, and image data are saved automatically and can be restored from history, marked “From Clipboard,” without Save As. Copied files still reference their originals; copied URLs and image addresses open as URLs without automatic downloading.
 
@@ -156,3 +156,7 @@ Terminal creation and reopening a closed terminal start immediately with its sav
 Blank foils show a one-line clipboard button below the opening icons, with a filename or content type that fills the available width. Its shortcut stays fully visible and follows normal or incognito mode. The button is hidden when the clipboard has nothing to open.
 
 The penultimate icon in a blank foil toggles the current foil between normal and incognito mode; Overview remains last. In an incognito foil it shows “Exit Incognito Mode” with a shoeprints icon. Its shortcut hint writes Escape as “esc”.
+
+Choose **Clipboard** from `/` in Quick Open, blank foils, or Overview, then type to search. Without Full Disk Access, results contain only the current clipboard and an authorization button. Enable foofoil in System Settings → Privacy & Security → Full Disk Access; return to retry, or reopen foofoil if required. With access, search reads Spotlight’s existing clipboard history without changing the system clipboard.
+
+Clipboard result titles use one line. Older items have a copy icon on the right; clicking it copies the saved content to the system clipboard without opening a foil. The current clipboard item has no copy icon.

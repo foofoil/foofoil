@@ -118,6 +118,11 @@ final class HistorySearchWindowController: ObservableObject {
             }
         }
         model.openFile = { [weak self] url in self?.openFile(url) }
+        model.openClipboardEntry = { [weak self] entry in
+            guard let self, let delegate = NSApp.delegate as? AppDelegate else { return }
+            if delegate.openClipboardSearchEntry(entry, isIncognito: self.openingIsIncognito) { self.dismiss() }
+            else { self.model.openError = NSLocalizedString("Clipboard History Open Failed", comment: "") }
+        }
         model.openResult = { [weak self] id in
             (NSApp.delegate as? AppDelegate)?.openSearchResultInNewWindow(id: id, isIncognito: self?.openingIsIncognito == true, target: self?.openingTarget)
         }

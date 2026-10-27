@@ -16,10 +16,10 @@ struct SearchScopeTests {
 
     @Test func scopeAvailabilityFollowsMusicLibrarySetting() {
         let disabledScopes = SearchScope.availableScopes(musicLibraryEnabled: false)
-        #expect(disabledScopes == [.history, .file, .folder, .url, .terminal, .camera, .clipboard, .enableMusic])
+        #expect(disabledScopes == [.history, .clipboard, .file, .folder, .url, .terminal, .camera, .enableMusic])
 
         let enabledScopes = SearchScope.availableScopes(musicLibraryEnabled: true)
-        #expect(enabledScopes == [.history, .file, .folder, .url, .terminal, .camera, .clipboard, .album, .playlist, .song])
+        #expect(enabledScopes == [.history, .clipboard, .file, .folder, .url, .terminal, .camera, .album, .playlist, .song])
 
         #expect(SearchScope.history.displayName == "历史")
         #expect(SearchScope.file.displayName == "文件")
@@ -31,9 +31,9 @@ struct SearchScopeTests {
 
     @Test func disabledSourcesBecomeEnableActionsAtTheBottom() {
         #expect(SearchScope.availableScopes(musicLibraryEnabled: false, fileSearchEnabled: false)
-            == [.history, .url, .terminal, .camera, .clipboard, .enableFiles, .enableMusic])
+            == [.history, .clipboard, .url, .terminal, .camera, .enableFiles, .enableMusic])
         #expect(SearchScope.availableScopes(musicLibraryEnabled: true, fileSearchEnabled: false)
-            == [.history, .url, .terminal, .camera, .clipboard, .enableFiles, .album, .playlist, .song])
+            == [.history, .clipboard, .url, .terminal, .camera, .enableFiles, .album, .playlist, .song])
     }
 
     @Test func musicScopesRequireBothSettings() {
@@ -82,8 +82,8 @@ struct SearchScopeTests {
         }
     }
 
-    @Test func urlOptionEntersInputAndClipboardUsesOpeningActions() {
-        let quick = HistorySearchViewModel(clipboardContentProvider: { .init(.text) })
+    @Test func urlOptionEntersInputAndClipboardEntersSearchScope() {
+        let quick = HistorySearchViewModel()
         defer { quick.stop() }
         quick.query = "/"
         quick.selectScope(.url)
@@ -93,7 +93,7 @@ struct SearchScopeTests {
         var quickAction: SearchScope?
         quick.openCommand = { quickAction = $0 }
         quick.selectScope(.clipboard)
-        #expect(quickAction == .clipboard && quick.activeScope == nil)
+        #expect(quickAction == nil && quick.activeScope == .clipboard)
 
         let expose = FoilExposeModel(items: [], historyItems: [], clipboardContent: .init(.text))
         defer { expose.stopFileSearch() }
@@ -102,22 +102,38 @@ struct SearchScopeTests {
         expose.selectScope(.url)
         #expect(exposeAction == .url && expose.activeScope == nil)
         expose.selectScope(.clipboard)
-        #expect(exposeAction == .clipboard && expose.activeScope == nil)
+        #expect(exposeAction == .url && expose.activeScope == .clipboard)
     }
 
-    @Test func unavailableClipboardCannotExecute() {
-        let quick = HistorySearchViewModel(clipboardContentProvider: { nil })
+    @Test func clipboardScopeIsAvailableEvenWhenCurrentClipboardIsEmpty() {
+        let quick = HistorySearchViewModel()
         quick.query = "/"
         defer { quick.stop() }
         var executed = false
         quick.openCommand = { _ in executed = true }
         quick.selectScope(.clipboard)
-        #expect(!executed && !quick.isScopeEnabled(.clipboard))
+        #expect(!executed && quick.isScopeEnabled(.clipboard) && quick.activeScope == .clipboard)
         let expose = FoilExposeModel(items: [], historyItems: [])
         defer { expose.stopFileSearch() }
         expose.onOpenCommand = { _ in executed = true }
         expose.selectScope(.clipboard)
-        #expect(!executed && !expose.isScopeEnabled(.clipboard))
+        #expect(!executed && expose.isScopeEnabled(.clipboard) && expose.activeScope == .clipboard)
+    }
+
+    @Test func clipboardScopeExcludesOtherSourcesAndClearingRestoresSearch() async throws {
+        var historyCalled = false
+        var filesCalled = false
+        let quick = HistorySearchViewModel(historySearch: { _ in historyCalled = true; return [] },
+                                           fileSearch: { _, completion in filesCalled = true; completion(.results([])) })
+        defer { quick.stop() }
+        quick.selectScope(.clipboard)
+        quick.query = "clipboard regression query"
+        try await Task.sleep(for: .milliseconds(350))
+        #expect(!historyCalled && !filesCalled)
+        #expect(quick.directPath == nil && quick.openURL == nil)
+        quick.clearActiveScope()
+        try await eventually { historyCalled && filesCalled }
+        #expect(quick.activeScope == nil && quick.query == "clipboard regression query")
     }
 
     @Test func openingCommandsExecuteWithoutActivatingScope() {

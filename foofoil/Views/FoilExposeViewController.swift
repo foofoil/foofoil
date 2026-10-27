@@ -6,6 +6,7 @@ import SwiftUI
 final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
     let model: FoilExposeModel
     let searchField = NSTextField()
+    private let clipboardAuthorizationNote = NSTextField(wrappingLabelWithString: NSLocalizedString("Clipboard History Authorization Instructions", comment: ""))
     private let hint = NSTextField(labelWithString: NSLocalizedString("Search Foils Hint", comment: ""))
     private let searchBackground = NSView()
     private let searchPrompt = QuickOpenPromptHostingView(rootView: QuickOpenSearchPrompt(musicLibraryEnabled: false))
@@ -51,9 +52,12 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         shade.frame = root.bounds
         shade.autoresizingMask = [.width, .height]
         root.addSubview(shade)
-        for child in [grid, hint, searchBackground, clipboardButton, scopePicker, toast] {
+        for child in [grid, hint, searchBackground, clipboardButton, clipboardAuthorizationNote, scopePicker, toast] {
             root.addSubview(child)
         }
+        clipboardAuthorizationNote.font = .systemFont(ofSize: 12)
+        clipboardAuthorizationNote.textColor = .white.withAlphaComponent(0.75)
+        clipboardAuthorizationNote.isSelectable = true
         hint.font = .systemFont(ofSize: 13)
         hint.textColor = .white.withAlphaComponent(0.62)
         hint.alignment = .center
@@ -167,8 +171,9 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         scopeButton.title = model.activeScope.map { $0.displayName + "  ×" } ?? ""
         scopeButton.setAccessibilityLabel(NSLocalizedString("Clear Search Scope", comment: ""))
         scopeButton.image = model.activeScope.flatMap { NSImage(systemSymbolName: $0.symbolName, accessibilityDescription: nil) }
-        hint.isHidden = model.isChoosingScope
-        clipboardButton.isHidden = model.clipboardContent == nil
+        clipboardAuthorizationNote.isHidden = model.activeScope != .clipboard || model.clipboardSearch.access != .needsAuthorization
+        hint.isHidden = model.isChoosingScope || !clipboardAuthorizationNote.isHidden
+        clipboardButton.isHidden = model.clipboardContent == nil || model.activeScope == .clipboard
         if let content = model.clipboardContent {
             let title = model.isOptionPressed
                 ? NSLocalizedString("Open Clipboard Incognito", comment: "")
@@ -356,7 +361,8 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
                                    width: max(20, searchBackground.bounds.width - scopeWidth - 43), height: fieldHeight)
         searchPrompt.frame = searchField.frame
         hint.frame = NSRect(x: 20, y: 70, width: max(0, width - 40), height: 20)
-        let top: CGFloat = 106
+        clipboardAuthorizationNote.frame = NSRect(x: left, y: 72, width: rowWidth, height: 44)
+        let top: CGFloat = clipboardAuthorizationNote.isHidden ? 106 : 130
         grid.frame = NSRect(x: 0, y: top, width: width, height: max(0, view.bounds.height - top))
         let pickerSize = NSSize(width: scopePickerWidth, height: scopePicker.arrangedSubviews.reduce(12) {
             $0 + max(16, $1.intrinsicContentSize.height) + 2

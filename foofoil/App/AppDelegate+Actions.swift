@@ -448,6 +448,39 @@ extension AppDelegate {
         return openClipboardText(from: NSPasteboard.general, isIncognito: isIncognito)
     }
 
+    /// 从搜索快照打开，不把历史内容写回 NSPasteboard.general，避免改变 Spotlight 历史。
+    @discardableResult
+    func openClipboardSearchEntry(_ entry: ClipboardSearchEntry, isIncognito: Bool = false) -> Bool {
+        switch entry.content {
+        case .unavailable: return false
+        case .files(let urls): return openClipboardFileURLs(urls, isIncognito: isIncognito)
+        case .html(let html, let plain):
+            if let plain, AppState.looksLikeMarkdown(plain) {
+                let target = clipboardContentTarget(isIncognito: isIncognito)
+                target.state.openText(plain, isMarkdown: true); presentClipboardTarget(target); return true
+            }
+            return openClipboardHTML(html, plainText: plain, isIncognito: isIncognito)
+        case .image(let data):
+            guard let image = NSImage(data: data) else { return false }
+            let target = clipboardContentTarget(isIncognito: isIncognito)
+            target.state.openImage(image: image, imageSource: .clipboard, originalData: data,
+                                   filenameExtension: entry.imageFilenameExtension ?? "png")
+            presentClipboardTarget(target); return true
+        case .markdown(let text):
+            let target = clipboardContentTarget(isIncognito: isIncognito)
+            target.state.openText(text, isMarkdown: true); presentClipboardTarget(target); return true
+        case .text(let text):
+            if let url = AppState.websiteURL(fromClipboardText: text), SettingsStore.shared.appleMusicLibraryEnabled, AppleMusicLink(url: url) != nil {
+                openAppleMusicLink(url, isIncognito: isIncognito); return true
+            }
+            let target = clipboardContentTarget(isIncognito: isIncognito)
+            if let url = AppState.websiteURL(fromClipboardText: text) { target.state.openWeb(url: url) }
+            else if AppState.looksLikeHTML(text) { return openClipboardHTML(text, plainText: nil, isIncognito: isIncognito) }
+            else { target.state.openText(text, isMarkdown: AppState.looksLikeMarkdown(text)) }
+            presentClipboardTarget(target); return true
+        }
+    }
+
     /// 剪贴板文件与拖入箔片走同一条管线；没有空白箔片时新建一扇再接管。
     func openClipboardFileURLs(_ urls: [URL], isIncognito: Bool = false) -> Bool {
         let probe = AppState()
@@ -552,7 +585,7 @@ extension AppDelegate {
         }
     }
 
-    private static let markdownPasteboardTypes: [NSPasteboard.PasteboardType] = [
+    static let markdownPasteboardTypes: [NSPasteboard.PasteboardType] = [
         NSPasteboard.PasteboardType("net.daringfireball.markdown"),
         NSPasteboard.PasteboardType("public.markdown")
     ]

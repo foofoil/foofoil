@@ -96,7 +96,7 @@ final class FoilExposeGrid: NSScrollView {
             var key: String {
                 // 更新只随模型变化执行；滚动不会重新生成或比较这些数据。
                 [foil?.id.uuidString ?? "", title, subtitle, symbol, foil?.thumbnailPath ?? "",
-                 foil?.bodyPreview ?? "", String(foil?.historyIsPinned ?? false), String(foil?.isClipboardContent ?? false),
+                 foil?.bodyPreview ?? "", String(foil?.historyIsPinned ?? false), String(foil?.isClipboardContent ?? false), String(foil?.clipboardEntry?.isCurrentClipboard ?? false),
                  String(foil?.controller?.appState.isIncognito ?? false), String(foil?.hasHistoryRecord ?? false),
                  String(foil?.canRenameTitle ?? false), String(foil?.isHistoryEntry ?? false), String(index ?? -1)].joined(separator: "\u{1F}")
             }
@@ -139,7 +139,21 @@ final class FoilExposeGrid: NSScrollView {
             }
             var next: [Section] = []
             let open = items.indices.filter { !items[$0].isHistoryEntry && items[$0].musicItem == nil }
-            if !open.isEmpty { next.append(Section(title: NSLocalizedString("Expose Open Section", comment: ""), compact: false, count: open.filter { !items[$0].isNewFoil }.count, symbol: "macwindow", tint: .systemMint, entries: foilEntries(open))) }
+            if model.activeScope == .clipboard {
+                var entries = foilEntries(Array(items.indices))
+                if model.clipboardSearch.isLoading { entries.append(Entry(title: NSLocalizedString("Clipboard History Loading", comment: ""))) }
+                else if entries.isEmpty { entries.append(Entry(title: NSLocalizedString("No Search Results", comment: ""))) }
+                if model.clipboardSearch.access == .needsAuthorization {
+                    entries.append(Entry(title: NSLocalizedString("Clipboard History Authorize", comment: ""), symbol: "lock.open", action: { model.clipboardSearch.openAuthorizationSettings() }))
+                } else if model.clipboardSearch.access == .unavailable {
+                    entries.append(Entry(title: NSLocalizedString("Clipboard History Unavailable", comment: "")))
+                    entries.append(Entry(title: NSLocalizedString("Retry File Search", comment: ""), action: { model.clipboardSearch.refresh() }))
+                }
+                if let notice = model.fileSearchNotice ?? model.clipboardSearch.copyError { entries.append(Entry(title: notice)) }
+                next.append(Section(title: NSLocalizedString("Clipboard Search Scope", comment: ""), compact: true,
+                                    count: items.count, symbol: "doc.on.clipboard", tint: .systemCyan, entries: entries))
+            }
+            if model.activeScope != .clipboard, !open.isEmpty { next.append(Section(title: NSLocalizedString("Expose Open Section", comment: ""), compact: false, count: open.filter { !items[$0].isNewFoil }.count, symbol: "macwindow", tint: .systemMint, entries: foilEntries(open))) }
             if model.showsHistorySection {
                 let history = items.indices.filter { items[$0].isHistoryEntry }
                 var entries = foilEntries(history)
@@ -447,6 +461,7 @@ private final class ExposeNativeCard: NSView {
     private let subtitleLabel = NSTextField(labelWithString: "")
     private let badge = NSTextField(labelWithString: "")
     private let clipboardIcon = NSImageView()
+    private let copyButton = NSButton()
     private let dashedBorder = CAShapeLayer()
     private let playback = CALayer()
     private var playbackSubscription: AnyCancellable?
@@ -519,6 +534,14 @@ private final class ExposeNativeCard: NSView {
         pinned.contentTintColor = .systemYellow
         addSubview(thumbnail)
         for view in [preview, icon, typeIcon, badge, pinned, incognito] { thumbnail.addSubview(view) }
+        copyButton.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: NSLocalizedString("Clipboard History Copy", comment: ""))
+        copyButton.isBordered = false
+        copyButton.contentTintColor = .white.withAlphaComponent(0.8)
+        copyButton.toolTip = NSLocalizedString("Clipboard History Copy", comment: "")
+        copyButton.setAccessibilityLabel(NSLocalizedString("Clipboard History Copy", comment: ""))
+        copyButton.target = self; copyButton.action = #selector(copyClipboardEntry)
+        copyButton.isHidden = true
+        addSubview(copyButton)
         addSubview(clipboardIcon)
         addSubview(titleLabel)
         addSubview(subtitleLabel)
@@ -544,6 +567,10 @@ private final class ExposeNativeCard: NSView {
         reset()
         self.foil = foil; self.model = model; self.action = action; self.compact = compact
         self.highlighted = highlighted
+        copyButton.isHidden = foil?.clipboardEntry == nil || foil?.clipboardEntry?.isCurrentClipboard == true
+        copyButton.isEnabled = foil?.clipboardEntry?.canCopy == true
+        copyButton.setAccessibilityIdentifier(foil?.clipboardEntry.map { "clipboard.copy.\($0.id)" })
+        setAccessibilityChildren(copyButton.isHidden ? [] : [copyButton])
         isNotice = compact && action == nil && foil == nil
         thumbnail.isHidden = isNotice
         titleLabel.font = .systemFont(ofSize: 12, weight: isNotice ? .regular : .medium)
@@ -653,9 +680,11 @@ private final class ExposeNativeCard: NSView {
         pinned.frame = NSRect(x: side - 36, y: 4, width: 28, height: 28)
         incognito.frame = NSRect(x: side - 33, y: side - 33, width: 22, height: 22)
         let badgeWidth = max(28, badge.intrinsicContentSize.width + 12)
-        badge.frame = compact ? NSRect(x: bounds.width - badgeWidth - 8, y: 19, width: badgeWidth, height: 20)
+        let copyInset: CGFloat = copyButton.isHidden ? 0 : 28
+        copyButton.frame = NSRect(x: bounds.width - 34, y: 15, width: 26, height: 26)
+        badge.frame = compact ? NSRect(x: bounds.width - badgeWidth - 8 - copyInset, y: 19, width: badgeWidth, height: 20)
             : NSRect(x: 7, y: 7, width: badgeWidth, height: 22)
-        titleLabel.frame = compact ? NSRect(x: 50, y: subtitleLabel.isHidden ? 19 : 10, width: max(0, bounds.width - 100), height: 20)
+        titleLabel.frame = compact ? NSRect(x: 50, y: subtitleLabel.isHidden ? 19 : 10, width: max(0, bounds.width - 100 - copyInset), height: 20)
             : NSRect(x: 0, y: side + 8, width: bounds.width, height: 18)
         if !compact {
             let clipboardWidth: CGFloat = clipboardIcon.isHidden ? 0 : 18
@@ -670,7 +699,7 @@ private final class ExposeNativeCard: NSView {
         if isNotice {
             titleLabel.frame = NSRect(x: 10, y: 19, width: max(0, bounds.width - 20), height: 20)
         }
-        subtitleLabel.frame = NSRect(x: 50, y: 31, width: max(0, bounds.width - 65), height: 16)
+        subtitleLabel.frame = NSRect(x: 50, y: 31, width: max(0, bounds.width - 65 - copyInset), height: 16)
         CATransaction.commit()
         updateEmphasisTransform(animated: false)
     }
@@ -712,7 +741,11 @@ private final class ExposeNativeCard: NSView {
     }
     override func mouseExited(with event: NSEvent) { hovered = false; updateAppearance() }
     override func hitTest(_ point: NSPoint) -> NSView? {
-        super.hitTest(point) == nil ? nil : self
+        guard let target = super.hitTest(point) else { return nil }
+        return target === copyButton ? copyButton : self
+    }
+    @objc private func copyClipboardEntry() {
+        if let entry = foil?.clipboardEntry { model?.clipboardSearch.copy(entry) }
     }
     override func mouseDown(with event: NSEvent) {}
     override func mouseUp(with event: NSEvent) {

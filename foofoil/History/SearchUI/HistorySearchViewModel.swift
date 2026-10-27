@@ -27,6 +27,9 @@ enum FileSearchStatus: Equatable {
 @MainActor
 final class HistorySearchViewModel: ObservableObject {
     let toast = FoilToastCenter()
+    let clipboardSearch = ClipboardHistorySearch()
+    private var clipboardCancellable: AnyCancellable?
+    var openClipboardEntry: ((ClipboardSearchEntry) -> Void)?
     @Published var activeScope: SearchScope? = nil {
         didSet {
             if oldValue != activeScope && !isResetting {
@@ -67,19 +70,9 @@ final class HistorySearchViewModel: ObservableObject {
         selectScope(filteredScopes[index])
     }
 
-    @Published private(set) var scopeClipboardContent: ClipboardOpenableContent?
-    private let clipboardContentProvider: @MainActor () -> ClipboardOpenableContent?
+    func isScopeEnabled(_ scope: SearchScope) -> Bool { true }
 
-    func isScopeEnabled(_ scope: SearchScope) -> Bool {
-        scope != .clipboard || scopeClipboardContent != nil
-    }
-
-    func scopeTitle(_ scope: SearchScope) -> String {
-        if scope == .clipboard, let content = scopeClipboardContent {
-            return content.openingTitle(isIncognito: opensIncognito)
-        }
-        return scope.displayName
-    }
+    func scopeTitle(_ scope: SearchScope) -> String { scope.displayName }
 
     var openCommand: ((SearchScope) -> Void)?
     var canMaintainInputFocus: () -> Bool = { false }
@@ -112,6 +105,7 @@ final class HistorySearchViewModel: ObservableObject {
         resultFilter = .all
         highlightedScopeIndex = 0
         focusRequest += 1
+        performSearch()
     }
 
     @Published var query = "" {
@@ -197,9 +191,8 @@ final class HistorySearchViewModel: ObservableObject {
          resolveMusicLink: @escaping @MainActor (AppleMusicLink) async throws -> AppleMusicLibraryItem = { try await AppleMusicLibrary.shared.resolve($0) },
          musicAuthorized: @escaping @MainActor () -> Bool = { AppleMusicLibrary.shared.isAuthorized },
          musicEnabled: @escaping @MainActor () -> Bool = { SettingsStore.shared.appleMusicSearchEnabled },
-         musicLibraryEnabled: @escaping @MainActor () -> Bool = { SettingsStore.shared.appleMusicLibraryEnabled },
-         clipboardContentProvider: @escaping @MainActor () -> ClipboardOpenableContent? = { (NSApp.delegate as? AppDelegate)?.clipboardOpenableContent() }) {
-        self.clipboardContentProvider = clipboardContentProvider
+         musicLibraryEnabled: @escaping @MainActor () -> Bool = { SettingsStore.shared.appleMusicLibraryEnabled }) {
+
         self.musicLibraryEnabled = musicLibraryEnabled
         self.resolveMusicLink = resolveMusicLink
         self.musicSearch = { term, filter in
@@ -222,6 +215,11 @@ final class HistorySearchViewModel: ObservableObject {
             }
         }
         self.cancelFiles = cancelFiles ?? { service.cancel() }
+        clipboardCancellable = clipboardSearch.objectWillChange.receive(on: DispatchQueue.main).sink { [weak self] _ in
+            guard let self, self.activeScope == .clipboard else { return }
+            self.objectWillChange.send()
+            self.reconcileSelection(previousIndex: self.selectedIndex)
+        }
         self.fileSettingsCancellable = NotificationCenter.default.publisher(for: .localFileSearchDidChange)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -242,7 +240,7 @@ final class HistorySearchViewModel: ObservableObject {
             }
     }
 
-    var isSearching: Bool { isHistorySearching || isFileSearching || isMusicSearching }
+    var isSearching: Bool { isHistorySearching || isFileSearching || isMusicSearching || (activeScope == .clipboard && clipboardSearch.isLoading) }
     func musicResults(in category: AppleMusicSearchCategory) -> [AppleMusicLibraryItem] {
         musicResults.filter { $0.searchCategory == category }
     }
@@ -300,6 +298,7 @@ final class HistorySearchViewModel: ObservableObject {
     }
     var itemIDs: [String] {
         if isPickingScope { return [] }
+        if activeScope == .clipboard { return clipboardSearch.entries.map { "clipboard:\($0.id)" } }
         if let musicLink { return ["music-link:\(musicLink.url.absoluteString)"] }
         let pathItems = directPath.map { [$0.id] } ?? []
         return pathItems + (showsOpenCamera ? ["camera"] : []) + visibleResults.map { "history:\($0.id)" } + visibleFiles.map { "file:\($0.id)" }
@@ -311,7 +310,6 @@ final class HistorySearchViewModel: ObservableObject {
 
     /// 空箔重新激活时保留当前查询和选区，不执行全选。
     func focusInput() {
-        if isPickingScope { scopeClipboardContent = clipboardContentProvider() }
         shouldSelectAll = false
         focusRequest += 1
     }
@@ -330,7 +328,8 @@ final class HistorySearchViewModel: ObservableObject {
         performSearch()
     }
 
-    func stop(clearToast: Bool = true) {
+    func stop(clearToast: Bool = true, stopClipboard: Bool = true) {
+        if stopClipboard { clipboardSearch.stop() }
         if clearToast { toast.dismiss() }
         isActive = false
         musicTask?.cancel()
@@ -354,6 +353,10 @@ final class HistorySearchViewModel: ObservableObject {
     }
 
     func openSelected() {
+        if activeScope == .clipboard {
+            if let entry = clipboardSearch.entries.first(where: { "clipboard:\($0.id)" == selectedID }) { openClipboardEntry?(entry) }
+            return
+        }
         if musicLink != nil { openLinkedMusic(); return }
         if let directPath, selectedID == directPath.id { openFile?(directPath.url); return }
         if selectedID == "camera" { openCamera?(); return }
@@ -402,12 +405,12 @@ final class HistorySearchViewModel: ObservableObject {
 
     private func performSearch() {
         // 刷新排序会重启搜索任务，但收藏结果提示应继续显示到自己的截止时间。
-        stop(clearToast: false)
+        stop(clearToast: false, stopClipboard: false)
         isActive = true
         let currentGeneration = generation
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         // 直接输入的路径优先于所有来源：命中时排在第一项并默认选中。
-        directPath = mode == .history ? DirectFilePathResolver.resolve(trimmed) : nil
+        directPath = mode == .history && activeScope != .clipboard ? DirectFilePathResolver.resolve(trimmed) : nil
         results = []; files = []; rawFiles = []
         musicResults = []; musicError = nil
         musicLink = nil; linkedMusicItem = nil; musicLinkError = nil
@@ -417,8 +420,14 @@ final class HistorySearchViewModel: ObservableObject {
         isMusicSearchEnabled = musicEnabled()
         fileStatus = nil; openError = nil
         userMovedSelection = false
+        if activeScope == .clipboard {
+            directPath = nil; openURL = nil
+            clipboardSearch.search(trimmed)
+            selectedID = itemIDs.first
+            return
+        }
+        clipboardSearch.stop()
         if isPickingScope {
-            scopeClipboardContent = clipboardContentProvider()
             selectedID = nil
             return
         }
