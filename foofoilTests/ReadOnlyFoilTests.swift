@@ -40,6 +40,21 @@ struct ReadOnlyFoilTests {
         model.stop()
     }
 
+    @Test func clipboardHistoryButtonEntersTheScopePickerWithoutOpeningContent() {
+        let state = AppState(isIncognito: true)
+        let search = HistorySearchWindowController(embedded: true)
+        search.beginEmbeddedSearch(target: state)
+        defer { search.endEmbeddedSearch() }
+        search.model.query = "old query"
+        let request = search.model.focusRequest
+        search.model.showClipboardScopePicker()
+        #expect(search.model.query == "/" + SearchScope.clipboard.displayName)
+        #expect(search.model.isPickingScope && search.model.activeScope == nil)
+        #expect(search.model.filteredScopes == [.clipboard])
+        #expect(search.model.focusRequest > request && !search.model.shouldSelectAll)
+        #expect(state.isBlank && state.text.isEmpty && search.model.opensIncognito)
+    }
+
     @Test func embeddedSearchDoesNotChangeTheBlankFoil() throws {
         let state = AppState(isIncognito: true)
         let search = HistorySearchWindowController(embedded: true)

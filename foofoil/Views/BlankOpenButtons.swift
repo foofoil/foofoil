@@ -3,6 +3,7 @@ import SwiftUI
 /// 空箔的打开入口直接绑定来源状态，避免主窗口变化导致无痕内容进入普通箔。
 struct BlankOpenButtons: View {
     @ObservedObject var appState: AppState
+    let showClipboardSearch: () -> Void
     @State private var hovered: Int?
     @State private var shortcutRevision = 0
     @State private var clipboardContent: ClipboardOpenableContent?
@@ -157,42 +158,57 @@ struct BlankOpenButtons: View {
 
     @ViewBuilder
     private var clipboardBanner: some View {
-        if let content = clipboardContent {
-            Button {
-                refreshClipboard(force: true)
-                guard clipboardContent != nil, let delegate = NSApp.delegate as? AppDelegate else { return }
-                if let controller = delegate.windowControllers.first(where: { $0.appState === appState }) {
-                    delegate.activateWindow(controller)
-                }
-                _ = delegate.openClipboardContentInNewWindow(isIncognito: opensIncognito)
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "doc.on.clipboard")
-                    Text(content.openingTitle(isIncognito: opensIncognito, abbreviatesFileName: false))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                    if let shortcut = clipboardShortcut {
-                        Text(shortcut)
-                            .font(.system(size: 10, weight: .medium))
-                            .fixedSize()
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 3)
-                            .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+        HStack(spacing: 6) {
+            if let content = clipboardContent {
+                Button {
+                    refreshClipboard(force: true)
+                    guard clipboardContent != nil, let delegate = NSApp.delegate as? AppDelegate else { return }
+                    if let controller = delegate.windowControllers.first(where: { $0.appState === appState }) {
+                        delegate.activateWindow(controller)
                     }
+                    _ = delegate.openClipboardContentInNewWindow(isIncognito: opensIncognito)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "doc.on.clipboard")
+                        Text(content.openingTitle(isIncognito: opensIncognito, abbreviatesFileName: false))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        if let shortcut = clipboardShortcut {
+                            Text(shortcut)
+                                .font(.system(size: 10, weight: .medium))
+                                .fixedSize()
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 3)
+                                .background(.quaternary, in: RoundedRectangle(cornerRadius: 4))
+                        }
+                    }
+                    .font(.system(size: 12))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .frame(height: 34)
+                    .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.2)))
+                    .contentShape(Rectangle())
                 }
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 10)
-                .frame(height: 34)
-                .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.2)))
-                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+                .help(content.openingTitle(isIncognito: opensIncognito, abbreviatesFileName: false))
+                .accessibilityIdentifier("blank.clipboard")
+            }
+            Button(action: showClipboardSearch) {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 34, height: 34)
+                    .background(.primary.opacity(0.05), in: RoundedRectangle(cornerRadius: 8))
+                    .overlay(RoundedRectangle(cornerRadius: 8).stroke(.secondary.opacity(0.2)))
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(content.openingTitle(isIncognito: opensIncognito, abbreviatesFileName: false))
-            .accessibilityIdentifier("blank.clipboard")
-            .padding(.bottom, 2)
+            .help(NSLocalizedString("Browse Clipboard History", comment: ""))
+            .accessibilityLabel(NSLocalizedString("Browse Clipboard History", comment: ""))
+            .accessibilityIdentifier("blank.clipboardHistory")
         }
+        .padding(.bottom, 2)
     }
 
     private func open(_ index: Int) {

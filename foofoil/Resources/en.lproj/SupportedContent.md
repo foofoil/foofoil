@@ -4,7 +4,7 @@ Blank foils show “What would you like to open? Type here.” followed by the `
 
 Spotlight file search is on by default and can be turned off in Settings → General → Search. When off, search results still offer Enable File Search. Searching does not require selecting the home folder; opening protected files may require macOS authorization.
 
-The ungrouped `/` list offers History, Clipboard, File, Folder, URL, Terminal, and Camera, followed by enabled Apple Music Albums, Playlists, and Songs at the end. URL enters URL input mode. Clipboard has a fixed title and the input keyword `clipboard`; selecting it enters a searchable clipboard scope, available even when the clipboard is empty. Terminal opens configuration; Camera opens immediately.
+The ungrouped `/` list offers Clipboard, History, File, Folder, URL, Terminal, and Camera, followed by enabled Apple Music Albums, Playlists, and Songs at the end. URL enters URL input mode. Clipboard has a fixed title and the input keyword `clipboard`; selecting it enters a searchable clipboard scope, available even when the clipboard is empty. Terminal opens configuration; Camera opens immediately.
 
 Local files are referenced directly, with bookmarks tracking renames and moves when possible. History keeps no body copy of an original file, and deleting history never deletes that original. Clipboard text, Markdown, HTML, and image data are saved automatically and can be restored from history, marked “From Clipboard,” without Save As. Copied files still reference their originals; copied URLs and image addresses open as URLs without automatic downloading.
 
@@ -162,3 +162,5 @@ Choose **Clipboard** from `/` in Quick Open, blank foils, or Overview, then type
 Clipboard result titles use one line. Older items have a copy icon on the right; clicking it copies the saved content to the system clipboard without opening a foil. The current clipboard item has no copy icon.
 
 Clipboard images show thumbnails, while other content uses larger type icons. When the source app is known and installed, its icon appears at the lower-right corner.
+
+The ellipsis button to the right of Open Clipboard Content in a blank foil fills the search field with the clipboard slash option and focuses it.

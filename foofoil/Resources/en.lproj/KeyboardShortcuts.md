@@ -189,6 +189,8 @@ The search field in a blank foil uses Quick Open: ↑ / ↓ selects, Return open
 
 An active blank foil keeps its search field focused. After `/`, arrow keys select a search type, action, or an enable option at the bottom; Return confirms and Esc clears while retaining input focus.
 
-The `/ More options` menu includes URL input after Folder and Clipboard after Camera. Return confirms the selection; the three Apple Music categories appear last.
+The `/ More options` menu places Clipboard first and URL input after Folder. Return confirms the selection; the three Apple Music categories appear last.
 
 In all three search surfaces, type `/`, choose Clipboard, and keep typing to filter. Use arrow keys to select and Return to open. Full Disk Access enables system history; without it, only the current clipboard is searched.
+
+The ellipsis beside Open Clipboard Content in a blank foil fills the clipboard slash option and focuses the search field; Return confirms the scope.

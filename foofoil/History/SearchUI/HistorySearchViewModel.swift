@@ -314,6 +314,12 @@ final class HistorySearchViewModel: ObservableObject {
         focusRequest += 1
     }
 
+    /// 与在空箔中键入范围词一致：保留下拉选项，光标位于末尾，等待确认。
+    func showClipboardScopePicker() {
+        reset(initialQuery: "/" + SearchScope.clipboard.displayName)
+        focusInput()
+    }
+
     func reset(mode: HistorySearchMode = .history, initialQuery: String? = nil) {
         stop()
         isResetting = true

@@ -85,7 +85,7 @@ enum SearchScope: String, CaseIterable, Identifiable, Sendable {
     var isEnableAction: Bool { self == .enableFiles || self == .enableMusic }
 
     static func availableScopes(musicLibraryEnabled: Bool, fileSearchEnabled: Bool = true, musicSearchEnabled: Bool = true) -> [SearchScope] {
-        var scopes: [SearchScope] = [.history, .clipboard]
+        var scopes: [SearchScope] = [.clipboard, .history]
         if fileSearchEnabled { scopes += [.file, .folder] }
         scopes += [.url, .terminal, .camera]
         if !fileSearchEnabled { scopes.append(.enableFiles) }

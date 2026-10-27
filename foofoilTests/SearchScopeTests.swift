@@ -16,10 +16,10 @@ struct SearchScopeTests {
 
     @Test func scopeAvailabilityFollowsMusicLibrarySetting() {
         let disabledScopes = SearchScope.availableScopes(musicLibraryEnabled: false)
-        #expect(disabledScopes == [.history, .clipboard, .file, .folder, .url, .terminal, .camera, .enableMusic])
+        #expect(disabledScopes == [.clipboard, .history, .file, .folder, .url, .terminal, .camera, .enableMusic])
 
         let enabledScopes = SearchScope.availableScopes(musicLibraryEnabled: true)
-        #expect(enabledScopes == [.history, .clipboard, .file, .folder, .url, .terminal, .camera, .album, .playlist, .song])
+        #expect(enabledScopes == [.clipboard, .history, .file, .folder, .url, .terminal, .camera, .album, .playlist, .song])
 
         #expect(SearchScope.history.displayName == "历史")
         #expect(SearchScope.file.displayName == "文件")
@@ -31,9 +31,9 @@ struct SearchScopeTests {
 
     @Test func disabledSourcesBecomeEnableActionsAtTheBottom() {
         #expect(SearchScope.availableScopes(musicLibraryEnabled: false, fileSearchEnabled: false)
-            == [.history, .clipboard, .url, .terminal, .camera, .enableFiles, .enableMusic])
+            == [.clipboard, .history, .url, .terminal, .camera, .enableFiles, .enableMusic])
         #expect(SearchScope.availableScopes(musicLibraryEnabled: true, fileSearchEnabled: false)
-            == [.history, .clipboard, .url, .terminal, .camera, .enableFiles, .album, .playlist, .song])
+            == [.clipboard, .history, .url, .terminal, .camera, .enableFiles, .album, .playlist, .song])
     }
 
     @Test func musicScopesRequireBothSettings() {
