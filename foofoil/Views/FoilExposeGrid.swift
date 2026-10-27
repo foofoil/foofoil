@@ -128,6 +128,8 @@ final class FoilExposeGrid: NSScrollView {
         func update(model: FoilExposeModel) {
             self.model = model
             guard let collection, let scroll else { return }
+            model.columnCount = FoilExposeGridMetrics(width: scroll.contentSize.width, compact: false).columns
+            model.musicColumnCount = FoilExposeGridMetrics(width: scroll.contentSize.width, compact: true).columns
             let items = model.currentItems
             func foilEntries(_ indices: [Int]) -> [Entry] {
                 indices.map { index in
@@ -138,27 +140,41 @@ final class FoilExposeGrid: NSScrollView {
                 }
             }
             var next: [Section] = []
-            let open = items.indices.filter { !items[$0].isHistoryEntry && items[$0].musicItem == nil }
-            if model.activeScope == .clipboard {
-                var entries = foilEntries(Array(items.indices))
-                if model.clipboardSearch.isLoading { entries.append(Entry(title: NSLocalizedString("Clipboard History Loading", comment: ""))) }
-                else if entries.isEmpty { entries.append(Entry(title: NSLocalizedString("No Search Results", comment: ""))) }
-                if model.clipboardSearch.access == .needsAuthorization {
-                    entries.append(Entry(title: NSLocalizedString("Clipboard History Authorize", comment: ""), symbol: "lock.open", action: { model.clipboardSearch.openAuthorizationSettings() }))
-                } else if model.clipboardSearch.access == .unavailable {
-                    entries.append(Entry(title: NSLocalizedString("Clipboard History Unavailable", comment: "")))
-                    entries.append(Entry(title: NSLocalizedString("Retry File Search", comment: ""), action: { model.clipboardSearch.refresh() }))
-                }
-                if let notice = model.fileSearchNotice ?? model.clipboardSearch.copyError { entries.append(Entry(title: notice)) }
-                next.append(Section(title: NSLocalizedString("Clipboard Search Scope", comment: ""), compact: true,
-                                    count: items.count, symbol: "doc.on.clipboard", tint: .systemCyan, entries: entries))
-            }
-            if model.activeScope != .clipboard, !open.isEmpty { next.append(Section(title: NSLocalizedString("Expose Open Section", comment: ""), compact: false, count: open.filter { !items[$0].isNewFoil }.count, symbol: "macwindow", tint: .systemMint, entries: foilEntries(open))) }
+            let open = items.indices.filter { !items[$0].isHistoryEntry && items[$0].musicItem == nil && items[$0].clipboardEntry == nil }
+            if !open.isEmpty { next.append(Section(title: NSLocalizedString("Expose Open Section", comment: ""), compact: false, count: open.filter { !items[$0].isNewFoil }.count, symbol: "macwindow", tint: .systemMint, entries: foilEntries(open))) }
             if model.showsHistorySection {
                 let history = items.indices.filter { items[$0].isHistoryEntry }
                 var entries = foilEntries(history)
+                if model.canShowMoreHistory {
+                    entries.append(Entry(title: NSLocalizedString("Search More History", comment: ""), symbol: "ellipsis", action: { model.selectScope(.history) }))
+                }
                 if entries.isEmpty { entries = [Entry(title: NSLocalizedString("Expose History Category Empty", comment: ""))] }
                 next.append(Section(title: NSLocalizedString("Expose History Section", comment: ""), compact: history.isEmpty, count: model.historyCount(in: model.historyCategory), symbol: "clock.arrow.circlepath", isHistory: true, entries: entries))
+            }
+            if model.showsClipboardSection {
+                let indices = items.indices.filter { items[$0].clipboardEntry != nil }
+                var entries = foilEntries(indices)
+                if model.canShowMoreClipboard {
+                    entries.append(Entry(title: NSLocalizedString("More Clipboard History", comment: ""), symbol: "ellipsis", action: { let query = model.searchQuery; model.selectScope(.clipboard); model.searchText = query }))
+                }
+                if model.clipboardSearch.isLoading { entries.append(Entry(title: NSLocalizedString("Clipboard History Loading", comment: ""))) }
+                else if entries.isEmpty && model.activeScope == .clipboard { entries.append(Entry(title: NSLocalizedString("No Search Results", comment: ""))) }
+                if model.activeScope == .clipboard {
+                    if model.clipboardSearch.access == .needsAuthorization {
+                        entries.append(Entry(title: NSLocalizedString("Clipboard History Authorize", comment: ""), symbol: "lock.open", action: { model.clipboardSearch.openAuthorizationSettings() }))
+                    } else if model.clipboardSearch.access == .unavailable {
+                        entries.append(Entry(title: NSLocalizedString("Clipboard History Unavailable", comment: "")))
+                        entries.append(Entry(title: NSLocalizedString("Retry File Search", comment: ""), action: { model.clipboardSearch.refresh() }))
+                    }
+                }
+                if let notice = model.clipboardSearch.copyError { entries.append(Entry(title: notice)) }
+                if !entries.isEmpty || model.activeScope == .clipboard {
+                    next.append(Section(title: NSLocalizedString("Clipboard Search Scope", comment: ""), compact: true,
+                                        count: model.clipboardCount, symbol: "doc.on.clipboard", tint: .systemCyan, entries: entries))
+                }
+            }
+            if model.activeScope != nil && model.activeScope != .history && model.activeScope != .clipboard && model.searchQuery.isEmpty {
+                next.append(Section(title: "", compact: true, entries: [Entry(title: NSLocalizedString("Enter Keywords to Search Scope", comment: ""), symbol: "magnifyingglass")]))
             }
             if model.showsFileResults {
                 var entries = model.visibleFiles.enumerated().map { offset, file in

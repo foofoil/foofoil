@@ -13665,6 +13665,40 @@
           }
         }
       }
+    },
+    "More Clipboard History": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "More Clipboard History"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更多剪贴板内容"
+          }
+        }
+      }
+    },
+    "Enter Keywords to Search Scope": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter keywords to search this category"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输入关键词搜索此分类"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

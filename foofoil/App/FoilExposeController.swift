@@ -236,6 +236,7 @@ final class FoilExposeModel: ObservableObject {
             onOpenCommand?(scope)
             return
         }
+        if scope == .history { historyCategory = .all; pinnedOnly = false }
         activeScope = scope
         searchText = ""
         highlightedScopeIndex = 0
@@ -256,7 +257,7 @@ final class FoilExposeModel: ObservableObject {
         resultFilter = .all
         highlightedScopeIndex = 0
         selectedIndex = 0
-        clipboardSearch.stop()
+        clipboardSearch.search(searchQuery)
         scheduleFileSearch()
         scheduleMusicSearch()
     }
@@ -283,7 +284,7 @@ final class FoilExposeModel: ObservableObject {
             normalizeHistoryCategory()
             scheduleFileSearch()
             scheduleMusicSearch()
-            if activeScope == .clipboard { clipboardSearch.search(searchText) }
+            if activeScope == nil || activeScope == .clipboard { clipboardSearch.search(committedSearchQuery) }
             else { clipboardSearch.stop() }
         }
     }
@@ -396,9 +397,10 @@ final class FoilExposeModel: ObservableObject {
                 if case .text(let text) = entry.content { item.bodyPreview = FoilExposeItem.makeBodyPreview(kind: .note, text: text) }
                 return item
             }
-            self.selectedIndex = min(self.selectedIndex, max(0, self.clipboardItems.count - 1))
+            self.selectedIndex = min(self.selectedIndex, max(0, self.displayedResultCount - 1))
             self.objectWillChange.send()
         }
+        self.clipboardSearch.search("")
         fileSettingsCancellable = NotificationCenter.default.publisher(for: .localFileSearchDidChange)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
@@ -439,6 +441,8 @@ final class FoilExposeModel: ObservableObject {
         let openIDs = Set(items.map(\.id))
         let combined = (items + historyItems.filter { !openIDs.contains($0.id) })
             .filter { SettingsStore.shared.appleMusicLibraryEnabled || $0.symbolName != AppleMusicReference.symbolName }
+        if activeScope == .history { return combined.filter { $0.isHistoryEntry && (searchQuery.isEmpty || $0.matches(query: searchQuery)) } }
+        guard activeScope == nil else { return [] }
         guard !searchQuery.isEmpty else { return combined }
         guard resultFilter == .all || resultFilter == .history else { return [] }
         let command = (resultFilter == .all && CameraCaptureController.matches(searchQuery, available: cameraAvailable())) ? [FoilExposeItem(id: FoilExposeItem.cameraCommandID, controller: nil, isHistoryEntry: false, title: NSLocalizedString("Open Camera", comment: ""), symbolName: "web.camera.fill", contentKind: .camera, thumbnailPath: nil)] : []
@@ -489,7 +493,7 @@ final class FoilExposeModel: ObservableObject {
     }
 
     var showsHistorySection: Bool {
-        activeScope != .clipboard && (searchQuery.isEmpty || resultFilter == .all || resultFilter == .history)
+        activeScope == nil || activeScope == .history
     }
 
     private var matchedFoilItems: [FoilExposeItem] {
@@ -500,15 +504,31 @@ final class FoilExposeModel: ObservableObject {
     }
 
     /// 总览搜索中文件与各音乐分组各自独立展示，没有跨来源的总数上限；只有已打开与历史条目列表封顶 maximum。
+    var showsClipboardSection: Bool { activeScope == nil || activeScope == .clipboard }
+    var canShowMoreHistory: Bool {
+        activeScope == nil && searchQuery.isEmpty && matchedFoilItems.filter(\.isHistoryEntry).count > max(1, columnCount) * 2
+    }
+    var canShowMoreClipboard: Bool {
+        activeScope == nil && clipboardItems.count > max(1, musicColumnCount) * 2
+    }
+    var clipboardCount: Int { clipboardItems.count }
     var currentItems: [FoilExposeItem] {
         if activeScope == .clipboard { return clipboardItems }
-        guard !searchQuery.isEmpty else { return matchedFoilItems }
-        return Array(matchedFoilItems.prefix(SearchResultLimits.maximum)) + visibleMusicItems
+        var foils = matchedFoilItems
+        if activeScope == nil && searchQuery.isEmpty {
+            let open = foils.filter { !$0.isHistoryEntry }
+            let history = foils.filter(\.isHistoryEntry).prefix(max(1, columnCount) * 2)
+            foils = open + history
+        } else if activeScope != .history {
+            foils = Array(foils.prefix(SearchResultLimits.maximum))
+        }
+        let clipboard = activeScope == nil ? Array(clipboardItems.prefix(max(1, musicColumnCount) * 2)) : []
+        return foils + clipboard + visibleMusicItems
     }
     var visibleFiles: [SpotlightFileResult] { Array(files.prefix(fileDisplayCount)) }
     var displayedResultCount: Int { currentItems.count + visibleFiles.count }
     var showsResultLimitNotice: Bool {
-        if activeScope == .clipboard { return false }
+        if activeScope == .clipboard || activeScope == .history || searchQuery.isEmpty { return false }
         let foilsTruncated = matchedFoilItems.count > SearchResultLimits.maximum
         let hasExtra = visibleFiles.count < files.count
             || AppleMusicSearchCategory.allCases.contains { resultFilter.includes($0) && (musicDisplayCount(in: $0) < musicItems(in: $0).count || musicHasMoreCategories.contains($0)) }
@@ -554,6 +574,7 @@ final class FoilExposeModel: ObservableObject {
         searchText = ""
         activeScope = nil
         resultFilter = .all
+        clipboardSearch.search("")
         requestSearchFieldFocus()
         selectedIndex = 0
     }
