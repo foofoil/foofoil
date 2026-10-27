@@ -129,6 +129,20 @@ nonisolated enum ContentImageFormat: String, CaseIterable, Sendable {
         panel.nameFieldStringValue = stem + (savesHTML ? ".html" : ".md")
     }
 
+    /// 无原文件名时沿用正文标题提取规则，过滤路径字符并限制长度。
+    nonisolated static func defaultFileName(for markdown: String, originalName: String?) -> String {
+        if let originalName, !originalName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return originalName
+        }
+        let title = WindowConfig.markdownHistoryTitle(from: markdown)
+        let invalid = CharacterSet.controlCharacters.union(CharacterSet(charactersIn: "/:\\"))
+        let cleaned = title.components(separatedBy: invalid).joined(separator: " ")
+            .split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")
+            .trimmingCharacters(in: CharacterSet(charactersIn: ". "))
+        let stem = String(cleaned.prefix(80))
+        return (stem.isEmpty ? "Untitled" : stem) + ".md"
+    }
+
     nonisolated static func html(_ markdown: String) -> String {
         """
         <!doctype html>
@@ -212,6 +226,21 @@ extension AppState {
         NSLocalizedString(terminalConfiguration != nil ? "Export Terminal Transcript..." : "Save As...", comment: "")
     }
 
+    /// 剪贴板 Markdown 的未命名标题只是模式标记，不是来源文件名。
+    var contentSaveName: String? {
+        if terminalConfiguration != nil {
+            return NSLocalizedString("Terminal Transcript", comment: "") + ".txt"
+        }
+        guard isMarkdownDocument, let textURL, Self.isManagedCacheURL(textURL),
+              let originalImageName else { return originalImageName }
+        let placeholderNames = Bundle.main.localizations.compactMap { localization -> String? in
+            guard let path = Bundle.main.path(forResource: localization, ofType: "lproj"),
+                  let bundle = Bundle(path: path) else { return nil }
+            return bundle.localizedString(forKey: "Untitled Markdown", value: nil, table: nil) + ".md"
+        } + [NSLocalizedString("Untitled Markdown", comment: "") + ".md"]
+        return placeholderNames.contains(originalImageName) ? nil : originalImageName
+    }
+
     var contentSavePayload: ContentSavePayload? {
         guard !isCamera, !isLoading, !isFileOpenFeedback, appleMusicReference == nil else { return nil }
         if terminalConfiguration != nil {
@@ -282,8 +311,10 @@ extension AppDelegate {
         panel.canCreateDirectories = true
         switch content {
         case .file(let source): panel.nameFieldStringValue = name ?? source.lastPathComponent
-        case .text(_, let markdown):
-            panel.nameFieldStringValue = name ?? (markdown ? "Untitled.md" : "Untitled.txt")
+        case .text(let text, let markdown):
+            panel.nameFieldStringValue = markdown
+                ? ContentMarkdownSaveOptions.defaultFileName(for: text, originalName: name)
+                : name ?? "Untitled.txt"
             // JSON 等文本文件不属于 plainText，按原扩展名限制类型，避免面板强行改成 .txt。
             if let name, let type = UTType(filenameExtension: (name as NSString).pathExtension) {
                 panel.allowedContentTypes = [type]

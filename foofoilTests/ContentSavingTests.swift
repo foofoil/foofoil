@@ -9,6 +9,34 @@ import ImageIO
 
 @Suite(.sharedApplicationState, .serialized) @MainActor
 struct ContentSavingTests {
+    @Test func clipboardMarkdownSaveNameUsesHeadingInsteadOfPlaceholder() throws {
+        let state = AppState()
+        state.openText("# 附件指令功能\n\n正文", isMarkdown: true)
+        defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
+        #expect(state.originalImageName == NSLocalizedString("Untitled Markdown", comment: "") + ".md")
+        #expect(state.contentSaveName == nil)
+        guard case .text(let text, markdown: true) = state.contentSavePayload else {
+            Issue.record("Missing Markdown payload"); return
+        }
+        #expect(ContentMarkdownSaveOptions.defaultFileName(for: text, originalName: state.contentSaveName) == "附件指令功能.md")
+        state.originalImageName = "自定义名称.md"
+        #expect(state.contentSaveName == "自定义名称.md")
+        state.textURL = URL(fileURLWithPath: "/tmp/original.md")
+        state.originalImageName = NSLocalizedString("Untitled Markdown", comment: "") + ".md"
+        #expect(state.contentSaveName == state.originalImageName)
+    }
+
+    @Test func markdownDefaultFileNameUsesContentWithoutOriginalName() {
+        #expect(ContentMarkdownSaveOptions.defaultFileName(for: "# 新标题", originalName: "original.md") == "original.md")
+        #expect(ContentMarkdownSaveOptions.defaultFileName(for: "开场白\n\n## **项目计划**", originalName: nil) == "项目计划.md")
+        #expect(ContentMarkdownSaveOptions.defaultFileName(for: "```\n# code\n```\n# 正文", originalName: nil) == "正文.md")
+        #expect(ContentMarkdownSaveOptions.defaultFileName(for: "第一行内容\n第二行", originalName: "  ") == "第一行内容.md")
+        #expect(ContentMarkdownSaveOptions.defaultFileName(for: "# 路径/名称:测试", originalName: nil) == "路径 名称 测试.md")
+        #expect(ContentMarkdownSaveOptions.defaultFileName(for: "# ...", originalName: nil) == "Untitled.md")
+        #expect(ContentMarkdownSaveOptions.defaultFileName(for: " \n", originalName: nil) == "Untitled.md")
+        #expect(ContentMarkdownSaveOptions.defaultFileName(for: "# " + String(repeating: "长", count: 100), originalName: nil) == String(repeating: "长", count: 80) + ".md")
+    }
+
     @Test func markdownSaveFormatAndHTMLDocument() {
         let panel = NSSavePanel()
         panel.nameFieldStringValue = "Chapter.md"

@@ -162,7 +162,7 @@ extension AppDelegate {
                 name: Notification.Name("saveWebArchive_\(state.id.uuidString)"), object: nil)
         } else {
             presentContentSavePanel(content,
-                name: state.terminalConfiguration != nil ? NSLocalizedString("Terminal Transcript", comment: "") + ".txt" : state.originalImageName,
+                name: state.contentSaveName,
                 title: state.saveAsTitle)
         }
     }
