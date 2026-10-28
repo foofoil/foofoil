@@ -82,6 +82,38 @@ struct SearchScopeTests {
         }
     }
 
+    @Test func scopeHighlightWrapsInBothSearchModels() {
+        let quick = HistorySearchViewModel()
+        let expose = FoilExposeModel(items: [], historyItems: [])
+        defer { quick.stop(); expose.stopFileSearch() }
+        quick.query = "/"
+        expose.searchText = "/"
+        let count = quick.filteredScopes.count
+        #expect(count > 1 && expose.filteredScopes.count == count)
+        quick.moveScopeSelection(by: -1)
+        expose.moveScopeSelection(by: -1)
+        #expect(quick.highlightedScopeIndex == count - 1)
+        #expect(expose.highlightedScopeIndex == count - 1)
+        quick.moveScopeSelection(by: 1)
+        expose.moveScopeSelection(by: 1)
+        #expect(quick.highlightedScopeIndex == 0)
+        #expect(expose.highlightedScopeIndex == 0)
+
+        quick.query = "/nonexistent-scope"
+        expose.searchText = "/nonexistent-scope"
+        #expect(quick.filteredScopes.isEmpty && expose.filteredScopes.isEmpty)
+        quick.moveScopeSelection(by: -1)
+        expose.moveScopeSelection(by: -1)
+        #expect(quick.highlightedScopeIndex == 0 && expose.highlightedScopeIndex == 0)
+
+        quick.query = "/clipboard"
+        expose.searchText = "/clipboard"
+        #expect(quick.filteredScopes.count == 1 && expose.filteredScopes.count == 1)
+        quick.moveScopeSelection(by: -1)
+        expose.moveScopeSelection(by: 1)
+        #expect(quick.highlightedScopeIndex == 0 && expose.highlightedScopeIndex == 0)
+    }
+
     @Test func urlOptionEntersInputAndClipboardEntersSearchScope() {
         let quick = HistorySearchViewModel()
         defer { quick.stop() }

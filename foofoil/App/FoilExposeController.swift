@@ -203,7 +203,8 @@ final class FoilExposeModel: ObservableObject {
 
     func moveScopeSelection(by offset: Int) {
         guard directAction == nil, !filteredScopes.isEmpty else { return }
-        highlightedScopeIndex = min(max(highlightedScopeIndex + offset, 0), filteredScopes.count - 1)
+        let count = filteredScopes.count
+        highlightedScopeIndex = ((highlightedScopeIndex + offset) % count + count) % count
     }
 
     func selectHighlightedScope() {
