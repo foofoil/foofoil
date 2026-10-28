@@ -201,7 +201,8 @@ struct FoilExposeModelTests {
         #expect(model.currentItems.isEmpty)
         #expect(model.showsHistorySection)
         #expect(model.historyCount(in: .images) == 1)
-        model.resultFilter = .files
+        model.selectScope(.file)
+        #expect(model.activeScope == .file)
         #expect(!model.showsHistorySection)
     }
 
