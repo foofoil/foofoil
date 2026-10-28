@@ -73,12 +73,15 @@ nonisolated struct TerminalBootstrap {
             let tools = Bundle.main.executableURL?.deletingLastPathComponent().path ?? "/usr/bin"
             let sourceScript = "\nreadonly FOOFOIL_TERMINAL_ID=\(Self.quote(terminalID))\nexport FOOFOIL_TERMINAL_ID\nexport PATH=\(Self.quote(tools)):\"$PATH\"\nbuiltin source \(Self.quote(script.path))\n"
             if URL(fileURLWithPath: shell).lastPathComponent == "zsh" {
-                // .zshenv 和 .zshrc 仍读取用户自己的文件；临时 ZDOTDIR 只负责选择启动钩子。
+                // 登录 Shell 负责系统 PATH 初始化；临时 ZDOTDIR 转发用户配置，并在 .zlogin 后执行启动命令。
                 let original = env["ZDOTDIR"] ?? env["HOME"]!
                 try Self.write("ZDOTDIR=\(Self.quote(original))\n[[ -r \"$ZDOTDIR/.zshenv\" ]] && builtin source \"$ZDOTDIR/.zshenv\"\nFOOFOIL_USER_ZDOTDIR=$ZDOTDIR\nZDOTDIR=\(Self.quote(directory.path))\n", to: directory.appendingPathComponent(".zshenv"))
-                try Self.write("ZDOTDIR=$FOOFOIL_USER_ZDOTDIR\nunset FOOFOIL_USER_ZDOTDIR\n[[ -r \"$ZDOTDIR/.zshrc\" ]] && builtin source \"$ZDOTDIR/.zshrc\"\n" + sourceScript, to: directory.appendingPathComponent(".zshrc"))
+                for name in [".zprofile", ".zshrc"] {
+                    try Self.write("ZDOTDIR=$FOOFOIL_USER_ZDOTDIR\n[[ -r \"$ZDOTDIR/\(name)\" ]] && builtin source \"$ZDOTDIR/\(name)\"\nFOOFOIL_USER_ZDOTDIR=$ZDOTDIR\nZDOTDIR=\(Self.quote(directory.path))\n", to: directory.appendingPathComponent(name))
+                }
+                try Self.write("ZDOTDIR=$FOOFOIL_USER_ZDOTDIR\nunset FOOFOIL_USER_ZDOTDIR\n[[ -r \"$ZDOTDIR/.zlogin\" ]] && builtin source \"$ZDOTDIR/.zlogin\"\n" + sourceScript, to: directory.appendingPathComponent(".zlogin"))
                 env["ZDOTDIR"] = directory.path
-                arguments = ["-i"]
+                arguments = ["-l", "-i"]
             } else {
                 let rc = directory.appendingPathComponent("bashrc")
                 try Self.write("[[ -r \"$HOME/.bashrc\" ]] && builtin source \"$HOME/.bashrc\"\n" + sourceScript, to: rc)

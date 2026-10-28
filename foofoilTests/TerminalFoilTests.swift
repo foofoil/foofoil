@@ -321,6 +321,30 @@ struct TerminalFoilTests {
         }
     }
 
+    @Test func loginStartupInitializesPathAndPreservesUserConfigurationOrder() async throws {
+        let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let redirected = root.appendingPathComponent("redirected", isDirectory: true)
+        try FileManager.default.createDirectory(at: redirected, withIntermediateDirectories: false)
+        // .zprofile 改写 ZDOTDIR 后，后续配置和启动命令仍须在同一个 Shell 中按顺序执行。
+        try "FOIL_ORDER=env\n".write(to: root.appendingPathComponent(".zshenv"), atomically: true, encoding: .utf8)
+        try "FOIL_ORDER+=:profile\nZDOTDIR=\(TerminalBootstrap.quote(redirected.path))\n".write(to: root.appendingPathComponent(".zprofile"), atomically: true, encoding: .utf8)
+        try "FOIL_ORDER+=:rc\n".write(to: redirected.appendingPathComponent(".zshrc"), atomically: true, encoding: .utf8)
+        try "FOIL_ORDER+=:login\n".write(to: redirected.appendingPathComponent(".zlogin"), atomically: true, encoding: .utf8)
+        let result = root.appendingPathComponent("login-result")
+        let config = TerminalLaunchConfiguration(shellPath: "/bin/zsh", workingDirectory: root.path,
+            environment: ["HOME": root.path, "ZDOTDIR": root.path, "PATH": "/usr/bin:/bin:/usr/sbin:/sbin"],
+            startupCommands: "printf '%s\\n' \"$FOIL_ORDER\" \"$ZDOTDIR\" \"$PATH\" \"$options[login]\" > \(TerminalBootstrap.quote(result.path))")
+        let session = TerminalSession(configuration: config)
+        defer { session.stop() }
+        session.start()
+        try await waitFor { FileManager.default.fileExists(atPath: result.path) }
+        let lines = try String(contentsOf: result, encoding: .utf8).components(separatedBy: "\n")
+        #expect(lines[0] == "env:profile:rc:login")
+        #expect(lines[1] == redirected.path)
+        #expect(lines[2].components(separatedBy: ":").contains("/usr/local/bin"))
+        #expect(lines[3] == "on")
+    }
+
     @Test func nativeStartupPreservesShellStateAndStopsBackgroundJobs() async throws {
         let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let started = root.appendingPathComponent("started")
