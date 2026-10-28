@@ -127,6 +127,81 @@ struct ThreeFingerWindowDragTests {
 @MainActor
 @Suite(.sharedApplicationState, .serialized)
 struct SidebarThreeFingerWindowDragTests {
+    private final class DragWindow: FloatingWindow {
+        var activationRequests = 0
+        var wasActivatedWhenDragStarted = false
+        var onActivation: (() -> Void)?
+
+        override func makeKeyAndOrderFront(_ sender: Any?) {
+            activationRequests += 1
+            super.makeKeyAndOrderFront(sender)
+            onActivation?()
+        }
+
+        override func performDrag(with event: NSEvent) {
+            wasActivatedWhenDragStarted = activationRequests > 0
+        }
+    }
+
+    @Test(arguments: [false, true]) func commandDragActivatesTargetBeforeNativeDrag(fromSidebar: Bool) throws {
+        let target = DragWindow(contentRect: NSRect(x: 100, y: 100, width: 300, height: 200), defer: false)
+        let foreground = FloatingWindow(contentRect: NSRect(x: 500, y: 100, width: 300, height: 200), defer: false)
+        for window in [target, foreground] { window.isReleasedWhenClosed = false }
+        defer { target.close(); foreground.close() }
+        target.orderFront(nil)
+        foreground.makeKeyAndOrderFront(nil)
+        #expect(!target.isKeyWindow)
+        let event = try #require(NSEvent.mouseEvent(
+            with: .leftMouseDown, location: NSPoint(x: 100, y: 100), modifierFlags: .command,
+            timestamp: 0, windowNumber: target.windowNumber, context: nil,
+            eventNumber: 1, clickCount: 1, pressure: 1))
+        if fromSidebar {
+            let panel = NavigatorPanel(contentRect: .zero, styleMask: [.borderless], backing: .buffered, defer: false)
+            panel.isReleasedWhenClosed = false
+            target.addChildWindow(panel, ordered: .above)
+            defer { target.removeChildWindow(panel); panel.close() }
+            panel.sendEvent(event)
+        } else {
+            target.sendEvent(event)
+        }
+        #expect(target.wasActivatedWhenDragStarted)
+        #expect(target.activationRequests == 1)
+    }
+
+    @Test(arguments: [false, true]) func threeFingerDragActivatesTargetOnFirstMovement(fromSidebar: Bool) throws {
+        let target = DragWindow(contentRect: NSRect(x: 100, y: 100, width: 300, height: 200), defer: false)
+        let foreground = FloatingWindow(contentRect: NSRect(x: 500, y: 100, width: 300, height: 200), defer: false)
+        for window in [target, foreground] { window.isReleasedWhenClosed = false }
+        defer { target.close(); foreground.close() }
+        target.orderFront(nil)
+        foreground.makeKeyAndOrderFront(nil)
+        let panel = NavigatorPanel(contentRect: NSRect(x: 50, y: 100, width: 50, height: 200),
+                                   styleMask: [.borderless], backing: .buffered, defer: false)
+        panel.isReleasedWhenClosed = false
+        defer { target.removeChildWindow(panel); panel.close() }
+        if fromSidebar {
+            target.addChildWindow(panel, ordered: .above)
+            // 后台测试宿主无法取得系统焦点，模拟侧栏交出焦点时的同步回调。
+            target.onActivation = { panel.resignKey() }
+        }
+        let cursor = CGEvent(source: nil)?.location
+        defer { if let cursor { CGWarpMouseCursorPosition(cursor) } }
+        let origin = target.frame.origin
+        func contacts(_ x: CGFloat) -> [ThreeFingerWindowDrag.Contact] {
+            (1...3).map { .init(identity: $0, position: NSPoint(x: x, y: 0)) }
+        }
+        target.handleWindowDragContacts(contacts(0))
+        target.handleWindowDragContacts(contacts(0.5))
+        #expect(target.activationRequests == 0)
+        #expect(target.frame.origin == origin)
+        target.handleWindowDragContacts(contacts(3))
+        #expect(target.activationRequests == 1)
+        #expect(target.frame.origin == NSPoint(x: origin.x + 15, y: origin.y))
+        target.handleWindowDragContacts(contacts(6))
+        #expect(target.frame.origin == NSPoint(x: origin.x + 30, y: origin.y))
+        #expect(target.activationRequests == 1)
+    }
+
     @Test func sidebarRoutesToItsOwnFoilAndMovesWithIt() throws {
         let foil = FloatingWindow(contentRect: NSRect(x: 500, y: 300, width: 400, height: 300), defer: false)
         let otherFoil = FloatingWindow(contentRect: NSRect(x: 100, y: 100, width: 200, height: 200), defer: false)

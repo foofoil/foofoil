@@ -24,6 +24,7 @@ public class FloatingWindow: NSWindow {
     private var threeFingerCursorAnchor: (position: CGPoint, windowOrigin: NSPoint)?
     private var isCommandDragCursorVisible = false
     private var isCommandWindowDragInProgress = false
+    private(set) var isActivatingForWindowDrag = false
     private var isEdgeResizeCursorVisible = false
     private weak var resizeCursorTrackingView: NSView?
     private var resizeCursorTrackingArea: NSTrackingArea?
@@ -173,6 +174,11 @@ public class FloatingWindow: NSWindow {
                          position: NSPoint(x: touch.normalizedPosition.x * touch.deviceSize.width,
                                            y: touch.normalizedPosition.y * touch.deviceSize.height))
         }
+        handleWindowDragContacts(contacts)
+    }
+
+    func handleWindowDragContacts(_ contacts: [ThreeFingerWindowDrag.Contact]) {
+        let wasDragging = threeFingerWindowDrag.isDragging
         let origin = threeFingerWindowDrag.update(contacts: contacts, windowOrigin: frame.origin)
         guard threeFingerWindowDrag.isTracking else {
             threeFingerCursorAnchor = nil
@@ -182,6 +188,7 @@ public class FloatingWindow: NSWindow {
             threeFingerCursorAnchor = CGEvent(source: nil).map { ($0.location, frame.origin) }
         }
         if let origin {
+            if !wasDragging { activateForWindowDrag() }
             setFrameOrigin(origin)
             if let anchor = threeFingerCursorAnchor {
                 // 三指不会驱动系统指针；用起始锚点跟随窗口，避免逐帧像素取整累积漂移。
@@ -191,6 +198,14 @@ public class FloatingWindow: NSWindow {
                 _ = CGWarpMouseCursorPosition(target)
             }
         }
+    }
+
+    func activateForWindowDrag() {
+        // ⌘ 移窗和三指移窗绕过普通点击派发，需在开始移动时显式激活目标箔。
+        isActivatingForWindowDrag = true
+        defer { isActivatingForWindowDrag = false }
+        NSApp.activate(ignoringOtherApps: true)
+        makeKeyAndOrderFront(nil)
     }
 
     public override func sendEvent(_ event: NSEvent) {
@@ -277,6 +292,7 @@ public class FloatingWindow: NSWindow {
            (windowController as? FloatingWindowController)?.appState.isFullScreen != true {
             updateCommandDragCursor(isCommandPressed: true)
             isCommandWindowDragInProgress = true
+            activateForWindowDrag()
             performDrag(with: event)
             return
         }

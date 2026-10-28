@@ -59,7 +59,10 @@ final class NavigatorPanel: NSWindow {
     }
 
     override func resignKey() {
-        (parent as? FloatingWindow)?.resetWindowDragTouches()
+        // 三指从侧栏激活父箔时，焦点交接不能中断正在进行的拖动。
+        if let foil = parent as? FloatingWindow, !foil.isActivatingForWindowDrag {
+            foil.resetWindowDragTouches()
+        }
         super.resignKey()
         synchronizeNavigatorFocus(navigationState)
     }
@@ -115,7 +118,11 @@ final class NavigatorPanel: NSWindow {
     /// 拖父窗口，子窗口随相对位置一起走；事件坐标换算到箔片，避免 performDrag 跳一下。
     private func dragAttachedFoofoil(with event: NSEvent) {
         guard let parent else { return }
-        parent.makeKeyAndOrderFront(nil)
+        if let foil = parent as? FloatingWindow {
+            foil.activateForWindowDrag()
+        } else {
+            parent.makeKeyAndOrderFront(nil)
+        }
         let screenPoint = convertPoint(toScreen: event.locationInWindow)
         let parentPoint = parent.convertPoint(fromScreen: screenPoint)
         guard let dragEvent = NSEvent.mouseEvent(
