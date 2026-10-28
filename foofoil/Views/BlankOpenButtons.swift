@@ -42,6 +42,9 @@ struct BlankOpenButtons: View {
     }
 
     private func title(for item: Item) -> String {
+        if item.selector == #selector(AppDelegate.openClipboardContentAction), let clipboardContent {
+            return clipboardContent.openingTitle(isIncognito: opensIncognito)
+        }
         let key = opensIncognito ? item.shortcutID.flatMap { IncognitoOpening.titles[$0] } ?? item.title : item.title
         return NSLocalizedString(key, comment: "")
     }
