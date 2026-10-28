@@ -255,14 +255,11 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         }
         for (index, scope) in scopes.enumerated() {
             let button = ExposeActionButton()
-            if scope == .clipboard {
-                let suffix = "    " + scope.englishName
-                let suffixWidth = (suffix as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 12, weight: .medium)]).width
-                button.title = fittedTitle(model.scopeTitle(scope), width: scopePickerWidth - 49 - suffixWidth) + suffix
-                button.toolTip = model.scopeTitle(scope)
-            } else {
-                button.title = model.scopeTitle(scope) + (scope.isEnableAction ? "" : "    " + scope.englishName)
-            }
+            button.scopeRow = true
+            button.title = model.scopeTitle(scope)
+            button.scopeSuffix = scope.isEnableAction ? nil : scope.englishName
+            button.toolTip = model.scopeTitle(scope)
+            button.setAccessibilityIdentifier("expose.scope." + scope.id)
             button.isEnabled = model.isScopeEnabled(scope)
             button.image = NSImage(systemSymbolName: scope.symbolName, accessibilityDescription: nil)
             button.isEmphasized = index == model.highlightedScopeIndex
@@ -276,10 +273,6 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
             notice.setAccessibilityIdentifier("expose.scope.noMatches")
             scopePicker.addArrangedSubview(notice)
         }
-        let tip = NSTextField(labelWithString: NSLocalizedString("Scope Hints Tip", comment: ""))
-        tip.font = .systemFont(ofSize: 10)
-        tip.textColor = .white.withAlphaComponent(0.55)
-        scopePicker.addArrangedSubview(tip)
     }
 
     /// 直接打开项使用与范围列表相同的下拉框外观；完整路径或网址放在帮助提示中。
@@ -415,6 +408,15 @@ private final class ExposeActionButton: NSButton {
         didSet { setAccessibilityLabel(title); invalidateIntrinsicContentSize(); needsDisplay = true }
     }
     var perform: (() -> Void)?
+    var scopeRow = false {
+        didSet {
+            font = .systemFont(ofSize: 13)
+            layer?.cornerRadius = 8
+            invalidateIntrinsicContentSize()
+            updateStyle()
+        }
+    }
+    var scopeSuffix: String? { didSet { needsDisplay = true } }
     var isEmphasized = false { didSet { updateStyle() } }
     var allowsKeyboardFocus = false
     override var acceptsFirstResponder: Bool { allowsKeyboardFocus }
@@ -438,13 +440,33 @@ private final class ExposeActionButton: NSButton {
     override var intrinsicContentSize: NSSize {
         let text = (title as NSString).size(withAttributes: [.font: font ?? NSFont.systemFont(ofSize: 12)]).width
         let keycap = shortcutText.map { ($0 as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .bold)]).width + 20 } ?? 0
-        return NSSize(width: ceil(text) + (image == nil ? 0 : 19) + keycap + 18, height: 32)
+        return NSSize(width: ceil(text) + (image == nil ? 0 : 19) + keycap + 18, height: scopeRow ? 36 : 32)
     }
 
     override func draw(_ dirtyRect: NSRect) {
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
         NSBezierPath(rect: bounds).addClip()
+        if scopeRow {
+            let textColor = NSColor.white.withAlphaComponent(0.95)
+            let secondaryColor = NSColor.white.withAlphaComponent(0.55)
+            if let image {
+                let symbol = image.withSymbolConfiguration(.init(paletteColors: [secondaryColor])) ?? image
+                symbol.draw(in: NSRect(x: 14, y: (bounds.height - 16) / 2, width: 16, height: 16),
+                            from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
+            }
+            let suffix = scopeSuffix.map { NSAttributedString(string: $0, attributes: [.font: NSFont.systemFont(ofSize: 11), .foregroundColor: secondaryColor]) }
+            let suffixWidth = suffix.map { $0.size().width } ?? 0
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.lineBreakMode = .byTruncatingTail
+            let text = NSAttributedString(string: title, attributes: [.font: font ?? NSFont.systemFont(ofSize: 13), .foregroundColor: textColor, .paragraphStyle: paragraph])
+            text.draw(in: NSRect(x: 42, y: (bounds.height - text.size().height) / 2,
+                                 width: max(0, bounds.width - 54 - (suffixWidth > 0 ? suffixWidth + 10 : 0)), height: text.size().height))
+            if let suffix {
+                suffix.draw(at: NSPoint(x: bounds.width - 12 - suffixWidth, y: (bounds.height - suffix.size().height) / 2))
+            }
+            return
+        }
         // NSButton 的默认 imageLeading 会贴住边缘，显式绘制内边距但保留原生点击和菜单行为。
         let color = NSColor.white.withAlphaComponent(isHighlighted ? 1 : (isEmphasized ? 0.95 : textOpacity))
         var x: CGFloat = 9
@@ -473,7 +495,7 @@ private final class ExposeActionButton: NSButton {
     }
 
     private func updateStyle() {
-        layer?.backgroundColor = NSColor.white.withAlphaComponent(isEmphasized ? 0.2 : 0.07).cgColor
+        layer?.backgroundColor = NSColor.white.withAlphaComponent(isEmphasized ? 0.2 : (scopeRow ? 0 : 0.07)).cgColor
         setAccessibilityValue(isEmphasized ? 1 : 0)
         needsDisplay = true
     }

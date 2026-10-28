@@ -60,7 +60,7 @@ struct HistorySearchView: View {
                                         Text(model.scopeTitle(scope))
                                             .font(.body)
                                             .lineLimit(1)
-                                            .foregroundStyle(index == model.highlightedScopeIndex ? Color.accentColor : .primary)
+                                            .foregroundStyle(.primary)
                                         Spacer()
                                         if !scope.isEnableAction {
                                             Text(scope.englishName)
