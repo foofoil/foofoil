@@ -4,6 +4,64 @@ import Testing
 
 @MainActor
 struct FoilExposeViewTests {
+    @Test func refreshingOverviewKeepsSearchEditingSessionAndSelection() throws {
+        let model = model()
+        model.searchText = "stable query"
+        let panel = FoilExposeController.makePanel(for: try #require(NSScreen.main), model: model)
+        let controller = try #require(panel.contentViewController as? FoilExposeViewController)
+        defer { controller.prepareForDismissal(); panel.close(); model.stopFileSearch() }
+        panel.makeKeyAndOrderFront(nil)
+        model.requestSearchFieldFocus()
+        controller.synchronize()
+        let editor = try #require(controller.searchField.currentEditor() as? NSTextView)
+        let selection = NSRange(location: 2, length: 3)
+        editor.setSelectedRange(selection)
+        let initialFocusRequest = model.searchFieldFocusRequest
+
+        // 空范围和选定范围都必须跳过同值占位文字，不能重启共享编辑器。
+        for _ in 0..<20 {
+            model.isOptionPressed.toggle()
+            controller.synchronize()
+        }
+        #expect(model.searchFieldFocusRequest == initialFocusRequest)
+        #expect(controller.searchField.currentEditor() === editor)
+        #expect(panel.firstResponder === editor)
+        #expect(editor.selectedRange() == selection)
+        #expect(controller.searchField.placeholderString == "")
+
+        model.activeScope = .history
+        controller.synchronize()
+        let scopedFocusRequest = model.searchFieldFocusRequest
+        for _ in 0..<20 { controller.synchronize() }
+        #expect(model.searchFieldFocusRequest == scopedFocusRequest)
+        #expect(controller.searchField.placeholderString == String(
+            format: NSLocalizedString("Search In Scope Placeholder", comment: ""), SearchScope.history.displayName))
+    }
+
+    @Test func hiddenAndDismissingOverviewDoesNotRestoreSearchFocus() throws {
+        let model = model()
+        let panel = FoilExposeController.makePanel(for: try #require(NSScreen.main), model: model)
+        let controller = try #require(panel.contentViewController as? FoilExposeViewController)
+        defer { panel.close(); model.stopFileSearch() }
+        let notification = Notification(name: NSControl.textDidEndEditingNotification, object: controller.searchField)
+        let hiddenRequest = model.searchFieldFocusRequest
+        controller.controlTextDidEndEditing(notification)
+        #expect(model.searchFieldFocusRequest == hiddenRequest)
+
+        panel.makeKeyAndOrderFront(nil)
+        model.requestSearchFieldFocus()
+        controller.synchronize()
+        #expect(controller.searchField.currentEditor() != nil)
+        let beforeDismissal = model.searchFieldFocusRequest
+        controller.prepareForDismissal()
+        controller.controlTextDidEndEditing(notification)
+        #expect(model.searchFieldFocusRequest == beforeDismissal)
+        // 即使退出前排队的模型刷新到达，也不能再次接管输入。
+        model.requestSearchFieldFocus()
+        controller.synchronize()
+        #expect(controller.searchField.currentEditor() == nil)
+    }
+
     private func model(clipboardContent: ClipboardOpenableContent? = nil) -> FoilExposeModel {
         let history = FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true, title: "Native note",
                                      symbolName: "note.text", contentKind: .note, thumbnailPath: nil, hasHistoryRecord: true)

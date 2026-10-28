@@ -1517,6 +1517,9 @@ final class FoilExposeController {
 
     func dismiss() {
         guard model != nil || !panels.isEmpty else { return }
+        for panel in panels {
+            (panel.contentViewController as? FoilExposeViewController)?.prepareForDismissal()
+        }
         model?.stopFileSearch()
         if let keyMonitor {
             NSEvent.removeMonitor(keyMonitor)

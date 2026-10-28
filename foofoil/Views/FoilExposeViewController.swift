@@ -25,6 +25,7 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
     private var scopeSignature: [String] = []
     private var lastFocusRequest: UInt64?
     private var lastToastID: UUID?
+    private var isDismissing = false
 
     init(model: FoilExposeModel) {
         self.model = model
@@ -140,7 +141,7 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
     }
 
     private func scheduleUpdate() {
-        guard !updatePending else { return }
+        guard !isDismissing, !updatePending else { return }
         updatePending = true
         DispatchQueue.main.async { [weak self] in
             guard let self else { return }
@@ -150,19 +151,24 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
     }
 
     func synchronize() {
+        guard !isDismissing else { return }
         let editor = searchField.currentEditor() as? NSTextView
         // 输入法组合文字归编辑器所有，其他模型通知不能重置候选输入或选区。
         if editor?.hasMarkedText() != true, searchField.stringValue != model.searchText {
             searchField.stringValue = model.searchText
             editor?.string = model.searchText
         }
-        searchField.placeholderString = model.activeScope.map {
+        let placeholder = model.activeScope.map {
             String(format: NSLocalizedString("Search In Scope Placeholder", comment: ""), $0.displayName)
-        } ?? NSLocalizedString("Search Foils Placeholder", comment: "")
+        } ?? ""
+        // AppKit 改写占位文字会重启 field editor；只提交最终值且跳过同值，
+        // 避免编辑结束 → 请求聚焦 → 刷新占位文字的输入服务重建循环。
+        if searchField.placeholderString != placeholder {
+            searchField.placeholderString = placeholder
+        }
         searchPrompt.rootView = QuickOpenSearchPrompt(musicLibraryEnabled: SettingsStore.shared.appleMusicSearchEnabled)
         searchPrompt.isHidden = !model.searchText.isEmpty || model.activeScope != nil
         searchField.setAccessibilityLabel(QuickOpenSearchPrompt.title(musicLibraryEnabled: SettingsStore.shared.appleMusicSearchEnabled))
-        if model.activeScope == nil { searchField.placeholderString = "" }
         scopeButton.isHidden = model.activeScope == nil
         scopeButton.title = model.activeScope.map { $0.displayName + "  ×" } ?? ""
         scopeButton.setAccessibilityLabel(NSLocalizedString("Clear Search Scope", comment: ""))
@@ -369,16 +375,28 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
     func controlTextDidBeginEditing(_ obj: Notification) { model.isClipboardFocused = false }
     func controlTextDidChange(_ obj: Notification) { model.searchText = searchField.stringValue }
     func controlTextDidEndEditing(_ obj: Notification) {
-        if !model.isClipboardFocused { model.requestSearchFieldFocus() }
+        guard canFocusSearch, !model.isClipboardFocused else { return }
+        model.requestSearchFieldFocus()
+    }
+    private var canFocusSearch: Bool {
+        guard !isDismissing, isViewLoaded, let window = view.window else { return false }
+        return window.isVisible && window.isKeyWindow && window.attachedSheet == nil
     }
     private func focusSearch() {
-        model.isClipboardFocused = false
-        guard let window = view.window else { return }
+        guard canFocusSearch, let window = view.window else { return }
+        if model.isClipboardFocused { model.isClipboardFocused = false }
         if let editor = searchField.currentEditor(), window.firstResponder === editor { return }
         window.makeFirstResponder(searchField)
         if let editor = searchField.currentEditor() as? NSTextView {
             editor.setSelectedRange(NSRange(location: editor.string.utf16.count, length: 0))
         }
+    }
+
+    /// 先停掉焦点恢复，再结束编辑，避免隐藏面板时重新激活系统输入 UI。
+    func prepareForDismissal() {
+        isDismissing = true
+        subscriptions.removeAll()
+        viewIfLoaded?.window?.endEditing(for: searchField)
     }
     @objc private func clearCategory(_ sender: NSMenuItem) {
         guard let raw = sender.representedObject as? String, let category = FoilExposeHistoryCategory(rawValue: raw) else { return }
