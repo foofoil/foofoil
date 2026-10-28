@@ -25,6 +25,8 @@ struct SearchScopeTests {
         #expect(SearchScope.file.displayName == "文件")
         #expect(SearchScope.folder.displayName == "目录")
         #expect(SearchScope.album.displayName == "Apple Music 专辑")
+        #expect(SearchScope.album.symbolName == "music.pages")
+        #expect(AppleMusicSearchCategory.albums.symbolName == "music.pages")
         #expect(SearchScope.playlist.displayName == "Apple Music 歌单")
         #expect(SearchScope.song.displayName == "Apple Music 歌曲")
     }

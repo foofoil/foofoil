@@ -38,7 +38,7 @@ enum AppleMusicSearchCategory: CaseIterable, Identifiable, Hashable {
     }
     var symbolName: String {
         switch self {
-        case .albums: "square.stack"
+        case .albums: "music.pages"
         case .songs: "music.note"
         case .playlists: "music.note.list"
         }

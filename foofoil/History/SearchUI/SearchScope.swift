@@ -58,7 +58,7 @@ enum SearchScope: String, CaseIterable, Identifiable, Sendable {
         case .folder: return "folder"
         case .url: return "link"
         case .clipboard: return "doc.on.clipboard"
-        case .album: return "square.stack"
+        case .album: return "music.pages"
         case .playlist: return "music.note.list"
         case .song: return "music.note"
         case .terminal: return "terminal"
