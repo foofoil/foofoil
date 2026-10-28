@@ -26,6 +26,8 @@ extension AppState {
                     paths: Set(delegate.windowControllers.flatMap { $0.appState.cachedContentPaths }).union(cachedContentPaths))
             }
             guard !isIncognito, !HistoryRepository.shared.wasDeleted(id) else { return }
+            // SSH 认证或远端初始化失败时不创建或覆盖历史；已存在的历史原样保留。
+            if terminalConfiguration?.ssh != nil, terminalSession?.hasConnected != true { return }
             if hasOpenedContent || appleMusicReference != nil {
                 if !fileOpenFeedback.isEmpty { fileOpenFeedback = [] }
                 closesEmptyWindowAfterFileOpenFailure = false

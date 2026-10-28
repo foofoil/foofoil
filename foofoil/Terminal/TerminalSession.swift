@@ -14,6 +14,8 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
     /// 只影响本次会话的展示及搜索范围；隐藏不删除持久化的历史快照。
     @Published var isPreviousOutputHidden = false
     var onOutputSnapshotChanged: (() -> Void)?
+    var onConnected: (() -> Void)?
+    private(set) var hasConnected = false
     /// Shell 自行结束后通知宿主；宿主据此关闭箔片，不再停留在已结束界面。
     var onSessionEnded: (() -> Void)?
     private var snapshotSave: Task<Void, Never>?
@@ -42,6 +44,13 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
         view.applyDocumentStyle(font: view.font, foregroundColor: nil, backgroundColor: nil)
         view.getTerminal().changeHistorySize(1_000)
         view.outputDidChange = { [weak self] in self?.scheduleSnapshotSave() }
+        if configuration.ssh != nil {
+            view.expectReadyMarker(TerminalBootstrap.readyMarker(id)) { [weak self] in
+                guard let self, !self.hasConnected else { return }
+                self.hasConnected = true
+                self.onConnected?()
+            }
+        }
     }
 
     /// 只保存已渲染的普通屏幕文本；不保存转义序列，不重放到 PTY，也不持久化 TUI 备用屏幕。
@@ -165,13 +174,16 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
             }
             bootstrap?.cleanup(); bootstrap = nil
             managedPID = nil
-            state = .exited(finalExitCode)
+            // SSH 异常退出时保留终端输出，供用户查看连接错误并重试。
+            let sshFailed = endedByShell && configuration.ssh != nil && finalExitCode != 0
+            state = sshFailed ? .failed("SSH_SESSION_FAILED") : .exited(finalExitCode)
             onOutputSnapshotChanged?()
-            if endedByShell {
+            if endedByShell && !sshFailed {
                 endedByShell = false
                 // Shell 自行结束：通知宿主关闭箔片，不再显示启动新会话的入口。
                 onSessionEnded?()
             }
+            endedByShell = false
             closing = nil
         }
         closing = task
@@ -340,11 +352,39 @@ final class FoilTerminalView: LocalProcessTerminalView {
     }
 
     var outputDidChange: (() -> Void)?
+    private var readyMarker: [UInt8] = []
+    private var readyPrefix: [UInt8] = []
+    private var onReady: (() -> Void)?
+    func expectReadyMarker(_ marker: [UInt8], onReady: @escaping () -> Void) {
+        readyMarker = marker
+        self.onReady = onReady
+    }
+
+    // 标记可能跨 PTY 数据块到达；只暂存可能属于标记的前缀，不吞掉登录提示。
+    private func removingReadyMarker(_ bytes: ArraySlice<UInt8>) -> [UInt8] {
+        guard !readyMarker.isEmpty else { return Array(bytes) }
+        var output: [UInt8] = []
+        for byte in bytes {
+            readyPrefix.append(byte)
+            while !readyPrefix.isEmpty && !readyMarker.starts(with: readyPrefix) {
+                output.append(readyPrefix.removeFirst())
+            }
+            if !readyMarker.isEmpty && readyPrefix == readyMarker {
+                readyPrefix.removeAll()
+                readyMarker.removeAll()
+                let callback = onReady
+                onReady = nil
+                callback?()
+            }
+        }
+        return output
+    }
     private var keyboardProtocol = TerminalKeyboardProtocol()
 
     override func dataReceived(slice: ArraySlice<UInt8>) {
         // 协商序列不能交给 SwiftTerm 当成恢复光标；响应仍经同一 PTY 返回给前台程序。
-        for output in keyboardProtocol.receive(slice) {
+        let visible = removingReadyMarker(slice)
+        for output in keyboardProtocol.receive(visible[...]) {
             switch output {
             case .display(let bytes): super.dataReceived(slice: bytes[...])
             case .reply(let text): send(txt: text)
@@ -364,6 +404,7 @@ final class FoilTerminalView: LocalProcessTerminalView {
     }
 
     override func processTerminated(_ source: LocalProcess, exitCode: Int32?) {
+        if !readyPrefix.isEmpty { super.dataReceived(slice: readyPrefix[...]); readyPrefix.removeAll() }
         keyboardProtocol = TerminalKeyboardProtocol()
         super.processTerminated(source, exitCode: exitCode)
     }

@@ -384,6 +384,69 @@ struct TerminalFoilTests {
         try await waitFor { FileManager.default.fileExists(atPath: marker.path) }
     }
 
+    @Test func sshBootstrapKeepsRemoteSettingsOutOfLocalEnvironment() throws {
+        let ssh = TerminalLaunchConfiguration.SSH(host: "example.com", username: "alice", port: 2222)
+        let config = TerminalLaunchConfiguration(workingDirectory: "/remote path", environment: ["REMOTE_VALUE": "a'b"], startupCommands: "echo ready", ssh: ssh)
+        let launch = try TerminalBootstrap(configuration: config, terminalID: "test")
+        defer { launch.cleanup() }
+        #expect(launch.shell == "/usr/bin/ssh")
+        #expect(launch.arguments.contains("2222"))
+        #expect(launch.arguments.last?.contains("cd -- '/remote path'") == true)
+        #expect(launch.arguments.last?.contains("export REMOTE_VALUE='a'\\''b'") == true)
+        #expect(launch.environment["REMOTE_VALUE"] == nil)
+        #expect(try JSONDecoder().decode(TerminalLaunchConfiguration.self, from: JSONEncoder().encode(config)) == config)
+        let defaultDirectory = try TerminalBootstrap(configuration: .init(workingDirectory: "", ssh: ssh), terminalID: "test")
+        defer { defaultDirectory.cleanup() }
+        #expect(defaultDirectory.arguments.last?.contains("cd --") == false)
+        #expect(throws: AgentFailure.self) {
+            _ = try TerminalBootstrap(configuration: .init(ssh: .init(host: "-bad", username: "alice")), terminalID: "test")
+        }
+    }
+
+    @Test func failedSSHConnectionKeepsOutputAndDoesNotCloseFoil() async throws {
+        let session = TerminalSession(configuration: .init(ssh: .init(host: "127.0.0.1", username: "test")))
+        var closed = false
+        session.onSessionEnded = { closed = true }
+        session.view.feed(text: "Connection refused")
+        // 使用 SSH 的 waitpid 状态模拟连接失败，验证退出后的清理及宿主通知。
+        session.processTerminated(source: session.view, exitCode: 255 << 8)
+        try await waitFor { session.state == .failed("SSH_SESSION_FAILED") }
+        #expect(!closed)
+        #expect(String(decoding: session.view.getTerminal().getBufferAsData(kind: .normal), as: UTF8.self).contains("Connection refused"))
+    }
+
+    @Test func sshHistoryWaitsForRemoteInitializationAndPreservesExistingRecord() throws {
+        let state = AppState()
+        let config = TerminalLaunchConfiguration(workingDirectory: "/remote", ssh: .init(host: "example.com", username: "test"))
+        let id = state.id
+        defer { _ = HistoryRepository.shared.remove(ids: [id]) }
+        state.prepareTerminal(config, start: false)
+        let session = try #require(state.terminalSession)
+        state.saveState()
+        #expect(HistoryRepository.shared.config(id: id) == nil)
+        session.view.dataReceived(slice: Array("Connection failed".utf8)[...])
+        state.saveState()
+        #expect(HistoryRepository.shared.config(id: id) == nil)
+
+        let marker = TerminalBootstrap.readyMarker(session.id)
+        let first = Array("\r\nBefore".utf8) + marker.prefix(7)
+        session.view.dataReceived(slice: first[...])
+        #expect(!session.hasConnected)
+        session.view.dataReceived(slice: (Array(marker.dropFirst(7)) + Array("After".utf8))[...])
+        #expect(session.hasConnected)
+        #expect(HistoryRepository.shared.config(id: id)?.terminalConfiguration == config)
+        let output = String(decoding: session.view.getTerminal().getBufferAsData(kind: .normal), as: UTF8.self)
+        #expect(output.contains("BeforeAfter"))
+        #expect(!output.contains("foofoil-ready"))
+
+        // 失败重连不能删除或覆盖之前成功创建的历史。
+        let original = try #require(HistoryRepository.shared.config(id: id))
+        state.prepareTerminal(config, start: false)
+        state.customTitle = "not saved on failure"
+        state.saveState()
+        #expect(HistoryRepository.shared.config(id: id)?.customTitle == original.customTitle)
+    }
+
     @Test func creationStartsImmediatelyAndInvalidConfigurationFailsBeforeCreatingWindow() throws {
         let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let bootstrap = try TerminalBootstrap(configuration: .init(environment: ["HOME": root.path]), terminalID: "test")

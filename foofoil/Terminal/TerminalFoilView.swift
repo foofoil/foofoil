@@ -41,7 +41,16 @@ struct TerminalFoilView: View {
                 // 会话结束后箔片会被宿主关闭，这里只保留退出信息作为兜底显示。
                 Text(String(format: NSLocalizedString("Terminal Exit Format", comment: ""), code.map(String.init) ?? "—"))
                     .font(.caption).padding(8)
-            case .failed(let code): Text(code).font(.caption).foregroundStyle(.red).padding(8)
+            case .failed(let code):
+                if code == "SSH_SESSION_FAILED" {
+                    HStack {
+                        Text("Terminal SSH Failed").foregroundStyle(.red)
+                        Spacer()
+                        Button("Terminal SSH Retry") { appState.startTerminalForExplicitOpen() }
+                    }.font(.caption).padding(8)
+                } else {
+                    Text(code).font(.caption).foregroundStyle(.red).padding(8)
+                }
             }
         }
         .padding(8)
@@ -214,6 +223,11 @@ extension AppState {
     }
     func configureTerminalSnapshotSaving() {
         terminalSession?.onOutputSnapshotChanged = isIncognito ? nil : { [weak self] in self?.saveState() }
+        let session = terminalSession
+        session?.onConnected = isIncognito ? nil : { [weak self, weak session] in
+            guard let self, let session, self.terminalSession === session else { return }
+            self.saveState()
+        }
     }
     func prepareTerminal(_ configuration: TerminalLaunchConfiguration, start: Bool) {
         let previous = isIncognito ? nil : terminalSession?.outputSnapshot

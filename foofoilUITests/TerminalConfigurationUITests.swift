@@ -6,6 +6,47 @@ final class TerminalConfigurationUITests: XCTestCase {
     }
 
     @MainActor
+    func testSSHShowsRemoteFieldsAndClearsDirectory() {
+        let app = makeTestApplication()
+        app.launch()
+        app.activate()
+        app.typeKey("n", modifierFlags: .command)
+        let open = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label IN %@", "terminal", ["Open Terminal…", "打开终端…"])).firstMatch
+        XCTAssertTrue(open.waitForExistence(timeout: 5))
+        open.click()
+        let ssh = app.checkBoxes.matching(NSPredicate(format: "label CONTAINS %@", "SSH")).firstMatch
+        XCTAssertTrue(ssh.waitForExistence(timeout: 5))
+        ssh.click()
+        let directory = app.textFields.matching(NSPredicate(format: "label IN %@", ["Remote working directory", "远端工作目录"])).firstMatch
+        XCTAssertTrue(directory.waitForExistence(timeout: 5))
+        XCTAssertEqual(directory.value as? String, "")
+        XCTAssertTrue(app.textFields.matching(NSPredicate(format: "label IN %@", ["Host", "主机"])).firstMatch.exists)
+        XCTAssertTrue(app.textFields.matching(NSPredicate(format: "label IN %@", ["Username", "用户名"])).firstMatch.exists)
+        XCTAssertTrue(app.textFields.matching(NSPredicate(format: "label IN %@", ["Port", "端口号"])).firstMatch.exists)
+    }
+
+    @MainActor
+    func testMissingSSHUsernameKeepsConfigurationOpen() {
+        let app = makeTestApplication()
+        app.launch()
+        app.activate()
+        app.typeKey("n", modifierFlags: .command)
+        let open = app.buttons.matching(NSPredicate(format: "identifier == %@ OR label IN %@", "terminal", ["Open Terminal…", "打开终端…"])).firstMatch
+        XCTAssertTrue(open.waitForExistence(timeout: 5))
+        open.click()
+        let ssh = app.checkBoxes.matching(NSPredicate(format: "label CONTAINS %@", "SSH")).firstMatch
+        XCTAssertTrue(ssh.waitForExistence(timeout: 5))
+        ssh.click()
+        let host = app.textFields.matching(NSPredicate(format: "label IN %@", ["Host", "主机"])).firstMatch
+        host.click()
+        host.typeText("example.com")
+        app.buttons.matching(NSPredicate(format: "label IN %@", ["Open", "打开"])).firstMatch.click()
+        let message = app.staticTexts.matching(NSPredicate(format: "value CONTAINS %@ OR value CONTAINS %@", "Enter a valid SSH username.", "请输入有效的 SSH 用户名。")).firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(host.exists)
+    }
+
+    @MainActor
     func testSwiftUIFormRemainsInteractiveWhenOpenedFromBlankFoil() {
         let app = makeTestApplication()
         app.launch()

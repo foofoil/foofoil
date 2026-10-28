@@ -2,9 +2,18 @@ import AppKit
 import SwiftUI
 import Combine
 
+private struct TerminalEditorError: LocalizedError {
+    let key: String
+    var errorDescription: String? { NSLocalizedString(key, comment: "") }
+}
+
 @MainActor
 private final class TerminalEditorModel: ObservableObject {
     @Published var title = ""
+    @Published var useSSH = false
+    @Published var sshHost = ""
+    @Published var sshUsername = ""
+    @Published var sshPort = "22"
     @Published var directory = FileManager.default.homeDirectoryForCurrentUser.path
     @Published var shell = getpwuid(getuid())?.pointee.pw_shell.map { String(cString: $0) } ?? "/bin/zsh"
     @Published var environment = ""
@@ -13,12 +22,21 @@ private final class TerminalEditorModel: ObservableObject {
     func configuration() throws -> TerminalLaunchConfiguration {
         var values: [String: String] = [:]
         for line in environment.split(separator: "\n") {
-            guard let equal = line.firstIndex(of: "=") else { throw AgentFailure("INVALID_ARGUMENTS") }
+            guard let equal = line.firstIndex(of: "=") else { throw TerminalEditorError(key: "Terminal Invalid Environment") }
             let key = String(line[..<equal]); let value = String(line[line.index(after: equal)...])
-            guard values[key] == nil else { throw AgentFailure("INVALID_ARGUMENTS") }
+            guard values[key] == nil else { throw TerminalEditorError(key: "Terminal Invalid Environment") }
             values[key] = value
         }
-        return TerminalLaunchConfiguration(shellPath: shell, workingDirectory: directory, environment: values, startupCommands: commands)
+        var ssh: TerminalLaunchConfiguration.SSH?
+        if useSSH {
+            let host = sshHost.trimmingCharacters(in: .whitespacesAndNewlines)
+            let username = sshUsername.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard host.range(of: "^[A-Za-z0-9_:][A-Za-z0-9_.:-]*$", options: .regularExpression) != nil else { throw TerminalEditorError(key: "Terminal Invalid SSH Host") }
+            guard username.range(of: "^[A-Za-z0-9_][A-Za-z0-9_.-]*$", options: .regularExpression) != nil else { throw TerminalEditorError(key: "Terminal Invalid SSH Username") }
+            guard let port = Int(sshPort), (1...65535).contains(port) else { throw TerminalEditorError(key: "Terminal Invalid SSH Port") }
+            ssh = .init(host: host, username: username, port: port)
+        }
+        return TerminalLaunchConfiguration(shellPath: useSSH ? nil : shell, workingDirectory: directory, environment: values, startupCommands: commands, ssh: ssh)
     }
 }
 
@@ -34,33 +52,47 @@ private struct TerminalConfigurationEditor: View {
                 singleLineField("Terminal Title", text: $model.title)
             }
             GridRow {
-                fieldLabel("Terminal Directory")
+                fieldLabel("Terminal SSH")
+                Toggle("Terminal SSH", isOn: $model.useSSH).toggleStyle(.checkbox).labelsHidden()
+                    .accessibilityLabel(Text("Terminal SSH"))
+                    .onChange(of: model.useSSH) {
+                        model.directory = model.useSSH ? "" : FileManager.default.homeDirectoryForCurrentUser.path
+                    }
+            }
+            if model.useSSH {
+                GridRow { fieldLabel("Terminal SSH Host"); singleLineField("Terminal SSH Host", text: $model.sshHost) }
+                GridRow { fieldLabel("Terminal SSH Username"); singleLineField("Terminal SSH Username", text: $model.sshUsername) }
+                GridRow { fieldLabel("Terminal SSH Port"); singleLineField("Terminal SSH Port", text: $model.sshPort) }
+            }
+            GridRow {
+                fieldLabel(model.useSSH ? "Terminal Remote Directory" : "Terminal Directory")
                 HStack(spacing: 6) {
-                    singleLineField("Terminal Directory", text: $model.directory)
-                    Button(action: chooseDirectory) {
+                    singleLineField(model.useSSH ? "Terminal Remote Directory" : "Terminal Directory", text: $model.directory)
+                    if !model.useSSH { Button(action: chooseDirectory) {
                         Image(systemName: "folder")
                     }
                     .accessibilityLabel(Text("Choose Terminal Directory"))
-                    .help("Choose Terminal Directory")
+                    .help("Choose Terminal Directory") }
+                    if model.useSSH { Text("Terminal Remote Directory Note").font(.caption).foregroundStyle(.secondary) }
                 }
             }
-            GridRow {
+            if !model.useSSH { GridRow {
                 fieldLabel("Terminal Shell")
                 singleLineField("Terminal Shell", text: $model.shell)
-            }
+            } }
             GridRow {
-                fieldLabel("Terminal Environment Label")
+                fieldLabel(model.useSSH ? "Terminal Remote Environment Label" : "Terminal Environment Label")
                 VStack(alignment: .leading, spacing: 5) {
-                    multilineField("Terminal Environment", text: $model.environment, height: 64, field: .environment)
+                    multilineField(model.useSSH ? "Terminal Remote Environment" : "Terminal Environment", text: $model.environment, height: 64, field: .environment)
                     Text("Terminal Environment Note").font(.caption).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
             GridRow {
-                fieldLabel("Terminal Trusted Script")
-                multilineField("Terminal Trusted Script", text: $model.commands, height: 120, field: .commands)
+                fieldLabel(model.useSSH ? "Terminal Remote Script" : "Terminal Trusted Script")
+                multilineField(model.useSSH ? "Terminal Remote Script" : "Terminal Trusted Script", text: $model.commands, height: 120, field: .commands)
             }
-        }.padding(8).frame(width: 480, height: 370)
+        }.padding(8).frame(width: 480, height: 470, alignment: .top)
     }
 
     private func chooseDirectory() {
@@ -115,15 +147,29 @@ private struct TerminalConfigurationEditor: View {
 @MainActor
 private final class TerminalConfigurationPanel: NSPanel {
     static var current: TerminalConfigurationPanel?
-    var onOpen: (@MainActor @Sendable () -> Void)?
+    var onOpen: (@MainActor @Sendable () throws -> Void)?
 
     func finish(open: Bool) {
-        let action = open ? onOpen : nil
+        if open {
+            do { try onOpen?() }
+            catch {
+                let alert = NSAlert()
+                alert.messageText = NSLocalizedString("Terminal Configuration Failed", comment: "")
+                if let error = error as? TerminalEditorError {
+                    alert.informativeText = error.localizedDescription
+                } else if (error as? AgentFailure)?.code == "WORKING_DIRECTORY_UNAVAILABLE" {
+                    alert.informativeText = NSLocalizedString("Terminal Invalid Directory", comment: "")
+                } else {
+                    alert.informativeText = NSLocalizedString("Terminal Invalid Configuration", comment: "")
+                }
+                alert.beginSheetModal(for: self)
+                return
+            }
+        }
         onOpen = nil
         orderOut(nil)
         Self.current = nil
         super.close()
-        if let action { DispatchQueue.main.async(execute: action) }
     }
 
     override func close() { finish(open: false) }
@@ -148,7 +194,7 @@ extension AppDelegate {
             return
         }
         let model = TerminalEditorModel()
-        let panel = TerminalConfigurationPanel(contentRect: NSRect(x: 0, y: 0, width: 512, height: 430),
+        let panel = TerminalConfigurationPanel(contentRect: NSRect(x: 0, y: 0, width: 512, height: 530),
                                                styleMask: [.titled, .closable], backing: .buffered, defer: false)
         panel.title = NSLocalizedString("Open Terminal Title", comment: "")
         panel.isReleasedWhenClosed = false
@@ -156,13 +202,19 @@ extension AppDelegate {
         model.window = panel
         TerminalConfigurationPanel.current = panel
         panel.onOpen = { [weak self] in
-            guard let self else { return }
-            do { _ = try self.applicationControl.createTerminal(model.configuration(), title: model.title, incognito: isIncognito, reuseBlankWindow: true) }
-            catch {
-                let failure = NSAlert()
-                failure.messageText = NSLocalizedString("Terminal Configuration Failed", comment: "")
-                failure.informativeText = (error as? AgentFailure)?.code ?? "INVALID_ARGUMENTS"
-                failure.runModal()
+            let configuration = try model.configuration()
+            let validation = try TerminalBootstrap(configuration: configuration, terminalID: "validation")
+            validation.cleanup()
+            // 先完成表单校验，再退出按钮回调创建窗口，避免 SwiftUI 回调重入。
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                do { _ = try self.applicationControl.createTerminal(configuration, title: model.title, incognito: isIncognito, reuseBlankWindow: true) }
+                catch {
+                    let failure = NSAlert()
+                    failure.messageText = NSLocalizedString("Terminal Configuration Failed", comment: "")
+                    failure.informativeText = (error as? AgentFailure)?.code ?? "INVALID_ARGUMENTS"
+                    failure.runModal()
+                }
             }
         }
         panel.contentView = NSHostingView(rootView: VStack(spacing: 0) {

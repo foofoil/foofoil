@@ -11,7 +11,7 @@ enum TerminalConfigurationField: String, CaseIterable {
 
     func value(in configuration: TerminalLaunchConfiguration) -> String {
         switch self {
-        case .directory: configuration.workingDirectory ?? FileManager.default.homeDirectoryForCurrentUser.path
+        case .directory: configuration.workingDirectory ?? (configuration.ssh == nil ? FileManager.default.homeDirectoryForCurrentUser.path : "")
         case .shell: configuration.shellPath ?? getpwuid(getuid())?.pointee.pw_shell.map { String(cString: $0) } ?? "/bin/zsh"
         case .environment: configuration.environment.sorted { $0.key < $1.key }.map { "\($0.key)=\($0.value)" }.joined(separator: "\n")
         case .script: configuration.startupCommands

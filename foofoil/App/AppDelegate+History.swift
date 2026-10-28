@@ -206,8 +206,10 @@ extension AppDelegate {
             state.startTerminalForExplicitOpen()
             controller.showWindow(nil)
         }
-        HistoryRepository.shared.touch(id: id)
-        HistoryManager.shared.refresh()
+        if config.terminalConfiguration?.ssh == nil {
+            HistoryRepository.shared.touch(id: id)
+            HistoryManager.shared.refresh()
+        }
         HistorySearchWindowController.shared.dismiss()
         return controller
     }

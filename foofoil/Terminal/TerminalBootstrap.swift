@@ -9,6 +9,37 @@ nonisolated struct TerminalBootstrap {
     let workingDirectory: String
 
     init(configuration: TerminalLaunchConfiguration, terminalID: String) throws {
+        if let ssh = configuration.ssh {
+            guard ssh.host.range(of: "^[A-Za-z0-9_:][A-Za-z0-9_.:-]*$", options: .regularExpression) != nil,
+                  ssh.username.range(of: "^[A-Za-z0-9_][A-Za-z0-9_.-]*$", options: .regularExpression) != nil,
+                  (1...65535).contains(ssh.port),
+                  configuration.startupCommands.utf8.count <= 32_768,
+                  !configuration.startupCommands.contains("\0"), configuration.environment.count <= 128,
+                  configuration.environment.allSatisfy({ key, value in
+                      key.range(of: "^[A-Za-z_][A-Za-z0-9_]*$", options: .regularExpression) != nil
+                          && !key.hasPrefix("FOOFOIL_") && !value.contains("\0") && value.utf8.count <= 8192
+                  }), !(configuration.workingDirectory ?? "").contains("\0") else { throw AgentFailure("INVALID_ARGUMENTS") }
+            shell = "/usr/bin/ssh"
+            workingDirectory = FileManager.default.homeDirectoryForCurrentUser.path
+            directory = FileManager.default.temporaryDirectory.appendingPathComponent("foofoil-shell-\(UUID())", isDirectory: true)
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
+            var commands = [String]()
+            if let path = configuration.workingDirectory, !path.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                commands.append("cd -- \(Self.quote(path)) || exit 1")
+            }
+            commands += configuration.environment.sorted { $0.key < $1.key }.map { "export \($0.key)=\(Self.quote($0.value))" }
+            commands.append(configuration.startupCommands)
+            // 只有远端目录和初始化完成后才通知宿主写入历史。
+            commands.append("printf '\\033]777;foofoil-ready-\(terminalID)\\007'")
+            // 远端登录 shell 执行初始化后，以交互 shell 继承目录和导出的环境。
+            commands.append("exec \"${SHELL:-/bin/sh}\" -i")
+            arguments = ["-tt", "-p", String(ssh.port), "-l", ssh.username, "--", ssh.host, commands.joined(separator: "\n")]
+            var env = ProcessInfo.processInfo.environment
+            env["TERM"] = "xterm-256color"
+            env["COLORTERM"] = "truecolor"
+            environment = env
+            return
+        }
         let user = getpwuid(getuid())?.pointee
         shell = configuration.shellPath.map { NSString(string: $0).expandingTildeInPath } ?? user?.pw_shell.map { String(cString: $0) } ?? "/bin/zsh"
         guard ["zsh", "bash"].contains(URL(fileURLWithPath: shell).lastPathComponent),
@@ -60,6 +91,9 @@ nonisolated struct TerminalBootstrap {
         environment = env
     }
 
+    static func readyMarker(_ terminalID: String) -> [UInt8] {
+        Array("\u{1b}]777;foofoil-ready-\(terminalID)\u{7}".utf8)
+    }
     static func quote(_ value: String) -> String { "'" + value.replacingOccurrences(of: "'", with: "'\\''") + "'" }
     private static func write(_ value: String, to url: URL) throws {
         guard FileManager.default.createFile(atPath: url.path, contents: Data(value.utf8), attributes: [.posixPermissions: 0o600]) else { throw AgentFailure("CLI_IO_ERROR") }

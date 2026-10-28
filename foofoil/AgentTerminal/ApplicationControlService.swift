@@ -52,7 +52,8 @@ final class ApplicationControlService {
         return configs.first { config in
             guard FileListState.normalizedTitle(config.customTitle) == nil,
                   let candidate = config.terminalConfiguration else { return false }
-            return candidate.resolvedWorkingDirectory == directory
+            return candidate.ssh == configuration.ssh
+                && (configuration.ssh == nil ? candidate.resolvedWorkingDirectory == directory : candidate.workingDirectory == configuration.workingDirectory)
                 && candidate.environment == configuration.environment
                 && candidate.startupCommands == configuration.startupCommands
         }
