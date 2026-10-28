@@ -57,11 +57,11 @@ final class NavigatorHostingView: NSHostingView<NavigatorPanelView> {
     }
 
     override func touchesEnded(with event: NSEvent) {
-        windowDragTarget?.resetWindowDragTouches()
+        windowDragTarget?.handleWindowDragTouches(event, in: self)
     }
 
     override func touchesCancelled(with event: NSEvent) {
-        windowDragTarget?.resetWindowDragTouches()
+        windowDragTarget?.resetWindowDragTouches(keepingScrollSuppression: true)
     }
 
     static func enclosing(_ responder: NSResponder?) -> NavigatorHostingView? {

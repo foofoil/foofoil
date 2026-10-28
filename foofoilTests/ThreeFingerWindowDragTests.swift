@@ -54,6 +54,67 @@ struct ThreeFingerWindowDragTests {
         #expect(returned == cursor)
     }
 
+    @Test func scrollSuppressionSurvivesPartialLiftAndMomentum() {
+        var drag = ThreeFingerWindowDrag()
+        _ = drag.update(contacts: contacts(), windowOrigin: .zero)
+        let landingScroll = drag.shouldSuppressScroll(phase: .began, momentumPhase: [])
+        #expect(landingScroll)
+        _ = drag.update(contacts: contacts(3), windowOrigin: .zero)
+        _ = drag.update(contacts: contacts(ids: [1, 2]), windowOrigin: .zero)
+        #expect(!drag.isTracking)
+        let partialLiftScroll = drag.shouldSuppressScroll(phase: .changed, momentumPhase: [])
+        #expect(partialLiftScroll)
+        let partialLiftNewPhase = drag.shouldSuppressScroll(phase: .began, momentumPhase: [])
+        #expect(partialLiftNewPhase)
+        _ = drag.update(contacts: [], windowOrigin: .zero)
+        let endingScroll = drag.shouldSuppressScroll(phase: .ended, momentumPhase: [])
+        #expect(endingScroll)
+        for phase: NSEvent.Phase in [.began, .changed, .ended] {
+            let momentumScroll = drag.shouldSuppressScroll(phase: [], momentumPhase: phase)
+            #expect(momentumScroll)
+        }
+        let trailingScroll = drag.shouldSuppressScroll(phase: [], momentumPhase: [])
+        #expect(trailingScroll)
+        let freshScroll = drag.shouldSuppressScroll(phase: .began, momentumPhase: [])
+        #expect(!freshScroll)
+        let freshScrollChange = drag.shouldSuppressScroll(phase: .changed, momentumPhase: [])
+        #expect(!freshScrollChange)
+    }
+
+    @Test func freshTwoFingerTouchRestoresScrolling() {
+        var drag = ThreeFingerWindowDrag()
+        _ = drag.update(contacts: contacts(), windowOrigin: .zero)
+        _ = drag.update(contacts: [], windowOrigin: .zero)
+        _ = drag.update(contacts: contacts(ids: [4, 5]), windowOrigin: .zero)
+        let twoFingerScroll = drag.shouldSuppressScroll(phase: .changed, momentumPhase: [])
+        #expect(!twoFingerScroll)
+    }
+
+    @Test func cancellationKeepsTailSuppressedAndExplicitResetClearsIt() {
+        var drag = ThreeFingerWindowDrag()
+        _ = drag.update(contacts: contacts(), windowOrigin: .zero)
+        drag.reset(keepingScrollSuppression: true)
+        #expect(!drag.isTracking)
+        let cancelledScroll = drag.shouldSuppressScroll(phase: .cancelled, momentumPhase: [])
+        #expect(cancelledScroll)
+        let cancelledMomentum = drag.shouldSuppressScroll(phase: [], momentumPhase: .began)
+        #expect(cancelledMomentum)
+        drag.reset()
+        let resetScroll = drag.shouldSuppressScroll(phase: [], momentumPhase: [])
+        #expect(!resetScroll)
+    }
+
+    @Test func ordinaryMouseWheelDoesNotGetStuckAfterDragging() {
+        var drag = ThreeFingerWindowDrag()
+        _ = drag.update(contacts: contacts(), windowOrigin: .zero)
+        _ = drag.update(contacts: [], windowOrigin: .zero)
+        let mouseWheelSuppressed = drag.shouldSuppressScroll(
+            phase: [], momentumPhase: [], hasPreciseScrollingDeltas: false)
+        #expect(!mouseWheelSuppressed)
+        let momentumSuppressed = drag.shouldSuppressScroll(phase: [], momentumPhase: .began)
+        #expect(momentumSuppressed)
+    }
+
     @Test func cancellationDiscardsPreviousAnchor() {
         var drag = ThreeFingerWindowDrag()
         _ = drag.update(contacts: contacts(), windowOrigin: .zero)

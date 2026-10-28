@@ -139,10 +139,21 @@ public class FloatingWindow: NSWindow {
         resizeCursorTrackingArea = trackingArea
     }
 
-    var isTrackingWindowDragTouches: Bool { threeFingerWindowDrag.isTracking }
+    func shouldSuppressWindowDragEvent(_ event: NSEvent) -> Bool {
+        switch event.type {
+        case .scrollWheel:
+            return threeFingerWindowDrag.shouldSuppressScroll(
+                phase: event.phase, momentumPhase: event.momentumPhase,
+                hasPreciseScrollingDeltas: event.hasPreciseScrollingDeltas)
+        case .swipe:
+            return threeFingerWindowDrag.suppressesScrolling
+        default:
+            return false
+        }
+    }
 
-    func resetWindowDragTouches() {
-        threeFingerWindowDrag.reset()
+    func resetWindowDragTouches(keepingScrollSuppression: Bool = false) {
+        threeFingerWindowDrag.reset(keepingScrollSuppression: keepingScrollSuppression)
         threeFingerCursorAnchor = nil
     }
 
@@ -186,7 +197,7 @@ public class FloatingWindow: NSWindow {
         let modifiers = KeyboardShortcut.effectiveModifiers(for: event)
         if event.type == .keyDown, handleIncognitoShortcut(event) { return }
         // 三指序列期间不把同一动作解释为正文滚动或网页后退。
-        if threeFingerWindowDrag.isTracking, event.type == .scrollWheel || event.type == .swipe { return }
+        if shouldSuppressWindowDragEvent(event) { return }
         if event.type == .leftMouseDown { resetWindowDragTouches() }
 
         // ⌘ 拖窗的整段鼠标序列归窗口所有；否则残余 dragged 会让终端凭空建立文字选区。

@@ -29,7 +29,7 @@ final class NavigatorPanel: NSWindow {
         if (parent as? FloatingWindow)?.handleIncognitoShortcut(event) == true { return }
         if let foil = parent as? FloatingWindow {
             // 三指移箔期间不让侧栏列表同时滚动；普通双指滚动仍按原路径派发。
-            if foil.isTrackingWindowDragTouches, event.type == .scrollWheel || event.type == .swipe { return }
+            if foil.shouldSuppressWindowDragEvent(event) { return }
             if event.type == .leftMouseDown { foil.resetWindowDragTouches() }
         }
         if event.type == .scrollWheel,

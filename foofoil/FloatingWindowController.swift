@@ -51,11 +51,11 @@ final class FileDropHostingView<Content: View>: NSHostingView<Content> {
     }
 
     override func touchesEnded(with event: NSEvent) {
-        (window as? FloatingWindow)?.resetWindowDragTouches()
+        (window as? FloatingWindow)?.handleWindowDragTouches(event, in: self)
     }
 
     override func touchesCancelled(with event: NSEvent) {
-        (window as? FloatingWindow)?.resetWindowDragTouches()
+        (window as? FloatingWindow)?.resetWindowDragTouches(keepingScrollSuppression: true)
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
