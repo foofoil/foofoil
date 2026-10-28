@@ -29,7 +29,7 @@ struct ReadOnlyTextView: View {
     }
 }
 
-struct ReadOnlyTextNSView: NSViewRepresentable {
+struct ReadOnlyTextNSView: NSViewRepresentable, Equatable {
     let text: String
     let font: NSFont
     let textColor: NSColor?
@@ -52,7 +52,10 @@ struct ReadOnlyTextNSView: NSViewRepresentable {
 
         let contentSize = scrollView.contentSize
 
-        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: contentSize.width, height: contentSize.height))
+        // TextKit 2 按段落绘制布局片段，超长单行软换行后会在滚动时重绘大量屏外文字。
+        // 纯文本使用 TextKit 1 的可见行绘制；代码行号栏仍依赖 TextKit 2 的片段定位。
+        let textView = NSTextView(usingTextLayoutManager: codeLineNumbersVisible != nil)
+        textView.frame = NSRect(x: 0, y: 0, width: contentSize.width, height: contentSize.height)
         textView.minSize = NSSize(width: 0.0, height: contentSize.height)
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.isVerticallyResizable = true
@@ -93,36 +96,50 @@ struct ReadOnlyTextNSView: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSScrollView, context: Context) {
-        if let textView = nsView.documentView as? NSTextView {
-            if textView.string != text {
-                textView.string = text
-            }
-            if let codeLineNumbersVisible {
-                nsView.rulersVisible = codeLineNumbersVisible
-                context.coordinator.updateLineNumbers(for: text)
-            }
-            // 仅在字体或颜色变化时重设，避免每次更新都重置输入属性（影响输入法与撤销）
-            if textView.font?.fontName != font.fontName || textView.font?.pointSize != font.pointSize {
-                textView.font = font
-            }
-            let resolvedTextColor = textColor ?? .labelColor
-            if textView.textColor?.isEqual(resolvedTextColor) != true {
-                textView.textColor = resolvedTextColor
-            }
-            DocumentTextSpacing.apply(
-                to: textView,
-                lineHeightMultiple: lineHeightMultiple,
-                paragraphSpacingMultiple: paragraphSpacingMultiple,
-                fontSize: font.pointSize
-            )
-            context.coordinator.ruler?.refresh()
-        }
+        context.coordinator.update(nsView, configuration: self)
     }
 
     final class Coordinator {
         weak var ruler: CodeLineNumberRulerView?
         private var indexedText: String?
         private var indexGeneration = 0
+        private var appliedConfiguration: ReadOnlyTextNSView?
+
+        func update(_ scrollView: NSScrollView, configuration: ReadOnlyTextNSView) {
+            // 缓存 Swift 字符串及样式；悬停等无关刷新不能桥接、比较或遍历原生全文。
+            guard appliedConfiguration != configuration,
+                  let textView = scrollView.documentView as? NSTextView else { return }
+            let textChanged = appliedConfiguration?.text != configuration.text
+            let spacingChanged = appliedConfiguration?.lineHeightMultiple != configuration.lineHeightMultiple
+                || appliedConfiguration?.paragraphSpacingMultiple != configuration.paragraphSpacingMultiple
+                || appliedConfiguration?.font.pointSize != configuration.font.pointSize
+            if textChanged {
+                textView.string = configuration.text
+            }
+            if let visible = configuration.codeLineNumbersVisible {
+                scrollView.rulersVisible = visible
+                updateLineNumbers(for: configuration.text)
+            }
+            if textView.font?.fontName != configuration.font.fontName
+                || textView.font?.pointSize != configuration.font.pointSize {
+                textView.font = configuration.font
+            }
+            let resolvedTextColor = configuration.textColor ?? .labelColor
+            if textView.textColor?.isEqual(resolvedTextColor) != true {
+                textView.textColor = resolvedTextColor
+            }
+            // 新正文需要补齐段落属性；只改颜色或行号时不扫描全文。
+            if textChanged || spacingChanged {
+                DocumentTextSpacing.apply(
+                    to: textView,
+                    lineHeightMultiple: configuration.lineHeightMultiple,
+                    paragraphSpacingMultiple: configuration.paragraphSpacingMultiple,
+                    fontSize: configuration.font.pointSize
+                )
+            }
+            ruler?.refresh()
+            appliedConfiguration = configuration
+        }
 
         /// 行起点索引在后台计算；结果未就绪前行号栏为空，文本照常显示。
         func updateLineNumbers(for text: String) {
