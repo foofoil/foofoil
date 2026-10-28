@@ -265,7 +265,7 @@ struct FoilExposeModelTests {
     }
 
     @Test func overviewLimitsSectionsAndScopesShowTheirContents() async {
-        let entries = (0..<8).map { index in
+        let entries = (0..<15).map { index in
             ClipboardSearchEntry(id: "entry-\(index)", title: "Clip \(index)", searchText: "Clip \(index)", content: .text("Clip \(index)"), date: Date())
         }
         let search = ClipboardHistorySearch(load: { .init(access: .available, entries: entries) }, currentContent: { nil })
@@ -274,26 +274,26 @@ struct FoilExposeModelTests {
         model.columnCount = 2
         model.musicColumnCount = 2
         for _ in 0..<100 {
-            if !search.isLoading && model.currentItems.filter({ $0.clipboardEntry != nil }).count == 4 { break }
+            if !search.isLoading && model.currentItems.filter({ $0.clipboardEntry != nil }).count == 12 { break }
             try? await Task.sleep(for: .milliseconds(10))
         }
         #expect(model.currentItems.filter(\.isHistoryEntry).count == 4)
-        #expect(model.currentItems.filter { $0.clipboardEntry != nil }.count == 4)
+        #expect(model.currentItems.filter { $0.clipboardEntry != nil }.count == 12)
         #expect(model.canShowMoreHistory && model.canShowMoreClipboard)
-        model.searchText = "Clip 1"
+        model.searchText = "Clip 7"
         for _ in 0..<100 {
             if model.currentItems.compactMap(\.clipboardEntry).count == 1 { break }
             try? await Task.sleep(for: .milliseconds(10))
         }
-        #expect(model.currentItems.compactMap(\.clipboardEntry).map(\.title) == ["Clip 1"])
+        #expect(model.currentItems.compactMap(\.clipboardEntry).map(\.title) == ["Clip 7"])
         model.selectScope(.history)
         #expect(model.currentItems.count == 10)
         model.selectScope(.clipboard)
         for _ in 0..<100 {
-            if model.currentItems.count == 8 { break }
+            if model.currentItems.count == 15 { break }
             try? await Task.sleep(for: .milliseconds(10))
         }
-        #expect(model.currentItems.count == 8)
+        #expect(model.currentItems.count == 15)
         model.selectScope(.file)
         #expect(model.currentItems.isEmpty)
         model.stopFileSearch()

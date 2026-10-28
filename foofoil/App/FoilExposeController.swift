@@ -508,8 +508,9 @@ final class FoilExposeModel: ObservableObject {
     var canShowMoreHistory: Bool {
         activeScope == nil && searchQuery.isEmpty && matchedFoilItems.filter(\.isHistoryEntry).count > max(1, columnCount) * 2
     }
+    private static let overviewClipboardLimit = 12
     var canShowMoreClipboard: Bool {
-        activeScope == nil && clipboardItems.count > max(1, musicColumnCount) * 2
+        activeScope == nil && clipboardItems.count > Self.overviewClipboardLimit
     }
     var clipboardCount: Int { clipboardItems.count }
     var currentItems: [FoilExposeItem] {
@@ -522,7 +523,7 @@ final class FoilExposeModel: ObservableObject {
         } else if activeScope != .history {
             foils = Array(foils.prefix(SearchResultLimits.maximum))
         }
-        let clipboard = activeScope == nil ? Array(clipboardItems.prefix(max(1, musicColumnCount) * 2)) : []
+        let clipboard = activeScope == nil ? Array(clipboardItems.prefix(Self.overviewClipboardLimit)) : []
         return foils + clipboard + visibleMusicItems
     }
     var visibleFiles: [SpotlightFileResult] { Array(files.prefix(fileDisplayCount)) }

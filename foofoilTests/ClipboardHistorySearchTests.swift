@@ -129,7 +129,9 @@ struct ClipboardHistorySearchTests {
         let search = ClipboardHistorySearch(load: { await gate.wait() }, currentContent: { nil },
                                             cachedLoad: { .init(access: .available, entries: [cached]) })
         defer { search.stop() }
+        #expect(search.access == .unknown)
         search.search("")
+        #expect(search.access == .unknown && search.isLoading)
         for _ in 0..<100 {
             if search.entries.map(\.id) == ["cached"] { break }
             try await Task.sleep(for: .milliseconds(10))

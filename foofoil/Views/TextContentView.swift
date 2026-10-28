@@ -129,7 +129,7 @@ struct TextContentView: View {
                     }
 
                     if isBlank && !isSearching && geometry.size.height >= 140 {
-                        BlankOpenButtons(appState: appState) { search.model.showClipboardScopePicker() }
+                        BlankOpenButtons(appState: appState)
                             .padding(.horizontal, 16)
                             .padding(.bottom, appState.isIncognito ? 16 : 18)
                     }

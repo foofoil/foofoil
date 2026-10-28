@@ -64,6 +64,7 @@ final class FoilExposeGrid: NSScrollView {
         collection.dataSource = coordinator
         collection.delegate = coordinator
         collection.register(ExposeCollectionItem.self, forItemWithIdentifier: .exposeCard)
+        collection.register(ExposeAuthorizationItem.self, forItemWithIdentifier: .exposeAuthorization)
         collection.register(ExposeSectionHeader.self, forSupplementaryViewOfKind: NSCollectionView.elementKindSectionHeader,
                             withIdentifier: .exposeHeader)
         collection.frame = NSRect(origin: .zero, size: contentSize)
@@ -108,6 +109,7 @@ final class FoilExposeGrid: NSScrollView {
             var symbol = "doc"
             var tint: NSColor = .white.withAlphaComponent(0.7)
             var isHistory = false
+            var isClipboardAuthorization = false
             var entries: [Entry]
         }
         var model: FoilExposeModel
@@ -160,17 +162,19 @@ final class FoilExposeGrid: NSScrollView {
                 if model.clipboardSearch.isLoading { entries.append(Entry(title: NSLocalizedString("Clipboard History Loading", comment: ""))) }
                 else if entries.isEmpty && model.activeScope == .clipboard { entries.append(Entry(title: NSLocalizedString("No Search Results", comment: ""))) }
                 if model.activeScope == .clipboard {
-                    if model.clipboardSearch.access == .needsAuthorization {
-                        entries.append(Entry(title: NSLocalizedString("Clipboard History Authorize", comment: ""), symbol: "lock.open", action: { model.clipboardSearch.openAuthorizationSettings() }))
-                    } else if model.clipboardSearch.access == .unavailable {
+                    if model.clipboardSearch.access == .unavailable {
                         entries.append(Entry(title: NSLocalizedString("Clipboard History Unavailable", comment: "")))
                         entries.append(Entry(title: NSLocalizedString("Retry File Search", comment: ""), action: { model.clipboardSearch.refresh() }))
                     }
                 }
                 if let notice = model.clipboardSearch.copyError { entries.append(Entry(title: notice)) }
-                if !entries.isEmpty || model.activeScope == .clipboard {
+                if !entries.isEmpty || model.activeScope == .clipboard || model.clipboardSearch.access == .needsAuthorization {
                     next.append(Section(title: NSLocalizedString("Clipboard Search Scope", comment: ""), compact: true,
                                         count: model.clipboardCount, symbol: "doc.on.clipboard", tint: .systemCyan, entries: entries))
+                }
+                if model.clipboardSearch.access == .needsAuthorization {
+                    next.append(Section(title: "", compact: true, isClipboardAuthorization: true,
+                                        entries: [Entry(title: NSLocalizedString("Clipboard History Authorization Instructions", comment: ""))]))
                 }
             }
             if model.activeScope != nil && model.activeScope != .history && model.activeScope != .clipboard && model.searchQuery.isEmpty {
@@ -222,7 +226,7 @@ final class FoilExposeGrid: NSScrollView {
             if next.isEmpty {
                 next = [Section(title: "", compact: true, entries: [Entry(title: NSLocalizedString("No Foils on This Screen", comment: ""))])]
             }
-            let nextSignature = next.map { [$0.title, String($0.compact), String($0.count ?? -1)] + $0.entries.map(\.key) }
+            let nextSignature = next.map { [$0.title, String($0.compact), String($0.count ?? -1), String($0.isClipboardAuthorization)] + $0.entries.map(\.key) }
             // 不在选中项、焦点或滚动变化时 reloadData，保留复用卡片和已解码图片。
             let changed = nextSignature != signature
             sections = next
@@ -296,8 +300,13 @@ final class FoilExposeGrid: NSScrollView {
         func numberOfSections(in collectionView: NSCollectionView) -> Int { sections.count }
         func collectionView(_ collectionView: NSCollectionView, numberOfItemsInSection section: Int) -> Int { sections[section].entries.count }
         func collectionView(_ collectionView: NSCollectionView, itemForRepresentedObjectAt indexPath: IndexPath) -> NSCollectionViewItem {
-            let item = collectionView.makeItem(withIdentifier: .exposeCard, for: indexPath) as! ExposeCollectionItem
             let section = sections[indexPath.section]
+            if section.isClipboardAuthorization {
+                let item = collectionView.makeItem(withIdentifier: .exposeAuthorization, for: indexPath) as! ExposeAuthorizationItem
+                item.configure { [weak model] in model?.clipboardSearch.openAuthorizationSettings() }
+                return item
+            }
+            let item = collectionView.makeItem(withIdentifier: .exposeCard, for: indexPath) as! ExposeCollectionItem
             let entry = section.entries[indexPath.item]
             item.card.configure(foil: entry.foil, title: entry.title, subtitle: entry.subtitle, symbol: entry.symbol,
                                 compact: section.compact, shortcut: entry.foil == nil ? nil : entry.index.flatMap { FoilExposeShortcut.key(forIndex: $0) },
@@ -314,11 +323,22 @@ final class FoilExposeGrid: NSScrollView {
             return header
         }
         func collectionView(_ collectionView: NSCollectionView, layout collectionViewLayout: NSCollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> NSSize {
-            FoilExposeGridMetrics(width: scroll?.contentSize.width ?? collectionView.bounds.width, compact: sections[indexPath.section].compact).itemSize
+            let width = scroll?.contentSize.width ?? collectionView.bounds.width
+            if sections[indexPath.section].isClipboardAuthorization {
+                let metrics = FoilExposeGridMetrics(width: width, compact: true)
+                let itemWidth = max(1, width - 2 * metrics.inset)
+                let text = NSLocalizedString("Clipboard History Authorization Instructions", comment: "") as NSString
+                let textHeight = text.boundingRect(with: NSSize(width: max(1, itemWidth - 32), height: .greatestFiniteMagnitude),
+                                                   options: [.usesLineFragmentOrigin, .usesFontLeading],
+                                                   attributes: [.font: NSFont.systemFont(ofSize: 14)]).height
+                return NSSize(width: itemWidth, height: ceil(textHeight) + 62)
+            }
+            return FoilExposeGridMetrics(width: width, compact: sections[indexPath.section].compact).itemSize
         }
         func collectionView(_ collectionView: NSCollectionView, layout collectionViewLayout: NSCollectionViewLayout, insetForSectionAt section: Int) -> NSEdgeInsets {
             let metrics = FoilExposeGridMetrics(width: scroll?.contentSize.width ?? collectionView.bounds.width, compact: sections[section].compact)
-            return NSEdgeInsets(top: 8, left: metrics.inset, bottom: 32, right: metrics.inset)
+            return NSEdgeInsets(top: sections[section].isClipboardAuthorization ? 0 : 8,
+                                left: metrics.inset, bottom: 32, right: metrics.inset)
         }
         func collectionView(_ collectionView: NSCollectionView, layout collectionViewLayout: NSCollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat { sections[section].compact ? 10 : 18 }
         func collectionView(_ collectionView: NSCollectionView, layout collectionViewLayout: NSCollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat { sections[section].compact ? 10 : 18 }
@@ -330,6 +350,7 @@ final class FoilExposeGrid: NSScrollView {
 
 private extension NSUserInterfaceItemIdentifier {
     static let exposeCard = Self("ExposeNativeCard")
+    static let exposeAuthorization = Self("ExposeAuthorization")
     static let exposeHeader = Self("ExposeNativeHeader")
 }
 
@@ -413,6 +434,41 @@ private final class ExposeSectionHeader: NSView {
         }
         divider.frame = NSRect(x: headingEnd + 10, y: center, width: max(0, right - headingEnd - 10), height: 1)
     }
+}
+
+private final class ExposeAuthorizationItem: NSCollectionViewItem {
+    private let note = NSTextField(wrappingLabelWithString: NSLocalizedString("Clipboard History Authorization Instructions", comment: ""))
+    private let button = NSButton(title: NSLocalizedString("Clipboard History Authorize", comment: ""), target: nil, action: nil)
+    private var perform: (() -> Void)?
+
+    override func loadView() {
+        view = NSView()
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.07).cgColor
+        view.layer?.cornerRadius = 10
+        note.font = .systemFont(ofSize: 14)
+        note.textColor = .white.withAlphaComponent(0.85)
+        note.translatesAutoresizingMaskIntoConstraints = false
+        button.bezelStyle = .rounded
+        button.appearance = NSAppearance(named: .darkAqua)
+        button.target = self
+        button.action = #selector(authorize)
+        button.setAccessibilityIdentifier("clipboard.authorize")
+        button.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(note)
+        view.addSubview(button)
+        NSLayoutConstraint.activate([
+            note.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            note.topAnchor.constraint(equalTo: view.topAnchor, constant: 12),
+            note.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            button.leadingAnchor.constraint(equalTo: note.leadingAnchor),
+            button.topAnchor.constraint(equalTo: note.bottomAnchor, constant: 8),
+            button.bottomAnchor.constraint(lessThanOrEqualTo: view.bottomAnchor, constant: -10)
+        ])
+    }
+
+    func configure(perform: @escaping () -> Void) { self.perform = perform }
+    @objc private func authorize() { perform?() }
 }
 
 private final class ExposeCollectionItem: NSCollectionViewItem {

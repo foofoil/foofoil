@@ -57,7 +57,7 @@ nonisolated struct ClipboardSearchEntry: Identifiable, Sendable, Equatable {
     }
 }
 
-nonisolated enum ClipboardHistoryAccess: Equatable, Sendable { case available, needsAuthorization, unavailable }
+nonisolated enum ClipboardHistoryAccess: Equatable, Sendable { case unknown, available, needsAuthorization, unavailable }
 nonisolated struct ClipboardHistorySnapshot: Sendable {
     let access: ClipboardHistoryAccess
     let entries: [ClipboardSearchEntry]
@@ -137,7 +137,7 @@ actor ClipboardHistoryReader {
 
 @MainActor
 final class ClipboardHistorySearch: ObservableObject {
-    @Published private(set) var access: ClipboardHistoryAccess = .needsAuthorization
+    @Published private(set) var access: ClipboardHistoryAccess = .unknown
     @Published private(set) var entries: [ClipboardSearchEntry] = []
     @Published private(set) var isLoading = false
     @Published private(set) var copyError: String?
@@ -169,6 +169,7 @@ final class ClipboardHistorySearch: ObservableObject {
     }
     func refresh() {
         task?.cancel()
+        access = .unknown
         current = currentContent()
         filter()
         isLoading = true
@@ -187,7 +188,7 @@ final class ClipboardHistorySearch: ObservableObject {
     }
     func stop() {
         active = false; task?.cancel(); task = nil
-        snapshot = []; current = nil; entries = []; isLoading = false; copyError = nil
+        access = .unknown; snapshot = []; current = nil; entries = []; isLoading = false; copyError = nil
     }
     private func filter() {
         // 未授权时最多一项；不把系统历史导入浮箔自己的历史数据库。

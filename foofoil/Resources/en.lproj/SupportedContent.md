@@ -153,7 +153,7 @@ Use `foil list --scope all`, `reveal`, `hide`, `inspect`, `set` and `close --sco
 
 Terminal creation and reopening a closed terminal start immediately with its saved optional environment and startup script. Revealing a running terminal keeps its session. Automatic app restoration waits for user activation. Ordinary terminals retain up to 500 lines / 128 KiB of read-only previous output; incognito terminals do not persist output.
 
-Blank foils show a one-line clipboard button below the opening icons, with a filename or content type that fills the available width. Its shortcut stays fully visible and follows normal or incognito mode. The button is hidden when the clipboard has nothing to open.
+The clipboard icon in the blank foil’s opening row opens the current clipboard content. It is disabled when there is nothing to open and follows normal or incognito mode.
 
 The penultimate icon in a blank foil toggles the current foil between normal and incognito mode; Overview remains last. In an incognito foil it shows “Exit Incognito Mode” with a shoeprints icon. Its shortcut hint writes Escape as “esc”.
 
@@ -163,4 +163,3 @@ Clipboard result titles use one line. Older items have a copy icon on the right;
 
 Clipboard images show thumbnails, while other content uses larger type icons. When the source app is known and installed, its icon appears at the lower-right corner.
 
-The ellipsis button to the right of Open Clipboard Content in a blank foil fills the search field with the clipboard slash option and focuses it.
