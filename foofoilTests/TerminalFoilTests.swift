@@ -7,6 +7,86 @@ import SwiftTerm
 @MainActor
 @Suite(.sharedApplicationState, .serialized)
 struct TerminalFoilTests {
+    @Test func markedInputTracksUTF16ReplacementAndCandidateGeometry() throws {
+        let view = FoilTerminalView(frame: NSRect(x: 0, y: 0, width: 720, height: 460))
+        let window = NSWindow(contentRect: view.frame, styleMask: [.borderless], backing: .buffered, defer: false)
+        window.contentView = view
+        defer { window.contentView = nil }
+        let absent = NSRange(location: NSNotFound, length: 0)
+        let originalSubviewCount = view.subviews.count
+        view.setMarkedText(NSAttributedString(string: "你😀"), selectedRange: NSRange(location: 3, length: 0), replacementRange: absent)
+        #expect(view.hasMarkedText())
+        #expect(view.markedRange() == NSRange(location: 0, length: 3))
+        #expect(view.selectedRange() == NSRange(location: 3, length: 0))
+        view.setMarkedText("好", selectedRange: NSRange(location: 1, length: 0), replacementRange: NSRange(location: 1, length: 2))
+        #expect(view.markedRange() == NSRange(location: 0, length: 2))
+        #expect(view.selectedRange() == NSRange(location: 2, length: 0))
+        #expect(view.subviews.count == originalSubviewCount + 1)
+        for name in [NSAppearance.Name.aqua, .darkAqua] {
+            window.appearance = NSAppearance(named: name)
+            view.viewDidChangeEffectiveAppearance()
+            #expect(view.hasMarkedText())
+            let bitmap = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+            let preview = NSImage(size: view.bounds.size)
+            preview.addRepresentation(bitmap)
+            Attachment.record(preview, named: "Terminal marked input \(name.rawValue)", as: .png)
+        }
+        var actual = absent
+        #expect(view.attributedSubstring(forProposedRange: NSRange(location: 0, length: 99), actualRange: &actual)?.string == "你好")
+        #expect(actual == NSRange(location: 0, length: 2))
+        let start = view.firstRect(forCharacterRange: NSRange(location: 0, length: 0), actualRange: nil)
+        let end = view.firstRect(forCharacterRange: view.selectedRange(), actualRange: &actual)
+        #expect(end.minX > start.minX)
+        #expect(end.height > 0 && end.origin.x.isFinite && end.origin.y.isFinite)
+        #expect(actual == view.selectedRange())
+        #expect(view.firstRect(forCharacterRange: view.markedRange(), actualRange: nil).width > 1)
+        view.setMarkedText("", selectedRange: .init(location: 0, length: 0), replacementRange: absent)
+        #expect(!view.hasMarkedText())
+        #expect(view.markedRange() == absent)
+    }
+
+    @Test func compositionPreventsNegotiatedSpecialKeyEncoding() throws {
+        let view = FoilTerminalView(frame: NSRect(x: 0, y: 0, width: 720, height: 460))
+        view.dataReceived(slice: Array("\u{1b}[>1u".utf8)[...])
+        let events = try [("", UInt16(123)), ("\r", UInt16(36)), ("", UInt16(53))].map { key, code in
+            try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                windowNumber: 0, context: nil, characters: key, charactersIgnoringModifiers: key,
+                isARepeat: false, keyCode: code))
+        }
+        for event in events { #expect(view.terminalKeyEncoding(for: event) != nil) }
+        view.setMarkedText("ni", selectedRange: .init(location: 2, length: 0), replacementRange: .init(location: NSNotFound, length: 0))
+        for event in events { #expect(view.terminalKeyEncoding(for: event) == nil) }
+        view.setMarkedText("", selectedRange: .init(location: 0, length: 0), replacementRange: .init(location: NSNotFound, length: 0))
+        for event in events { #expect(view.terminalKeyEncoding(for: event) != nil) }
+    }
+
+    @Test func compositionOnlySendsCommittedTextToPTY() async throws {
+        let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let captured = root.appendingPathComponent("composition-bytes")
+        let session = TerminalSession(configuration: .init(shellPath: "/bin/zsh", workingDirectory: root.path,
+            environment: ["ZDOTDIR": root.path, "HISTFILE": "/dev/null"],
+            startupCommands: "stty raw -echo; printf 'COMPOSITION_READY'; dd bs=1 count=10 > \(TerminalBootstrap.quote(captured.path)) 2>/dev/null; printf 'COMPOSITION_DONE'; stty sane"))
+        defer { session.stop() }
+        session.start()
+        try await waitFor { String(decoding: session.view.getTerminal().getBufferAsData(), as: UTF8.self).contains("COMPOSITION_READY") }
+        let view = session.view
+        let absent = NSRange(location: NSNotFound, length: 0)
+        view.setMarkedText("ni", selectedRange: .init(location: 2, length: 0), replacementRange: absent)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect((try? Data(contentsOf: captured).count) == 0)
+        view.insertText(NSAttributedString(string: "中文"), replacementRange: absent)
+        #expect(!view.hasMarkedText())
+        view.setMarkedText("好", selectedRange: .init(location: 1, length: 0), replacementRange: absent)
+        view.unmarkText()
+        view.unmarkText()
+        view.setMarkedText("discard", selectedRange: .init(location: 7, length: 0), replacementRange: absent)
+        view.setMarkedText("", selectedRange: .init(location: 0, length: 0), replacementRange: absent)
+        view.insertText("!", replacementRange: absent)
+        try await waitFor { String(decoding: view.getTerminal().getBufferAsData(), as: UTF8.self).contains("COMPOSITION_DONE") }
+        #expect(try Data(contentsOf: captured) == Data("中文好!".utf8))
+    }
+
     private final class MenuTarget: NSObject {
         var invoked = false
         @objc func move(_ sender: Any?) { invoked = true }
@@ -155,6 +235,8 @@ struct TerminalFoilTests {
 
     @Test func documentStyleUpdatesTerminalWithoutReplacingItsBuffer() throws {
         let state = AppState(isIncognito: true)
+        // 本测试验证颜色持久化；固定外观，避免浅色系统恢复时按设计镜像深色测试色。
+        state.documentAppearance = .dark
         state.prepareTerminal(.init(), start: false)
         #expect(state.supportsContentBackgroundColor)
         #expect(state.supportsDocumentTextStyling)

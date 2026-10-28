@@ -237,6 +237,116 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
 }
 
 final class FoilTerminalView: LocalProcessTerminalView {
+    private var markedInput = ""
+    private var markedSelection = NSRange(location: 0, length: 0)
+    private var compositionView: TerminalCompositionView?
+
+    /// SwiftTerm 1.10.1 的组合态接口为空实现；预编辑只保存在视图里，提交前不能写入 PTY。
+    override func setMarkedText(_ string: Any, selectedRange: NSRange, replacementRange: NSRange) {
+        guard let text = Self.inputString(string) else { return }
+        let previous = markedInput as NSString
+        let replacement = replacementRange.location == NSNotFound
+            ? NSRange(location: 0, length: previous.length)
+            : Self.clampedInputRange(replacementRange, length: previous.length)
+        markedInput = previous.replacingCharacters(in: replacement, with: text)
+        let selection = Self.clampedInputRange(selectedRange, length: (text as NSString).length)
+        markedSelection = NSRange(location: replacement.location + selection.location, length: selection.length)
+        updateCompositionPresentation()
+    }
+
+    override func hasMarkedText() -> Bool { !markedInput.isEmpty }
+    override func markedRange() -> NSRange {
+        hasMarkedText() ? NSRange(location: 0, length: (markedInput as NSString).length)
+            : NSRange(location: NSNotFound, length: 0)
+    }
+    override func selectedRange() -> NSRange {
+        hasMarkedText() ? markedSelection : super.selectedRange()
+    }
+    override func validAttributesForMarkedText() -> [NSAttributedString.Key] { [.underlineStyle, .markedClauseSegment] }
+
+    override func attributedSubstring(forProposedRange range: NSRange, actualRange: NSRangePointer?) -> NSAttributedString? {
+        guard hasMarkedText(), range.location != NSNotFound,
+              range.location < (markedInput as NSString).length else { return nil }
+        let actual = Self.clampedInputRange(range, length: (markedInput as NSString).length)
+        actualRange?.pointee = actual
+        return NSAttributedString(string: (markedInput as NSString).substring(with: actual), attributes: [.font: font])
+    }
+
+    override func insertText(_ string: Any, replacementRange: NSRange) {
+        guard let text = Self.inputString(string) else { return }
+        clearMarkedInput()
+        // 上游只接受 NSString，输入法也可能传 NSAttributedString，统一转成正文后只发送一次。
+        super.insertText(text, replacementRange: replacementRange)
+    }
+
+    override func unmarkText() {
+        guard hasMarkedText() else { return }
+        // 按 NSTextInputClient 约定，解除标记等价于接受当前预编辑；取消由空 setMarkedText 表达。
+        insertText(markedInput, replacementRange: markedRange())
+    }
+
+    override func firstRect(forCharacterRange range: NSRange, actualRange: NSRangePointer?) -> NSRect {
+        guard hasMarkedText(), let window, let compositionView else {
+            return super.firstRect(forCharacterRange: range, actualRange: actualRange)
+        }
+        let actual = Self.clampedInputRange(range, length: (markedInput as NSString).length)
+        actualRange?.pointee = actual
+        let prefix = (markedInput as NSString).substring(to: actual.location) as NSString
+        let width = prefix.size(withAttributes: [.font: font]).width
+        let selected = (markedInput as NSString).substring(with: actual) as NSString
+        let rect = NSRect(x: width, y: 0, width: max(1, selected.size(withAttributes: [.font: font]).width),
+                          height: compositionView.bounds.height)
+        return window.convertToScreen(compositionView.convert(rect, to: nil))
+    }
+
+    override func layout() {
+        super.layout()
+        if hasMarkedText() { updateCompositionPresentation() }
+    }
+
+    private static func inputString(_ value: Any) -> String? {
+        (value as? NSAttributedString)?.string ?? value as? String
+    }
+
+    private static func clampedInputRange(_ range: NSRange, length: Int) -> NSRange {
+        let start = range.location == NSNotFound ? length : min(range.location, length)
+        return NSRange(location: start, length: min(range.length, length - start))
+    }
+
+    private func clearMarkedInput() {
+        markedInput = ""
+        markedSelection = NSRange(location: 0, length: 0)
+        compositionView?.isHidden = true
+    }
+
+    private func updateCompositionPresentation() {
+        guard hasMarkedText() else { compositionView?.isHidden = true; return }
+        if compositionView == nil {
+            let overlay = TerminalCompositionView()
+            addSubview(overlay)
+            compositionView = overlay
+        }
+        guard let overlay = compositionView else { return }
+        let attributes: [NSAttributedString.Key: Any] = [
+            .font: font, .foregroundColor: nativeForegroundColor, .underlineStyle: NSUnderlineStyle.single.rawValue
+        ]
+        let text = NSMutableAttributedString(string: markedInput, attributes: attributes)
+        if markedSelection.length > 0 {
+            text.addAttributes([.backgroundColor: NSColor.selectedTextBackgroundColor,
+                                .foregroundColor: NSColor.selectedTextColor], range: markedSelection)
+        }
+        overlay.text = text
+        overlay.caretOffset = (markedInput as NSString).substring(to: markedSelection.location)
+            .size(withAttributes: [.font: font]).width
+        overlay.fillColor = nativeBackgroundColor
+        let anchor = super.firstRect(forCharacterRange: NSRange(location: 0, length: 0), actualRange: nil)
+        let origin = window.map { convert($0.convertFromScreen(anchor), from: nil).origin } ?? .zero
+        overlay.frame = NSRect(origin: origin, size: NSSize(width: max(1, overlay.text.size().width + 2),
+                                                           height: max(anchor.height, overlay.text.size().height)))
+        overlay.isHidden = false
+        overlay.needsDisplay = true
+    }
+
     struct SearchSpan { let row: Int; let columns: Range<Int> }
     struct SearchMatch {
         let spans: [SearchSpan]
@@ -395,7 +505,10 @@ final class FoilTerminalView: LocalProcessTerminalView {
 
     /// SwiftTerm 的 keyDown 不是 open；窗口在终端持有焦点时统一从此入口分发。
     func handleTerminalKeyDown(with event: NSEvent) {
-        if let encoded = keyboardProtocol.encoding(for: event, optionAsMetaKey: optionAsMetaKey), !hasMarkedText() {
+        if hasMarkedText() {
+            // 上游 keyDown 会自行处理方向键/Control；组合期间所有按键必须先交给输入法。
+            interpretKeyEvents([event])
+        } else if let encoded = terminalKeyEncoding(for: event) {
             selectNone()
             send(txt: encoded)
         } else {
@@ -403,7 +516,13 @@ final class FoilTerminalView: LocalProcessTerminalView {
         }
     }
 
+    func terminalKeyEncoding(for event: NSEvent) -> String? {
+        guard !hasMarkedText() else { return nil }
+        return keyboardProtocol.encoding(for: event, optionAsMetaKey: optionAsMetaKey)
+    }
+
     override func processTerminated(_ source: LocalProcess, exitCode: Int32?) {
+        clearMarkedInput()
         if !readyPrefix.isEmpty { super.dataReceived(slice: readyPrefix[...]); readyPrefix.removeAll() }
         keyboardProtocol = TerminalKeyboardProtocol()
         super.processTerminated(source, exitCode: exitCode)
@@ -434,6 +553,7 @@ final class FoilTerminalView: LocalProcessTerminalView {
             }
         }
         needsDisplay = true
+        if hasMarkedText() { updateCompositionPresentation() }
     }
 
     /// 保留 ANSI 色位语义；浅底使用较深的低饱和色，深底使用柔和亮色，避免默认荧光绿/青。
@@ -464,6 +584,21 @@ final class FoilTerminalView: LocalProcessTerminalView {
             return true
         }
         return super.performKeyEquivalent(with: event)
+    }
+}
+
+/// 预编辑复用一个普通子视图绘制，不创建额外窗口或第二个文本输入上下文。
+private final class TerminalCompositionView: NSView {
+    var text = NSAttributedString(string: "")
+    var fillColor = NSColor.textBackgroundColor
+    var caretOffset: CGFloat = 0
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func draw(_ dirtyRect: NSRect) {
+        fillColor.setFill()
+        bounds.fill()
+        text.draw(at: .zero)
+        NSColor.labelColor.setFill()
+        NSRect(x: caretOffset, y: 0, width: 1, height: bounds.height).fill()
     }
 }
 
