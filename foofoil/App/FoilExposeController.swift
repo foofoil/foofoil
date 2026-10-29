@@ -527,7 +527,10 @@ final class FoilExposeModel: ObservableObject {
         let clipboard = activeScope == nil ? Array(clipboardItems.prefix(Self.overviewClipboardLimit)) : []
         return foils + clipboard + visibleMusicItems
     }
-    var visibleFiles: [SpotlightFileResult] { Array(files.prefix(fileDisplayCount)) }
+    private var effectiveFileDisplayCount: Int {
+        resultFilter == .files || resultFilter == .folders ? SearchResultLimits.maximum : fileDisplayCount
+    }
+    var visibleFiles: [SpotlightFileResult] { Array(files.prefix(effectiveFileDisplayCount)) }
     var displayedResultCount: Int { currentItems.count + visibleFiles.count }
     var showsResultLimitNotice: Bool {
         if activeScope == .clipboard || activeScope == .history || searchQuery.isEmpty { return false }
@@ -593,7 +596,8 @@ final class FoilExposeModel: ObservableObject {
             }
     }
     func musicDisplayCount(in category: AppleMusicSearchCategory) -> Int {
-        musicDisplayCounts[category, default: SearchResultLimits.overviewGroupInitial]
+        resultFilter.musicCategory == category ? SearchResultLimits.maximum
+            : musicDisplayCounts[category, default: SearchResultLimits.overviewGroupInitial]
     }
     func canExpandMusicResults(in category: AppleMusicSearchCategory) -> Bool {
         musicDisplayCount(in: category) < SearchResultLimits.maximum && musicDisplayCount(in: category) < musicItems(in: category).count
@@ -702,7 +706,7 @@ final class FoilExposeModel: ObservableObject {
         }
     }
 
-    var canExpandFileResults: Bool { fileDisplayCount < SearchResultLimits.maximum && fileDisplayCount < files.count }
+    var canExpandFileResults: Bool { effectiveFileDisplayCount < SearchResultLimits.maximum && effectiveFileDisplayCount < files.count }
     func expandFileResults() {
         guard canExpandFileResults else { return }
         fileDisplayCount = min(SearchResultLimits.maximum, fileDisplayCount + SearchResultLimits.increment)

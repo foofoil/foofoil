@@ -311,16 +311,12 @@ struct AppleMusicSearchTests {
         quick.resultFilter = .albums
         expose.resultFilter = .albums
         try await waitUntil { !quick.isSearching && !expose.isMusicSearching }
-        #expect(quick.resultCount == 6 && expose.displayedResultCount == 18)
+        #expect(quick.resultCount == 6 && expose.displayedResultCount == 60)
         #expect(quick.visibleResults.isEmpty && quick.visibleFiles.isEmpty)
         #expect(quick.visibleMusicResults.allSatisfy { $0.searchCategory == .albums })
         for expected in [24, 42, 60] {
             quick.expandMusicResults(in: .albums)
             #expect(quick.resultCount == expected)
-        }
-        for expected in [36, 54, 60] {
-            expose.expandMusicResults(in: .albums)
-            #expect(expose.displayedResultCount == expected)
         }
         #expect(quick.showsResultLimitNotice && expose.showsResultLimitNotice)
         #expect(!quick.canExpandMusicResults(in: .albums) && !expose.canExpandMusicResults(in: .albums))
@@ -336,7 +332,7 @@ struct AppleMusicSearchTests {
         expose.resultFilter = .files
         try await waitUntil { !quick.isSearching && !expose.isFileSearching }
         #expect(musicRequests == requestsBeforeFiles)
-        #expect(quick.resultCount == 60 && expose.displayedResultCount == 18)
+        #expect(quick.resultCount == 60 && expose.displayedResultCount == 60)
         #expect(quick.musicResults.isEmpty && expose.musicItems.isEmpty)
         quick.stop()
         expose.stopFileSearch()
@@ -387,7 +383,7 @@ struct AppleMusicSearchTests {
         quick.resultFilter = .files
         expose.resultFilter = .files
         try await waitUntil { !quick.isSearching && !expose.isFileSearching }
-        #expect(quick.resultCount == 60 && expose.displayedResultCount == 18)
+        #expect(quick.resultCount == 60 && expose.displayedResultCount == 60)
         #expect(!quick.showsResultLimitNotice && !expose.showsResultLimitNotice)
         quick.resultFilter = .albums
         expose.resultFilter = .albums

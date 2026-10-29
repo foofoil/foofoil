@@ -46,7 +46,7 @@ In the Apple Music library window, Esc closes the window, including while the se
 
 Open directories with File → Open Directory. The configurable shortcut is listed in this section; directories use the same handling as dragging them into a foil.
 
-Quick Open and the overview’s search also search songs, albums, and playlists in your Apple Music library. Enable or disable Apple Music search in Settings → General → Search; music access authorization is required. Select a result and press Return to play it in a foil. Search results show user files first, then Apple Music groups for albums, playlists, and songs. In the overview search, user files and each Apple Music group initially show 18 results; More Files, More Albums, More Playlists, or More Songs adds 18 results at a time. Each group shows at most 60 results, with no combined limit across groups. A notice appears in the overview search when additional matches are known to exist.
+Quick Open and the overview’s search also search songs, albums, and playlists in your Apple Music library. Enable or disable Apple Music search in Settings → General → Search; music access authorization is required. Select a result and press Return to play it in a foil. Search results show user files first, then Apple Music groups for albums, playlists, and songs. In the overview search across all sources, user files and each Apple Music group initially show 18 results; More Files, More Albums, More Playlists, or More Songs adds 18 results at a time. Each group shows at most 60 results, with no combined limit across groups. When a file, folder, or music category is selected, up to 60 results appear immediately. A notice appears in the overview search when additional matches are known to exist.
 
 
 
