@@ -11,6 +11,7 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
     private let searchPrompt = QuickOpenPromptHostingView(rootView: QuickOpenSearchPrompt(musicLibraryEnabled: false))
     private let searchIcon = NSImageView()
     private let scopeButton = ExposeActionButton()
+    private let newFoilButton = ExposeActionButton()
     private let clipboardButton = ExposeActionButton()
     private let categories = NSStackView()
     private let categoryScroll = NSScrollView()
@@ -52,7 +53,7 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         shade.frame = root.bounds
         shade.autoresizingMask = [.width, .height]
         root.addSubview(shade)
-        for child in [grid, hint, searchBackground, clipboardButton, scopePicker, toast] {
+        for child in [grid, hint, searchBackground, newFoilButton, clipboardButton, scopePicker, toast] {
             root.addSubview(child)
         }
         hint.font = .systemFont(ofSize: 13)
@@ -84,6 +85,13 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         searchBackground.addSubview(searchPrompt)
         scopeButton.perform = { [weak self] in self?.model.clearActiveScope(); self?.focusSearch() }
         scopeButton.setAccessibilityLabel(NSLocalizedString("Clear Search Scope", comment: ""))
+        newFoilButton.image = NSImage(systemSymbolName: "plus.rectangle.on.rectangle", accessibilityDescription: nil)
+        newFoilButton.font = .systemFont(ofSize: 13, weight: .medium)
+        newFoilButton.textOpacity = 0.88
+        newFoilButton.setAccessibilityIdentifier("expose.newFoil")
+        newFoilButton.layer?.borderColor = NSColor.white.withAlphaComponent(0.3).cgColor
+        newFoilButton.layer?.borderWidth = 1
+        newFoilButton.perform = { [weak model] in model?.onNewFoil() }
         clipboardButton.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
         clipboardButton.allowsKeyboardFocus = true
         clipboardButton.focusRingType = .none
@@ -174,6 +182,8 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         scopeButton.setAccessibilityLabel(NSLocalizedString("Clear Search Scope", comment: ""))
         scopeButton.image = model.activeScope.flatMap { NSImage(systemSymbolName: $0.symbolName, accessibilityDescription: nil) }
         hint.isHidden = model.isChoosingScope
+        newFoilButton.title = NSLocalizedString(model.isOptionPressed ? "New Incognito Foil" : "New foofoil", comment: "")
+        newFoilButton.shortcutText = model.isOptionPressed ? "⇧⌘N" : "⌘N"
         clipboardButton.isHidden = model.clipboardContent == nil || model.activeScope == .clipboard
         if let content = model.clipboardContent {
             let title = model.isOptionPressed
@@ -342,11 +352,13 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         let rowWidth = max(0, min(1000, width - 40))
         let buttonWidth = clipboardButton.isHidden ? 0 : min(clipboardButton.intrinsicContentSize.width, rowWidth * 0.5)
         let gap: CGFloat = clipboardButton.isHidden ? 0 : 12
-        let searchWidth = max(0, rowWidth - buttonWidth - gap)
+        let newWidth = min(newFoilButton.intrinsicContentSize.width, rowWidth * 0.3)
+        let searchWidth = max(0, rowWidth - buttonWidth - gap - newWidth - 12)
         let left = (width - rowWidth) / 2
         let scopeWidth: CGFloat = scopeButton.isHidden ? 0 : min(180, max(0, searchWidth - 100), scopeButton.intrinsicContentSize.width)
         searchBackground.frame = NSRect(x: left, y: 30, width: searchWidth, height: 32)
-        clipboardButton.frame = NSRect(x: left + searchWidth + gap, y: 30, width: buttonWidth, height: 32)
+        newFoilButton.frame = NSRect(x: left + searchWidth + 12, y: 30, width: newWidth, height: 32)
+        clipboardButton.frame = NSRect(x: left + searchWidth + 12 + newWidth + gap, y: 30, width: buttonWidth, height: 32)
         searchIcon.frame = NSRect(x: 12, y: 10, width: 12, height: 12)
         scopeButton.frame = NSRect(x: 31, y: 3, width: scopeWidth, height: 26)
         // 按原生单行文本的实际高度居中，让占位文字、光标和编辑文字共用同一基线。

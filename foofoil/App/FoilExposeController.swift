@@ -335,6 +335,7 @@ final class FoilExposeModel: ObservableObject {
     var onEnableFileSearch: () -> Void = {}
     /// 点击剪贴板提示：由控制器关闭覆盖层并打开剪贴板内容（等价于 ⌘⇧V）。
     var onOpenClipboard: () -> Void = {}
+    var onNewFoil: () -> Void = {}
     private let fileSearch: (String, SpotlightSearchTarget, @escaping (SpotlightSearchOutcome) -> Void) -> Void
     private let cameraAvailable: () -> Bool
     private let cancelFiles: () -> Void
@@ -1002,6 +1003,13 @@ final class FoilExposeController {
         model.onOpenFile = { [weak self] url in self?.openFile(url) }
         model.onOpenURL = { [weak self] url in self?.openWebURL(url) }
         model.onEnableFileSearch = { [weak self] in self?.enableFileSearch() }
+        model.onNewFoil = { [weak self, weak model] in
+            let isIncognito = model?.isOptionPressed == true
+            self?.dismiss()
+            guard let delegate = NSApp.delegate as? AppDelegate else { return }
+            if isIncognito { delegate.newIncognitoWindowAction() }
+            else { delegate.newWindowAction() }
+        }
         model.onOpenClipboard = { [weak self, weak model] in self?.openClipboard(isIncognito: model?.isOptionPressed == true) }
         model.onClearHistory = { [weak self] category in self?.confirmClearHistory(category) }
         model.onClearHistoryItem = { [weak self] item in self?.clearHistoryItem(item) }
@@ -1415,7 +1423,8 @@ final class FoilExposeController {
                 KeyboardShortcutStore.shared.matches(event, identifier: $0)
                     || KeyboardShortcutStore.shared.matchesIncognito(event, identifier: $0)
             }
-            if opensAnotherView {
+            let isNewFoil = key == "n" && modifiers.intersection([.command, .shift, .option, .control]) == .command
+            if opensAnotherView || isNewFoil {
                 self.dismiss()
                 return event
             }

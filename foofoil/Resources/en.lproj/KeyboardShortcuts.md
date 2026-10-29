@@ -35,7 +35,7 @@ Add ⌥ to the configured shortcut to open incognito.
 
 | Action | Default shortcut | Current shortcut | Notes |
 | --- | --- | --- | --- |
-| New foil | ⌘N | ⌘N |  |
+| New foil | ⌘N | ⌘N | Closes the overview when it is open. |
 | Save Content Image | ⌘S | ⌘S | Save the visible content as HEIC by default, with PNG and JPG choices; audio saves the cover image when available |
 | Save As | ⇧⌘S | ⇧⌘S | Save the source file or complete text; clipboard images use the image export panel, and websites save a web archive. Unavailable for camera, CUE, SACD ISO, and Apple Music |
 {{file}}
