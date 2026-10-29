@@ -72,3 +72,21 @@ if model.activeScope == nil { searchField.placeholderString = "" }
 这将触发边界进一步收窄到该提交新增的一行。它是对历史视图代码的受控对照，不是两个完整历史 App 及其历史依赖的构建二分，也不将所有过去的系统异常归于这一提交。
 
 源码和输出在本机证据目录的 `history-before.swift`、`history-after.swift`、`history-after-without-clear.swift`、`history-*-run.txt` 和 `historical-ab-creations.txt`。对照完成后服务 CPU 为 0%，修复版浮箔仍在运行。
+
+
+## 2026-10-29 旧安装版被验证工具误启动
+
+本次用户报告高 CPU 时，CursorUIViewService（PID 23386）占用约 83–96% CPU，sample 再次记录 64 个 dispatch 线程达到上限，主线程停在 CAContext 清理与 Core Animation 锁等待。当前 Debug 应用（PID 75909）的 sample 则主要处于事件等待，没有捕获到上次的占位文字/编辑器重启循环。
+
+按客户端 PID 汇总统一日志后，16:18–16:19 的 `com.apple.TextInputUI.xpc.CursorUIViewService.peer` 连接激活记录分别为：
+
+- `/Applications/foofoil.app`（PID 75959）：2,693 + 1,816 = 4,509 次。
+- 当前工作区 Debug 应用（PID 75909）：1 + 7 = 8 次。
+
+旧安装版可执行文件的修改时间为 2026-10-28 14:21:28，早于上文 14:59 的修复验证。上一轮验证通过应用名称调用原生 UI 工具，意外启动这份旧安装版，并打开其总览；之后虽然停止了旧应用，服务端仍维持异常状态。因此这次日志直接定位到误启动的旧进程，不能将它归为当前焦点补交改动已复现的重建循环。上一轮只在切到 Debug 版后验证交互、没有继续检查服务 CPU，是验证遗漏。
+
+保留 sample 和日志后，对异常服务先 TERM；未退出，再 KILL，使系统按需重启服务。仅使用 Debug 应用的绝对路径打开总览。恢复后的 16:24:56–16:25:56，每 5 秒采样一次，13 次观测的服务 CPU 均为 0%，RSS 从约 26 MB 稳定到约 19 MB；16:24:40 起的恢复日志查询只发现 Debug 客户端 1 次服务连接。此为短时进程观察；结束时 UI 已回到空箔，不能将整段都算作总览静置，也不能代替所有输入法与长时交互的验证。
+
+`AGENTS.md` 已补充原生 UI 验证必须指定工作区 Debug 应用绝对路径、核对进程路径，禁止通过显示名称或 bundle ID 定位，以免 LaunchServices 打开旧安装版。
+
+本机证据：`~/Library/Logs/foofoil-cursor-ui/incident-old-installed-overview-20261029/`，含应用/服务 sample、事发前 15 分钟日志、恢复日志和定时 CPU/RSS 观测。

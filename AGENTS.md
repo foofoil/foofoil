@@ -81,6 +81,7 @@ When editing the app together with `extension-kit` or `hifi`, open `foofoil.xcwo
 - For window interaction, menus, drag and drop, keyboard handling, or visual changes that are impractical to cover with unit tests, perform a focused manual check and report what was verified.
 - Treat new warnings as defects. Do not silence warnings without addressing or documenting the underlying reason.
 - After completing a task that results in app code changes, run `./run` from the repository root to build and launch the app so the user can directly see the result. Skip this only if the change cannot or should not affect the running app.
+- For native UI verification after `./run`, target the absolute `build/Build/Products/Debug/foofoil.app` path and verify the running executable path. Do not resolve the app by display name or bundle ID: LaunchServices may start an outdated `/Applications/foofoil.app` alongside the Debug build and reproduce already-fixed bugs. When investigating input-service CPU, correlate connection logs with client PIDs and executable paths before attributing the issue to the current build.
 
 ## Shortcut Documentation Maintenance
 
