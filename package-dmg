@@ -151,6 +151,7 @@ fi
 xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" \
     -derivedDataPath "$DERIVED_DATA" -destination "$DESTINATION" \
     CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+    CURRENT_PROJECT_VERSION="$(date +%Y%m%d%H%M%S)" FOOFOIL_BUILD_SOURCE=dmg \
     build
 
 APP_PATH="$DERIVED_DATA/Build/Products/$CONFIGURATION/$APP_NAME.app"

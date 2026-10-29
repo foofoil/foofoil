@@ -31,6 +31,16 @@ extension AppDelegate {
         }
     }
 
+    @objc func showAboutPanel(_ sender: Any?) {
+        guard let source = Bundle.main.object(forInfoDictionaryKey: "FoofoilBuildSource") as? String,
+              !source.isEmpty,
+              let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String else {
+            NSApp.orderFrontStandardAboutPanel(sender)
+            return
+        }
+        NSApp.orderFrontStandardAboutPanel(options: [.applicationVersion: "\(version) (\(source))"])
+    }
+
     func setupMainMenu() {
         installMenuImageVisibilityObservers()
         let mainMenu = NSMenu()
@@ -40,7 +50,7 @@ extension AppDelegate {
         let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
             ?? Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
             ?? "foofoil"
-        appMenu.addItem(withTitle: String(format: NSLocalizedString("About %@", comment: ""), appName), action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        appMenu.addItem(withTitle: String(format: NSLocalizedString("About %@", comment: ""), appName), action: #selector(showAboutPanel(_:)), keyEquivalent: "")
             .withSymbol("info.circle")
         appMenu.addItem(NSMenuItem.separator())
 
@@ -706,7 +716,7 @@ extension AppDelegate {
         commandsOverviewItem.withSymbol("terminal")
         helpMenu.addItem(commandsOverviewItem)
         helpMenu.addItem(.separator())
-        helpMenu.addItem(withTitle: String(format: NSLocalizedString("About %@", comment: ""), appName), action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        helpMenu.addItem(withTitle: String(format: NSLocalizedString("About %@", comment: ""), appName), action: #selector(showAboutPanel(_:)), keyEquivalent: "")
             .withSymbol("info.circle")
 
         let helpMenuItem = NSMenuItem(title: NSLocalizedString("Help", comment: ""), action: nil, keyEquivalent: "")
