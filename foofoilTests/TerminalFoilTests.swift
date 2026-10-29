@@ -321,6 +321,21 @@ struct TerminalFoilTests {
         }
     }
 
+    @Test func bashStartupIncludesSystemToolPaths() async throws {
+        let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let result = root.appendingPathComponent("bash-path")
+        try "export FOIL_BASH_RC=loaded\n".write(to: root.appendingPathComponent(".bashrc"), atomically: true, encoding: .utf8)
+        let session = TerminalSession(configuration: .init(shellPath: "/bin/bash", workingDirectory: root.path,
+            environment: ["HOME": root.path, "PATH": "/usr/bin:/bin"],
+            startupCommands: "printf '%s\\n' \"$PATH\" \"$FOIL_BASH_RC\" > \(TerminalBootstrap.quote(result.path))"))
+        defer { session.stop() }
+        session.start()
+        try await waitFor { FileManager.default.fileExists(atPath: result.path) }
+        let lines = try String(contentsOf: result, encoding: .utf8).components(separatedBy: "\n")
+        #expect(lines[0].components(separatedBy: ":").contains("/usr/local/bin"))
+        #expect(lines[1] == "loaded")
+    }
+
     @Test func loginStartupInitializesPathAndPreservesUserConfigurationOrder() async throws {
         let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let redirected = root.appendingPathComponent("redirected", isDirectory: true)

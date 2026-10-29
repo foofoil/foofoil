@@ -84,7 +84,8 @@ nonisolated struct TerminalBootstrap {
                 arguments = ["-l", "-i"]
             } else {
                 let rc = directory.appendingPathComponent("bashrc")
-                try Self.write("[[ -r \"$HOME/.bashrc\" ]] && builtin source \"$HOME/.bashrc\"\n" + sourceScript, to: rc)
+                // 自定义 --rcfile 不经过 /etc/profile；先加载 macOS 标准命令路径，再交给用户配置。
+                try Self.write("if [[ -x /usr/libexec/path_helper ]]; then eval \"$(/usr/libexec/path_helper -s)\"; fi\n[[ -r \"$HOME/.bashrc\" ]] && builtin source \"$HOME/.bashrc\"\n" + sourceScript, to: rc)
                 arguments = ["--noprofile", "--rcfile", rc.path, "-i"]
             }
         } catch {
