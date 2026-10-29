@@ -266,3 +266,6 @@ print "Built: $DMG_PATH"
 print "Signed/notarized: $([[ $SIGN_ENABLED -eq 1 ]] && print yes || print no)$([[ $NOTARIZE_ENABLED -eq 1 ]] && print ' + notarized' || true)"
 print "Bundled plugins:"
 ls -1 "$APP_PATH/Contents/PlugIns"
+
+# 8. 在 Finder 中打开 DMG 所在目录并选中它，方便直接分发。
+open -R "$DMG_PATH" 2>/dev/null || true
