@@ -27,7 +27,7 @@ struct DocumentThemeTests {
         terminal.prepareTerminal(.init(), start: false)
         #expect(terminal.documentAppearance == .light)
         let text = AppState(isIncognito: true)
-        text.openText("普通文本")
+        text.openText("普通文本", isMarkdown: false)
         #expect(text.documentAppearance == .system)
     }
 
