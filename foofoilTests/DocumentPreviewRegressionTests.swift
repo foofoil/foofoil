@@ -6,6 +6,31 @@ import Testing
 @MainActor
 @Suite(.sharedApplicationState, .serialized)
 struct DocumentPreviewRegressionTests {
+    @Test func plainTextKeepsDocumentColorsInDarkAppearance() throws {
+        let configuration = ReadOnlyTextNSView(text: "普通文本", font: .systemFont(ofSize: 16),
+            textColor: NSColor(hex: "#E6E6E6"), lineHeightMultiple: nil,
+            paragraphSpacingMultiple: nil, codeLineNumbersVisible: nil)
+        let host = NSHostingView(rootView: ReadOnlyTextView(text: configuration.text,
+            font: configuration.font, textColor: configuration.textColor,
+            lineHeightMultiple: nil, paragraphSpacingMultiple: nil))
+        let window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 400, height: 300),
+            styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.contentView = host
+        defer { window.close() }
+        host.layoutSubtreeIfNeeded()
+        func findText(_ view: NSView) -> NSTextView? {
+            (view as? NSTextView) ?? view.subviews.lazy.compactMap { findText($0) }.first
+        }
+        let text = try #require(findText(host))
+        #expect(!text.usesAdaptiveColorMappingForDarkAppearance)
+        let coordinator = ReadOnlyTextNSView.Coordinator()
+        let scroll = try #require(text.enclosingScrollView)
+        coordinator.update(scroll, configuration: configuration)
+        #expect(text.textStorage?.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor == configuration.textColor)
+    }
+
     @Test func docxPreviewAllowsTextSelectionAndCopy() async throws {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".docx")
         let source = NSAttributedString(string: "选择中文与 emoji 😀\nSecond paragraph", attributes: [.font: NSFont.systemFont(ofSize: 16)])

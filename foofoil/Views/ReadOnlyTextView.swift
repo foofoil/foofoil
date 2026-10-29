@@ -63,6 +63,8 @@ struct ReadOnlyTextNSView: NSViewRepresentable, Equatable {
         textView.autoresizingMask = .width
         textView.drawsBackground = false
         textView.backgroundColor = .clear
+        // 文档主题已提供亮暗配色，禁止 TextKit 再映射一次而把浅色文字反转成黑色。
+        textView.usesAdaptiveColorMappingForDarkAppearance = false
         textView.isRichText = false
         textView.importsGraphics = false
         textView.isEditable = false // 只读
@@ -125,7 +127,7 @@ struct ReadOnlyTextNSView: NSViewRepresentable, Equatable {
                 textView.font = configuration.font
             }
             let resolvedTextColor = configuration.textColor ?? .labelColor
-            if textView.textColor?.isEqual(resolvedTextColor) != true {
+            if textChanged || textView.textColor?.isEqual(resolvedTextColor) != true {
                 textView.textColor = resolvedTextColor
             }
             // 新正文需要补齐段落属性；只改颜色或行号时不扫描全文。
