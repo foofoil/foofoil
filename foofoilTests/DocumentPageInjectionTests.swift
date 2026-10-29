@@ -4,6 +4,7 @@
 //  Created by tolg on 2026/9/18.
 //
 
+import SwiftUI
 import AppKit
 import Foundation
 import WebKit
@@ -13,6 +14,79 @@ import Testing
 @MainActor
 @Suite(.serialized)
 struct DocumentPageInjectionTests {
+    @Test func clipboardFragmentPreservesWhiteAndRepairsMissingSourceStyles() async throws {
+        let (webView, window, directory) = try await loadPage("""
+        <html><body style="color:black">
+        <p id="white" style="color:white">源片段的白字</p>
+        <p id="missing" style="color:var(--text-primary)">缺少 Codex 的 CSS 变量</p>
+        <p id="black" style="color:black;-webkit-text-fill-color:black">固定黑字</p>
+        <p id="accent" style="color:rgb(120,200,255)">原有强调色</p>
+        <div style="background:white"><span id="paper" style="color:black">独立白底黑字</span></div>
+        <span id="hidden" style="color:transparent">透明文字</span>
+        </body></html>
+        """)
+        defer { window.orderOut(nil); try? FileManager.default.removeItem(at: directory) }
+        _ = try await webView.evaluateJavaScript(DocumentPageInjection.script(.init(backgroundColorHex: "#1C1D1F")))
+        _ = try await webView.evaluateJavaScript(ClipboardHTMLAppearance.script(isDark: true, textHex: "#E6E6E6"))
+        #expect(try await style(of: "document.querySelector('#white')", in: webView, property: "color") == "rgb(255, 255, 255)")
+        for id in ["missing", "black"] {
+            #expect(try await style(of: "document.querySelector('#\(id)')", in: webView, property: "-webkit-text-fill-color") == "rgb(230, 230, 230)")
+        }
+        #expect(try await style(of: "document.querySelector('#accent')", in: webView, property: "color") == "rgb(120, 200, 255)")
+        #expect(try await style(of: "document.querySelector('#paper')", in: webView, property: "color") == "rgb(0, 0, 0)")
+        #expect(try await style(of: "document.querySelector('#hidden')", in: webView, property: "color") == "rgba(0, 0, 0, 0)")
+        _ = try await webView.evaluateJavaScript(DocumentPageInjection.script(.init(backgroundColorHex: "#F8F9FA")))
+        _ = try await webView.evaluateJavaScript(ClipboardHTMLAppearance.script(isDark: false, textHex: "#1F2328"))
+        #expect(try await style(of: "document.querySelector('#white')", in: webView, property: "color") == "rgb(31, 35, 40)")
+        #expect(try await style(of: "document.querySelector('#black')", in: webView, property: "color") == "rgb(0, 0, 0)")
+        _ = try await webView.evaluateJavaScript(DocumentPageInjection.script(.init(backgroundColorHex: "#1C1D1F")))
+        _ = try await webView.evaluateJavaScript(ClipboardHTMLAppearance.script(isDark: true, textHex: "#E6E6E6"))
+        #expect(try await style(of: "document.querySelector('#white')", in: webView, property: "color") == "rgb(255, 255, 255)")
+    }
+
+    @Test func clipboardFragmentDefaultsAndDirectBodyTextFollowAppearance() async throws {
+        for html in ["<html><body>默认文字</body></html>", "<html><body style='color:black'>固定黑字</body></html>"] {
+            let (webView, window, directory) = try await loadPage(html)
+            defer { window.orderOut(nil); try? FileManager.default.removeItem(at: directory) }
+            _ = try await webView.evaluateJavaScript(DocumentPageInjection.script(.init(backgroundColorHex: "#1C1D1F")))
+            _ = try await webView.evaluateJavaScript(ClipboardHTMLAppearance.script(isDark: true, textHex: "#E6E6E6"))
+            let color = try await style(of: "document.body", in: webView, property: "color")
+            #expect(color != "rgb(0, 0, 0)")
+        }
+    }
+
+    @Test func clipboardHTMLAppearanceAppliesThroughWebViewAndHistory() async throws {
+        let state = AppState(isIncognito: true)
+        #expect(state.openHTML("<p id='sample' style='color:black'>已修复并分别提交到 5 个本地分支</p>"))
+        #expect(state.isClipboardHTMLFragment)
+        state.selectDocumentAppearance(.dark, systemIsDark: false)
+        let restored = AppState(config: state.toConfig(), isIncognito: true)
+        #expect(restored.isClipboardHTMLFragment)
+        let url = try #require(restored.webURL)
+        let host = NSHostingView(rootView: WebView(url: url, zoom: 1, appState: restored,
+            isLoading: .constant(false), progress: .constant(0), loadError: .constant(nil),
+            onTitleChange: { _ in }, onScreenshotTaken: { _ in }))
+        let window = NSWindow(contentRect: NSRect(x: -2000, y: -2000, width: 400, height: 300),
+            styleMask: .borderless, backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.close() }
+        host.layoutSubtreeIfNeeded()
+        func findWeb(_ view: NSView) -> WKWebView? {
+            (view as? WKWebView) ?? view.subviews.lazy.compactMap { findWeb($0) }.first
+        }
+        let web = try #require(findWeb(host))
+        var color = ""
+        for _ in 0..<150 {
+            color = (try? await web.evaluateJavaScript("document.querySelector('#sample') && getComputedStyle(document.querySelector('#sample')).color")) as? String ?? ""
+            if color == "rgb(230, 230, 230)" { break }
+            try await Task.sleep(for: .milliseconds(30))
+        }
+        #expect(color == "rgb(230, 230, 230)")
+        restored.openWeb(url: URL(string: "https://example.com")!)
+        #expect(!restored.isClipboardHTMLFragment)
+    }
+
     /// 注入的背景色要盖过页面自有背景（含样式表与内联样式），清除后页面恢复原样。
     @Test func injectionOverridesPageBackgroundAndRestoresOnClear() async throws {
         let (webView, window, directory) = try await loadPage(

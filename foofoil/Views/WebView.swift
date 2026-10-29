@@ -111,6 +111,7 @@ struct WebView: NSViewRepresentable {
         var lastLoadedURL: URL?
         /// 上一次注入到页面的背景色；导航后 DOM 重置，didFinish 会无条件重注入。
         private var appliedDocumentBackgroundHex: String?
+        private var appliedClipboardAppearance: String?
         private var titleObservation: NSKeyValueObservation?
         private var progressObservation: NSKeyValueObservation?
         private var loadingObservation: NSKeyValueObservation?
@@ -127,13 +128,22 @@ struct WebView: NSViewRepresentable {
         /// 同时把页面外观切到与自选背景对比的一侧，避免页面文字沿用系统外观后与背景撞色。
         func applyDocumentBackgroundIfNeeded(to webView: WKWebView, force: Bool = false) {
             let hex = parent.appState.contentBackgroundHex
-            guard force || appliedDocumentBackgroundHex != hex else { return }
+            let isFragment = parent.appState.isClipboardHTMLFragment
+            let isDark = parent.appState.documentUsesDarkAppearance
+            let textHex = DocumentThemeCatalog.shared.theme(for: parent.appState.documentThemeId ?? "")?.textHex(isDark: isDark)
+                ?? DocumentThemeCatalog.defaultTheme.textHex(isDark: isDark)
+            let fragmentAppearance = isFragment ? "\(isDark):\(textHex)" : nil
+            guard force || appliedDocumentBackgroundHex != hex || appliedClipboardAppearance != fragmentAppearance else { return }
+            appliedClipboardAppearance = fragmentAppearance
             appliedDocumentBackgroundHex = hex
             webView.appearance = DocumentPageInjection.appearance(hex: hex)
             Task { @MainActor in
                 _ = try? await webView.evaluateJavaScript(
                     DocumentPageInjection.script(DocumentPageInjection.Overrides(backgroundColorHex: hex))
                 )
+                if isFragment {
+                    _ = try? await webView.evaluateJavaScript(ClipboardHTMLAppearance.script(isDark: isDark, textHex: textHex))
+                }
             }
         }
 

@@ -161,6 +161,13 @@ extension AppState {
         self.createdAt = Date()
     }
 
+    /// 只给剪贴板导入的托管 HTML 补齐阅读外观，普通网页与用户本地 HTML 仍保留站点样式。
+    var isClipboardHTMLFragment: Bool {
+        guard sourceFingerprint?.hasPrefix("clipboard:") == true, let webURL,
+              webURL.isFileURL, Self.isManagedCacheURL(webURL) else { return false }
+        return ["html", "htm"].contains(webURL.pathExtension.lowercased())
+    }
+
     /// 将 HTML 源码写入网页缓存文件后按网页打开。
     @discardableResult
     public func openHTML(_ html: String, originalName: String? = nil, isClipboard: Bool = true) -> Bool {
