@@ -234,6 +234,7 @@ extension AppState {
         terminalSession?.onOutputSnapshotChanged = nil
         terminalSession?.stop()
         terminalConfiguration = configuration
+        applyDefaultDocumentThemeIfNeeded()
         terminalSession = TerminalSession(configuration: configuration, previousOutput: previous)
         configureTerminalSnapshotSaving()
         if start { terminalSession?.start() }

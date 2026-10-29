@@ -156,6 +156,8 @@ extension AppState {
     func applyDefaultDocumentThemeIfNeeded() {
         guard supportsContentBackgroundColor || supportsDocumentTextStyling || supportsContentSearch,
               documentThemeId == nil, backgroundColorHex == nil, textColorHex == nil else { return }
+        // 新终端固定采用暗色；其它文档继续跟随原有默认外观。
+        if terminalConfiguration != nil { documentAppearance = .dark }
         applyDocumentTheme(DocumentThemeCatalog.defaultTheme, isDark: documentUsesDarkAppearance)
     }
 

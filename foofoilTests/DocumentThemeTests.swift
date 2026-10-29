@@ -15,6 +15,22 @@ import Testing
 @Suite(.sharedApplicationState, .serialized)
 struct DocumentThemeTests {
     /// 预设主题色彩合规性：所有预设在亮暗两套外观下均为合法 sRGB 色彩，且对比度均达到 WCAG AAA 标杆（>= 7:1）。
+    @Test func newTerminalDefaultsToDarkWithoutChangingTextDefaults() throws {
+        let terminal = AppState(isIncognito: true)
+        terminal.prepareTerminal(.init(), start: false)
+        #expect(terminal.documentAppearance == .dark)
+        #expect(terminal.backgroundColorHex == DocumentThemeCatalog.defaultTheme.darkBackgroundHex)
+        #expect(terminal.textColorHex == DocumentThemeCatalog.defaultTheme.darkTextHex)
+        let restored = AppState(config: terminal.toConfig(), isIncognito: true)
+        #expect(restored.documentAppearance == .dark)
+        terminal.selectDocumentAppearance(.light, systemIsDark: false)
+        terminal.prepareTerminal(.init(), start: false)
+        #expect(terminal.documentAppearance == .light)
+        let text = AppState(isIncognito: true)
+        text.openText("普通文本")
+        #expect(text.documentAppearance == .system)
+    }
+
     @Test func presetsHaveValidColorsAndHighContrast() throws {
         let catalog = DocumentThemeCatalog.shared
         #expect(catalog.presets.count >= 6, "预设主题数量不足")
