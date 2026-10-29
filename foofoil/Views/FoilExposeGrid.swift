@@ -110,6 +110,8 @@ final class FoilExposeGrid: NSScrollView {
             var tint: NSColor = .white.withAlphaComponent(0.7)
             var isHistory = false
             var isClipboardAuthorization = false
+            var moreTitle: String? = nil
+            var moreAction: (() -> Void)? = nil
             var entries: [Entry]
         }
         var model: FoilExposeModel
@@ -147,18 +149,14 @@ final class FoilExposeGrid: NSScrollView {
             if model.showsHistorySection {
                 let history = items.indices.filter { items[$0].isHistoryEntry }
                 var entries = foilEntries(history)
-                if model.canShowMoreHistory {
-                    entries.append(Entry(title: NSLocalizedString("Search More History", comment: ""), symbol: "ellipsis", action: { model.selectScope(.history) }))
-                }
                 if entries.isEmpty { entries = [Entry(title: NSLocalizedString("Expose History Category Empty", comment: ""))] }
-                next.append(Section(title: NSLocalizedString("Expose History Section", comment: ""), compact: history.isEmpty, count: model.historyCount(in: model.historyCategory), symbol: "clock.arrow.circlepath", isHistory: true, entries: entries))
+                next.append(Section(title: NSLocalizedString("Expose History Section", comment: ""), compact: history.isEmpty, count: model.historyCount(in: model.historyCategory), symbol: "clock.arrow.circlepath", isHistory: true,
+                                    moreTitle: model.canShowMoreHistory ? NSLocalizedString("Search More History", comment: "") : nil,
+                                    moreAction: model.canShowMoreHistory ? { model.selectScope(.history) } : nil, entries: entries))
             }
             if model.showsClipboardSection {
                 let indices = items.indices.filter { items[$0].clipboardEntry != nil }
                 var entries = foilEntries(indices)
-                if model.canShowMoreClipboard {
-                    entries.append(Entry(title: NSLocalizedString("More Clipboard History", comment: ""), symbol: "ellipsis", action: { let query = model.searchQuery; model.selectScope(.clipboard); model.searchText = query }))
-                }
                 if model.clipboardSearch.isLoading { entries.append(Entry(title: NSLocalizedString("Clipboard History Loading", comment: ""))) }
                 else if entries.isEmpty && model.activeScope == .clipboard { entries.append(Entry(title: NSLocalizedString("No Search Results", comment: ""))) }
                 if model.activeScope == .clipboard {
@@ -170,7 +168,9 @@ final class FoilExposeGrid: NSScrollView {
                 if let notice = model.clipboardSearch.copyError { entries.append(Entry(title: notice)) }
                 if !entries.isEmpty || model.activeScope == .clipboard || model.clipboardSearch.access == .needsAuthorization {
                     next.append(Section(title: NSLocalizedString("Clipboard Search Scope", comment: ""), compact: true,
-                                        count: model.clipboardCount, symbol: "doc.on.clipboard", tint: .systemCyan, entries: entries))
+                                        count: model.clipboardCount, symbol: "doc.on.clipboard", tint: .systemCyan,
+                                        moreTitle: model.canShowMoreClipboard ? NSLocalizedString("More Clipboard History", comment: "") : nil,
+                                        moreAction: model.canShowMoreClipboard ? { let query = model.searchQuery; model.selectScope(.clipboard); model.searchText = query } : nil, entries: entries))
                 }
                 if model.clipboardSearch.access == .needsAuthorization {
                     next.append(Section(title: "", compact: true, isClipboardAuthorization: true,
@@ -226,7 +226,7 @@ final class FoilExposeGrid: NSScrollView {
             if next.isEmpty {
                 next = [Section(title: "", compact: true, entries: [Entry(title: NSLocalizedString("No Foils on This Screen", comment: ""))])]
             }
-            let nextSignature = next.map { [$0.title, String($0.compact), String($0.count ?? -1), String($0.isClipboardAuthorization)] + $0.entries.map(\.key) }
+            let nextSignature = next.map { [$0.title, String($0.compact), String($0.count ?? -1), String($0.isClipboardAuthorization), $0.moreTitle ?? ""] + $0.entries.map(\.key) }
             // 不在选中项、焦点或滚动变化时 reloadData，保留复用卡片和已解码图片。
             let changed = nextSignature != signature
             sections = next
@@ -317,7 +317,8 @@ final class FoilExposeGrid: NSScrollView {
             let header = collectionView.makeSupplementaryView(ofKind: kind, withIdentifier: .exposeHeader, for: indexPath) as! ExposeSectionHeader
             let section = sections[indexPath.section]
             header.configure(title: section.title, count: section.count, symbol: section.symbol,
-                             tint: section.tint, filters: section.isHistory ? historyFilters : nil)
+                             tint: section.tint, filters: section.isHistory ? historyFilters : nil,
+                             moreTitle: section.moreTitle, moreAction: section.moreAction)
             header.setAccessibilityIdentifier(section.isHistory ? "expose.section.history" : "expose.section." + section.symbol)
             if section.isHistory { historyHeader = header }
             return header
@@ -370,7 +371,8 @@ private final class ExposeSectionHeader: NSView {
     private let label = NSTextField(labelWithString: "")
     private let countLabel = NSTextField(labelWithString: "")
     private let countBadge = NSView()
-    private let divider = NSView()
+    private let moreButton = NSButton()
+    private var moreAction: (() -> Void)?
     private weak var filters: NSScrollView?
     override var isFlipped: Bool { true }
 
@@ -390,13 +392,18 @@ private final class ExposeSectionHeader: NSView {
         countBadge.layer?.cornerRadius = 10
         countBadge.setAccessibilityIdentifier("expose.section.count")
         countBadge.addSubview(countLabel)
-        divider.wantsLayer = true
-        divider.layer?.backgroundColor = NSColor.white.withAlphaComponent(0.12).cgColor
-        for child in [icon, label, countBadge, divider] { addSubview(child) }
+        moreButton.isBordered = false
+        moreButton.image = NSImage(systemSymbolName: "chevron.right", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 14, weight: .semibold))
+        moreButton.contentTintColor = .white.withAlphaComponent(0.65)
+        moreButton.target = self
+        moreButton.action = #selector(showMore)
+        for child in [icon, label, countBadge, moreButton] { addSubview(child) }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
-    func configure(title: String, count: Int?, symbol: String, tint: NSColor, filters: NSScrollView?) {
+    func configure(title: String, count: Int?, symbol: String, tint: NSColor, filters: NSScrollView?,
+                   moreTitle: String?, moreAction: (() -> Void)?) {
         isHidden = title.isEmpty
         label.stringValue = title
         countLabel.stringValue = count?.formatted() ?? ""
@@ -408,7 +415,10 @@ private final class ExposeSectionHeader: NSView {
         if self.filters !== filters, self.filters?.superview === self { self.filters?.removeFromSuperview() }
         self.filters = filters
         if let filters, filters.superview !== self { addSubview(filters) }
-        divider.isHidden = filters != nil
+        self.moreAction = moreAction
+        moreButton.isHidden = moreAction == nil
+        moreButton.toolTip = moreTitle
+        moreButton.setAccessibilityLabel(moreTitle)
         needsLayout = true
     }
 
@@ -424,7 +434,9 @@ private final class ExposeSectionHeader: NSView {
         countBadge.frame = NSRect(x: label.frame.maxX + 10, y: center - 10, width: countWidth, height: 20)
         let countHeight = countLabel.cell?.cellSize.height ?? 14
         countLabel.frame = NSRect(x: 0, y: (20 - countHeight) / 2, width: countWidth, height: countHeight)
-        let headingEnd = countBadge.isHidden ? label.frame.maxX : countBadge.frame.maxX
+        let countEnd = countBadge.isHidden ? label.frame.maxX : countBadge.frame.maxX
+        moreButton.frame = NSRect(x: countEnd + 4, y: center - 12, width: 24, height: 24)
+        let headingEnd = moreButton.isHidden ? countEnd : moreButton.frame.maxX
         let right = bounds.width - inset
         if let filters {
             // 分类与历史标题同一行；窄窗口只压缩横向滚动区，不压缩标题。
@@ -432,8 +444,9 @@ private final class ExposeSectionHeader: NSView {
             let width = min(naturalWidth, max(0, right - headingEnd - 16))
             filters.frame = NSRect(x: right - width, y: center - 16, width: width, height: 32)
         }
-        divider.frame = NSRect(x: headingEnd + 10, y: center, width: max(0, right - headingEnd - 10), height: 1)
     }
+
+    @objc private func showMore() { moreAction?() }
 }
 
 private final class ExposeAuthorizationItem: NSCollectionViewItem {
