@@ -321,6 +321,17 @@ struct TerminalFoilTests {
         }
     }
 
+    @Test func userShellDoesNotInheritHostAgentMarkers() {
+        let inherited = ["CODEX_CI": "1", "CODEX_THREAD_ID": "host-thread", "PATH": "/usr/local/bin:/usr/bin", "LANG": "en_US.UTF-8"]
+        let cleaned = TerminalBootstrap.shellEnvironment(inheriting: inherited)
+        #expect(cleaned["CODEX_CI"] == nil)
+        #expect(cleaned["CODEX_THREAD_ID"] == nil)
+        #expect(cleaned["PATH"] == inherited["PATH"])
+        #expect(cleaned["LANG"] == inherited["LANG"])
+        let explicit = TerminalBootstrap.shellEnvironment(inheriting: inherited, overrides: ["CODEX_CI": "1"])
+        #expect(explicit["CODEX_CI"] == "1")
+    }
+
     @Test func bashStartupIncludesSystemToolPaths() async throws {
         let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
         let result = root.appendingPathComponent("bash-path")

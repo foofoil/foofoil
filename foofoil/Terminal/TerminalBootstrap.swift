@@ -34,7 +34,7 @@ nonisolated struct TerminalBootstrap {
             // 远端登录 shell 执行初始化后，以交互 shell 继承目录和导出的环境。
             commands.append("exec \"${SHELL:-/bin/sh}\" -i")
             arguments = ["-tt", "-p", String(ssh.port), "-l", ssh.username, "--", ssh.host, commands.joined(separator: "\n")]
-            var env = ProcessInfo.processInfo.environment
+            var env = Self.shellEnvironment(inheriting: ProcessInfo.processInfo.environment)
             env["TERM"] = "xterm-256color"
             env["COLORTERM"] = "truecolor"
             environment = env
@@ -56,8 +56,7 @@ nonisolated struct TerminalBootstrap {
               FileManager.default.isReadableFile(atPath: workingDirectory) else { throw AgentFailure("WORKING_DIRECTORY_UNAVAILABLE") }
         directory = FileManager.default.temporaryDirectory.appendingPathComponent("foofoil-shell-\(UUID())", isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
-        var env = ProcessInfo.processInfo.environment
-        env.merge(configuration.environment) { _, explicit in explicit }
+        var env = Self.shellEnvironment(inheriting: ProcessInfo.processInfo.environment, overrides: configuration.environment)
         env["TERM"] = "xterm-256color"; env["COLORTERM"] = "truecolor"
         if env["LANG"] == nil { env["LANG"] = "en_US.UTF-8" }
         if env["LC_CTYPE"] == nil { env["LC_CTYPE"] = "UTF-8" }
@@ -93,6 +92,14 @@ nonisolated struct TerminalBootstrap {
             throw error
         }
         environment = env
+    }
+
+    /// GUI 可能由 Codex 启动；用户终端不能继承宿主的 Agent 标记，否则 TUI 会误选自动化输出。
+    /// 显式终端配置在清理后合并，允许用户有意在该终端中运行 Agent 工作流。
+    static func shellEnvironment(inheriting environment: [String: String], overrides: [String: String] = [:]) -> [String: String] {
+        var result = environment.filter { !$0.key.hasPrefix("CODEX_") }
+        result.merge(overrides) { _, explicit in explicit }
+        return result
     }
 
     static func readyMarker(_ terminalID: String) -> [UInt8] {
