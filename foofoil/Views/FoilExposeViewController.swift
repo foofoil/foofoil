@@ -93,7 +93,6 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         newFoilButton.layer?.borderWidth = 1
         newFoilButton.perform = { [weak model] in model?.onNewFoil() }
         clipboardButton.image = NSImage(systemSymbolName: "doc.on.clipboard", accessibilityDescription: nil)
-        clipboardButton.allowsKeyboardFocus = true
         clipboardButton.focusRingType = .none
         clipboardButton.textOpacity = 0.88
         clipboardButton.font = .systemFont(ofSize: 13, weight: .medium)
@@ -138,6 +137,13 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         // objectWillChange 在赋值前发出；合并到下一次主循环再读取完整状态。
         model.objectWillChange.sink { [weak self] in self?.scheduleUpdate() }.store(in: &subscriptions)
         model.toast.objectWillChange.sink { [weak self] in self?.scheduleUpdate() }.store(in: &subscriptions)
+        // 面板稍后成为 key（包括跨屏激活）时立即恢复输入，不依赖模型刷新时序。
+        NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)
+            .sink { [weak self] notification in
+                guard let self, let window = self.viewIfLoaded?.window,
+                      notification.object as? NSWindow === window else { return }
+                self.focusSearch()
+            }.store(in: &subscriptions)
         NotificationCenter.default.publisher(for: .keyboardShortcutsDidChange)
             .sink { [weak self] _ in self?.scheduleUpdate() }.store(in: &subscriptions)
         synchronize()
@@ -195,8 +201,6 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
             clipboardButton.title = title
             clipboardButton.shortcutText = shortcut
         }
-        clipboardButton.isEmphasized = model.isClipboardFocused
-        if model.isClipboardFocused { view.window?.makeFirstResponder(clipboardButton) }
         updateCategories()
         updateScopes()
         updateToast()
@@ -207,10 +211,8 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
             lastFocusRequest = model.searchFieldFocusRequest
             focusSearch()
         }
-        searchBackground.layer?.borderWidth = model.isClipboardFocused ? 1 : 2
-        searchBackground.layer?.borderColor = NSColor.white.withAlphaComponent(model.isClipboardFocused ? 0.32 : 0.85).cgColor
-        clipboardButton.layer?.borderWidth = model.isClipboardFocused ? 2 : 1
-        clipboardButton.layer?.borderColor = NSColor.white.withAlphaComponent(model.isClipboardFocused ? 0.85 : 0.3).cgColor
+        searchBackground.layer?.borderWidth = 2
+        searchBackground.layer?.borderColor = NSColor.white.withAlphaComponent(0.85).cgColor
     }
 
     private func updateCategories() {
@@ -251,7 +253,7 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
     }
 
     private func updateScopes() {
-        scopePicker.isHidden = !model.isChoosingScope || model.isClipboardFocused
+        scopePicker.isHidden = !model.isChoosingScope
         let scopes = model.filteredScopes
         let signature = scopes.map { $0.id }
             + [model.directAction?.id ?? "-", String(model.highlightedScopeIndex), String(model.isChoosingScope), String(model.isOptionPressed)]
@@ -377,10 +379,9 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         toast.frame = NSRect(x: (width - toastSize.width) / 2, y: 10, width: toastSize.width, height: toastSize.height)
     }
 
-    func controlTextDidBeginEditing(_ obj: Notification) { model.isClipboardFocused = false }
     func controlTextDidChange(_ obj: Notification) { model.searchText = searchField.stringValue }
     func controlTextDidEndEditing(_ obj: Notification) {
-        guard canFocusSearch, !model.isClipboardFocused else { return }
+        guard canFocusSearch else { return }
         model.requestSearchFieldFocus()
     }
     private var canFocusSearch: Bool {
@@ -389,7 +390,6 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
     }
     private func focusSearch() {
         guard canFocusSearch, let window = view.window else { return }
-        if model.isClipboardFocused { model.isClipboardFocused = false }
         if let editor = searchField.currentEditor(), window.firstResponder === editor { return }
         window.makeFirstResponder(searchField)
         if let editor = searchField.currentEditor() as? NSTextView {
@@ -430,8 +430,7 @@ private final class ExposeActionButton: NSButton {
     }
     var scopeSuffix: String? { didSet { needsDisplay = true } }
     var isEmphasized = false { didSet { updateStyle() } }
-    var allowsKeyboardFocus = false
-    override var acceptsFirstResponder: Bool { allowsKeyboardFocus }
+    override var acceptsFirstResponder: Bool { false }
     init() {
         super.init(frame: .zero)
         bezelStyle = .recessed

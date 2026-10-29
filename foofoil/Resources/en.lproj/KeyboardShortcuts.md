@@ -158,7 +158,7 @@ Editing shortcuts apply to text fields or selectable content, depending on focus
 
 - Moving the keyboard highlight to the top row scrolls the list to the top, revealing its heading.
 - Arrow keys select; ↑ / ↓ move between visual rows using the cards’ left edges for alignment; Return activates the selected foil or opens the selected Spotlight file. Spotlight file results support the same arrow-key navigation. Control + number or letter selects numbered items directly, including offscreen items. The first 30 items are numbered 1–9, 0, then A–Z with the navigation letters A/E/P/N/F/B skipped (C, D, G, H, I, J, K, L, M, O, Q–Z) in list order; scrolling does not change their numbers.
-- Tab switches focus between the input and the clipboard button. With the clipboard button focused, result highlights disappear and Return opens the clipboard content. Hold Option to open incognito and show its shortcut. Input method composition retains Tab.
+- The search field keeps keyboard focus; Tab and Shift-Tab do not move focus. Input method composition retains Tab. Click the clipboard button or use its shortcut to open clipboard content; hold Option to open incognito and show its shortcut.
 - ⌃P / ⌃N / ⌃F / ⌃B move the highlight up / down / right / left, taking priority over letter selection while keeping search focused.
 - ⌃A / ⌃E move the highlight to the start / end of the current row, keeping search focused.
 - Search is shown and focused automatically and stays active; type `/` to choose a search scope.

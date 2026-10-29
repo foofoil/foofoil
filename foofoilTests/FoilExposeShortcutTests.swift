@@ -11,29 +11,74 @@ import Testing
 
 @Suite(.sharedApplicationState)
 struct FoilExposeShortcutTests {
-    @Test @MainActor func tabFocusesClipboardAndReturnUsesOptionState() throws {
+    @Test @MainActor func tabKeepsSearchFocusAndReturnOpensHighlightedResult() throws {
         let controller = FoilExposeController.shared
         let previous = controller.model
-        let model = FoilExposeModel(items: [], historyItems: [], clipboardContent: .init(.image),
+        let item = FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true,
+                                 title: "Note", symbolName: "note.text", contentKind: .note, thumbnailPath: nil)
+        let model = FoilExposeModel(items: [], historyItems: [item], clipboardContent: .init(.image),
                                    fileSearch: { _, _ in }, cancelFiles: {}, musicEnabled: { false })
+        let panel = FoilExposeController.makePanel(for: try #require(NSScreen.main), model: model)
+        let view = try #require(panel.contentViewController as? FoilExposeViewController)
         controller.model = model
-        defer { controller.model = previous }
-        var opened: [Bool] = []
-        model.onOpenClipboard = { opened.append(model.isOptionPressed) }
-        func press(_ code: UInt16, option: Bool = false) throws {
-            let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
-                modifierFlags: option ? .option : [], timestamp: 0, windowNumber: 0, context: nil,
-                characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code))
-            #expect(controller.handleKeyEvent(event) == nil)
+        defer {
+            view.prepareForDismissal(); panel.close(); model.stopFileSearch()
+            controller.model = previous
         }
-        try press(48)
-        #expect(model.isClipboardFocused)
-        #expect(model.highlightedItem == nil)
-        try press(36)
-        try press(36, option: true)
-        #expect(opened == [false, true])
-        try press(48)
-        #expect(!model.isClipboardFocused)
+        panel.makeKeyAndOrderFront(nil)
+        view.synchronize()
+        let editor = try #require(view.searchField.currentEditor() as? NSTextView)
+        var openedClipboard = false
+        var openedResult = false
+        model.onOpenClipboard = { openedClipboard = true }
+        model.onSelect = { openedResult = $0.id == item.id }
+        func event(_ code: UInt16, modifiers: NSEvent.ModifierFlags = []) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
+                modifierFlags: modifiers, timestamp: 0, windowNumber: panel.windowNumber, context: nil,
+                characters: "", charactersIgnoringModifiers: "", isARepeat: false, keyCode: code))
+        }
+        for modifiers in [NSEvent.ModifierFlags(), .shift] {
+            #expect(controller.handleKeyEvent(try event(48, modifiers: modifiers)) == nil)
+            view.synchronize()
+            #expect(panel.firstResponder === editor)
+            #expect(model.highlightedItem?.id == item.id)
+        }
+        #expect(controller.handleKeyEvent(try event(36)) == nil)
+        #expect(openedResult && !openedClipboard)
+        // 输入法的 Tab 候选操作必须仍能到达共享编辑器。
+        editor.setMarkedText("拼", selectedRange: NSRange(location: 1, length: 0), replacementRange: NSRange(location: NSNotFound, length: 0))
+        let composingTab = try event(48)
+        #expect(controller.handleKeyEvent(composingTab) === composingTab)
+        editor.unmarkText()
+    }
+
+    @Test @MainActor func overviewReclaimsFocusAfterFoilBecomesKey() async throws {
+        let controller = FoilExposeController.shared
+        #expect(!controller.isShowing)
+        let screen = try #require(NSScreen.screens.last)
+        let foil = FloatingWindow(contentRect: NSRect(x: screen.frame.minX + 40, y: screen.frame.minY + 40,
+                                                      width: 300, height: 200), defer: false)
+        foil.isReleasedWhenClosed = false
+        defer { controller.dismiss(); foil.close() }
+        NSApp.activate(ignoringOtherApps: true)
+        foil.makeKeyAndOrderFront(nil)
+        controller.show()
+        for _ in 0..<50 {
+            if NSApp.isActive && NSApp.keyWindow is FoilExposePanel { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let panel = try #require(NSApp.keyWindow as? FoilExposePanel)
+        let view = try #require(panel.contentViewController as? FoilExposeViewController)
+        #expect(view.searchField.currentEditor() === panel.firstResponder)
+        // 模拟应用激活后的迟到窗口排序：即使箔片在另一块屏幕，也必须交回总览。
+        foil.makeKeyAndOrderFront(nil)
+        for _ in 0..<50 {
+            if NSApp.keyWindow === panel { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(NSApp.keyWindow === panel)
+        #expect(view.searchField.currentEditor() != nil)
+        #expect(view.searchField.currentEditor() === panel.firstResponder)
     }
 
     @Test @MainActor func controlNavigationMovesHighlightBeforeLetterSelection() throws {

@@ -158,7 +158,6 @@ final class FoilExposeModel: ObservableObject {
     let clipboardContent: ClipboardOpenableContent?
     /// 当前键盘高亮的条目下标（对应 currentItems）；默认高亮第一项。
     @Published var selectedIndex: Int = 0
-    @Published var isClipboardFocused = false
     @Published var isOptionPressed = false
     /// 键盘移动高亮的请求序号：即使已到边界不移动，视图也据此把选中项完整滚入可见区域。
     @Published private(set) var selectionRevealRequest: UInt64 = 0
@@ -541,7 +540,6 @@ final class FoilExposeModel: ObservableObject {
 
     /// 高亮条目：越界时回退到第一项。
     var highlightedItem: FoilExposeItem? {
-        guard !isClipboardFocused else { return nil }
         let items = currentItems
         return items.indices.contains(selectedIndex) ? items[selectedIndex] : nil
     }
@@ -568,7 +566,6 @@ final class FoilExposeModel: ObservableObject {
 
     /// 请求视图把第一响应者交给搜索输入框；面板刚成为 key window 时补一次聚焦。
     func requestSearchFieldFocus() {
-        isClipboardFocused = false
         searchFieldFocusRequest &+= 1
     }
 
@@ -864,6 +861,12 @@ final class FoilExposeController {
         )
         NotificationCenter.default.addObserver(
             self,
+            selector: #selector(handleWindowDidBecomeKey(_:)),
+            name: NSWindow.didBecomeKeyNotification,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
             selector: #selector(handleDidResignActive),
             name: NSApplication.didResignActiveNotification,
             object: NSApp
@@ -1032,17 +1035,15 @@ final class FoilExposeController {
         }
         self.model = model
 
-        // 先激活本 App，再在当前活跃显示器上铺一块非激活面板并指定它为 key window。
-        // 全局热键冷触发时激活是异步完成的，handleDidBecomeActive 会补交键盘焦点。
-        NSApp.activate(ignoringOtherApps: true)
+        // 先准备总览，再激活应用，避免激活期间恢复其他显示器上的箔片焦点。
         if let screen = Self.activeScreen() {
             let panel = Self.makePanel(for: screen, model: model)
             panel.orderFront(nil)
             panels.append(panel)
         }
-        if NSApp.isActive {
-            focusPanel()
-        }
+        NSApp.activate(ignoringOtherApps: true)
+        focusPanel()
+        schedulePanelFocus()
 
         installKeyMonitor()
     }
@@ -1069,6 +1070,22 @@ final class FoilExposeController {
     @objc private func handleDidBecomeActive() {
         guard isShowing, !isPresentingSystemUI, !panels.contains(where: { $0.attachedSheet != nil }) else { return }
         focusPanel()
+    }
+
+    /// 激活和跨屏窗口排序可能在下一轮主循环恢复箔片焦点；总览仍显示时再交回面板。
+    private func schedulePanelFocus() {
+        guard let panel = panels.first else { return }
+        DispatchQueue.main.async { [weak self, weak panel] in
+            guard let self, let panel, self.panels.first === panel,
+                  NSApp.isActive, !self.isPresentingSystemUI,
+                  !self.panels.contains(where: { $0.attachedSheet != nil }) else { return }
+            self.focusPanel()
+        }
+    }
+
+    @objc private func handleWindowDidBecomeKey(_ notification: Notification) {
+        guard isShowing, notification.object is FloatingWindow else { return }
+        schedulePanelFocus()
     }
 
     /// App 失去激活（如切到别的 App）时自动关闭覆盖层。
@@ -1433,10 +1450,6 @@ final class FoilExposeController {
                 return event
             }
             // 带 ⌥ 的按键放行给菜单快捷键（如再次触发的 ⌥⎋）。
-            if model.isClipboardFocused, !hasCommand, !hasControl, [36, 76].contains(event.keyCode) {
-                model.onOpenClipboard()
-                return nil
-            }
             if hasOption {
                 return event
             }
@@ -1487,13 +1500,9 @@ final class FoilExposeController {
                 return nil
             }
             switch event.keyCode {
-            case 48: // 输入法组合时保留 Tab，其余情况切换顶部控件焦点。
+            case 48: // Tab / Shift-Tab 不移动焦点；组合输入仍交给输入法。
                 if isComposing { return event }
-                if model.isClipboardFocused {
-                    model.requestSearchFieldFocus()
-                } else if model.clipboardContent != nil {
-                    model.isClipboardFocused = true
-                }
+                model.requestSearchFieldFocus()
                 return nil
             case 116, 121: // PageUp / PageDown：整页滚动
                 model.requestPageScroll(direction: event.keyCode == 116 ? .up : .down)

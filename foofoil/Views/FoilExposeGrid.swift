@@ -262,7 +262,7 @@ final class FoilExposeGrid: NSScrollView {
                 guard let path = collection.indexPath(for: item), sections.indices.contains(path.section),
                       sections[path.section].entries.indices.contains(path.item) else { continue }
                 let entry = sections[path.section].entries[path.item]
-                item.card.setHighlighted(!model.isClipboardFocused && entry.index == model.selectedIndex)
+                item.card.setHighlighted(entry.index == model.selectedIndex)
             }
             previousSelection = model.selectedIndex
             previousRevealRequest = model.selectionRevealRequest
@@ -310,7 +310,7 @@ final class FoilExposeGrid: NSScrollView {
             let entry = section.entries[indexPath.item]
             item.card.configure(foil: entry.foil, title: entry.title, subtitle: entry.subtitle, symbol: entry.symbol,
                                 compact: section.compact, shortcut: entry.foil == nil ? nil : entry.index.flatMap { FoilExposeShortcut.key(forIndex: $0) },
-                                highlighted: !model.isClipboardFocused && entry.index == model.selectedIndex, action: entry.action, model: model)
+                                highlighted: entry.index == model.selectedIndex, action: entry.action, model: model)
             return item
         }
         func collectionView(_ collectionView: NSCollectionView, viewForSupplementaryElementOfKind kind: NSCollectionView.SupplementaryElementKind, at indexPath: IndexPath) -> NSView {
