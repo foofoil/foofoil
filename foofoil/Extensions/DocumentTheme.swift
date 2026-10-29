@@ -10,7 +10,7 @@ import Combine
 import SwiftUI
 
 /// 单个文档箔的外观偏好；默认跟随系统，固定亮暗仅覆盖当前箔而不改变应用设置。
-public enum DocumentAppearanceMode: String, Codable, CaseIterable {
+public enum DocumentAppearanceMode: String, Codable, CaseIterable, Sendable {
     case system
     case light
     case dark

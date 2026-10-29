@@ -7,7 +7,7 @@
 
 import Foundation
 
-nonisolated public enum ImageSource: String, Codable {
+nonisolated public enum ImageSource: String, Codable, Sendable {
     case clipboard
 }
 
@@ -120,7 +120,7 @@ public nonisolated enum StartupBehavior: String, Codable, CaseIterable, Sendable
     }
 }
 
-nonisolated public struct WindowConfig: Codable, Identifiable {
+nonisolated public struct WindowConfig: Codable, Identifiable, Sendable {
     public let id: UUID
     public var imagePath: String?
     public var isCamera: Bool
