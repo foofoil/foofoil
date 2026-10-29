@@ -35,6 +35,9 @@ if (( INCLUDE_VIDEO )); then
     EXTENSION_BUNDLES+=("Video.foofoilextension")
 fi
 DEVELOPMENT_EXTENSIONS="$SCRIPT_DIR/build/DevelopmentExtensions"
+# 每次运行隔离模块构建缓存，避免被中断或并发构建留下的不完整缓存影响。
+EXTENSION_TEMP_DIR=$(mktemp -d "${TMPDIR:-/tmp}/foofoil-run.XXXXXXXX")
+trap 'rm -rf "$EXTENSION_TEMP_DIR"' EXIT
 
 SIGN_NAME=$(codesign -dvv "$APP_PATH" 2>&1 | awk -F= '
     /^Authority=/ && value == "" { value=$2 }
@@ -57,7 +60,7 @@ for i in {1..$#EXTENSION_ROOTS}; do
     EXT_ROOT="${EXTENSION_ROOTS[$i]}"
     BUNDLE_NAME="${EXTENSION_BUNDLES[$i]}"
     if [[ -x "$EXT_ROOT/build-plugin" ]]; then
-        "$EXT_ROOT/build-plugin" "$DEVELOPMENT_EXTENSIONS" "$SIGN_IDENTITY"
+        TMPDIR="$EXTENSION_TEMP_DIR/" "$EXT_ROOT/build-plugin" "$DEVELOPMENT_EXTENSIONS" "$SIGN_IDENTITY"
         rm -rf "$APP_PATH/Contents/PlugIns/$BUNDLE_NAME"
         cp -R "$DEVELOPMENT_EXTENSIONS/$BUNDLE_NAME" "$APP_PATH/Contents/PlugIns/"
         SIGNING_CHANGED=1
