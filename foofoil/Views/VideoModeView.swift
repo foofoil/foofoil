@@ -123,11 +123,13 @@ struct VideoModeView: View {
         .onAppear {
             controller.isLooping = appState.shouldLoopCurrentItem
             controller.activateRemoteCommands()
-            if appState.resumesMediaPlaybackOnActivation {
+            if appState.resumesMediaPlaybackOnActivation && !controller.isPlaying {
                 controller.play()
             }
         }
         .onDisappear {
+            // AppKit 全屏重挂载期间继续播放，真正离开内容时仍释放输出。
+            guard !appState.presentationWindowState.isTransitioningFullScreen else { return }
             controller.stopOutput()
             MediaRemoteCommandCoordinator.shared.deactivate(controller)
             appState.isMediaPlaying = false

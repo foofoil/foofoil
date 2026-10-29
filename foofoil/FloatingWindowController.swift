@@ -264,7 +264,10 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     private var pointerScrollLocalMonitor: Any?
     private var pointerScrollGlobalMonitor: Any?
     private var backgroundMagnificationObserver: UUID?
-    private var isTransitioningFullScreen = false
+    private var isTransitioningFullScreen: Bool {
+        get { appState.isTransitioningFullScreen }
+        set { appState.isTransitioningFullScreen = newValue }
+    }
     var usesFullScreenFrame: Bool { appState.isFullScreen || isTransitioningFullScreen }
     private var insertedResizableForFullScreen = false
     private var windowedFrameDescriptorBeforeFullScreen: String?

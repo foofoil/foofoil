@@ -664,6 +664,9 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     @Published public var isMediaPlaying = false
 
     /// 切歌时是否自动播放。只由用户点播放/暂停改写；视图卸载和自然播完不得改写，否则暂停切歌会被 onAppear 强制起播。
+    /// 原生全屏切换会暂时卸载视图，但不代表结束当前媒体输出。
+    var isTransitioningFullScreen = false
+
     var resumesMediaPlaybackOnActivation = true
 
     func noteUserStartedMediaPlayback() {
