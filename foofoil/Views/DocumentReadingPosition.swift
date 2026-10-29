@@ -11,7 +11,16 @@ nonisolated public struct DocumentReadingPosition: Codable, Equatable, Sendable 
 extension AppState {
     func readingPositionKey(_ surface: String) -> String {
         let source = fileList?.currentID ?? sourceFingerprint ?? textURL?.path ?? imageURL?.path ?? webURL?.absoluteString ?? id.uuidString
-        return surface + ":" + source
+        // 书签恢复会把 /tmp 等符号链接换成真实路径，保存与恢复必须使用同一来源键。
+        let canonical: String
+        if source.hasPrefix("file:") {
+            canonical = "file:" + URL(fileURLWithPath: String(source.dropFirst(5))).resolvingSymlinksInPath().path
+        } else if source.hasPrefix("/") {
+            canonical = URL(fileURLWithPath: source).resolvingSymlinksInPath().path
+        } else {
+            canonical = source
+        }
+        return surface + ":" + canonical
     }
 
     func noteReadingPosition(_ position: DocumentReadingPosition, key: String) {

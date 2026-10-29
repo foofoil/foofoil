@@ -26,6 +26,27 @@ struct DocumentReadingPositionTests {
         #expect(restored.documentReadingPositions.isEmpty)
     }
 
+    @Test func bookmarkResolutionUsesSameReadingPositionKey() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let original = root.appendingPathComponent("original.txt")
+        let alias = root.appendingPathComponent("alias.txt")
+        try "document".write(to: original, atomically: true, encoding: .utf8)
+        try FileManager.default.createSymbolicLink(at: alias, withDestinationURL: original)
+        let state = AppState(isIncognito: true)
+        state.openTextFile(url: alias)
+        state.sourceFingerprint = "file:" + alias.path
+        let key = state.readingPositionKey("text")
+        state.noteReadingPosition(.init(x: 0, y: 640), key: key)
+        var config = state.toConfig()
+        config.sourceFingerprint = "file:" + original.resolvingSymlinksInPath().path
+        config.textPath = original.path
+        let restored = AppState(config: config, isIncognito: true)
+        #expect(restored.readingPositionKey("text") == key)
+        #expect(restored.documentReadingPositions[restored.readingPositionKey("text")]?.y == 640)
+    }
+
     @Test func nativeScrollRestoresAndClampsShorterDocuments() async throws {
         let state = AppState(isIncognito: true)
         state.openText("document", isMarkdown: false)
