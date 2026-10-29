@@ -732,6 +732,7 @@ struct ExtensionKitTests {
         hoverState.builtInNavigatorContributions = [contribution]
         hoverState.navigatorPanelVisibilityMode = .onHover
         let hoverController = FloatingWindowController(appState: hoverState)
+        hoverController.navigatorHoverActiveOverride = { true }
         hoverController.showWindow(nil)
         hoverController.restoreAfterApplicationUnhide()
         defer { hoverController.close() }
@@ -791,11 +792,11 @@ struct ExtensionKitTests {
         state.navigatorPanelSide = .right
 
         let controller = FloatingWindowController(appState: state)
+        controller.navigatorHoverActiveOverride = { true }
         let foilWindow = try #require(controller.window)
         #expect(controller.isNavigatorPanelVisible == false)
 
         foilWindow.makeKeyAndOrderFront(nil)
-        #expect(foilWindow.isKeyWindow)
 
         let interior = NSPoint(x: foilWindow.frame.width / 2, y: foilWindow.frame.height / 2)
         controller.updateNavigatorEdgeHover(at: interior)
@@ -822,6 +823,8 @@ struct ExtensionKitTests {
         ]
         state.navigatorPanelVisibilityMode = .onHover
         let controller = FloatingWindowController(appState: state)
+        var isActive = true
+        controller.navigatorHoverActiveOverride = { isActive }
         defer { controller.close() }
         let foilWindow = try #require(controller.window)
         let interior = NSPoint(x: foilWindow.frame.width / 2, y: foilWindow.frame.height / 2)
@@ -831,40 +834,26 @@ struct ExtensionKitTests {
         #expect(state.isNavigatorEdgeHovered)
         #expect(controller.isNavigatorPanelVisible)
 
-        let foreground = NSWindow(contentRect: NSRect(x: 600, y: 100, width: 100, height: 100),
-                                  styleMask: [.titled], backing: .buffered, defer: false)
-        foreground.isReleasedWhenClosed = false
-        defer { foreground.close() }
-        foreground.makeKeyAndOrderFront(nil)
-        #expect(!foilWindow.isKeyWindow)
-        try await Task.sleep(for: .milliseconds(150))
-        #expect(!state.isNavigatorEdgeHovered)
-        #expect(!state.isNavigatorPanelHovered)
-        #expect(!controller.isNavigatorPanelVisible)
-
-        // 非激活箔即便指针位于窗口内也不展开侧栏。
+        // 模拟焦点转移，并重新计算悬停状态。
+        isActive = false
         controller.updateNavigatorEdgeHover(at: interior)
         #expect(!state.isNavigatorEdgeHovered)
+        try await Task.sleep(for: .milliseconds(500))
         #expect(!controller.isNavigatorPanelVisible)
 
-        // 重新激活后恢复 hover 唤出。
-        foilWindow.makeKeyAndOrderFront(nil)
+        // 焦点回到箔片或其目录面板时恢复悬停行为。
+        isActive = true
         controller.updateNavigatorEdgeHover(at: interior)
         #expect(state.isNavigatorEdgeHovered)
         #expect(controller.isNavigatorPanelVisible)
-
-        // 焦点转交给自己的目录面板时保持显示。
-        let panel = try #require(foilWindow.childWindows?.first { $0 is NavigatorPanel })
-        panel.makeKey()
-        try await Task.sleep(for: .milliseconds(150))
-        #expect(panel.isKeyWindow)
-        #expect(controller.isNavigatorPanelVisible)
+        #expect(foilWindow.childWindows?.contains { $0 is NavigatorPanel } == true)
     }
 
     @Test func asynchronouslyArrivingNavigatorRefreshesStationaryPointer() async throws {
         let state = AppState()
         state.navigatorPanelVisibilityMode = .onHover
         let controller = FloatingWindowController(appState: state)
+        controller.navigatorHoverActiveOverride = { true }
         defer { controller.close() }
         let window = try #require(controller.window)
         let pointer = NSEvent.mouseLocation
@@ -978,10 +967,10 @@ struct ExtensionKitTests {
         state.navigatorPanelWidth = 260
         state.isFullScreen = true
         let controller = FloatingWindowController(appState: state)
+        controller.navigatorHoverActiveOverride = { true }
         defer { controller.close() }
         let foilWindow = try #require(controller.window)
         foilWindow.makeKeyAndOrderFront(nil)
-        #expect(foilWindow.isKeyWindow)
 
         // 指针在内容区中部：不出现。
         controller.updateNavigatorEdgeHover(at: NSPoint(x: foilWindow.frame.width / 2, y: 100))

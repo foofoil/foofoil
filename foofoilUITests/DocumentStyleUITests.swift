@@ -80,7 +80,7 @@ final class DocumentStyleUITests: XCTestCase {
         XCTAssertTrue(panel.waitForExistence(timeout: 10), "文档样式面板未打开")
         // 文本箔的外观、背景、字体、行距、段距都渲染出来。
         XCTAssertTrue(panel.staticTexts["Appearance"].waitForExistence(timeout: 5))
-        XCTAssertTrue(panel.segmentedControls["documentAppearancePicker"].exists)
+        XCTAssertTrue(panel.descendants(matching: .any)["documentAppearancePicker"].exists)
         XCTAssertTrue(panel.staticTexts["Background Color"].exists)
         XCTAssertTrue(panel.staticTexts["Font"].exists)
         XCTAssertTrue(panel.staticTexts["Line Spacing"].exists)
@@ -109,10 +109,24 @@ final class DocumentStyleUITests: XCTestCase {
         app.activate()
         XCTAssertTrue(app.windows.element(boundBy: 0).waitForExistence(timeout: 15), "箔窗未出现")
         if withDocument {
-            let editor = app.textViews.element(boundBy: 0)
-            XCTAssertTrue(editor.waitForExistence(timeout: 5))
-            editor.typeText("Document style UI fixture")
-            XCTAssertTrue((editor.value as? String)?.contains("Document style UI fixture") == true)
+            // 空白箔现在显示搜索入口，通过剪贴板打开正文来创建文档箔。
+            let pasteboard = NSPasteboard.general
+            let saved = (pasteboard.pasteboardItems ?? []).map { original in
+                let copy = NSPasteboardItem()
+                for type in original.types {
+                    if let data = original.data(forType: type) { copy.setData(data, forType: type) }
+                }
+                return copy
+            }
+            defer {
+                pasteboard.clearContents()
+                pasteboard.writeObjects(saved)
+            }
+            pasteboard.clearContents()
+            pasteboard.setString("Document style UI fixture", forType: .string)
+            app.menuBars.menuBarItems["File"].click()
+            app.menuBars.menuItems["openClipboardContentAction"].click()
+            XCTAssertTrue(app.textViews.element(boundBy: 0).waitForExistence(timeout: 10))
         }
         return app
     }

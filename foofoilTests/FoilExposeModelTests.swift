@@ -585,7 +585,9 @@ struct FoilExposeModelTests {
         var opened: URL?
         model.onOpenFile = { opened = $0 }
         model.openHighlightedResult()
-        #expect(opened == model.visibleFiles[2].url)
+        let visibleFiles = model.visibleFiles
+        try #require(visibleFiles.count > 2)
+        #expect(opened == visibleFiles[2].url)
         model.moveSelection(.up)
         model.moveSelection(.up)
         #expect(model.selectedIndex == 0)

@@ -2,7 +2,7 @@ import AppKit
 import Testing
 @testable import foofoil
 
-@Suite(.sharedApplicationState)
+@Suite(.sharedApplicationState, .serialized)
 @MainActor
 struct IncognitoOpeningShortcutTests {
     @Test func clipboardAppBindingsFollowGlobalAndRejectLocalChanges() throws {
@@ -52,6 +52,15 @@ struct IncognitoOpeningShortcutTests {
 
     @Test func derivationFollowsCustomizationAndClearing() throws {
         let store = KeyboardShortcutStore.shared
+        // 固定剪贴板快捷键仅在全局私密快捷键未启用时生效。
+        let globalPrivate = try #require(KeyboardShortcutCatalog.definition(withID: "global.openClipboardIncognito"))
+        let previousGlobal = store.shortcut(for: globalPrivate)
+        let wasCustomized = store.isCustomized(globalPrivate)
+        defer {
+            if wasCustomized { store.setShortcut(previousGlobal, for: globalPrivate) }
+            else { store.reset(globalPrivate) }
+        }
+        #expect(store.setShortcut(nil, for: globalPrivate))
         let definition = try #require(KeyboardShortcutCatalog.definition(withID: "file.openURL"))
         let original = store.shortcut(for: definition)
         let customized = store.isCustomized(definition)
@@ -70,6 +79,15 @@ struct IncognitoOpeningShortcutTests {
 
     @Test func conflictsIncludeDerivedKeysInBothDirectionsAndFixedClipboard() throws {
         let store = KeyboardShortcutStore.shared
+        // 固定剪贴板快捷键仅在全局私密快捷键未启用时生效。
+        let globalPrivate = try #require(KeyboardShortcutCatalog.definition(withID: "global.openClipboardIncognito"))
+        let previousGlobal = store.shortcut(for: globalPrivate)
+        let wasCustomized = store.isCustomized(globalPrivate)
+        defer {
+            if wasCustomized { store.setShortcut(previousGlobal, for: globalPrivate) }
+            else { store.reset(globalPrivate) }
+        }
+        #expect(store.setShortcut(nil, for: globalPrivate))
         let opening = try #require(KeyboardShortcutCatalog.definition(withID: "file.openURL"))
         let other = try #require(KeyboardShortcutCatalog.definition(withID: "view.reloadPage"))
         let before = store.shortcut(for: other)

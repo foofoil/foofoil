@@ -1047,7 +1047,11 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     /// 只有获得键盘焦点的箔才响应 hover；目录面板取 key 时视为同一激活单元。
+    /// 测试可指定焦点状态，避免窗口服务器不授予测试宿主键盘焦点。
+    var navigatorHoverActiveOverride: (() -> Bool)?
+
     private var isNavigatorHoverActive: Bool {
+        if let navigatorHoverActiveOverride { return navigatorHoverActiveOverride() }
         guard let window else { return false }
         return window.isKeyWindow || navigatorPanelController.window?.isKeyWindow == true
     }

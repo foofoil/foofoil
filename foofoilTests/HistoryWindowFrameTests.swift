@@ -7,11 +7,11 @@ import SwiftUI
 @Suite(.sharedApplicationState, .serialized)
 struct HistoryWindowFrameTests {
     @Test
-    func initialDocumentSizePreservesNoteAndWebDefaults() {
+    func initialDocumentSizePreservesBlankDocumentAndWebDefaults() {
         let state = AppState()
         #expect(FloatingWindowController.initialWindowSize(for: state) == NSSize(width: 400, height: 400))
         state.text = "Note"
-        #expect(FloatingWindowController.initialWindowSize(for: state) == NSSize(width: 400, height: 400))
+        #expect(FloatingWindowController.initialWindowSize(for: state) == NSSize(width: 540, height: 675))
         state.textURL = URL(fileURLWithPath: "/tmp/document.md")
         #expect(FloatingWindowController.initialWindowSize(for: state) == NSSize(width: 540, height: 675))
         state.webURL = URL(string: "https://example.com")
@@ -28,7 +28,7 @@ struct HistoryWindowFrameTests {
             controller.close()
             HistoryManager.shared.removeFromHistory(state.toConfig())
         }
-        let expectedSize = isMarkdown ? NSSize(width: 540, height: 675) : NSSize(width: 400, height: 400)
+        let expectedSize = NSSize(width: 540, height: 675)
         #expect(FloatingWindowController.initialWindowSize(for: state) == expectedSize)
         let window = try #require(controller.window)
         #expect(window.frame.size == expectedSize)

@@ -344,7 +344,8 @@ struct DocumentThemeTests {
             text: "正文测试",
             backgroundColorHex: "#F5EFE0",
             textColorHex: "#382E24",
-            documentThemeId: "parchment"
+            documentThemeId: "parchment",
+            documentAppearance: .light
         )
         try database.upsert(config)
 
