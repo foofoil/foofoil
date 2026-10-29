@@ -11,6 +11,45 @@ import Testing
 
 @Suite(.sharedApplicationState)
 struct FoilExposeShortcutTests {
+    @Test @MainActor func backspacePreservesScopeUntilCompositionEnds() throws {
+        let controller = FoilExposeController.shared
+        let previous = controller.model
+        let model = FoilExposeModel(items: [], historyItems: [], fileSearch: { _, _ in },
+                                    cancelFiles: {}, musicEnabled: { false })
+        model.selectScope(.history)
+        let panel = FoilExposeController.makePanel(for: try #require(NSScreen.main), model: model)
+        let view = try #require(panel.contentViewController as? FoilExposeViewController)
+        controller.model = model
+        defer {
+            view.prepareForDismissal(); panel.close(); model.stopFileSearch()
+            controller.model = previous
+        }
+        panel.makeKeyAndOrderFront(nil)
+        view.synchronize()
+        let editor = try #require(view.searchField.currentEditor() as? NSTextView)
+        let backspace = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero,
+            modifierFlags: [], timestamp: 0, windowNumber: panel.windowNumber, context: nil,
+            characters: "\u{7f}", charactersIgnoringModifiers: "\u{7f}", isARepeat: false, keyCode: 51))
+
+        // 未上屏的拼音不进入查询；退格必须先交给输入法，不能清除类别。
+        editor.setMarkedText("pin", selectedRange: NSRange(location: 3, length: 0),
+                             replacementRange: NSRange(location: NSNotFound, length: 0))
+        #expect(editor.hasMarkedText())
+        #expect(model.searchText.isEmpty)
+        #expect(controller.handleKeyEvent(backspace) === backspace)
+        #expect(model.activeScope == .history)
+
+        editor.deleteBackward(nil)
+        #expect(editor.string == "pi")
+        #expect(model.activeScope == .history)
+
+        editor.unmarkText()
+        editor.string = ""
+        model.searchText = ""
+        #expect(controller.handleKeyEvent(backspace) == nil)
+        #expect(model.activeScope == nil)
+    }
+
     @Test @MainActor func tabKeepsSearchFocusAndReturnOpensHighlightedResult() throws {
         let controller = FoilExposeController.shared
         let previous = controller.model

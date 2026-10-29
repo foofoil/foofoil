@@ -1410,7 +1410,7 @@ final class FoilExposeController {
             let hasCommand = modifiers.contains(.command)
             let hasOption = modifiers.contains(.option)
             let hasControl = modifiers.contains(.control)
-            // 输入法正在组合文字时，Esc / 回车 / Tab 留给输入法自己处理（取消候选、上屏）。
+            // 输入法正在组合文字时，Esc / 回车 / Tab / ⌫ 留给输入法自己处理（取消候选、上屏、删字）。
             let isComposing = (NSApp.keyWindow?.firstResponder as? NSTextView)?.hasMarkedText() == true
             // 收藏筛选与条目收藏使用独立快捷键。
             if KeyboardShortcutStore.shared.matches(event, identifier: "history.filterFavorites") {
@@ -1466,7 +1466,7 @@ final class FoilExposeController {
                 self.dismiss()
                 return nil
             }
-            if event.keyCode == 51 && model.isSearching && model.searchText.isEmpty && model.activeScope != nil {
+            if event.keyCode == 51 && !isComposing && model.isSearching && model.searchText.isEmpty && model.activeScope != nil {
                 model.clearActiveScope()
                 return nil
             }
