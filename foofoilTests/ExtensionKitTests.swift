@@ -1336,6 +1336,7 @@ struct ExtensionKitTests {
             Notification(name: NSWindow.willEnterFullScreenNotification, object: window)
         )
         #expect(state.isFullScreen)
+        #expect(state.isTransitioningFullScreen)
         #expect(state.showBorder)
         #expect(!state.effectiveShowBorder)
         #expect(controller.isNavigatorPanelVisible)
@@ -1347,6 +1348,7 @@ struct ExtensionKitTests {
             Notification(name: NSWindow.didEnterFullScreenNotification, object: window)
         )
         #expect(controller.isNavigatorPanelVisible)
+        #expect(!state.isTransitioningFullScreen)
 
         controller.windowWillExitFullScreen(
             Notification(name: NSWindow.willExitFullScreenNotification, object: window)
@@ -1355,6 +1357,7 @@ struct ExtensionKitTests {
             Notification(name: NSWindow.didExitFullScreenNotification, object: window)
         )
         #expect(!state.isFullScreen)
+        #expect(!state.isTransitioningFullScreen)
         #expect(state.showBorder)
         #expect(state.effectiveShowBorder)
         #expect(state.windowFrame == windowedFrame)
