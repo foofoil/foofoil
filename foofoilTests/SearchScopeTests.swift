@@ -436,6 +436,25 @@ struct SearchScopeTests {
         #expect(model.query == "")
     }
 
+    @Test func tabSelectsFilteredScopeInOverviewAndEmbeddedSearch() {
+        let controller = FoilExposeController.shared
+        let originalModel = controller.model
+        defer { controller.model = originalModel }
+        let overview = FoilExposeModel(items: [], historyItems: [], cameraAvailable: { false })
+        controller.model = overview
+        overview.beginSearch()
+        overview.searchText = "/hist"
+        let embedded = HistorySearchViewModel(historySearch: { _ in [] }, cameraAvailable: { false })
+        embedded.query = "/hist"
+        let tab = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0,
+                                   windowNumber: 0, context: nil, characters: "\t",
+                                   charactersIgnoringModifiers: "\t", isARepeat: false, keyCode: 48)!
+        #expect(controller.handleKeyEvent(tab) == nil)
+        #expect(overview.activeScope == .history && overview.searchText.isEmpty)
+        #expect(HistorySearchPanel.handleSearchKey(tab, model: embedded, preservesIncognitoShortcut: true, dismiss: {}))
+        #expect(embedded.activeScope == .history && embedded.query.isEmpty)
+    }
+
     @Test func ctrlNAndCtrlPSelectScopeInHistorySearchPanel() {
         let model = HistorySearchViewModel(
             historySearch: { _ in [] },

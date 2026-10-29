@@ -1504,8 +1504,12 @@ final class FoilExposeController {
                 return nil
             }
             switch event.keyCode {
-            case 48: // Tab / Shift-Tab 不移动焦点；组合输入仍交给输入法。
+            case 48: // 类别选择时确认高亮项；组合输入仍交给输入法。
                 if isComposing { return event }
+                if model.isPickingScope {
+                    model.selectHighlightedScope()
+                    return nil
+                }
                 model.requestSearchFieldFocus()
                 return nil
             case 116, 121: // PageUp / PageDown：整页滚动
