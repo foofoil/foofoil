@@ -3,16 +3,22 @@
 set -euo pipefail
 
 SCRIPT_DIR="${0:A:h}"
-BUILD_ROOT="${TMPDIR:-/tmp}/foofoil-video-plugin-build"
+# 构建状态放在仓库内而不是系统临时目录：临时目录会被系统按时间清理，
+# 清理后 SwiftBuild 仍会复用已失效的增量状态，导致 WriteAuxiliaryFile 报 “No such file or directory”。
+BUILD_ROOT="${FOOFOIL_PLUGIN_BUILD_ROOT:-$SCRIPT_DIR/.build/plugin}"
 OUTPUT_ROOT="${1:-${TMPDIR:-/tmp}/foofoil-video-plugin}"
 SIGN_IDENTITY="${2:--}"
 CONFIGURATION="${3:-debug}"
+PRODUCT="VideoExtensionRuntime"
 BUNDLE_PATH="$OUTPUT_ROOT/Video.foofoilextension"
 
 "$SCRIPT_DIR/scripts/build-ffmpeg"
 
 BUILD_LOG=$(mktemp "${TMPDIR:-/tmp}/foofoil-video-build.XXXXXX")
 trap 'rm -f "$BUILD_LOG"' EXIT
+
+# SwiftBuild 增量状态损坏时的典型错误；只有这类基础设施错误才值得清理重建。
+STALE_STATE_PATTERN='unable to (write|read|open) file .*: No such file or directory|failed to deserialize .*No such file or directory'
 
 build_runtime() {
     SWIFTPM_MODULECACHE_OVERRIDE="$BUILD_ROOT/module-cache" \
@@ -22,19 +28,22 @@ build_runtime() {
         --disable-sandbox \
         --scratch-path "$BUILD_ROOT" \
         --configuration "$CONFIGURATION" \
-        --product VideoExtensionRuntime
+        --product "$PRODUCT" 2>&1 | tee "$BUILD_LOG"
 }
 
-if build_runtime 2>&1 | tee "$BUILD_LOG"; then
+if build_runtime; then
     :
 else
     BUILD_RESULT=$?
-    # 临时目录被部分清理后，SwiftBuild 可能仍复用缺失的任务上下文；仅对此错误重建一次。
-    if ! grep -Fq 'failed to deserialize Info.plist task context: No such file or directory (2)' "$BUILD_LOG"; then
+    if ! grep -Eq "$STALE_STATE_PATTERN" "$BUILD_LOG"; then
         exit "$BUILD_RESULT"
     fi
-    print -u2 "SwiftBuild Info.plist task context is missing; cleaning video build products and retrying once."
-    swift package --package-path "$SCRIPT_DIR" --scratch-path "$BUILD_ROOT" clean
+    if [[ -z "$BUILD_ROOT" || "$BUILD_ROOT" == "/" || "$BUILD_ROOT" == "$HOME" ]]; then
+        print -u2 "Refusing to remove unsafe build root: '$BUILD_ROOT'"
+        exit 1
+    fi
+    print -u2 "Detected damaged SwiftBuild state; removing $BUILD_ROOT and rebuilding once."
+    rm -rf "$BUILD_ROOT"
     build_runtime
 fi
 
