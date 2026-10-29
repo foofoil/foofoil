@@ -254,13 +254,14 @@
             cancelWorker();
             applyStyle(payload.style);
             const plainHTML = escapeHTML(source);
+            const previousScrollY = window.scrollY;
             applyWhenSelectionClears(() => {
                 if (payload.revision !== revision) return;
                 if (!renderRows(plainHTML, source)) {
                     post({ type: 'failed', revision: payload.revision, reason: 'verifyFailed' });
                     return;
                 }
-                window.scrollTo(0, 0);
+                window.scrollTo(0, previousScrollY);
                 post({ type: 'plain', revision: payload.revision });
                 if (payload.language) {
                     highlightInWorker(payload.revision, payload.language, source);

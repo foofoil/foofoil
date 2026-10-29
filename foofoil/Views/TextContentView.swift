@@ -77,7 +77,8 @@ struct TextContentView: View {
                                 taskSource: appState.renderedMarkdownSource,
                                 onOpenLink: { appState.openMarkdownLink($0) },
                                 scrollRequest: appState.markdownScrollRequest,
-                                onVisibleLocationChange: { appState.markdownVisibleLocationDidChange($0, settledLocation: $1) }
+                                onVisibleLocationChange: { appState.markdownVisibleLocationDidChange($0, settledLocation: $1) },
+                                appState: appState
                             )
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 // 整个滚动视图避开四边缩放热区，滚动条首尾也不会触发角部缩放。
@@ -89,7 +90,7 @@ struct TextContentView: View {
                                     text: appState.text,
                                     languageID: languageID,
                                     style: codePreviewStyle,
-                                    onFailure: { codePreviewFailed = true }
+                                    onFailure: { codePreviewFailed = true }, appState: appState
                                 )
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                             } else {
@@ -99,7 +100,8 @@ struct TextContentView: View {
                                     textColor: appState.documentTextColor,
                                     lineHeightMultiple: appState.documentLineHeightMultiple,
                                     paragraphSpacingMultiple: appState.documentParagraphSpacingMultiple,
-                                    codeLineNumbersVisible: appState.codeLanguageID == nil ? nil : appState.showCodeLineNumbers
+                                    codeLineNumbersVisible: appState.codeLanguageID == nil ? nil : appState.showCodeLineNumbers,
+                                    appState: appState
                                 )
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                             }

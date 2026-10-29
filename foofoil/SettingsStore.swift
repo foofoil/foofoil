@@ -198,6 +198,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
     public var fileList: FileListState?
     /// 扩展文档最后阅读的章节文件名（如 chapter-0003.html）与滚动比例，成对保存；
     /// 重开历史时据此恢复阅读位置。文件名跨会话稳定，目录路径随会话临时目录变化。
+    public var documentReadingPositions: [String: DocumentReadingPosition]?
     public var documentScrollFile: String?
     public var documentScrollFraction: Double?
     public var appleMusicReference: AppleMusicReference?
@@ -258,6 +259,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         navigatorPanelVisibilityMode: NavigatorPanelVisibilityMode = .onHover,
         navigatorPanelWidth: Double = 260.0,
         fileList: FileListState? = nil,
+        documentReadingPositions: [String: DocumentReadingPosition]? = nil,
         documentScrollFile: String? = nil,
         documentScrollFraction: Double? = nil,
         appleMusicReference: AppleMusicReference? = nil,
@@ -315,6 +317,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         self.navigatorPanelVisibilityMode = navigatorPanelVisibilityMode
         self.navigatorPanelWidth = navigatorPanelWidth
         self.fileList = fileList?.isPresentable == true ? fileList : nil
+        self.documentReadingPositions = documentReadingPositions
         self.documentScrollFile = documentScrollFile
         self.documentScrollFraction = documentScrollFraction
         self.appleMusicReference = appleMusicReference
@@ -327,7 +330,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
 
     private enum CodingKeys: String, CodingKey {
         case terminalConfiguration, terminalScrollback
-        case historyIsPinned, isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, searchHighlightHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, documentAppearance, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource, showCodeLineNumbers, readOnlyPresentation
+        case documentReadingPositions, historyIsPinned, isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, searchHighlightHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, documentAppearance, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource, showCodeLineNumbers, readOnlyPresentation
     }
 
     public init(from decoder: Decoder) throws {
@@ -385,6 +388,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable {
         )
         let decodedList = try container.decodeIfPresent(FileListState.self, forKey: .fileList)
         fileList = decodedList?.isPresentable == true ? decodedList : nil
+        documentReadingPositions = try container.decodeIfPresent([String: DocumentReadingPosition].self, forKey: .documentReadingPositions)
         documentScrollFile = try container.decodeIfPresent(String.self, forKey: .documentScrollFile)
         documentScrollFraction = try container.decodeIfPresent(Double.self, forKey: .documentScrollFraction)
         appleMusicReference = try container.decodeIfPresent(AppleMusicReference.self, forKey: .appleMusicReference)

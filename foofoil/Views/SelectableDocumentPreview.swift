@@ -6,6 +6,7 @@ struct SelectableDocumentPreview: View {
     let url: URL
     let shouldHideBorder: Bool
     var search: FoilContentSearch? = nil
+    var appState: AppState? = nil
     @State private var document: NSAttributedString?
 
     static func supports(_ url: URL) -> Bool {
@@ -15,7 +16,7 @@ struct SelectableDocumentPreview: View {
     var body: some View {
         Group {
             if let document {
-                DocumentTextPreview(document: document)
+                DocumentTextPreview(document: document, appState: appState)
             } else {
                 if let search {
                     SearchableQuickLookView(url: url, shouldHideBorder: shouldHideBorder, search: search)
@@ -47,6 +48,9 @@ struct SelectableDocumentPreview: View {
 
 private struct DocumentTextPreview: NSViewRepresentable {
     let document: NSAttributedString
+    var appState: AppState?
+
+    func makeCoordinator() -> DocumentScrollTracker { DocumentScrollTracker() }
 
     func makeNSView(context: Context) -> NSScrollView {
         let scroll = NSScrollView()
@@ -73,8 +77,9 @@ private struct DocumentTextPreview: NSViewRepresentable {
     }
 
     func updateNSView(_ view: NSScrollView, context: Context) {
-        guard let text = view.documentView as? NSTextView,
-              text.textStorage?.isEqual(to: document) != true else { return }
-        text.textStorage?.setAttributedString(document)
+        if let text = view.documentView as? NSTextView, text.textStorage?.isEqual(to: document) != true {
+            text.textStorage?.setAttributedString(document)
+        }
+        context.coordinator.bind(view, state: appState, surface: "rich-text")
     }
 }

@@ -55,6 +55,7 @@ struct WebView: NSViewRepresentable {
         webView.pageZoom = CGFloat(zoom)
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
+        context.coordinator.scrollTracker.install(on: webView, state: appState, surface: "web")
         context.coordinator.setupObservers(webView: webView)
         return webView
     }
@@ -75,6 +76,7 @@ struct WebView: NSViewRepresentable {
             nsView.pageZoom = CGFloat(zoom)
         }
         if context.coordinator.lastLoadedURL != url {
+            context.coordinator.scrollTracker.updateSource(state: appState, surface: "web")
             context.coordinator.lastLoadedURL = url
             if url.isFileURL {
                 nsView.loadFileURL(url, allowingReadAccessTo: url)
@@ -87,6 +89,7 @@ struct WebView: NSViewRepresentable {
     }
 
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler, WKUIDelegate {
+        let scrollTracker = WebDocumentScrollTracker()
         static let editableFocusHandlerName = "foofoilEditableFocus"
         static let editableFocusTrackingScript = """
         (() => {
@@ -272,6 +275,7 @@ struct WebView: NSViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            scrollTracker.beginLoading()
             parent.appState.contentSearch.resetWebFrames(webView: webView)
             DispatchQueue.main.async {
                 self.parent.loadError = nil
@@ -311,6 +315,7 @@ struct WebView: NSViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            scrollTracker.restore()
             if let currentURL = webView.url {
                 DispatchQueue.main.async {
                     self.parent.appState.actualWebURL = currentURL

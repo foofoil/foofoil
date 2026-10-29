@@ -112,8 +112,8 @@ nonisolated final class HistoryDatabase {
                         document_zoom, document_scroll_file, document_scroll_fraction, text_fingerprint,
                         image_ocr_text, image_has_subject, image_subject_path, apple_music_reference, subtitle_associations, custom_title, archive_source,
                         show_code_line_numbers, read_only_presentation, history_is_pinned, terminal_configuration, terminal_scrollback,
-                        document_appearance
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        document_appearance, document_reading_positions
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -155,7 +155,8 @@ nonisolated final class HistoryDatabase {
                         read_only_presentation=excluded.read_only_presentation,
                         terminal_configuration=excluded.terminal_configuration,
                         terminal_scrollback=excluded.terminal_scrollback,
-                        document_appearance=excluded.document_appearance
+                        document_appearance=excluded.document_appearance,
+                        document_reading_positions=excluded.document_reading_positions
                     """, bindings: [
                         config.id.uuidString, kind.rawValue, title, config.originalImageName,
                         config.imagePath, config.textPath, config.webURLString, config.actualWebURLString,
@@ -186,7 +187,8 @@ nonisolated final class HistoryDatabase {
                         config.showCodeLineNumbers, config.readOnlyPresentation, config.historyIsPinned,
                         try config.terminalConfiguration.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) },
                         config.terminalScrollback,
-                        config.documentAppearance.rawValue
+                        config.documentAppearance.rawValue,
+                        try config.documentReadingPositions.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) }
                     ])
 
                 let metadata = (
@@ -498,6 +500,7 @@ nonisolated final class HistoryDatabase {
         // v12 扩展文档的正文缩放与阅读位置（章节文件名 + 滚动比例）；此前只存扩展状态引用，
         // 章节能恢复但字号/滚动被静默丢弃。
         try addColumnIfMissing("document_zoom", definition: "document_zoom REAL NOT NULL DEFAULT 1.0")
+        try addColumnIfMissing("document_reading_positions", definition: "document_reading_positions TEXT")
         try addColumnIfMissing("document_scroll_file", definition: "document_scroll_file TEXT")
         try addColumnIfMissing("document_scroll_fraction", definition: "document_scroll_fraction REAL")
         // v13 无排版文档内容的文字颜色与字体选择；旧记录沿用跟随系统、通道默认字体。
@@ -794,6 +797,9 @@ nonisolated final class HistoryDatabase {
                             storedDisplayTitle: text(statement, columns["display_title"]!),
                             originalFilename: optionalText(statement, columns["original_filename"]!)
                         )
+                    },
+                    documentReadingPositions: columns["document_reading_positions"].flatMap { optionalText(statement, $0) }.flatMap {
+                        try? JSONDecoder().decode([String: DocumentReadingPosition].self, from: Data($0.utf8))
                     },
                     documentScrollFile: columns["document_scroll_file"].flatMap { optionalText(statement, $0) },
                     documentScrollFraction: columns["document_scroll_fraction"].map {

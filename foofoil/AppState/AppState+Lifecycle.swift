@@ -53,6 +53,7 @@ extension AppState {
             // 重置后的箔没有内容，上一次的排版结果一并丢弃，避免残留到下一篇文档的预览。
             self.renderedMarkdown = NSAttributedString()
             self.renderedMarkdownIdentity = nil
+            self.documentReadingPositions = [:]
             self.sourceFingerprint = nil
             self.imageScale = 1.0
             self.id = UUID()

@@ -17,6 +17,8 @@ struct ReadOnlyTextView: View {
     /// 已识别语言的代码文件才传入：nil 表示普通文本，不创建行号栏；布尔值表示行号是否可见。
     var codeLineNumbersVisible: Bool? = nil
 
+    var appState: AppState? = nil
+
     var body: some View {
         ReadOnlyTextNSView(
             text: text,
@@ -24,7 +26,8 @@ struct ReadOnlyTextView: View {
             textColor: textColor,
             lineHeightMultiple: lineHeightMultiple,
             paragraphSpacingMultiple: paragraphSpacingMultiple,
-            codeLineNumbersVisible: codeLineNumbersVisible
+            codeLineNumbersVisible: codeLineNumbersVisible, appState: appState,
+            readingSourceID: appState?.readingPositionKey("text")
         )
     }
 }
@@ -36,8 +39,20 @@ struct ReadOnlyTextNSView: NSViewRepresentable, Equatable {
     let lineHeightMultiple: Double?
     let paragraphSpacingMultiple: Double?
     let codeLineNumbersVisible: Bool?
+    var appState: AppState? = nil
+
+    var readingSourceID: String? = nil
+
     // 与 Markdown 预览一致的文档内边距，保证滚动条贴边且首尾留白随内容滚动。
     private let documentPadding: CGFloat = 24
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.text == rhs.text && lhs.font == rhs.font && lhs.textColor == rhs.textColor
+            && lhs.lineHeightMultiple == rhs.lineHeightMultiple
+            && lhs.paragraphSpacingMultiple == rhs.paragraphSpacingMultiple
+            && lhs.codeLineNumbersVisible == rhs.codeLineNumbersVisible
+            && lhs.appState === rhs.appState && lhs.readingSourceID == rhs.readingSourceID
+    }
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -102,6 +117,7 @@ struct ReadOnlyTextNSView: NSViewRepresentable, Equatable {
     }
 
     final class Coordinator {
+        let scrollTracker = DocumentScrollTracker()
         weak var ruler: CodeLineNumberRulerView?
         private var indexedText: String?
         private var indexGeneration = 0
@@ -115,6 +131,7 @@ struct ReadOnlyTextNSView: NSViewRepresentable, Equatable {
             let spacingChanged = appliedConfiguration?.lineHeightMultiple != configuration.lineHeightMultiple
                 || appliedConfiguration?.paragraphSpacingMultiple != configuration.paragraphSpacingMultiple
                 || appliedConfiguration?.font.pointSize != configuration.font.pointSize
+            scrollTracker.bind(scrollView, state: configuration.appState, surface: "text", contentChanged: textChanged)
             if textChanged {
                 textView.string = configuration.text
             }

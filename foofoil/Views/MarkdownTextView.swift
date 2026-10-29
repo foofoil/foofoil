@@ -377,6 +377,7 @@ struct MarkdownTextView: NSViewRepresentable {
     /// 目录向下切换需要后者也越过标题，避免标题刚滚过顶部就频繁切换。
     var onVisibleLocationChange: (_ location: Int, _ settledLocation: Int) -> Void = { _, _ in }
     /// 向下滚动时，标题需要再滚过顶部这么多点才切换为当前节。
+    var appState: AppState? = nil
     static let headingSettleDistance: CGFloat = 40
     private let documentPadding: CGFloat = 24
 
@@ -417,6 +418,9 @@ struct MarkdownTextView: NSViewRepresentable {
         if let textView = nsView.documentView as? MarkdownNSTextView {
             // 目录滚动等无关刷新不应重建文本存储；只有渲染结果变化（新对象）时才替换。
             if context.coordinator.appliedText !== attributedText {
+                if attributedText.length > 0 {
+                    context.coordinator.scrollTracker.bind(nsView, state: appState, surface: "markdown", contentChanged: true)
+                }
                 context.coordinator.appliedText = attributedText
                 // 颜色语义化已在 AppState 渲染阶段完成，这里直接替换文本存储，避免每次更新全量复制与枚举。
                 textView.layoutManager?.replaceTextStorage(NSTextStorage(attributedString: attributedText))
@@ -431,6 +435,9 @@ struct MarkdownTextView: NSViewRepresentable {
                 }
             }
             context.coordinator.updateHeight(nsView)
+            if attributedText.length > 0 {
+                context.coordinator.scrollTracker.bind(nsView, state: appState, surface: "markdown")
+            }
 
             if let scrollRequest, scrollRequest.id != context.coordinator.handledScrollRequestID {
                 context.coordinator.handledScrollRequestID = scrollRequest.id
@@ -472,6 +479,7 @@ struct MarkdownTextView: NSViewRepresentable {
         var handledScrollRequestID: UInt64 = 0
         /// 当前已写入文本存储的富文本；与 AppState 的渲染结果做身份比较。
         var appliedText: NSAttributedString?
+        let scrollTracker = DocumentScrollTracker()
         private var scrollObserver: NSObjectProtocol?
 
         init(_ parent: MarkdownTextView) {

@@ -77,7 +77,7 @@ Read-only presentations created through foil also support the border toggle for 
 
 In a terminal foil, ⌘K (View → Clear Terminal Content) clears earlier screen content, scrollback, and saved output from a previous session while keeping the current prompt, input, and Shell session. Its binding can be changed in Keyboard Shortcuts → Content Display. In a terminal foil, Save As (⌘⇧S) appears as “Export Terminal Transcript…” and exports the retained output, including previous session output, as UTF-8 text.
 
-Use **View → Reload Content** (default ⌘R) to reread the current local file or reload a web page. The current foil and its window settings are retained.
+Use **View → Reload Content** (default ⌘R) to reread the current local file or reload a web page. The current foil, its window settings, and the document reading position are retained. Reopening a document from history also restores its reading position.
 
 | Mouse / trackpad gesture | Effect |
 | --- | --- |

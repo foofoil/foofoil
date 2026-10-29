@@ -62,7 +62,10 @@ public struct CSVTableView: View {
     private let cellWidth: CGFloat
     private let fontSize: CGFloat
 
-    public init(content: String, fontSize: Double = AppState.defaultTextFontSize) {
+    private var appState: AppState?
+
+    public init(content: String, fontSize: Double = AppState.defaultTextFontSize, appState: AppState? = nil) {
+        self.appState = appState
         let parsedRows = CSVParser.parse(content)
         self.rows = parsedRows
         self.columnCount = parsedRows.map(\.count).max() ?? 0
@@ -72,7 +75,7 @@ public struct CSVTableView: View {
     }
 
     public var body: some View {
-        CSVWebTable(rows: rows, columnCount: columnCount, cellWidth: cellWidth, fontSize: fontSize)
+        CSVWebTable(rows: rows, columnCount: columnCount, cellWidth: cellWidth, fontSize: fontSize, appState: appState)
     }
 }
 
@@ -81,10 +84,13 @@ private struct CSVWebTable: NSViewRepresentable {
     let columnCount: Int
     let cellWidth: CGFloat
     let fontSize: CGFloat
+    var appState: AppState?
     @Environment(\.colorScheme) private var colorScheme
     func makeCoordinator() -> Coordinator { Coordinator() }
     func makeNSView(context: Context) -> WKWebView {
         let view = WKWebView(frame: .zero, configuration: ExtensionDocumentWebViewFactory.makeConfiguration())
+        view.navigationDelegate = context.coordinator
+        context.coordinator.scrollTracker.install(on: view, state: appState, surface: "csv")
         view.setValue(false, forKey: "drawsBackground")
         return view
     }
@@ -105,8 +111,14 @@ private struct CSVWebTable: NSViewRepresentable {
         </style></head><body><table>\(body)</table></body></html>
         """
         guard context.coordinator.html != html else { return }
+        context.coordinator.scrollTracker.updateSource(state: appState, surface: "csv")
+        context.coordinator.scrollTracker.beginLoading()
         context.coordinator.html = html
         view.loadHTMLString(html, baseURL: nil)
     }
-    final class Coordinator { var html = "" }
+    final class Coordinator: NSObject, WKNavigationDelegate {
+        var html = ""
+        let scrollTracker = WebDocumentScrollTracker()
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { scrollTracker.restore() }
+    }
 }

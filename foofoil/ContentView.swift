@@ -103,7 +103,7 @@ struct FoilContentView: View {
                             userInfo: ["id": appState.id]
                         )
                     }
-                } else if appState.isLoading || (appState.isArchivePreview && !appState.hasOpenedContent) {
+                } else if (appState.isLoading && appState.textURL == nil) || (appState.isArchivePreview && !appState.hasOpenedContent) {
                     ProgressView()
                         .progressViewStyle(.circular)
                         .scaleEffect(1.2)
@@ -130,7 +130,7 @@ struct FoilContentView: View {
                         PPTXModeView(appState: appState, url: url)
                             .id(appState.contentReloadRevision)
                     } else if SelectableDocumentPreview.supports(url) {
-                        SelectableDocumentPreview(url: url, shouldHideBorder: shouldHideBorder, search: appState.contentSearch)
+                        SelectableDocumentPreview(url: url, shouldHideBorder: shouldHideBorder, search: appState.contentSearch, appState: appState)
                             .id(appState.contentReloadRevision)
                             .clipShape(RoundedRectangle(cornerRadius: shouldHideBorder ? 0 : 8, style: .continuous))
                     } else {
@@ -189,7 +189,7 @@ struct FoilContentView: View {
                     }
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
                 } else if appState.isCSVDocument {
-                    CSVTableView(content: appState.text, fontSize: appState.textFontSize)
+                    CSVTableView(content: appState.text, fontSize: appState.textFontSize, appState: appState)
                         .transition(.opacity)
                 } else {
                     // 文字模式

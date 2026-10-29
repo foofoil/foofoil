@@ -30,6 +30,7 @@ struct PDFModeView: NSViewRepresentable {
         }
         context.coordinator.pdfView = pdfView
         context.coordinator.loadedURL = url
+        context.coordinator.restoreReadingPosition()
         context.coordinator.postCurrentPageSize()
         return pdfView
     }
@@ -38,6 +39,7 @@ struct PDFModeView: NSViewRepresentable {
         if context.coordinator.loadedURL != url {
             context.coordinator.loadedURL = url
             pdfView.document = PDFDocument(url: url)
+            context.coordinator.restoreReadingPosition()
             context.coordinator.postCurrentPageSize()
         }
         if appState.isFullScreen {
@@ -123,8 +125,19 @@ struct PDFModeView: NSViewRepresentable {
             appState.imageScale = Double(fittedScale)
         }
 
+        func restoreReadingPosition() {
+            guard let pdfView, let document = pdfView.document,
+                  let saved = appState.documentReadingPositions[appState.readingPositionKey("pdf")],
+                  let index = saved.page, let page = document.page(at: min(max(0, index), document.pageCount - 1)) else { return }
+            pdfView.go(to: PDFDestination(page: page, at: NSPoint(x: saved.x, y: saved.y)))
+        }
+
         private func handlePageChange(_ notification: Notification) {
             guard notification.object as? PDFView === pdfView else { return }
+            if let pdfView, let document = pdfView.document, let destination = pdfView.currentDestination, let page = destination.page {
+                appState.noteReadingPosition(.init(x: max(0, destination.point.x), y: max(0, destination.point.y),
+                    page: document.index(for: page)), key: appState.readingPositionKey("pdf"))
+            }
             postCurrentPageSize()
             postPageIndicator()
         }

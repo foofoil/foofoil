@@ -115,6 +115,7 @@ extension AppState {
             self.documentParagraphSpacing = config.documentParagraphSpacing
             self.mediaPlaybackMode = config.mediaPlaybackMode
             self.extensionStateReference = config.extensionStateReference
+            self.documentReadingPositions = config.documentReadingPositions ?? [:]
             self.extensionDocumentScrollFile = config.documentScrollFile
             self.extensionDocumentScrollFraction = Self.clampScrollFraction(config.documentScrollFraction)
             self.navigatorPanelSide = config.navigatorPanelSide
@@ -325,6 +326,7 @@ extension AppState {
                 navigatorPanelVisibilityMode: navigatorPanelVisibilityMode,
                 navigatorPanelWidth: navigatorPanelWidth,
                 fileList: fileList?.items.isEmpty == false ? fileList : nil,
+                documentReadingPositions: documentReadingPositions.isEmpty ? nil : documentReadingPositions,
                 documentScrollFile: extensionDocumentScrollFile,
                 documentScrollFraction: extensionDocumentScrollFraction,
                 appleMusicReference: appleMusicReference,

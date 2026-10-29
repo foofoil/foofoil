@@ -66,16 +66,20 @@ struct ReadOnlyCodeView: NSViewRepresentable {
     let languageID: String
     let style: CodePreviewStyle
     let onFailure: () -> Void
+    var appState: AppState? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onFailure: onFailure)
     }
 
     func makeNSView(context: Context) -> CodePreviewWebView {
-        context.coordinator.makeWebView()
+        let view = context.coordinator.makeWebView()
+        context.coordinator.scrollTracker.install(on: view, state: appState, surface: "code")
+        return view
     }
 
     func updateNSView(_ webView: CodePreviewWebView, context: Context) {
+        context.coordinator.scrollTracker.updateSource(state: appState, surface: "code")
         context.coordinator.onFailure = onFailure
         context.coordinator.update(text: text, languageID: languageID, style: style)
     }
@@ -104,6 +108,7 @@ struct ReadOnlyCodeView: NSViewRepresentable {
         /// 页面就绪后展示源码的时限；超过即回退原生视图。
         private static let displayTimeout: Duration = .seconds(2)
 
+        let scrollTracker = WebDocumentScrollTracker()
         var onFailure: () -> Void
         private weak var webView: CodePreviewWebView?
         private var isPageReady = false
@@ -167,6 +172,7 @@ struct ReadOnlyCodeView: NSViewRepresentable {
         private func synchronize() {
             guard let desired, isPageReady, !isDisposed else { return }
             if desired.text != sentText || desired.languageID != sentLanguageID {
+                scrollTracker.beginLoading()
                 revision += 1
                 sentText = desired.text
                 sentLanguageID = desired.languageID
@@ -223,6 +229,7 @@ struct ReadOnlyCodeView: NSViewRepresentable {
             guard let messageRevision = body["revision"] as? Int, messageRevision == revision else { return }
             switch type {
             case "plain":
+                scrollTracker.restore()
                 cancelWatchdog()
             case "highlighted":
                 cancelWatchdog()

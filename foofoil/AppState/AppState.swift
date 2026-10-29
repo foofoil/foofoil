@@ -136,6 +136,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     /// 滚动回传高频，用普通属性避免触发 SwiftUI 失效，落盘由去抖任务统一执行。
     var extensionDocumentScrollFile: String?
     var extensionDocumentScrollFraction: Double?
+    var documentReadingPositions: [String: DocumentReadingPosition] = [:]
     var documentScrollSaveTask: Task<Void, Never>?
     var lastExtensionPlaybackCheckpoint = Date.distantPast
     var exclusivePlaybackGeneration: UInt64 = 0
