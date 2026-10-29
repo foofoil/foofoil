@@ -1,5 +1,7 @@
 # Supported Content
 
+Supported local files can also be opened from Finder using “Open With → foofoil”.
+
 Blank foils show “What would you like to open? Type here.” followed by the `/` keycap and More options; Quick Open and Exposé retain their full search hints. All three share the `/` options. Disabled local file search hides File and Folder; either disabled Apple Music library or music search hides music categories. Enable buttons update the menu immediately. The Apple Music enable action turns on both library and search settings. An active blank foil keeps the search field focused; system sheets retain their own focus.
 
 Spotlight file search is on by default and can be turned off in Settings → General → Search. When off, search results still offer Enable File Search. Searching does not require selecting the home folder; opening protected files may require macOS authorization.
