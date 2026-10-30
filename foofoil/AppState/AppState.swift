@@ -157,8 +157,10 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     weak var archiveWindowOwner: AppState?
     var archivePreviewLease: ArchivePreviewLease?
     @Published var builtInNavigatorContributions: [NavigatorContribution] = []
+    @Published var pdfNavigator: PDFNavigator?
     var navigatorContributions: [NavigatorContribution] {
         if let archiveSession { return [archiveSession.contribution] }
+        if isPDFDocument, let pdfNavigator, pdfNavigator.url == imageURL { return pdfNavigator.contributions }
         if !builtInNavigatorContributions.isEmpty { return builtInNavigatorContributions }
         return extensionSession?.navigatorContributions ?? []
     }

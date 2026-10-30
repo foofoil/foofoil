@@ -1218,6 +1218,7 @@ extension AppState {
         }
 
         func performNavigatorAction(_ action: NavigatorAction) {
+            if isPDFDocument, pdfNavigator?.activate(action) == true { return }
             if let archive = archiveSession(forNavigatorID: action.contributionID) {
                 if action.kind == .activate, let id = action.itemIDs.first { archive.selectNavigatorItem(id) }
                 return

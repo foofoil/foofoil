@@ -5,6 +5,7 @@
 
 import SwiftUI
 import PDFKit
+import Combine
 
 /// 采用系统 PDFKit 渲染 PDF，以保留多页文档的翻页能力。
 struct PDFModeView: NSViewRepresentable {
@@ -28,6 +29,7 @@ struct PDFModeView: NSViewRepresentable {
         }
         context.coordinator.pdfView = pdfView
         context.coordinator.loadedURL = url
+        context.coordinator.installNavigator()
         context.coordinator.restoreReadingPosition()
         context.coordinator.postCurrentPageSize()
         return pdfView
@@ -49,6 +51,7 @@ struct PDFModeView: NSViewRepresentable {
         if context.coordinator.loadedURL != url {
             context.coordinator.loadedURL = url
             pdfView.document = PDFDocument(url: url)
+            context.coordinator.installNavigator()
             context.coordinator.restoreReadingPosition()
             context.coordinator.postCurrentPageSize()
         }
@@ -135,6 +138,17 @@ struct PDFModeView: NSViewRepresentable {
             appState.imageScale = Double(fittedScale)
         }
 
+        func installNavigator() {
+            guard let pdfView, let loadedURL else { return }
+            DispatchQueue.main.async { [weak self, weak pdfView] in
+                guard let self, let pdfView, self.loadedURL == loadedURL else { return }
+                let navigator = PDFNavigator(view: pdfView, url: loadedURL)
+                self.appState.pdfNavigator = navigator
+                self.appState.activeNavigatorContributionID = pdfView.document?.outlineRoot == nil
+                    ? PDFNavigator.pagesID : PDFNavigator.outlineID
+            }
+        }
+
         func restoreReadingPosition() {
             guard let pdfView, let document = pdfView.document,
                   let saved = appState.documentReadingPositions[appState.readingPositionKey("pdf")],
@@ -174,6 +188,7 @@ struct PDFModeView: NSViewRepresentable {
 
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
+                self.appState.objectWillChange.send()
                 NotificationCenter.default.post(
                     name: .pdfPageDidChange,
                     object: nil,

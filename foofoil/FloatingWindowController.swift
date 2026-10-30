@@ -948,6 +948,15 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func setupNavigatorPanelBindings() {
+        contentPublisher(\.$pdfNavigator)
+            .sink { [weak self] _ in
+                DispatchQueue.main.async {
+                    self?.refreshNavigatorHoverFromPointer()
+                    self?.updateNavigatorPanelVisibility()
+                }
+            }
+            .store(in: &cancellables)
+
         contentPublisher(\.$extensionSession)
             .sink { [weak self] _ in
                 DispatchQueue.main.async { self?.updateNavigatorPanelVisibility() }

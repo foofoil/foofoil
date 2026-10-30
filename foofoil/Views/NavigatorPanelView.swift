@@ -56,10 +56,12 @@ struct NavigatorPanelView: View {
                 if let contribution = activeContribution {
                     // 标题区位于滚动区域之外，列表滚动时保持固定；
                     // 多个贡献时由选择器兼任标题与切换，避免重复展示同一名称。
-                    if appState.isNavigatorSearchActive {
-                        navigatorSearchBar
-                    } else if contributions.count > 1 {
+                    if contributions.count > 1 {
+                        // PDF 模式选择器始终留在最上方，搜索栏也不能替换它。
                         contributionPicker
+                        if appState.isNavigatorSearchActive { navigatorSearchBar }
+                    } else if appState.isNavigatorSearchActive {
+                        navigatorSearchBar
                     } else {
                         contributionTitleHeader(contribution)
                     }
@@ -72,6 +74,7 @@ struct NavigatorPanelView: View {
                     .allowsHitTesting(false)
                 }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
             resizeHandle
         }
@@ -485,7 +488,9 @@ struct NavigatorPanelView: View {
                 )
             } label: {
                 HStack(spacing: 8) {
-                    if let thumbnailPath {
+                    if contribution.id == PDFNavigator.pagesID, let page = appState.pdfNavigator?.page(for: row.item.id) {
+                        PDFNavigatorThumbnail(page: page)
+                    } else if let thumbnailPath {
                         NavigatorImageThumbnail(
                             path: thumbnailPath,
                             fallbackSymbolName: row.item.symbolName ?? "photo",

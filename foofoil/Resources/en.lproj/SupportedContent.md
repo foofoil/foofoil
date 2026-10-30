@@ -42,7 +42,7 @@ All text and Markdown source is read-only. Type in a blank foil to search with Q
 
 | Type | Common formats | What you can do |
 | --- | --- | --- |
-| PDF | .pdf | Read, turn pages, and jump to a page |
+| PDF | .pdf | Open with borders by default, scroll continuously, and navigate using the fixed sidebar selector for the table of contents or page thumbnails |
 | Markdown | .md, .markdown | Read formatted content, jump to headings from the Outline in the navigator, and adjust reading styles |
 | Tables | .csv | Browse data in rows and columns |
 | Text and code | {{textExtensions}}, etc. | Read text and adjust fonts, colors, and spacing; recognized source code is shown with syntax highlighting |
