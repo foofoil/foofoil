@@ -46,6 +46,25 @@ struct ClipboardHistorySearchTests {
         search.stop()
         #expect(search.entries.isEmpty)
     }
+    @Test func duplicateContentKeepsLatestRecordAndOriginalApplication() async throws {
+        let now = Date()
+        let original = ClipboardSearchEntry(id: "original", title: "Original title", searchText: "Original title\nSame content",
+            content: .text("Same content"), date: now.addingTimeInterval(-10), sourceBundleIdentifier: "com.apple.TextEdit")
+        let copied = ClipboardSearchEntry(id: "copy", title: "Copy", searchText: "Copy\nSame content",
+            content: .text("Same content"), date: now, sourceBundleIdentifier: Bundle.main.bundleIdentifier)
+        let search = ClipboardHistorySearch(load: { .init(access: .available, entries: [copied, original]) },
+                                            currentContent: { copied })
+        defer { search.stop() }
+        search.search("")
+        try await waitForLoad(search)
+        #expect(search.entries.count == 1)
+        #expect(search.entries.first?.id == "copy")
+        #expect(search.entries.first?.sourceBundleIdentifier == "com.apple.TextEdit")
+        #expect(search.entries.first?.isCurrentClipboard == true)
+        search.search("Original title")
+        #expect(search.entries.count == 1)
+    }
+
     @Test func noCurrentClipboardStillAllowsHistoricalResults() async throws {
         let history = entry("old", "Historical text")
         let search = ClipboardHistorySearch(load: { .init(access: .available, entries: [history]) }, currentContent: { nil })

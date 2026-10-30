@@ -31,6 +31,13 @@
         }
       }
     },
+    "Current Clipboard Item": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Current Clipboard Item" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前剪贴板内容" } }
+      }
+    },
     "Clipboard History Copy": {
       "extractionState": "manual",
       "localizations": {

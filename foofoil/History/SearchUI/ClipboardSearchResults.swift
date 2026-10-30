@@ -21,7 +21,12 @@ struct ClipboardSearchResults: View {
                                         Spacer(minLength: 0)
                                     }.padding(10).frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                                 }.buttonStyle(.plain)
-                                if !entry.isCurrentClipboard {
+                                if entry.isCurrentClipboard {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.secondary).padding(8)
+                                        .help(NSLocalizedString("Current Clipboard Item", comment: ""))
+                                        .accessibilityLabel(NSLocalizedString("Current Clipboard Item", comment: ""))
+                                } else {
                                     Button { search.copy(entry) } label: {
                                         Image(systemName: "doc.on.doc").padding(8)
                                     }.buttonStyle(.plain).disabled(!entry.canCopy)

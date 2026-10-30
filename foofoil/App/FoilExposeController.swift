@@ -140,6 +140,7 @@ final class FoilExposeModel: ObservableObject {
     let toast = FoilToastCenter()
     let clipboardSearch: ClipboardHistorySearch
     private var clipboardCancellable: AnyCancellable?
+    private var clipboardCopyCancellable: AnyCancellable?
     private var clipboardIDs: [String: UUID] = [:]
     private var clipboardItems: [FoilExposeItem] = []
     /// 打开的箔片条目。
@@ -161,7 +162,7 @@ final class FoilExposeModel: ObservableObject {
     }
 
     /// 展示时剪贴板里可打开的内容类型（与实际打开结果一致）；nil 表示没有可打开内容，不显示提示。
-    let clipboardContent: ClipboardOpenableContent?
+    @Published private(set) var clipboardContent: ClipboardOpenableContent?
     /// 当前键盘高亮的条目下标（对应 currentItems）；默认高亮第一项。
     @Published var selectedIndex: Int = 0
     @Published var isOptionPressed = false
@@ -369,7 +370,8 @@ final class FoilExposeModel: ObservableObject {
          musicSearch: (@MainActor (String) async throws -> [AppleMusicLibraryItem])? = nil,
          musicAuthorized: @escaping @MainActor () -> Bool = { AppleMusicLibrary.shared.isAuthorized },
          musicEnabled: @escaping @MainActor () -> Bool = { SettingsStore.shared.appleMusicSearchEnabled },
-         clipboardSearch: ClipboardHistorySearch? = nil) {
+         clipboardSearch: ClipboardHistorySearch? = nil,
+         readClipboardContent: @escaping @MainActor () -> ClipboardOpenableContent? = { (NSApp.delegate as? AppDelegate)?.clipboardOpenableContent() }) {
         self.clipboardSearch = clipboardSearch ?? ClipboardHistorySearch()
         self.cameraAvailable = cameraAvailable
         self.musicSearch = { term, filter in
@@ -409,6 +411,12 @@ final class FoilExposeModel: ObservableObject {
             self.selectedIndex = min(self.selectedIndex, max(0, self.displayedResultCount - 1))
             self.objectWillChange.send()
         }
+        clipboardCopyCancellable = NotificationCenter.default.publisher(for: .clipboardHistoryDidCopy)
+            .sink { [weak self] _ in
+                MainActor.assumeIsolated {
+                    self?.clipboardContent = readClipboardContent()
+                }
+            }
         self.clipboardSearch.search("")
         fileSettingsCancellable = NotificationCenter.default.publisher(for: .localFileSearchDidChange)
             .receive(on: DispatchQueue.main)

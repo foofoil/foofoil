@@ -4,7 +4,7 @@ import ImageIO
 import UniformTypeIdentifiers
 
 nonisolated struct ClipboardSearchEntry: Identifiable, Sendable, Equatable {
-    enum Content: Sendable, Equatable {
+    enum Content: Sendable, Hashable {
         case text(String), markdown(String), html(String, String?), image(Data), files([URL]), unavailable
     }
     let id: String
@@ -135,6 +135,10 @@ actor ClipboardHistoryReader {
 
 }
 
+extension Notification.Name {
+    static let clipboardHistoryDidCopy = Notification.Name("clipboardHistoryDidCopy")
+}
+
 @MainActor
 final class ClipboardHistorySearch: ObservableObject {
     @Published private(set) var access: ClipboardHistoryAccess = .unknown
@@ -147,6 +151,7 @@ final class ClipboardHistorySearch: ObservableObject {
     private var task: Task<Void, Never>?
     private var active = false
     private var activation: AnyCancellable?
+    private var copyNotification: AnyCancellable?
     private let load: @Sendable () async -> ClipboardHistorySnapshot
     private let currentContent: @MainActor () -> ClipboardSearchEntry?
     private let cachedLoad: @Sendable () async -> ClipboardHistorySnapshot?
@@ -158,6 +163,14 @@ final class ClipboardHistorySearch: ObservableObject {
         else if load == nil { self.cachedLoad = { await ClipboardHistoryReader.shared.cachedSnapshot() } }
         else { self.cachedLoad = { nil } }
         self.currentContent = currentContent
+        copyNotification = NotificationCenter.default.publisher(for: .clipboardHistoryDidCopy)
+            .sink { [weak self] notification in
+                MainActor.assumeIsolated {
+                    guard let self, self.active, notification.object as AnyObject? !== self else { return }
+                    self.current = self.currentContent()
+                    self.filter()
+                }
+            }
         activation = NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
             .sink { [weak self] _ in
                 MainActor.assumeIsolated { if self?.active == true { self?.refresh() } }
@@ -193,7 +206,26 @@ final class ClipboardHistorySearch: ObservableObject {
     private func filter() {
         // 未授权时最多一项；不把系统历史导入浮箔自己的历史数据库。
         let values = access == .available ? snapshot : []
-        var all = values
+        // 系统会为再次复制生成新记录；保留最新位置，并优先沿用其他应用的来源。
+        var all: [ClipboardSearchEntry] = []
+        var indices: [ClipboardSearchEntry.Content: Int] = [:]
+        for entry in values {
+            guard entry.canCopy else { all.append(entry); continue }
+            if let index = indices[entry.content] {
+                let existing = all[index]
+                let ownBundle = Bundle.main.bundleIdentifier
+                let source = [existing.sourceBundleIdentifier, entry.sourceBundleIdentifier]
+                    .compactMap { $0 }.first { $0 != ownBundle }
+                    ?? existing.sourceBundleIdentifier ?? entry.sourceBundleIdentifier
+                let newest = entry.date > existing.date ? entry : existing
+                all[index] = ClipboardSearchEntry(id: newest.id, title: newest.title,
+                    searchText: existing.searchText + "\n" + entry.searchText,
+                    content: newest.content, date: newest.date, sourceBundleIdentifier: source)
+            } else {
+                indices[entry.content] = all.count
+                all.append(entry)
+            }
+        }
         if let current, !all.contains(where: { $0.content == current.content }) { all.insert(current, at: 0) }
         entries = all.filter { $0.matches(query) }.map { entry in
             var result = entry
@@ -230,7 +262,10 @@ final class ClipboardHistorySearch: ObservableObject {
             success = pasteboard.setData(data, forType: NSPasteboard.PasteboardType(type as String))
         }
         copyError = success ? nil : NSLocalizedString("Clipboard History Copy Failed", comment: "")
-        if success { current = currentContent(); filter() }
+        if success {
+            current = currentContent(); filter()
+            if pasteboard == .general { NotificationCenter.default.post(name: .clipboardHistoryDidCopy, object: self) }
+        }
         return success
     }
 

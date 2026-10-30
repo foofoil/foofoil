@@ -695,8 +695,13 @@ private final class ExposeNativeCard: NSView {
         reset()
         self.foil = foil; self.model = model; self.action = action; self.compact = compact; self.terminalStyle = terminalStyle
         self.highlighted = highlighted
-        copyButton.isHidden = foil?.clipboardEntry == nil || foil?.clipboardEntry?.isCurrentClipboard == true
-        copyButton.isEnabled = foil?.clipboardEntry?.canCopy == true
+        let isCurrentClipboard = foil?.clipboardEntry?.isCurrentClipboard == true
+        let copyLabel = NSLocalizedString(isCurrentClipboard ? "Current Clipboard Item" : "Clipboard History Copy", comment: "")
+        copyButton.image = NSImage(systemSymbolName: isCurrentClipboard ? "checkmark.circle.fill" : "doc.on.doc", accessibilityDescription: copyLabel)
+        copyButton.toolTip = copyLabel
+        copyButton.setAccessibilityLabel(copyLabel)
+        copyButton.isHidden = foil?.clipboardEntry == nil
+        copyButton.isEnabled = !isCurrentClipboard && foil?.clipboardEntry?.canCopy == true
         copyButton.setAccessibilityIdentifier(foil?.clipboardEntry.map { "clipboard.copy.\($0.id)" })
         setAccessibilityChildren(copyButton.isHidden ? [] : [copyButton])
         isNotice = compact && action == nil && foil == nil

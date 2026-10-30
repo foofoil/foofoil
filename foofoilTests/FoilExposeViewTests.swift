@@ -107,6 +107,15 @@ struct FoilExposeViewTests {
         #expect(controller.searchField.currentEditor() == nil)
     }
 
+    @Test func clipboardCopyRefreshesOverviewOpeningContent() {
+        var content = ClipboardOpenableContent(.text)
+        let model = FoilExposeModel(items: [], historyItems: [], clipboardContent: content,
+                                    fileSearch: { _, _ in }, readClipboardContent: { content })
+        content = ClipboardOpenableContent(.image)
+        NotificationCenter.default.post(name: .clipboardHistoryDidCopy, object: nil)
+        #expect(model.clipboardContent == content)
+    }
+
     private func model(clipboardContent: ClipboardOpenableContent? = nil) -> FoilExposeModel {
         let history = FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true, title: "Native note",
                                      symbolName: "note.text", contentKind: .note, thumbnailPath: nil, hasHistoryRecord: true)
