@@ -98,9 +98,9 @@ extension AppState {
             self.originalImageName = originalName
             self.sourceFingerprint = fileList == nil ? Self.localSourceFingerprint(for: url) : nil
             self.imageSource = nil
-            // 列表内切项保留边框；新打开图片仍默认无边框。
+            // 列表内切项保留边框；新 PDF 默认有边框，普通图片默认无边框。
             if clearsFileList || imageURL == nil {
-                self.showBorder = false
+                self.showBorder = self.isPDFDocument
             }
             self.createdAt = Date()
             self.stopCamera()
@@ -1402,7 +1402,7 @@ extension AppState {
                         self.sourceFingerprint = imageSource == .clipboard ? "clipboard:\(requestID)" : nil
                         self.originalImageName = originalName ?? "dropped_image.png"
                         self.imageSource = imageSource
-                        self.showBorder = false
+                        self.showBorder = self.isPDFDocument
                         self.createdAt = Date()
                         self.stopCamera()
                         self.webURL = nil

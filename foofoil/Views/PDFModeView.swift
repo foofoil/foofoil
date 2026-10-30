@@ -18,9 +18,7 @@ struct PDFModeView: NSViewRepresentable {
     func makeNSView(context: Context) -> PDFView {
         let pdfView = FoofoilPDFView()
         pdfView.autoScales = false
-        pdfView.displayMode = .singlePage
-        pdfView.displayDirection = .horizontal
-        pdfView.displaysPageBreaks = false
+        Self.applyDisplayMode(to: pdfView, showBorder: appState.showBorder)
         pdfView.document = PDFDocument(url: url)
         pdfView.scaleFactor = CGFloat(appState.imageScale)
         context.coordinator.defaultBackgroundColor = pdfView.backgroundColor
@@ -35,7 +33,19 @@ struct PDFModeView: NSViewRepresentable {
         return pdfView
     }
 
+    /// 有框阅读使用 PDFKit 连续布局；切换边框时保留当前页和页内位置。
+    static func applyDisplayMode(to view: PDFView, showBorder: Bool) {
+        let mode: PDFDisplayMode = showBorder ? .singlePageContinuous : .singlePage
+        guard view.displayMode != mode || view.displayDirection != .vertical else { return }
+        let destination = view.currentDestination
+        view.displayMode = mode
+        view.displayDirection = .vertical
+        view.displaysPageBreaks = showBorder
+        if let destination { view.go(to: destination) }
+    }
+
     func updateNSView(_ pdfView: PDFView, context: Context) {
+        Self.applyDisplayMode(to: pdfView, showBorder: appState.showBorder)
         if context.coordinator.loadedURL != url {
             context.coordinator.loadedURL = url
             pdfView.document = PDFDocument(url: url)
