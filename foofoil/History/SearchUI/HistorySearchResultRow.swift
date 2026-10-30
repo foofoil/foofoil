@@ -103,7 +103,7 @@ private struct SearchResultRow: View {
                 if historyIsPinned {
                     Image(systemName: "bookmark.fill")
                         .font(.system(size: 10))
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(Color(nsColor: .systemYellow))
                         .padding(3)
                         .background(.regularMaterial, in: Circle())
                         .padding(2)

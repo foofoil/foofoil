@@ -29,7 +29,7 @@ struct HistoryCardView: View {
             .overlay(alignment: .topTrailing) {
                 if config.historyIsPinned {
                     Image(systemName: "bookmark.fill")
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(Color(nsColor: .systemYellow))
                         .padding(4)
                         .background(.regularMaterial, in: Circle())
                         .padding(3)

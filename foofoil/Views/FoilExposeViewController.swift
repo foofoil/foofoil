@@ -246,6 +246,7 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
         favorite.setAccessibilityIdentifier("expose.favorites")
         favorite.title = [NSLocalizedString("Favorited History", comment: ""), shortcut].filter { !$0.isEmpty }.joined(separator: "  ")
         favorite.image = NSImage(systemSymbolName: "bookmark.fill", accessibilityDescription: nil)
+        favorite.symbolColor = .systemYellow
         favorite.isEmphasized = model.pinnedOnly
         favorite.perform = { [weak self] in self?.model.pinnedOnly.toggle(); self?.focusSearch() }
         categories.addArrangedSubview(favorite)
@@ -448,6 +449,7 @@ private final class ExposeActionButton: NSButton {
         updateStyle()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    var symbolColor: NSColor?
     var textOpacity: CGFloat = 0.65
     var shortcutText: String? { didSet { invalidateIntrinsicContentSize(); needsDisplay = true } }
     override var isFlipped: Bool { true }
@@ -485,7 +487,7 @@ private final class ExposeActionButton: NSButton {
         let color = NSColor.white.withAlphaComponent(isHighlighted ? 1 : (isEmphasized ? 0.95 : textOpacity))
         var x: CGFloat = 9
         if let image {
-            let symbol = image.withSymbolConfiguration(.init(paletteColors: [color])) ?? image
+            let symbol = image.withSymbolConfiguration(.init(paletteColors: [symbolColor ?? color])) ?? image
             symbol.draw(in: NSRect(x: x, y: (bounds.height - 14) / 2, width: 14, height: 14),
                         from: .zero, operation: .sourceOver, fraction: 1, respectFlipped: true, hints: nil)
             x += 19
