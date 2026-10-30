@@ -238,7 +238,9 @@ struct TextContentView: View {
                                     }
                                 }
                                 .padding(.horizontal, 16)
-                                .padding(.bottom, 28)
+                                // 为卡片上浮和阴影留出空间，避免被滚动区域裁切。
+                                .padding(.top, 9)
+                                .padding(.bottom, 19)
                             }
                             .frame(height: 88)
                             .coordinateSpace(name: "blankHistoryViewport")
