@@ -30,7 +30,7 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             updateExtractImageSubjectMenuItem()
         } else if let fileMenu, menu === fileMenu {
             updateFileMenu(menu)
-            refreshIncognitoClipboardVisibility()
+            menu.items.first { $0.representedObject as? String == "file.openCamera.incognito" }?.isHidden = !CameraCaptureController.isAvailable
             setMenuItem(withAction: #selector(openCameraAction), in: menu, isHidden: !CameraCaptureController.isAvailable)
         } else if let goMenu, menu === goMenu {
             updateGoMenu(goMenu)

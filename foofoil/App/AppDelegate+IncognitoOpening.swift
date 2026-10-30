@@ -10,37 +10,14 @@ extension AppDelegate {
             alternate.target = self
             alternate.representedObject = id + IncognitoOpening.suffix
             alternate.image = item.image
-            alternate.isAlternate = true
+            // 剪贴板已有独立的可见无痕命令；隐藏派生项但保留其快捷键。
+            let isClipboard = id == "file.openClipboardContent"
+            alternate.isAlternate = !isClipboard
             alternate.keyEquivalentModifierMask = item.keyEquivalentModifierMask.union(.option)
-            alternate.isHidden = item.isHidden
+            alternate.isHidden = isClipboard || item.isHidden
+            alternate.allowsKeyEquivalentWhenHidden = isClipboard
             menu.insertItem(alternate, at: menu.index(of: item) + 1)
         }
-    }
-
-    // 原生 alternate 处理按住 ⌥ 的替换；仅在菜单跟踪期间同步剪贴板独立入口，避免重复行。
-    public func menuWillOpen(_ menu: NSMenu) {
-        guard menu === fileMenu else { return }
-        refreshIncognitoClipboardVisibility()
-        fileMenuOptionTimer?.invalidate()
-        let timer = Timer(timeInterval: 0.05, target: self, selector: #selector(refreshIncognitoClipboardVisibility), userInfo: nil, repeats: true)
-        fileMenuOptionTimer = timer
-        RunLoop.main.add(timer, forMode: .eventTracking)
-    }
-
-    public func menuDidClose(_ menu: NSMenu) {
-        guard menu === fileMenu else { return }
-        fileMenuOptionTimer?.invalidate()
-        fileMenuOptionTimer = nil
-        fileMenu?.items.first { $0.action == #selector(openClipboardIncognitoAction) }?.isHidden = false
-    }
-
-    @objc func refreshIncognitoClipboardVisibility() {
-        updateIncognitoClipboardVisibility(optionPressed: NSEvent.modifierFlags.contains(.option))
-    }
-
-    func updateIncognitoClipboardVisibility(optionPressed: Bool) {
-        fileMenu?.items.first { $0.action == #selector(openClipboardIncognitoAction) }?.isHidden = optionPressed
-        fileMenu?.items.first { $0.representedObject as? String == "file.openCamera.incognito" }?.isHidden = !CameraCaptureController.isAvailable
     }
 
     @objc func openIncognitoContentAction(_ sender: NSMenuItem) {

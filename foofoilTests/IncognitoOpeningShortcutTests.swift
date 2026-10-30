@@ -161,13 +161,14 @@ struct IncognitoOpeningShortcutTests {
         delegate.applyKeyboardShortcuts(to: menu)
         for id in IncognitoOpening.titles.keys {
             let item = try #require(menu.items.first { $0.representedObject as? String == id + IncognitoOpening.suffix })
-            #expect(item.isAlternate)
+            #expect(item.isAlternate == (id != "file.openClipboardContent"))
+            if id == "file.openClipboardContent" {
+                #expect(item.isHidden)
+                #expect(item.allowsKeyEquivalentWhenHidden)
+            }
             #expect(item.action == #selector(AppDelegate.openIncognitoContentAction(_:)))
             #expect(item.keyEquivalentModifierMask.contains(.option))
         }
-        delegate.updateIncognitoClipboardVisibility(optionPressed: true)
-        #expect(clipboard.isHidden)
-        delegate.updateIncognitoClipboardVisibility(optionPressed: false)
         #expect(!clipboard.isHidden)
     }
     @Test func quickOpenIsAnOpeningCommandWithDerivedShortcut() throws {
