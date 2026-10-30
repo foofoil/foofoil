@@ -108,7 +108,7 @@ extension AppDelegate {
         newWindowItem.target = self
         fileMenu.addItem(newWindowItem)
         let privateItem = NSMenuItem(title: NSLocalizedString("New Incognito Foil", comment: ""), action: #selector(newIncognitoWindowAction), keyEquivalent: "n")
-        privateItem.keyEquivalentModifierMask = [.command, .shift]
+        privateItem.keyEquivalentModifierMask = [.command, .option]
         privateItem.representedObject = "file.newIncognito"
         privateItem.withImage(IncognitoFoilIcon.menuImage)
         privateItem.target = self

@@ -261,7 +261,7 @@ struct IncognitoFoilTests {
         let toggle = try #require(KeyboardShortcutCatalog.definition(withID: "file.toggleIncognito")?.defaultShortcut)
         let clipboard = try #require(KeyboardShortcutCatalog.definition(withID: "file.openClipboardIncognito")?.defaultShortcut)
         #expect(newFoil.keyEquivalent == "n")
-        #expect(newFoil.modifiers == [.command, .shift])
+        #expect(newFoil.modifiers == [.command, .option])
         #expect(toggle.keyEquivalent == "\u{1B}")
         #expect(toggle.modifiers == [.option])
         #expect(clipboard.keyEquivalent == "v")
