@@ -6,8 +6,12 @@ import FoofoilExtensionKit
 nonisolated final class ArchivePreviewLease: Sendable {
     let directory: URL
     let byteCount: Int64
-    init(directory: URL, byteCount: Int64 = 0) { self.directory = directory; self.byteCount = byteCount }
-    deinit { try? FileManager.default.removeItem(at: directory) }
+    private let retainedLeases: [ArchivePreviewLease]
+    private let removesDirectory: Bool
+    init(directory: URL, byteCount: Int64 = 0, retaining leases: [ArchivePreviewLease] = [], removesDirectory: Bool = true) {
+        self.directory = directory; self.byteCount = byteCount; self.retainedLeases = leases; self.removesDirectory = removesDirectory
+    }
+    deinit { if removesDirectory { try? FileManager.default.removeItem(at: directory) } }
 }
 
 @MainActor final class ArchivePreviewRetention {
@@ -18,7 +22,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
 @MainActor final class ArchiveSession: ObservableObject {
     static let navigatorID = "builtin.archive"
     let navigatorContributionID = ArchiveSession.navigatorID
-    let source: ArchiveSource
+    private(set) var source: ArchiveSource
     let urls: [URL]
     private let accessedURLs: [URL]
     @Published private(set) var index: ArchiveIndex?
@@ -45,6 +49,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
     }
     private var nestedArchives: [String: NestedArchive] = [:]
     private var archiveNodeIDs: Set<String> = []
+    private var projectedMediaKinds: [String: FileListKind] = [:]
     private var itemParents: [String: String] = [:]
     private var itemLocations: [String: (origin: ArchiveSession?, entry: ArchiveEntry)] = [:]
     private var retry: (() -> Void)?
@@ -82,7 +87,13 @@ nonisolated final class ArchivePreviewLease: Sendable {
             urls.append(url)
             refreshed.append(.init(path: url.path, bookmark: AppState.makeSecurityScopedBookmark(for: url)))
         }
-        self.source = ArchiveSource(volumes: refreshed, displayName: source.displayName)
+        var resolved = source
+        resolved.volumes = refreshed
+        resolved.localFiles = source.localFiles?.map { file in
+            let url = file.bookmark.flatMap(AppState.resolveVideoBookmark) ?? URL(fileURLWithPath: file.path)
+            return .init(path: url.path, bookmark: AppState.makeSecurityScopedBookmark(for: url))
+        }
+        self.source = resolved
         self.urls = urls
         self.accessedURLs = accessed
     }
@@ -153,15 +164,17 @@ nonisolated final class ArchivePreviewLease: Sendable {
         }
         let origin = location.origin ?? self
         guard let index = origin.index else { return }
+        let localSourceURL = localURL(for: id)
         let cachedLease = nestedArchives[id]?.lease
         let node = NestedArchive()
         nestedArchives[id] = node
         let urls = origin.urls, password = origin.password, queue = origin.workQueue, entry = location.entry
         let sourceLease = origin.sourceLease
-        let rootQueue = workQueue, rootURLs = self.urls, rootIndex = self.index
+        let rootQueue = workQueue, rootURLs = self.urls, rootIndex = source.localFiles == nil ? self.index : nil
         node.task = Task { [weak self, weak node] in
             defer { withExtendedLifetime(sourceLease) {} }
-            let worker = Task.detached(priority: .userInitiated) {
+            let worker = Task.detached(priority: .userInitiated) { () -> ArchivePreviewLease? in
+                if localSourceURL != nil { return nil }
                 if let rootIndex { try await rootQueue.validate(urls: rootURLs, index: rootIndex) }
                 if let cachedLease { return cachedLease }
                 return try await queue.preview(urls: urls, index: index, entry: entry, password: password, limit: ArchiveReader.maximumExportBytes)
@@ -170,8 +183,8 @@ nonisolated final class ArchivePreviewLease: Sendable {
                 let lease = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
                 guard let self, let node, !Task.isCancelled, self.nestedArchives[id] === node else { return }
                 let cachedBytes = self.nestedArchives.values.reduce(Int64(0)) { $0 + ($1.lease?.byteCount ?? 0) }
-                guard lease.byteCount <= ArchiveReader.maximumExportBytes - cachedBytes else { throw ArchiveFailure.limit }
-                let sourceURL = lease.directory.appendingPathComponent(entry.name)
+                guard (lease?.byteCount ?? 0) <= ArchiveReader.maximumExportBytes - cachedBytes else { throw ArchiveFailure.limit }
+                let sourceURL = localSourceURL ?? lease!.directory.appendingPathComponent(entry.name)
                 // 内层 ISO 在首次读取后使用同一内容探测分流，SACD 保持音频叶节点。
                 if sourceURL.pathExtension.lowercased() == "iso", ExtensionHost.shared.canOpenAsAudio(url: sourceURL) {
                     node.lease = lease
@@ -183,7 +196,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
                     if self.selectedID == id { self.select(id) }
                     return
                 }
-                let child = ArchiveSession(source: ArchiveSource(volumes: [.init(path: lease.directory.appendingPathComponent(entry.name).path)]), sourceLease: lease)
+                let child = ArchiveSession(source: ArchiveSource(volumes: [.init(path: sourceURL.path)]), sourceLease: lease)
                 node.lease = lease
                 node.session = child
                 node.task = nil
@@ -280,8 +293,170 @@ nonisolated final class ArchivePreviewLease: Sendable {
             }
         }
         if let index { append(index, origin: nil, prefix: "", parent: nil) }
-        cachedContribution = NavigatorContribution(id: navigatorContributionID, titleLocalizationKey: "Archive Contents", style: .outline,
+        projectedMediaKinds = Dictionary(uniqueKeysWithValues: items.compactMap { item in
+            mediaKind(for: item.id).map { (item.id, $0) }
+        })
+        cachedContribution = NavigatorContribution(id: navigatorContributionID, titleLocalizationKey: source.localFiles == nil ? "Archive Contents" : "Directory Contents", style: .outline,
             items: items, selectedItemIDs: [], allowedActions: [.activate])
+    }
+
+    var sidebarMode: CollectionSidebarMode { source.sidebarMode ?? .folder }
+    var displayedContributions: [NavigatorContribution] {
+        guard sidebarMode != .folder else { return [contribution] }
+        if let contributions = preview?.navigatorContributions, !contributions.isEmpty { return contributions }
+        let items = cachedContribution.items.filter { projectedMediaKinds[$0.id] == sidebarMode.kind }
+        return [.init(id: navigatorContributionID, titleLocalizationKey: sidebarMode.titleKey, style: .flat,
+                      items: items, selectedItemIDs: items.first.map { [$0.id] } ?? [], allowedActions: [.activate])]
+    }
+
+    private func localURL(for id: String) -> URL? {
+        guard let files = source.localFiles, itemLocations[id]?.origin == nil,
+              let ordinal = itemLocations[id]?.entry.ordinal,
+              files.indices.contains(ordinal) else { return nil }
+        return URL(fileURLWithPath: files[ordinal].path)
+    }
+
+    private func mediaKind(for id: String) -> FileListKind? {
+        guard let entry = itemLocations[id]?.entry, entry.isRegular else { return nil }
+        let url = localURL(for: id) ?? URL(fileURLWithPath: entry.path)
+        switch FileListGrouper.classify(url: url) {
+        case .listable(let kind): return kind
+        case .cueSheets: return .audio
+        case .other: return nil
+        }
+    }
+
+    var availableSidebarModes: [CollectionSidebarMode] {
+        let kinds = Set(projectedMediaKinds.values)
+        return CollectionSidebarMode.allCases.filter { $0.kind.map { kinds.contains($0) } ?? true }
+    }
+
+    @discardableResult
+    private func makePreview(lease: ArchivePreviewLease?) -> AppState {
+        let state = AppState(isIncognito: windowState?.isIncognito ?? true)
+        state.isArchivePreview = true
+        state.archiveWindowOwner = windowState
+        state.archivePreviewLease = lease
+        state.isFullScreen = windowState?.isFullScreen ?? false
+        state.showBorder = windowState?.showBorder ?? true
+        state.showCodeLineNumbers = windowState?.showCodeLineNumbers ?? true
+        preview = state
+        previewObservation = state.objectWillChange.debounce(for: .milliseconds(50), scheduler: RunLoop.main)
+            .sink { [weak self] _ in self?.objectWillChange.send(); self?.onChange?() }
+        return state
+    }
+
+    /// 媒体模式复用普通文件列表和播放控制；提取任务按代次取消，并共同持有所有预览缓存。
+    func setSidebarMode(_ mode: CollectionSidebarMode, restoring: Bool = false) {
+        guard (restoring || mode != sidebarMode), availableSidebarModes.contains(mode) else { return }
+        cancelPreview()
+        source.sidebarMode = mode
+        windowState?.endNavigatorSearch()
+        windowState?.navigatorFocusedItemID = nil
+        if mode == .folder {
+            if let selectedID { select(selectedID) }
+            onChange?()
+            windowState?.saveState()
+            return
+        }
+        let ids = cachedContribution.items.map(\.id).filter { projectedMediaKinds[$0] == mode.kind }
+        guard !ids.isEmpty else { return }
+        busy = true
+        onChange?()
+        let token = generation
+        task = Task { [weak self] in
+            guard let self else { return }
+            do {
+                var resolvedURLs: [String: URL] = [:]
+                var groups: [(origin: ArchiveSession, ids: [String], entries: [ArchiveEntry])] = []
+                for id in ids {
+                    if let url = self.localURL(for: id) { resolvedURLs[id] = url; continue }
+                    guard let location = self.itemLocations[id] else { continue }
+                    let origin = location.origin ?? self
+                    if let index = groups.firstIndex(where: { $0.origin === origin }) {
+                        groups[index].ids.append(id)
+                        groups[index].entries.append(location.entry)
+                    } else { groups.append((origin, [id], [location.entry])) }
+                }
+                var leases: [ArchivePreviewLease] = []
+                var total: Int64 = 0
+                for group in groups {
+                    try Task.checkCancellation()
+                    guard let index = group.origin.index else { continue }
+                    let lease = try await group.origin.workQueue.previewEntries(urls: group.origin.urls, index: index,
+                        entries: group.entries, password: group.origin.password, limit: ArchiveReader.maximumExportBytes - total)
+                    total += lease.byteCount
+                    guard total <= ArchiveReader.maximumExportBytes else { throw ArchiveFailure.limit }
+                    leases.append(lease)
+                    for (id, entry) in zip(group.ids, group.entries) {
+                        resolvedURLs[id] = lease.directory.appendingPathComponent(entry.path)
+                    }
+                }
+                let mediaURLs = ids.compactMap { resolvedURLs[$0] }
+                guard !Task.isCancelled, self.generation == token, let kind = mode.kind else { return }
+                let lease = leases.first.map { first in
+                    ArchivePreviewLease(directory: first.directory, byteCount: total, retaining: leases, removesDirectory: false)
+                }
+                let state = self.makePreview(lease: lease)
+                if kind == .audio { state.installAudioList(urls: mediaURLs, preservesIdentity: true) }
+                else { state.installFileList(kind: kind, urls: mediaURLs, preservesIdentity: true) }
+                self.busy = false
+                self.onChange?()
+                self.windowState?.saveState()
+            } catch {
+                guard !Task.isCancelled, self.generation == token else { return }
+                self.busy = false
+                self.handle(error) { [weak self] in self?.setSidebarMode(mode, restoring: true) }
+            }
+        }
+    }
+
+    func canOpenInNewFoil(_ id: String) -> Bool {
+        guard itemLocations[id]?.entry.isRegular == true else { return false }
+        if let url = localURL(for: id), let windowState {
+            return windowState.initialFileOpenFailure(url) == nil
+        }
+        return true
+    }
+
+    func openInNewFoil(_ id: String) {
+        guard canOpenInNewFoil(id) else { return }
+        let incognito = windowState?.isIncognito ?? true
+        Task { [weak self] in
+            guard let self, let location = self.itemLocations[id] else { return }
+            do {
+                let url: URL
+                let lease: ArchivePreviewLease?
+                if let local = self.localURL(for: id) { url = local; lease = nil }
+                else {
+                    let origin = location.origin ?? self
+                    guard let index = origin.index else { return }
+                    lease = try await origin.workQueue.preview(urls: origin.urls, index: index, entry: location.entry,
+                        password: origin.password, limit: ArchiveReader.maximumExportBytes)
+                    url = lease!.directory.appendingPathComponent(location.entry.name)
+                }
+                defer { withExtendedLifetime(lease) {} }
+                let state = AppState(isIncognito: incognito)
+                // 独立箔持有托管副本，关闭包预览或重启后仍能从历史打开。
+                if lease != nil, let managedURL = state.managedBodyURL(extension: url.pathExtension) {
+                    try await Task.detached(priority: .userInitiated) {
+                        try ContentCache.shared.copy(from: url, to: managedURL)
+                    }.value
+                    ContentCache.shared.retain([managedURL.path])
+                    defer { ContentCache.shared.release([managedURL.path]) }
+                    state.openFile(url: managedURL)
+                    state.ownedBodyPaths.insert(managedURL.path)
+                    state.originalImageName = location.entry.name
+                    state.customTitle = location.entry.name
+                    state.saveState()
+                } else {
+                    state.openFile(url: url)
+                }
+                (NSApp.delegate as? AppDelegate)?.showNewWindow(with: state)
+            } catch {
+                self.handle(error) { [weak self] in self?.openInNewFoil(id) }
+            }
+        }
     }
 
     func load() {
@@ -294,11 +469,15 @@ nonisolated final class ArchivePreviewLease: Sendable {
         busy = true
         message = nil
         let token = generation
+        let source = source
         let urls = urls, password = password, workQueue = workQueue
         let sourceLease = sourceLease
         task = Task { [weak self] in
             defer { withExtendedLifetime(sourceLease) {} }
-            let worker = Task.detached(priority: .userInitiated) { try await workQueue.scan(urls: urls, password: password) }
+            let worker = Task.detached(priority: .userInitiated) {
+                if source.localFiles != nil { return source.localIndex() }
+                return try await workQueue.scan(urls: urls, password: password)
+            }
             do {
                 let result = try await withTaskCancellationHandler { try await worker.value } onCancel: { worker.cancel() }
                 guard let self, !Task.isCancelled, self.generation == token else { return }
@@ -306,6 +485,10 @@ nonisolated final class ArchivePreviewLease: Sendable {
                 self.projectIndex()
                 self.busy = false
                 self.onChange?()
+                if self.sidebarMode != .folder {
+                    if self.availableSidebarModes.contains(self.sidebarMode) { self.setSidebarMode(self.sidebarMode, restoring: true) }
+                    else { self.source.sidebarMode = .folder; self.onChange?() }
+                }
             } catch {
                 guard let self, !Task.isCancelled, self.generation == token else { return }
                 self.busy = false
@@ -349,6 +532,12 @@ nonisolated final class ArchivePreviewLease: Sendable {
         message = nil
         onChange?()
         guard let entry = selected, !entry.isDirectory else { return }
+        if let url = localURL(for: id) {
+            let state = makePreview(lease: nil)
+            state.openFile(url: url)
+            onChange?()
+            return
+        }
         let isISO = (entry.name as NSString).pathExtension.lowercased() == "iso"
         guard !isArchiveNode(id) || isISO else { return }
         guard entry.isRegular else { message = NSLocalizedString("Archive Unsupported Entry", comment: ""); return }
@@ -360,7 +549,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
         busy = true
         let token = generation
         let urls = origin.urls, password = origin.password, workQueue = origin.workQueue, sourceLease = origin.sourceLease
-        let rootQueue = self.workQueue, rootURLs = self.urls, rootIndex = self.index
+        let rootQueue = self.workQueue, rootURLs = self.urls, rootIndex = source.localFiles == nil ? self.index : nil
         let cachedLease = nestedArchives[id]?.lease
         task = Task { [weak self] in
             defer { withExtendedLifetime(sourceLease) {} }
@@ -480,7 +669,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
         exportedBytes = 0
         message = nil
         let protectedURLs = self.urls + nestedArchives.values.flatMap { $0.session?.urls ?? [] }
-        let rootQueue = self.workQueue, rootIndex = self.index, rootURLs = self.urls
+        let rootQueue = self.workQueue, rootIndex = source.localFiles == nil ? self.index : nil, rootURLs = self.urls
         let urls = origin.urls, password = origin.password, workQueue = origin.workQueue, sourceLease = origin.sourceLease
         exportTask = Task { [weak self] in
             defer { withExtendedLifetime(sourceLease) {} }

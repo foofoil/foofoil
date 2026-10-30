@@ -30,6 +30,8 @@ struct NavigatorPanelView: View {
         var id: String { item.id }
     }
 
+    private var listState: AppState { appState.readingState }
+
     private var contributions: [NavigatorContribution] {
         appState.navigatorContributions
     }
@@ -53,6 +55,7 @@ struct NavigatorPanelView: View {
             MovableBackground()
 
             VStack(spacing: 0) {
+                if let session = appState.archiveSession { collectionModeToolbar(session) }
                 if let contribution = activeContribution {
                     // 标题区位于滚动区域之外，列表滚动时保持固定；
                     // 多个贡献时由选择器兼任标题与切换，避免重复展示同一名称。
@@ -124,6 +127,29 @@ struct NavigatorPanelView: View {
             guard appState.isNavigatorSearchActive else { return }
             isSearchFieldFocused = true
         }
+    }
+
+    private func collectionModeToolbar(_ session: ArchiveSession) -> some View {
+        let selectedMode = session.sidebarMode
+        let availableModes = session.availableSidebarModes
+        return HStack(spacing: 8) {
+            ForEach(availableModes, id: \.self) { mode in
+                Button { session.setSidebarMode(mode) } label: {
+                    Image(systemName: mode.symbol)
+                        .frame(width: 30, height: 28)
+                        .foregroundStyle(selectedMode == mode ? Color.accentColor : Color.secondary)
+                        .background(selectedMode == mode ? Color.accentColor.opacity(0.12) : .clear,
+                                    in: RoundedRectangle(cornerRadius: 5))
+                }
+                .buttonStyle(.plain)
+                .help(NSLocalizedString(mode.titleKey, comment: ""))
+                .accessibilityLabel(NSLocalizedString(mode.titleKey, comment: ""))
+                .accessibilityAddTraits(selectedMode == mode ? .isSelected : [])
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12).padding(.top, 6)
+        .background(NonMovableBackground())
     }
 
     private func localizedTitle(for contribution: NavigatorContribution) -> String {
@@ -375,7 +401,7 @@ struct NavigatorPanelView: View {
         alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
         let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 240, height: 24))
         // 预填当前展示标题（用户标题或分区推导名），用户可在此基础上修改。
-        field.stringValue = appState.fileList?.displayTitle ?? ""
+        field.stringValue = listState.fileList?.displayTitle ?? ""
         alert.accessoryView = field
         alert.window.initialFirstResponder = field
         guard alert.runModal() == .alertFirstButtonReturn else { return }
@@ -388,7 +414,7 @@ struct NavigatorPanelView: View {
             return item.title
         }
         if contribution.id == AppState.fileListNavigatorID,
-           let list = appState.fileList, list.isPresentable {
+           let list = listState.fileList, list.isPresentable {
             return list.displayTitle
         }
         return localizedTitle(for: contribution)
@@ -397,15 +423,15 @@ struct NavigatorPanelView: View {
     /// 只有纯单 CUE / SACD 列表在标题显示格式；通用扩展容器不显示徽标。
     private func containerHeaderBadge(for contribution: NavigatorContribution) -> String? {
         guard contribution.id == AppState.fileListNavigatorID,
-              let format = appState.fileList?.soleContainerFormat else { return nil }
+              let format = listState.fileList?.soleContainerFormat else { return nil }
         return format.badgeLocalizationKey.map { NSLocalizedString($0, comment: "") }
     }
 
     /// CUE / SACD 曲目把 Track 号显示为左侧序号，标题本身用曲名。
     private func cueTrackNumber(for row: VisibleRow, contribution: NavigatorContribution) -> String? {
         guard contribution.id == AppState.fileListNavigatorID,
-              appState.fileList?.isCueBased == true,
-              let item = appState.fileList?.items.first(where: { $0.id == row.item.id }),
+              listState.fileList?.isCueBased == true,
+              let item = listState.fileList?.items.first(where: { $0.id == row.item.id }),
               let number = item.cue?.trackNumber?.trimmingCharacters(in: .whitespacesAndNewlines),
               !number.isEmpty else {
             return nil
@@ -500,7 +526,7 @@ struct NavigatorPanelView: View {
                         if showsPlaybackIndicator(for: contribution), row.item.isCurrent {
                             // 内置音视频与扩展播放队列的当前项用频率柱状图指示：播放时底部对齐的
                             // 柱高持续起伏；暂停时时间轴停走、冻结在最后变化时刻。
-                            MediaPlaybackBars(isPlaying: appState.isMediaPlaying)
+                            MediaPlaybackBars(isPlaying: listState.isMediaPlaying)
                                 .frame(width: 16)
                         } else {
                             Image(systemName: symbolName)
@@ -573,9 +599,16 @@ struct NavigatorPanelView: View {
             }
             .contextMenu {
                 if let archive = appState.archiveSession(forNavigatorID: contribution.id) {
-                    Button(NSLocalizedString("Save As...", comment: "")) {
-                        archive.selectNavigatorItem(row.item.id)
-                        archive.saveSelected()
+                    if archive.canOpenInNewFoil(row.item.id) {
+                        Button(NSLocalizedString("Open in New Foil", comment: "")) {
+                            archive.openInNewFoil(row.item.id)
+                        }
+                    }
+                    if archive.source.localFiles == nil {
+                        Button(NSLocalizedString("Save As...", comment: "")) {
+                            archive.selectNavigatorItem(row.item.id)
+                            archive.saveSelected()
+                        }
                     }
                 }
                 if contribution.allowedActions.contains(.remove) {
@@ -672,7 +705,7 @@ struct NavigatorPanelView: View {
         return contribution.id == AppState.fileListNavigatorID
             && row.depth == 0
             && row.hasChildren
-            && appState.fileList?.sections.contains(where: { $0.id == row.item.id }) == true
+            && listState.fileList?.sections.contains(where: { $0.id == row.item.id }) == true
     }
 
     /// 列表项以下的剩余区域作为末尾投放区。
@@ -680,7 +713,7 @@ struct NavigatorPanelView: View {
         NavigatorMoveDropDelegate(
             canDrop: {
                 contribution.allowedActions.contains(.move)
-                    && (contribution.style == .flat || appState.fileList?.sections.contains(where: {
+                    && (contribution.style == .flat || listState.fileList?.sections.contains(where: {
                         $0.id == draggedNavigatorItemID
                     }) == true)
                     && draggedNavigatorContributionID == contribution.id
@@ -709,7 +742,7 @@ struct NavigatorPanelView: View {
 
     private func imageThumbnailPath(for itemID: String, contribution: NavigatorContribution) -> String? {
         guard contribution.id == AppState.fileListNavigatorID,
-              let list = appState.fileList,
+              let list = listState.fileList,
               list.kind == .image else { return nil }
         return list.items.first(where: { $0.id == itemID })?.path
     }
@@ -723,7 +756,7 @@ struct NavigatorPanelView: View {
             return true
         }
         guard contribution.id == AppState.fileListNavigatorID,
-              let kind = appState.fileList?.kind else { return false }
+              let kind = listState.fileList?.kind else { return false }
         return kind == .video || kind == .audio
     }
 

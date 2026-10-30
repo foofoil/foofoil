@@ -2022,7 +2022,7 @@ struct FoofoilTests {
         #expect(groups.flatMap(\.urls).map(\.lastPathComponent) == ["first.txt", "second.md"])
     }
 
-    @Test func directoryDropRecursesSkipsHiddenAndCreatesPreferredList() async throws {
+    @Test func directoryDropRecursesSkipsHiddenAndCreatesMixedTree() async throws {
         let directory = FileManager.default.temporaryDirectory
             .appendingPathComponent("foofoil-directory-drop-\(UUID().uuidString)", isDirectory: true)
         let nested = directory.appendingPathComponent("Disc 2", isDirectory: true)
@@ -2049,18 +2049,18 @@ struct FoofoilTests {
         let state = AppState()
         defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
         #expect(state.handleDroppedFileURLs([directory]))
-        for _ in 0..<100 where state.fileList == nil {
+        for _ in 0..<100 where state.archiveSession?.index == nil {
             try await Task.sleep(for: .milliseconds(20))
         }
 
-        #expect(state.fileList?.kind == .audio)
-        #expect(state.fileList?.items.map(\.displayName) == ["01.mp3", "02.mp3"])
-        #expect(state.fileList?.items.contains(where: { $0.path == unsupported.path }) == false)
-        // 多目录列表不再保存首个目录名，标题由分区推导：首目录名（超长截断）+ 等 N 个。
-        #expect(state.fileList?.title == nil)
-        let historyTitle = state.toConfig().historyMenuDisplayName
-        #expect(historyTitle.contains(String(directory.lastPathComponent.prefix(20))))
-        #expect(historyTitle.contains("2"))
+        let session = try #require(state.archiveSession)
+        #expect(session.sidebarMode == .folder)
+        let files = try #require(session.source.localFiles)
+        #expect(files.count == 5)
+        #expect(files.contains { TestFileIdentity.equals($0.path, unsupported.path) })
+        #expect(!files.contains { TestFileIdentity.equals($0.path, hiddenAudio.path) || TestFileIdentity.equals($0.path, nestedHiddenAudio.path) })
+        #expect(session.contribution.items.contains { $0.title == "Disc 2" })
+        #expect(state.toConfig().historyMenuDisplayName.contains(directory.lastPathComponent))
     }
 
     @Test func directoryScanStopsAtLimitAndSupportsCancellation() throws {
@@ -2279,7 +2279,7 @@ struct FoofoilTests {
         #expect(state.matchingDroppedFiles(urls: [image, text]) == [text])
     }
 
-    @Test func dockDropUsesTheSameImageFilteringAsInWindowDrop() throws {
+    @Test func dockMixedDropCreatesACollectionTree() throws {
         let first = try writeTestPNG(name: "dock-list-a.png")
         let second = try writeTestPNG(name: "dock-list-b.png")
         let text = FileManager.default.temporaryDirectory
@@ -2297,8 +2297,10 @@ struct FoofoilTests {
 
         AppDelegate().openDroppedFiles([text, second], into: state)
 
-        #expect(state.fileList?.items.count == 2)
-        #expect(state.fileList?.items.contains(where: { $0.path == text.path }) == false)
+        let files = try #require(state.archiveSession?.source.localFiles)
+        #expect(files.count == 2)
+        #expect(files.contains { TestFileIdentity.equals($0.path, text.path) })
+        #expect(files.contains { TestFileIdentity.equals($0.path, second.path) })
     }
 
     @Test func openWithFilesAlwaysCreatesANewFoilWindow() throws {
@@ -2428,7 +2430,7 @@ struct FoofoilTests {
         #expect(existing.text == "正在查看的内容", "“打开方式”覆盖了当前箔片的内容")
     }
 
-    @Test func inWindowDropAppendsOnlyImagesToCurrentImage() async throws {
+    @Test func inWindowMixedDropCreatesACollectionTree() async throws {
         let first = try writeTestPNG(name: "window-list-a.png")
         let second = try writeTestPNG(name: "window-list-b.png")
         let text = FileManager.default.temporaryDirectory
@@ -2461,39 +2463,36 @@ struct FoofoilTests {
         }
 
         #expect(accepted)
-        #expect(state.fileList?.items.count == 2)
-        #expect(state.fileList?.items.contains(where: { $0.path == text.path }) == false)
+        let files = try #require(state.archiveSession?.source.localFiles)
+        #expect(files.count == 2)
+        #expect(files.contains { TestFileIdentity.equals($0.path, text.path) })
+        #expect(files.contains { TestFileIdentity.equals($0.path, second.path) })
     }
 
-    @Test func windowFileDropCreatesAndExtendsImageListsInAllThreeStates() throws {
+    @Test func windowFileDropCreatesAndExtendsHomogeneousImageListsInAllThreeStates() throws {
         let first = try writeTestPNG(name: "native-drop-a.png")
         let second = try writeTestPNG(name: "native-drop-b.png")
         let third = try writeTestPNG(name: "native-drop-c.png")
         let fourth = try writeTestPNG(name: "native-drop-d.png")
-        let text = FileManager.default.temporaryDirectory
-            .appendingPathComponent("foofoil-\(UUID().uuidString)-native-drop.txt")
-        try Data("ignored".utf8).write(to: text)
         defer {
-            for url in [first, second, third, fourth, text] {
+            for url in [first, second, third, fourth] {
                 try? FileManager.default.removeItem(at: url)
             }
         }
 
         let blank = AppState()
         defer { HistoryManager.shared.removeFromHistory(blank.toConfig()) }
-        #expect(blank.handleDroppedFileURLs([first, text, second]))
+        #expect(blank.handleDroppedFileURLs([first, second]))
         #expect(blank.fileList?.items.map(\.displayName) == [first.lastPathComponent, second.lastPathComponent])
-        #expect(blank.fileList?.items.contains(where: { $0.path == text.path }) == false)
 
         let single = AppState()
         defer { HistoryManager.shared.removeFromHistory(single.toConfig()) }
         single.openFile(url: first)
-        #expect(single.handleDroppedFileURLs([text, second]))
+        #expect(single.handleDroppedFileURLs([second]))
         #expect(single.fileList?.items.count == 2)
 
-        #expect(single.handleDroppedFileURLs([third, text, fourth]))
+        #expect(single.handleDroppedFileURLs([third, fourth]))
         #expect(single.fileList?.items.count == 4)
-        #expect(single.fileList?.items.contains(where: { $0.path == text.path }) == false)
     }
 
     @Test func rootHostingViewOwnsNativeFileDropDestination() {

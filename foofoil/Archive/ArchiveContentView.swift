@@ -10,7 +10,7 @@ struct ArchiveContentView: View {
                 ProgressView()
                 Button(NSLocalizedString("Cancel", comment: "")) { session.cancelPreview() }
             } else {
-                Image(systemName: session.selected?.isDirectory == true ? "folder" : "archivebox")
+                Image(systemName: session.source.localFiles != nil || session.selected?.isDirectory == true ? "folder" : "archivebox")
                     .font(.largeTitle).foregroundStyle(.secondary)
                 if let entry = session.selected {
                     Text(entry.id == "root" ? session.source.name : entry.name).font(.headline)
@@ -19,10 +19,12 @@ struct ArchiveContentView: View {
                     if let size = entry.size {
                         Text(String(format: NSLocalizedString("Archive Original Size Format", comment: ""), ByteCountFormatter.string(fromByteCount: size, countStyle: .file)))
                     }
-                    Text(NSLocalizedString("Archive Compressed Size Unknown", comment: "")).font(.caption)
+                    if session.source.localFiles == nil { Text(NSLocalizedString("Archive Compressed Size Unknown", comment: "")).font(.caption) }
                     if let format = session.selectedFormat, !format.isEmpty { Text(format).font(.caption) }
-                    Button(NSLocalizedString("Save As...", comment: "")) { session.saveSelected() }
-                        .disabled(!session.canExport)
+                    if session.source.localFiles == nil {
+                        Button(NSLocalizedString("Save As...", comment: "")) { session.saveSelected() }
+                            .disabled(!session.canExport)
+                    }
                 } else {
                     Text(NSLocalizedString("Archive Select File", comment: ""))
                 }

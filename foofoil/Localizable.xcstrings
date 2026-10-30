@@ -1,6 +1,18 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Open in New Foil": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Open in New Foil" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "在新箔里打开" } }
+      }
+    },
+    "Directory Contents": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Directory Contents" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "目录内容" } }
+      }
+    },
     "Search Or Create Terminal Placeholder": {
       "extractionState": "manual",
       "localizations": {

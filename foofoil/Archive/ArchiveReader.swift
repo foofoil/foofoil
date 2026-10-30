@@ -7,6 +7,8 @@ nonisolated public struct ArchiveSource: Codable, Sendable, Equatable {
     }
     var volumes: [Volume]
     var displayName: String? = nil
+    var localFiles: [Volume]? = nil
+    var sidebarMode: CollectionSidebarMode? = nil
     var name: String { displayName ?? primaryURL.lastPathComponent }
     var primaryURL: URL { URL(fileURLWithPath: volumes[0].path) }
 }

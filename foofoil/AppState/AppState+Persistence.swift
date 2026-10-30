@@ -262,7 +262,7 @@ extension AppState {
             if let archiveSession {
                 return WindowConfig(id: id, imagePath: archiveSession.source.primaryURL.path,
                     originalImageName: archiveSession.source.name,
-                    isPinned: isPinned, opacity: opacity, windowFrame: windowFrame,
+                    isPinned: isPinned, opacity: opacity, windowFrame: windowFrame, showBorder: showBorder,
                     createdAt: createdAt, contentKind: .archive, sourceFingerprint: sourceFingerprint,
                     customTitle: customTitle, videoBookmark: archiveSession.source.volumes.first?.bookmark,
                     navigatorPanelSide: navigatorPanelSide, navigatorPanelVisibilityMode: navigatorPanelVisibilityMode,

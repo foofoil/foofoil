@@ -32,7 +32,7 @@ extension AppState {
         return nil
     }
 
-    /// 非空箔片锁定其文件类型，拖放不能用其它类型替换当前内容。
+    /// 单文件拖放和显式追加保持当前文件类型；混合批次由目录树接管。
     var currentDroppedFileKind: DroppedFileKind? {
         if archiveSession != nil { return .other("archive") }
         if webURL != nil { return .web }
@@ -571,7 +571,10 @@ extension AppState {
 
     /// 图片列表与 PPT 共用“上一项/下一项”命令和快捷键，PPT 首尾不循环。
     var supportsItemNavigation: Bool {
-        hasAppleMusicItemNavigation || fileList?.isPresentable == true || (isPPTXDocument && !pptxNavigationController.slides.isEmpty)
+        if let archiveSession, archiveSession.sidebarMode != .folder {
+            return archiveSession.preview?.supportsItemNavigation ?? false
+        }
+        return hasAppleMusicItemNavigation || fileList?.isPresentable == true || (isPPTXDocument && !pptxNavigationController.slides.isEmpty)
     }
 
     /// 不可编辑的正文（只读文本、Markdown 预览、扩展文档）上下键滚动内容；与 `ContentView` 的内容选择保持一致。
@@ -583,6 +586,10 @@ extension AppState {
     }
 
     func activateAdjacentFileListItem(delta: Int, wraps: Bool = false) {
+        if let archiveSession, archiveSession.sidebarMode != .folder, let preview = archiveSession.preview {
+            preview.activateAdjacentFileListItem(delta: delta, wraps: wraps)
+            return
+        }
         if appleMusicItem != nil {
             activateAdjacentAppleMusicItem(delta: delta, wraps: wraps)
             return
@@ -660,6 +667,10 @@ extension AppState {
            isNavigatorSearchActive {
             endNavigatorSearch()
             return true
+        }
+        if let archiveSession, archiveSession.sidebarMode != .folder, let preview = archiveSession.preview {
+            guard !isNavigatorSearchActive else { return false }
+            return preview.handleFileListKeyDown(event)
         }
         guard !isNavigatorSearchActive, supportsItemNavigation, !isPDFDocument else { return false }
         let shortcuts = KeyboardShortcutStore.shared

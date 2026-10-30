@@ -57,7 +57,7 @@ extension AppState {
                     if result.urls.isEmpty || result.urls.allSatisfy({ self.initialFileOpenFailure($0) != nil }) {
                         self.reportFileOpenFeedback(fileURLs.map { .init(url: $0, reason: .emptyDirectory) })
                     } else {
-                        _ = self.processDroppedFileURLs(result.urls, fileListTitle: fileListTitle, directorySourced: true)
+                        _ = self.processDroppedFileURLs(result.urls, fileListTitle: fileListTitle, directorySourced: true, collectionRoots: fileURLs)
                     }
                     if result.didReachLimit {
                         self.showDirectoryScanLimitAlert()
@@ -73,9 +73,15 @@ extension AppState {
         private func processDroppedFileURLs(
             _ fileURLs: [URL],
             fileListTitle: String? = nil,
-            directorySourced: Bool = false
+            directorySourced: Bool = false,
+            collectionRoots: [URL]? = nil
         ) -> Bool {
             guard !fileURLs.isEmpty else { return false }
+            // 混合目录保留完整文件树；不支持的条目留在树中，选择时再反馈。
+            if directorySourced, Self.needsCollectionTree(fileURLs) {
+                openFileCollection(fileURLs, roots: collectionRoots, title: fileListTitle)
+                return true
+            }
 
             let eligible = filterFileOpenFailures(fileURLs)
             guard !eligible.isEmpty else { return true }
@@ -85,6 +91,10 @@ extension AppState {
                 return consumedCover
             }
 
+            if Self.needsCollectionTree(remaining) {
+                openFileCollection(remaining, roots: collectionRoots, title: fileListTitle)
+                return true
+            }
             let openable = matchingDroppedFiles(urls: remaining)
             let matching = Set(openable.map(\.path))
             reportFileOpenFeedback(remaining.filter { !matching.contains($0.path) }.map { .init(url: $0, reason: .differentType) })
@@ -134,12 +144,22 @@ extension AppState {
                         completion(false)
                         return
                     }
+                    if directorySourced, !appendToFileList, Self.needsCollectionTree(urls) {
+                        self.openFileCollection(urls)
+                        completion(true)
+                        return
+                    }
                     let eligible = self.filterFileOpenFailures(urls)
                     guard !eligible.isEmpty else { completion(directorySourced || !urls.isEmpty); return }
                     let remaining = self.consumeDroppedImagesAsAudioCover(from: eligible, directorySourced: directorySourced)
                     let consumedCover = remaining.count < eligible.count
                     if remaining.isEmpty {
                         completion(consumedCover)
+                        return
+                    }
+                    if !appendToFileList, Self.needsCollectionTree(remaining) {
+                        self.openFileCollection(remaining)
+                        completion(true)
                         return
                     }
                     let openable = self.matchingDroppedFiles(urls: remaining)

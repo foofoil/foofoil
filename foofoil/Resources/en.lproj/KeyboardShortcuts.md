@@ -199,3 +199,5 @@ In all three search surfaces, type `/` to choose a scope; Up and Down wrap betwe
 The ellipsis beside Open Clipboard Content in a blank foil fills the clipboard slash option and focuses the search field; Return confirms the scope.
 
 In Quick Open and Exposé, choosing `/ URL` or `/ Terminal` fixes that scope at the start of the search field and shows its history immediately. URL queries match titles and addresses; a valid URL adds a highlighted open-URL result first. New Terminal always stays first: it is highlighted for an empty query or no matches; otherwise the first matching history item is highlighted. Arrow keys and Ctrl+N/F/B/P move the highlight; Return opens it.
+
+Image, audio, and video modes in folders and archives use the same item navigation and playback shortcuts as standalone media lists.

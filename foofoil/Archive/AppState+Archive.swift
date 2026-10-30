@@ -97,8 +97,14 @@ extension AppState {
         }
         session.onChange = { [weak self, weak session] in
             guard let self, let session, self.archiveSession === session else { return }
-            self.builtInNavigatorContributions = [session.contribution]
-            self.activeNavigatorContributionID = session.navigatorContributionID
+            self.builtInNavigatorContributions = session.displayedContributions
+            let ids = session.displayedContributions.map(\.id)
+            if !ids.contains(self.activeNavigatorContributionID ?? "") {
+                self.activeNavigatorContributionID = ids.first
+                if session.sidebarMode != .folder, let preview = session.preview {
+                    self.expandedNavigatorItemIDs.formUnion(preview.expandedNavigatorItemIDs)
+                }
+            }
         }
         activeNavigatorContributionID = session.navigatorContributionID
         expandedNavigatorItemIDs = ["root"]

@@ -290,6 +290,13 @@ extension AppDelegate {
         probe.fileOpenFeedbackBatchID = feedbackBatchID
         let urls = probe.filterFileOpenFailures(urls)
         let openable = urls.filter { probe.canOpenFile(url: $0) }
+        if !append, AppState.needsCollectionTree(openable) {
+            let state = target ?? AppState(isIncognito: probe.isIncognito)
+            state.openFileCollection(openable)
+            if target == nil { showNewWindow(with: state) }
+            else if let controller = windowControllers.first(where: { $0.appState === state }) { activateWindow(controller) }
+            return true
+        }
         var groups = FileListGrouper.groups(from: openable)
         guard !groups.isEmpty else { return false }
 
@@ -339,7 +346,7 @@ extension AppDelegate {
         return true
     }
 
-    /// Finder 拖到 Dock 图标时与箔片内拖放保持一致：非空箔片只接收当前类型。
+    /// Finder 拖到 Dock 图标时与箔片内拖放保持一致：混合批次显示目录树，同类型继续追加。
     func openDroppedFiles(_ urls: [URL], into target: AppState?, feedbackBatchID: UUID = UUID()) {
         let probe = target ?? AppState()
         probe.fileOpenFeedbackBatchID = feedbackBatchID
@@ -352,7 +359,7 @@ extension AppDelegate {
             return
         }
 
-        if isBlank(target) {
+        if isBlank(target) || DroppedFileResolver.containsDirectory(in: urls) || AppState.needsCollectionTree(urls) {
             guard target.handleDroppedFileURLs(urls, feedbackBatchID: feedbackBatchID) else { return }
             if let controller = windowControllers.first(where: { $0.appState === target }) {
                 activateWindow(controller)

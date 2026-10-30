@@ -28,6 +28,24 @@ actor ArchiveWorkQueue {
         }
     }
 
+    /// 同一媒体列表一次提取到共享目录，保留 CUE 引用和音频的父目录分组。
+    func previewEntries(urls: [URL], index: ArchiveIndex, entries: [ArchiveEntry], password: String?, limit: Int64) throws -> ArchivePreviewLease {
+        try Task.checkCancellation()
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("foofoil-archive-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        do {
+            _ = try ArchiveReader.extract(urls: urls, index: index, entries: entries, root: directory,
+                basePath: "", password: password, limit: limit)
+            let size = try entries.reduce(Int64(0)) { total, entry in
+                total + Int64(try directory.appendingPathComponent(entry.path).resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0)
+            }
+            return ArchivePreviewLease(directory: directory, byteCount: size)
+        } catch {
+            try? FileManager.default.removeItem(at: directory)
+            throw error
+        }
+    }
+
     func export(urls: [URL], index: ArchiveIndex, entries: [ArchiveEntry], selection: ArchiveEntry,
                 destination: URL, basePath: String, password: String?, protectedURLs: [URL] = [], progress: @Sendable (Int64) -> Void) throws -> Int {
         try Task.checkCancellation()
