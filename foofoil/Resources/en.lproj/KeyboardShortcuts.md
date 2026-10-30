@@ -1,6 +1,6 @@
 # Keyboard Shortcuts Overview
 
-In Quick Open and Exposé, the `/` list ends with Terminal and Camera. Selecting Terminal opens its configuration dialog; selecting Camera opens the camera immediately.
+In Quick Open and Exposé, the `/` list ends with Terminal and Camera. Selecting Terminal selects terminal history search. Selecting Camera opens the camera immediately.
 
 Customize bindings in Settings → Keyboard Shortcuts. The table below shows the default and current bindings, including automatically derived incognito opening shortcuts. Except for global shortcuts, foofoil must be active; some actions apply only to specific content.
 
@@ -197,3 +197,5 @@ The `/ More options` menu places Clipboard first and URL input after Folder. Ret
 In all three search surfaces, type `/` to choose a scope; Up and Down wrap between the first and last options; Return or Tab confirms the highlighted scope. Choose Clipboard and keep typing to filter. Use arrow keys to select and Return to open. Full Disk Access enables system history; without it, only the current clipboard is searched.
 
 The ellipsis beside Open Clipboard Content in a blank foil fills the clipboard slash option and focuses the search field; Return confirms the scope.
+
+In Quick Open and Exposé, choosing `/ URL` or `/ Terminal` fixes that scope at the start of the search field and shows its history immediately. URL queries match titles and addresses; a valid URL adds a highlighted open-URL result first. New Terminal always stays first: it is highlighted for an empty query or no matches; otherwise the first matching history item is highlighted. Arrow keys and Ctrl+N/F/B/P move the highlight; Return opens it.

@@ -38,7 +38,12 @@ struct HistoryCardView: View {
                 }
             }
             .overlay(alignment: .bottomTrailing) {
-                if config.isClipboardContent {
+                if historyKind == .web, let image = WebFaviconCache.image(for: config.id) {
+                    Image(nsImage: image).resizable().scaledToFit()
+                        .frame(width: 16, height: 16).padding(3)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 5))
+                        .padding(3)
+                } else if config.isClipboardContent {
                     Image(systemName: "doc.on.clipboard")
                         .font(.system(size: 10))
                         .padding(4)

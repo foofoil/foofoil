@@ -75,6 +75,8 @@ enum FoilExposeHistoryCategory: String, CaseIterable, Identifiable {
 struct FoilExposeItem: Identifiable {
     /// 文档型卡片正文的截取上限：只作渲染兜底，实际可见行数由卡片布局决定。
     static let cameraCommandID = UUID(uuidString: "67A8D052-221D-4121-B733-0F66AE5B88DF")!
+    static let terminalCommandID = UUID(uuidString: "7F73DFB4-8AC7-4E54-A882-67B456CFF91D")!
+    static let urlCommandID = UUID(uuidString: "E3DA972C-185D-4D76-A8AB-0D31B69BC451")!
     static let bodyPreviewCharacterLimit = 600
 
     let id: UUID
@@ -88,6 +90,10 @@ struct FoilExposeItem: Identifiable {
     var clipboardEntry: ClipboardSearchEntry? = nil
     var isClipboardContent: Bool = false
     var sourcePath: String? = nil
+    var webURLString: String? = nil
+    var actualWebURLString: String? = nil
+    var terminalConfiguration: TerminalLaunchConfiguration? = nil
+    var commandURL: URL? = nil
     /// 文档型箔片（文本/Markdown/CSV）的截断正文，供缩略图位置直接展示内容；其余类型为 nil。
     var bodyPreview: String? = nil
     var musicItem: AppleMusicLibraryItem? = nil
@@ -96,14 +102,15 @@ struct FoilExposeItem: Identifiable {
     var hasHistoryRecord: Bool = false
 
     var canRenameTitle: Bool {
-        allowsTitleEditing && contentKind != .camera && !isNewFoil && musicItem == nil && clipboardEntry == nil
+        !isSearchCommand && allowsTitleEditing && contentKind != .camera && !isNewFoil && musicItem == nil && clipboardEntry == nil
     }
 
     var requiresHistoryClearConfirmation: Bool { isHistoryEntry && historyIsPinned }
     var canShowInformation: Bool { isHistoryEntry || (controller != nil && controller?.appState.isBlank == false) }
 
     var window: NSWindow? { controller?.window }
-    var isNewFoil: Bool { controller == nil && !isHistoryEntry && musicItem == nil && clipboardEntry == nil && id != Self.cameraCommandID }
+    var isSearchCommand: Bool { id == Self.terminalCommandID || id == Self.urlCommandID }
+    var isNewFoil: Bool { !isSearchCommand && controller == nil && !isHistoryEntry && musicItem == nil && clipboardEntry == nil && id != Self.cameraCommandID }
 
     /// 文档型条目的正文预览：跳过首尾空白后截取开头；空白正文与非文档类型返回 nil，卡片回退到类型图标。
     static func makeBodyPreview(kind: HistoryContentKind, text: String) -> String? {
@@ -230,12 +237,12 @@ final class FoilExposeModel: ObservableObject {
             objectWillChange.send()
             return
         }
-        // 打开命令直接执行，不切换为搜索范围。
-        if scope.isOpeningCommand {
+        // 摄像头直接打开；网址和终端留在总览中搜索对应历史。
+        if scope.isOpeningCommand && scope != .url && scope != .terminal {
             onOpenCommand?(scope)
             return
         }
-        if scope == .history { historyCategory = .all; pinnedOnly = false }
+        if scope == .history || scope == .url || scope == .terminal { historyCategory = .all; pinnedOnly = false }
         activeScope = scope
         searchText = ""
         highlightedScopeIndex = 0
@@ -285,6 +292,8 @@ final class FoilExposeModel: ObservableObject {
             scheduleMusicSearch()
             if activeScope == nil || activeScope == .clipboard { clipboardSearch.search(committedSearchQuery) }
             else { clipboardSearch.stop() }
+            // 终端命令始终在首位；有关键词匹配时默认选中首条历史，导航后不再重置。
+            if activeScope == .terminal, !committedSearchQuery.isEmpty, currentItems.count > 1 { selectedIndex = 1 }
         }
     }
     /// 总览始终接收搜索输入，编号直选统一使用 Control 修饰键。
@@ -513,7 +522,41 @@ final class FoilExposeModel: ObservableObject {
         activeScope == nil && clipboardItems.count > Self.overviewClipboardLimit
     }
     var clipboardCount: Int { clipboardItems.count }
+    var isInlineOpeningScope: Bool { activeScope == .url || activeScope == .terminal }
+
+    /// 两个打开范围只匹配对应历史，网址同时匹配标题、输入地址与重定向地址。
+    private var openingScopeHistory: [FoilExposeItem] {
+        historyItems.filter { item in
+            guard item.contentKind == (activeScope == .url ? .web : .terminal) else { return false }
+            return searchQuery.isEmpty || item.matches(query: searchQuery)
+                || item.terminalConfiguration?.historySubtitle.range(of: searchQuery, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+                || (activeScope == .url && [item.webURLString, item.actualWebURLString].compactMap { $0 }.contains {
+                    $0.range(of: searchQuery, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+                })
+        }
+    }
+
+    private var openingScopeItems: [FoilExposeItem] {
+        let history = openingScopeHistory
+        if activeScope == .terminal {
+            return [FoilExposeItem(id: FoilExposeItem.terminalCommandID, controller: nil, isHistoryEntry: false,
+                                  title: NSLocalizedString("Expose New Terminal", comment: ""), symbolName: "terminal",
+                                  contentKind: .terminal, thumbnailPath: nil)] + history
+        }
+        guard let url = DirectURLResolver.url(from: searchQuery) else { return history }
+        return [FoilExposeItem(id: FoilExposeItem.urlCommandID, controller: nil, isHistoryEntry: false,
+                              title: url.absoluteString, symbolName: "link", contentKind: .web,
+                              thumbnailPath: nil, commandURL: url)] + history
+    }
+
+    func activateItem(_ item: FoilExposeItem) {
+        if let url = item.commandURL { onOpenURL(url) }
+        else if item.id == FoilExposeItem.terminalCommandID { onOpenCommand?(.terminal) }
+        else { onSelect(item) }
+    }
+
     var currentItems: [FoilExposeItem] {
+        if isInlineOpeningScope { return openingScopeItems }
         if activeScope == .clipboard { return clipboardItems }
         var foils = matchedFoilItems
         if activeScope == nil && searchQuery.isEmpty {
@@ -557,7 +600,7 @@ final class FoilExposeModel: ObservableObject {
         if showsFileResults, visibleFiles.indices.contains(fileIndex) {
             onOpenFile(visibleFiles[fileIndex].url)
         } else if let item = highlightedItem {
-            onSelect(item)
+            activateItem(item)
         }
     }
 
@@ -582,8 +625,8 @@ final class FoilExposeModel: ObservableObject {
     }
 
     /// 关键字非空时才呈现 Spotlight 文件结果区；空关键字不展示、不查询。
-    var showsFileResults: Bool { activeScope != .clipboard && !searchQuery.isEmpty && resultFilter.includesFiles }
-    var showsMusicResults: Bool { activeScope != .clipboard && !searchQuery.isEmpty && isMusicSearchEnabled && (resultFilter == .all || resultFilter.musicCategory != nil) }
+    var showsFileResults: Bool { !isInlineOpeningScope && activeScope != .clipboard && !searchQuery.isEmpty && resultFilter.includesFiles }
+    var showsMusicResults: Bool { !isInlineOpeningScope && activeScope != .clipboard && !searchQuery.isEmpty && isMusicSearchEnabled && (resultFilter == .all || resultFilter.musicCategory != nil) }
     func musicItems(in category: AppleMusicSearchCategory) -> [FoilExposeItem] {
         musicItems.filter { $0.musicItem?.searchCategory == category }
     }
@@ -631,7 +674,7 @@ final class FoilExposeModel: ObservableObject {
             selectedIndex = min(selectedIndex, max(0, currentItems.count - 1))
         }
         let query = searchQuery
-        guard activeScope != .clipboard, !isStopped, !isPickingScope, (resultFilter == .all || resultFilter.musicCategory != nil), !query.isEmpty, isMusicSearchEnabled, isMusicAuthorized else { return }
+        guard !isInlineOpeningScope, activeScope != .clipboard, !isStopped, !isPickingScope, (resultFilter == .all || resultFilter.musicCategory != nil), !query.isEmpty, isMusicSearchEnabled, isMusicAuthorized else { return }
         isMusicSearching = true
         musicTask = Task { [weak self] in
             do {
@@ -671,7 +714,7 @@ final class FoilExposeModel: ObservableObject {
         fileSearchNotice = nil
         fileDisplayCount = SearchResultLimits.overviewGroupInitial
         let query = searchQuery
-        guard activeScope != .clipboard, !isPickingScope, !query.isEmpty && resultFilter.includesFiles else {
+        guard !isInlineOpeningScope, activeScope != .clipboard, !isPickingScope, !query.isEmpty && resultFilter.includesFiles else {
             cancelFiles()
             rawFiles = []
             files = []
@@ -784,6 +827,14 @@ final class FoilExposeModel: ObservableObject {
     /// 分区各自从左起排满一行；不使用受滚动和高亮动画影响的卡片坐标。
     private var navigationRows: [[Int]] {
         let items = currentItems
+        if activeScope == .terminal {
+            // 新建终端独占首行，历史按两列排列，键盘跨行与实际布局一致。
+            return [[0]] + stride(from: 1, to: items.count, by: 2).map { Array($0..<min($0 + 2, items.count)) }
+        }
+        if isInlineOpeningScope {
+            let width = max(1, columnCount)
+            return stride(from: 0, to: items.count, by: width).map { Array($0..<min($0 + width, items.count)) }
+        }
         let groups: [([Int], Int)] = [
             (items.indices.filter { !items[$0].isHistoryEntry && items[$0].musicItem == nil }, activeScope == .clipboard ? musicColumnCount : columnCount),
             (items.indices.filter { items[$0].isHistoryEntry }, columnCount)
@@ -1132,6 +1183,9 @@ final class FoilExposeController {
                 thumbnailPath: thumbnailPath,
                 isClipboardContent: config.isClipboardContent,
                 sourcePath: Self.sourcePath(from: config),
+                webURLString: config.webURLString,
+                actualWebURLString: config.actualWebURLString,
+                terminalConfiguration: config.terminalConfiguration,
                 bodyPreview: bodyPreview,
                 allowsTitleEditing: controller.appState.toConfig().canRenameTitle,
                 historyIsPinned: historyConfig?.historyIsPinned ?? false,
@@ -1165,6 +1219,9 @@ final class FoilExposeController {
                 thumbnailPath: thumbnailPath,
                 isClipboardContent: config.isClipboardContent,
                 sourcePath: Self.sourcePath(from: config),
+                webURLString: config.webURLString,
+                actualWebURLString: config.actualWebURLString,
+                terminalConfiguration: config.terminalConfiguration,
                 bodyPreview: FoilExposeItem.makeBodyPreview(kind: contentKind, text: config.text),
                 allowsTitleEditing: config.canRenameTitle,
                 historyIsPinned: config.historyIsPinned,
@@ -1492,7 +1549,7 @@ final class FoilExposeController {
                 }
                 if let key = event.charactersIgnoringModifiers,
                    let item = model.item(forKey: key) {
-                    self.select(item)
+                    model.activateItem(item)
                     return nil
                 }
                 return event

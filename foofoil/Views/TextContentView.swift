@@ -131,7 +131,7 @@ struct TextContentView: View {
                     }
 
                     if isBlank && !isSearching && geometry.size.height >= 140 {
-                        BlankOpenButtons(appState: appState)
+                        BlankOpenButtons(appState: appState, search: search)
                             .padding(.horizontal, 16)
                             .padding(.bottom, appState.isIncognito ? 16 : 18)
                     }

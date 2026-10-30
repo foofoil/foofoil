@@ -322,6 +322,19 @@ struct WebView: NSViewRepresentable {
                 }
             }
             applyDocumentBackgroundIfNeeded(to: webView, force: true)
+            if !parent.appState.isIncognito, let pageURL = webView.url,
+               ["http", "https"].contains(pageURL.scheme?.lowercased() ?? "") {
+                let historyID = parent.appState.id
+                // 使用页面声明的图标，未声明时回退到站点根目录。
+                webView.evaluateJavaScript("document.querySelector('link[rel~=icon]')?.href || ''") { [weak webView] value, _ in
+                    guard webView?.url == pageURL else { return }
+                    let declared = (value as? String).flatMap { $0.isEmpty ? nil : URL(string: $0, relativeTo: pageURL)?.absoluteURL }
+                    let fallback = URL(string: "/favicon.ico", relativeTo: pageURL)?.absoluteURL
+                    if let iconURL = declared ?? fallback {
+                        Task { await WebFaviconCache.cache(iconURL: iconURL, historyID: historyID) }
+                    }
+                }
+            }
             // 网页可见正文与截图相互独立；正文失败不会影响现有截图流程。
             webView.evaluateJavaScript("document.body ? document.body.innerText : ''") { [weak self] value, _ in
                 guard let self, let text = value as? String else { return }

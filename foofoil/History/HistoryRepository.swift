@@ -117,7 +117,26 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
     public func search(_ query: String, limit: Int = 10) async -> [HistorySearchResult] {
         guard let database else { return [] }
         let keywords = SearchTextNormalizer.keywords(query)
-        guard !keywords.isEmpty else { return [] }
+        if keywords.isEmpty {
+            return await Task.detached(priority: .userInitiated) {
+                do {
+                    return try database.recent(limit: limit).map { config in
+                        HistorySearchResult(id: config.id, title: config.historyMenuDisplayName,
+                                            contentKind: config.contentKind ?? HistoryContentKind.infer(from: config),
+                                            thumbnailPath: config.thumbnailPath, matchedSnippet: nil,
+                                            matchedPageNumber: nil, score: 0,
+                                            terminalConfiguration: config.terminalConfiguration,
+                                            sourcePath: config.sourceFingerprint.flatMap { $0.hasPrefix("file:") ? String($0.dropFirst(5)) : nil },
+                                            isAppleMusic: config.appleMusicReference != nil,
+                                            isClipboardContent: config.isClipboardContent,
+                                            historyIsPinned: config.historyIsPinned)
+                    }
+                } catch {
+                    NSLog("最近历史读取失败：%@", error.localizedDescription)
+                    return []
+                }
+            }.value
+        }
         return await Task.detached(priority: .userInitiated) {
             do {
                 let groups = try keywords.map { keyword in
@@ -142,6 +161,7 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                         matchedSnippet: self.snippet(from: best.originalText, keywords: keywords),
                         matchedPageNumber: best.pageNumber,
                         score: self.score(best, query: normalizedQuery),
+                        terminalConfiguration: best.contentKind == .terminal ? try database.config(id: best.id)?.terminalConfiguration : nil,
                         sourcePath: best.sourceFingerprint.flatMap { $0.hasPrefix("file:") ? String($0.dropFirst(5)) : nil },
                         isAppleMusic: best.isAppleMusic,
                         isClipboardContent: best.sourceFingerprint?.hasPrefix("clipboard:") == true,
@@ -154,6 +174,29 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                 }.prefix(limit).map { $0 }
             } catch {
                 NSLog("历史搜索失败：%@", error.localizedDescription)
+                return []
+            }
+        }.value
+    }
+
+    /// 打开范围先按类型读取，再匹配标题和网址；空输入也返回历史，且不受其他类型的结果上限挤占。
+    func searchOpeningHistory(_ query: String, kind: HistoryContentKind) async -> [HistorySearchResult] {
+        guard let database else { return [] }
+        return await Task.detached(priority: .userInitiated) {
+            do {
+                return try database.configs(kind: kind).compactMap { config -> HistorySearchResult? in
+                    let title = config.historyMenuDisplayName
+                    let addresses = kind == .web ? [config.webURLString, config.actualWebURLString].compactMap { $0 } : []
+                    guard query.isEmpty || ([title] + addresses + (config.terminalConfiguration.map { [$0.historySubtitle] } ?? [])).contains(where: {
+                        $0.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+                    }) else { return nil }
+                    return HistorySearchResult(id: config.id, title: title, contentKind: kind,
+                                               thumbnailPath: config.thumbnailPath,
+                                               matchedSnippet: addresses.first, matchedPageNumber: nil, score: 0,
+                                               terminalConfiguration: config.terminalConfiguration, historyIsPinned: config.historyIsPinned)
+                }
+            } catch {
+                NSLog("打开范围历史读取失败：%@", error.localizedDescription)
                 return []
             }
         }.value

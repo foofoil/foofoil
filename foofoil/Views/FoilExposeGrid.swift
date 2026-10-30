@@ -17,6 +17,14 @@ struct FoilExposeGridMetrics {
         itemSize = NSSize(width: itemWidth, height: compact ? 58 : itemWidth + 28)
         inset = max(0, (width - (CGFloat(columns) * itemWidth + CGFloat(columns - 1) * spacing)) / 2)
     }
+
+    /// 终端卡片统一使用两列宽度；新建项由独立分区保持独占一行。
+    init(terminalWidth width: CGFloat) {
+        let available = max(1, min(1240, width) - 88)
+        columns = 2
+        itemSize = NSSize(width: max(1, (available - 10) / 2), height: 80)
+        inset = max(0, (width - available) / 2)
+    }
 }
 
 /// 选中项的滚动策略：完全可见不动；只露出一部分时最小滚动到完整可见；完全在视口外时居中。
@@ -108,6 +116,7 @@ final class FoilExposeGrid: NSScrollView {
             var count: Int? = nil
             var symbol = "doc"
             var tint: NSColor = .white.withAlphaComponent(0.7)
+            var terminalLayout = false
             var isHistory = false
             var isClipboardAuthorization = false
             var moreTitle: String? = nil
@@ -139,13 +148,28 @@ final class FoilExposeGrid: NSScrollView {
                 indices.map { index in
                     let item = items[index]
                     return Entry(foil: item, index: index, title: item.title,
-                                 subtitle: item.musicItem?.searchSubtitle ?? "", symbol: item.symbolName,
-                                 action: { model.onSelect(item) })
+                                 subtitle: item.terminalConfiguration?.historySubtitle ?? item.musicItem?.searchSubtitle ?? "", symbol: item.symbolName,
+                                 action: { model.activateItem(item) })
                 }
             }
             var next: [Section] = []
+            if model.isInlineOpeningScope {
+                let scope = model.activeScope!
+                var entries = foilEntries(Array(items.indices))
+                if entries.isEmpty { entries = [Entry(title: NSLocalizedString("No Search Results", comment: ""))] }
+                if scope == .terminal {
+                    next.append(Section(title: scope.displayName, compact: true, symbol: scope.symbolName,
+                                        terminalLayout: true, entries: Array(entries.prefix(1))))
+                    if entries.count > 1 {
+                        next.append(Section(title: "", compact: true, symbol: scope.symbolName,
+                                            terminalLayout: true, entries: Array(entries.dropFirst())))
+                    }
+                } else {
+                    next.append(Section(title: scope.displayName, compact: false, symbol: scope.symbolName, entries: entries))
+                }
+            }
             let open = items.indices.filter { !items[$0].isHistoryEntry && items[$0].musicItem == nil && items[$0].clipboardEntry == nil }
-            if !open.isEmpty { next.append(Section(title: NSLocalizedString("Expose Open Section", comment: ""), compact: false, count: open.filter { !items[$0].isNewFoil }.count, symbol: "macwindow", tint: .systemMint, entries: foilEntries(open))) }
+            if !model.isInlineOpeningScope && !open.isEmpty { next.append(Section(title: NSLocalizedString("Expose Open Section", comment: ""), compact: false, count: open.filter { !items[$0].isNewFoil }.count, symbol: "macwindow", tint: .systemMint, entries: foilEntries(open))) }
             if model.showsHistorySection {
                 let history = items.indices.filter { items[$0].isHistoryEntry }
                 var entries = foilEntries(history)
@@ -177,7 +201,7 @@ final class FoilExposeGrid: NSScrollView {
                                         entries: [Entry(title: NSLocalizedString("Clipboard History Authorization Instructions", comment: ""))]))
                 }
             }
-            if model.activeScope != nil && model.activeScope != .history && model.activeScope != .clipboard && model.searchQuery.isEmpty {
+            if !model.isInlineOpeningScope && model.activeScope != nil && model.activeScope != .history && model.activeScope != .clipboard && model.searchQuery.isEmpty {
                 next.append(Section(title: "", compact: true, entries: [Entry(title: NSLocalizedString("Enter Keywords to Search Scope", comment: ""), symbol: "magnifyingglass")]))
             }
             if model.showsFileResults {
@@ -226,7 +250,7 @@ final class FoilExposeGrid: NSScrollView {
             if next.isEmpty {
                 next = [Section(title: "", compact: true, entries: [Entry(title: NSLocalizedString("No Foils on This Screen", comment: ""))])]
             }
-            let nextSignature = next.map { [$0.title, String($0.compact), String($0.count ?? -1), String($0.isClipboardAuthorization), $0.moreTitle ?? ""] + $0.entries.map(\.key) }
+            let nextSignature = next.map { [$0.title, String($0.compact), String($0.terminalLayout), String($0.count ?? -1), String($0.isClipboardAuthorization), $0.moreTitle ?? ""] + $0.entries.map(\.key) }
             // 不在选中项、焦点或滚动变化时 reloadData，保留复用卡片和已解码图片。
             let changed = nextSignature != signature
             sections = next
@@ -309,13 +333,14 @@ final class FoilExposeGrid: NSScrollView {
             let item = collectionView.makeItem(withIdentifier: .exposeCard, for: indexPath) as! ExposeCollectionItem
             let entry = section.entries[indexPath.item]
             item.card.configure(foil: entry.foil, title: entry.title, subtitle: entry.subtitle, symbol: entry.symbol,
-                                compact: section.compact, shortcut: entry.foil == nil ? nil : entry.index.flatMap { FoilExposeShortcut.key(forIndex: $0) },
+                                compact: section.compact, terminalStyle: section.terminalLayout, shortcut: entry.foil == nil ? nil : entry.index.flatMap { FoilExposeShortcut.key(forIndex: $0) },
                                 highlighted: entry.index == model.selectedIndex, action: entry.action, model: model)
             return item
         }
         func collectionView(_ collectionView: NSCollectionView, viewForSupplementaryElementOfKind kind: NSCollectionView.SupplementaryElementKind, at indexPath: IndexPath) -> NSView {
             let header = collectionView.makeSupplementaryView(ofKind: kind, withIdentifier: .exposeHeader, for: indexPath) as! ExposeSectionHeader
             let section = sections[indexPath.section]
+            header.leadingInset = section.terminalLayout ? FoilExposeGridMetrics(terminalWidth: collectionView.bounds.width).inset : nil
             header.configure(title: section.title, count: section.count, symbol: section.symbol,
                              tint: section.tint, filters: section.isHistory ? historyFilters : nil,
                              moreTitle: section.moreTitle, moreAction: section.moreAction)
@@ -334,12 +359,17 @@ final class FoilExposeGrid: NSScrollView {
                                                    attributes: [.font: NSFont.systemFont(ofSize: 14)]).height
                 return NSSize(width: itemWidth, height: ceil(textHeight) + 62)
             }
-            return FoilExposeGridMetrics(width: width, compact: sections[indexPath.section].compact).itemSize
+            let section = sections[indexPath.section]
+            if section.terminalLayout { return FoilExposeGridMetrics(terminalWidth: width).itemSize }
+            return FoilExposeGridMetrics(width: width, compact: section.compact).itemSize
         }
         func collectionView(_ collectionView: NSCollectionView, layout collectionViewLayout: NSCollectionViewLayout, insetForSectionAt section: Int) -> NSEdgeInsets {
-            let metrics = FoilExposeGridMetrics(width: scroll?.contentSize.width ?? collectionView.bounds.width, compact: sections[section].compact)
+            let width = scroll?.contentSize.width ?? collectionView.bounds.width
+            let metrics = sections[section].terminalLayout
+                ? FoilExposeGridMetrics(terminalWidth: width)
+                : FoilExposeGridMetrics(width: width, compact: sections[section].compact)
             return NSEdgeInsets(top: sections[section].isClipboardAuthorization ? 0 : 8,
-                                left: metrics.inset, bottom: 32, right: metrics.inset)
+                                left: metrics.inset, bottom: sections[section].terminalLayout ? 10 : 32, right: metrics.inset)
         }
         func collectionView(_ collectionView: NSCollectionView, layout collectionViewLayout: NSCollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat { sections[section].compact ? 10 : 18 }
         func collectionView(_ collectionView: NSCollectionView, layout collectionViewLayout: NSCollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat { sections[section].compact ? 10 : 18 }
@@ -367,6 +397,7 @@ private final class ExposeFlowLayout: NSCollectionViewFlowLayout {
 }
 
 private final class ExposeSectionHeader: NSView {
+    var leadingInset: CGFloat?
     private let icon = NSImageView()
     private let label = NSTextField(labelWithString: "")
     private let countLabel = NSTextField(labelWithString: "")
@@ -424,7 +455,7 @@ private final class ExposeSectionHeader: NSView {
 
     override func layout() {
         super.layout()
-        let inset = FoilExposeGridMetrics(width: bounds.width, compact: false).inset
+        let inset = leadingInset ?? FoilExposeGridMetrics(width: bounds.width, compact: false).inset
         let center = bounds.midY
         icon.frame = NSRect(x: inset, y: center - 15, width: 30, height: 30)
         let labelSize = label.cell?.cellSize ?? .zero
@@ -542,6 +573,7 @@ private final class ExposeNativeCard: NSView {
     private let preview = NSTextField(wrappingLabelWithString: "")
     private let icon = NSImageView()
     private let typeIcon = ExposeShadowedIcon()
+    private let favicon = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "")
     private let subtitleLabel = NSTextField(labelWithString: "")
     private let badge = NSTextField(labelWithString: "")
@@ -557,6 +589,7 @@ private final class ExposeNativeCard: NSView {
     private var hovered = false
     private var highlighted = false
     private var compact = false
+    private var terminalStyle = false
     private var isNotice = false
     private var foil: FoilExposeItem?
     private weak var model: FoilExposeModel?
@@ -618,7 +651,12 @@ private final class ExposeNativeCard: NSView {
             image.imageScaling = .scaleProportionallyUpOrDown
         }
         pinned.contentTintColor = .systemYellow
+        favicon.imageScaling = .scaleProportionallyUpOrDown
+        favicon.wantsLayer = true
+        favicon.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.9).cgColor
+        favicon.layer?.cornerRadius = 5
         addSubview(thumbnail)
+        thumbnail.addSubview(favicon)
         for view in [preview, icon, typeIcon, badge, pinned, incognito] { thumbnail.addSubview(view) }
         copyButton.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: NSLocalizedString("Clipboard History Copy", comment: ""))
         copyButton.isBordered = false
@@ -653,9 +691,9 @@ private final class ExposeNativeCard: NSView {
     }
 
     func configure(foil: FoilExposeItem?, title: String, subtitle: String, symbol: String,
-                   compact: Bool, shortcut: String?, highlighted: Bool, action: (() -> Void)?, model: FoilExposeModel) {
+                   compact: Bool, terminalStyle: Bool = false, shortcut: String?, highlighted: Bool, action: (() -> Void)?, model: FoilExposeModel) {
         reset()
-        self.foil = foil; self.model = model; self.action = action; self.compact = compact
+        self.foil = foil; self.model = model; self.action = action; self.compact = compact; self.terminalStyle = terminalStyle
         self.highlighted = highlighted
         copyButton.isHidden = foil?.clipboardEntry == nil || foil?.clipboardEntry?.isCurrentClipboard == true
         copyButton.isEnabled = foil?.clipboardEntry?.canCopy == true
@@ -663,10 +701,11 @@ private final class ExposeNativeCard: NSView {
         setAccessibilityChildren(copyButton.isHidden ? [] : [copyButton])
         isNotice = compact && action == nil && foil == nil
         thumbnail.isHidden = isNotice
-        titleLabel.font = .systemFont(ofSize: 12, weight: isNotice ? .regular : .medium)
+        titleLabel.font = .systemFont(ofSize: terminalStyle ? 17 : 12, weight: isNotice ? .regular : .medium)
         titleLabel.textColor = .white.withAlphaComponent(isNotice ? 0.55 : 0.9)
         titleLabel.stringValue = title
         titleLabel.alignment = compact ? .left : .center
+        subtitleLabel.font = .systemFont(ofSize: terminalStyle ? 13 : 11)
         subtitleLabel.stringValue = subtitle
         subtitleLabel.isHidden = !compact || subtitle.isEmpty
         let paragraph = NSMutableParagraphStyle()
@@ -682,8 +721,14 @@ private final class ExposeNativeCard: NSView {
         if let entry = foil?.clipboardEntry {
             clipboardArtwork.isHidden = false; clipboardArtwork.configure(entry)
         }
+        favicon.image = foil.flatMap { $0.contentKind == .web && $0.controller?.appState.isIncognito != true ? WebFaviconCache.image(for: $0.id) : nil }
+        favicon.isHidden = compact || favicon.image == nil
         typeIcon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
         typeIcon.isHidden = compact || foil?.isNewFoil != false
+        if terminalStyle, foil?.terminalConfiguration?.ssh != nil {
+            typeIcon.image = NSImage(systemSymbolName: "network", accessibilityDescription: NSLocalizedString("Terminal SSH", comment: ""))
+            typeIcon.isHidden = false
+        }
         if symbol == AppleMusicReference.symbolName {
             icon.image = Self.musicIcon
             typeIcon.image = Self.musicIcon
@@ -694,12 +739,12 @@ private final class ExposeNativeCard: NSView {
         if let state = foil?.controller?.appState, foil?.contentKind == .audio || foil?.contentKind == .video {
             playbackSubscription = state.$isMediaPlaying.sink { [weak self] playing in self?.updatePlayback(playing) }
         }
-        pinned.isHidden = compact || foil?.historyIsPinned != true
+        pinned.isHidden = (compact && !terminalStyle) || foil?.historyIsPinned != true
         incognito.isHidden = compact || foil?.controller?.appState.isIncognito != true
         badge.stringValue = shortcut.map { "⌃" + $0 } ?? ""
         badge.isHidden = shortcut == nil
         let annotation = foil?.historyIsPinned == true ? NSLocalizedString("Favorited History", comment: "") + " " : ""
-        setAccessibilityLabel([badge.stringValue, annotation + title, subtitle].filter { !$0.isEmpty }.joined(separator: " "))
+        setAccessibilityLabel([badge.stringValue, annotation + title, foil?.terminalConfiguration?.ssh != nil ? NSLocalizedString("Terminal SSH", comment: "") : "", subtitle].filter { !$0.isEmpty }.joined(separator: " "))
         setAccessibilityRole(action == nil ? .staticText : .button)
         toolTip = subtitle.isEmpty ? title : title + "\n" + subtitle
         if !compact, let path = foil?.thumbnailPath {
@@ -771,6 +816,7 @@ private final class ExposeNativeCard: NSView {
         if !compact, foil?.contentKind == .camera {
             icon.frame = NSRect(x: (side - 56) / 2, y: (side - 56) / 2, width: 56, height: 56)
         }
+        favicon.frame = NSRect(x: side - 29, y: side - 29, width: 23, height: 23)
         typeIcon.frame = NSRect(x: 4, y: max(0, side - 32), width: 28, height: 28)
         pinned.frame = NSRect(x: side - 36, y: 4, width: 28, height: 28)
         incognito.frame = NSRect(x: side - 33, y: side - 33, width: 22, height: 22)
@@ -795,6 +841,17 @@ private final class ExposeNativeCard: NSView {
             titleLabel.frame = NSRect(x: 10, y: 19, width: max(0, bounds.width - 20), height: 20)
         }
         subtitleLabel.frame = NSRect(x: 50 + artworkInset, y: 31, width: max(0, bounds.width - 65 - copyInset - artworkInset), height: 16)
+        if terminalStyle {
+            icon.frame = NSRect(x: 18, y: (bounds.height - 30) / 2, width: 30, height: 30)
+            let titleX: CGFloat = typeIcon.isHidden ? 64 : 86
+            typeIcon.frame = NSRect(x: 64, y: 17, width: 16, height: 16)
+            titleLabel.frame = NSRect(x: titleX, y: subtitleLabel.isHidden ? 28 : 12,
+                                      width: max(0, bounds.width - titleX - badgeWidth - 24), height: 25)
+            let pinnedInset: CGFloat = pinned.isHidden ? 0 : 24
+            subtitleLabel.frame = NSRect(x: 64, y: 45, width: max(0, bounds.width - 84 - pinnedInset), height: 19)
+            pinned.frame = NSRect(x: bounds.width - 27, y: 46, width: 16, height: 16)
+            badge.frame.origin.y = 16
+        }
         CATransaction.commit()
         updateEmphasisTransform(animated: false)
     }

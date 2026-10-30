@@ -80,17 +80,13 @@ final class HistorySearchViewModel: ObservableObject {
 
     func selectScope(_ scope: SearchScope) {
         guard isScopeEnabled(scope) else { return }
-        if scope == .url {
-            reset(mode: .url)
-            return
-        }
         if scope.enableFeatureIfNeeded() {
             highlightedScopeIndex = 0
             objectWillChange.send()
             return
         }
-        // 打开命令直接执行，不切换为搜索范围。
-        if scope.isOpeningCommand {
+        // 摄像头直接打开；网址和终端保留范围标签并显示对应历史。
+        if scope.isOpeningCommand && scope != .url && scope != .terminal {
             openCommand?(scope)
             return
         }
@@ -164,6 +160,7 @@ final class HistorySearchViewModel: ObservableObject {
     @Published private(set) var focusRequest = 0
     @Published private(set) var shouldSelectAll = false
 
+    private let openingHistorySearch: (String, HistoryContentKind) async -> [HistorySearchResult]
     private let historySearch: (String) async -> [HistorySearchResult]
     private let fileSearch: (String, SpotlightSearchTarget, @escaping (SpotlightSearchOutcome) -> Void) -> Void
     private let cancelFiles: () -> Void
@@ -176,7 +173,9 @@ final class HistorySearchViewModel: ObservableObject {
     var openCamera: (() -> Void)?
     private let musicLibraryEnabled: @MainActor () -> Bool
     private let cameraAvailable: () -> Bool
-    var showsOpenCamera: Bool { mode == .history && resultFilter == .all && CameraCaptureController.matches(query, available: cameraAvailable()) }
+    var isInlineOpeningScope: Bool { activeScope == .url || activeScope == .terminal }
+    var showsNewTerminal: Bool { activeScope == .terminal }
+    var showsOpenCamera: Bool { !isInlineOpeningScope && mode == .history && resultFilter == .all && CameraCaptureController.matches(query, available: cameraAvailable()) }
     var openResult: ((UUID) -> Void)?
     var openWebURL: ((URL) -> Void)?
     var openFile: ((URL) -> Void)?
@@ -184,6 +183,7 @@ final class HistorySearchViewModel: ObservableObject {
     var isFileSearchEnabled: Bool { LocalFileSearchSettings.shared.isEnabled }
 
     init(historySearch: @escaping (String) async -> [HistorySearchResult] = { await HistoryRepository.shared.search($0, limit: SearchResultLimits.probe) },
+         openingHistorySearch: @escaping (String, HistoryContentKind) async -> [HistorySearchResult] = { await HistoryRepository.shared.searchOpeningHistory($0, kind: $1) },
          fileSearch: ((String, @escaping (SpotlightSearchOutcome) -> Void) -> Void)? = nil,
          targetFileSearch: ((String, SpotlightSearchTarget, @escaping (SpotlightSearchOutcome) -> Void) -> Void)? = nil,
          cancelFiles: (() -> Void)? = nil,
@@ -205,6 +205,7 @@ final class HistorySearchViewModel: ObservableObject {
         self.isMusicSearchEnabled = musicEnabled()
         self.cameraAvailable = cameraAvailable
         self.historySearch = historySearch
+        self.openingHistorySearch = openingHistorySearch
         let service = SpotlightFileSearch()
         if let targetFileSearch {
             self.fileSearch = targetFileSearch
@@ -269,7 +270,8 @@ final class HistorySearchViewModel: ObservableObject {
                            desiredFileCount: resultFilter == .all ? fileDisplayCount : nil)
     }
     var visibleResults: [HistorySearchResult] {
-        Array(results.prefix(max(0, budget.base - (showsOpenCamera ? 1 : 0) - (openURL == nil ? 0 : 1))))
+        if isInlineOpeningScope { return results }
+        return Array(results.prefix(max(0, budget.base - (showsOpenCamera ? 1 : 0) - (openURL == nil ? 0 : 1))))
     }
     var visibleFiles: [SpotlightFileResult] { Array(files.prefix(budget.files)) }
     func visibleMusicResults(in category: AppleMusicSearchCategory) -> [AppleMusicLibraryItem] {
@@ -295,12 +297,17 @@ final class HistorySearchViewModel: ObservableObject {
     var showsOverallEmptyState: Bool {
         guard !isSearching, musicLink == nil, directPath == nil, !isPickingScope else { return false }
         if mode == .url { return resultCount == 0 }
-        return results.isEmpty && files.isEmpty && musicResults.isEmpty && musicError == nil && openURL == nil && !showsOpenCamera && fileStatus == nil
+        return !showsNewTerminal && results.isEmpty && files.isEmpty && musicResults.isEmpty && musicError == nil && openURL == nil && !showsOpenCamera && fileStatus == nil
     }
     var itemIDs: [String] {
         if isPickingScope { return [] }
         if activeScope == .clipboard { return clipboardSearch.entries.map { "clipboard:\($0.id)" } }
         if let musicLink { return ["music-link:\(musicLink.url.absoluteString)"] }
+        if isInlineOpeningScope {
+            return (showsNewTerminal ? ["terminal"] : [])
+                + (openURL.map { ["url:\($0.absoluteString)"] } ?? [])
+                + visibleResults.map { "history:\($0.id)" }
+        }
         let pathItems = directPath.map { [$0.id] } ?? []
         return pathItems + (showsOpenCamera ? ["camera"] : []) + visibleResults.map { "history:\($0.id)" } + visibleFiles.map { "file:\($0.id)" }
             + visibleMusicResults.map { "music:\($0.id)" }
@@ -366,6 +373,7 @@ final class HistorySearchViewModel: ObservableObject {
         }
         if musicLink != nil { openLinkedMusic(); return }
         if let directPath, selectedID == directPath.id { openFile?(directPath.url); return }
+        if selectedID == "terminal" { openCommand?(.terminal); return }
         if selectedID == "camera" { openCamera?(); return }
         guard let selectedID else { return }
         if let row = visibleResults.first(where: { "history:\($0.id)" == selectedID }) { open(row) }
@@ -401,6 +409,12 @@ final class HistorySearchViewModel: ObservableObject {
     private func reconcileSelection(previousIndex: Int?) {
         if isPickingScope { selectedID = nil; return }
         if userMovedSelection, let selectedID, itemIDs.contains(selectedID) { return }
+        // 异步历史抵达时保留用户已移动的高亮；终端有关键词匹配时默认选首条历史。
+        if !userMovedSelection, showsNewTerminal, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+           let first = visibleResults.first {
+            selectedID = "history:\(first.id)"
+            return
+        }
         let index = userMovedSelection ? (previousIndex ?? 0) : 0
         selectedID = itemIDs.isEmpty ? nil : itemIDs[min(index, itemIDs.count - 1)]
     }
@@ -417,7 +431,7 @@ final class HistorySearchViewModel: ObservableObject {
         let currentGeneration = generation
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         // 直接输入的路径优先于所有来源：命中时排在第一项并默认选中。
-        directPath = mode == .history && activeScope != .clipboard ? DirectFilePathResolver.resolve(trimmed) : nil
+        directPath = !isInlineOpeningScope && mode == .history && activeScope != .clipboard ? DirectFilePathResolver.resolve(trimmed) : nil
         results = []; files = []; rawFiles = []
         musicResults = []; musicError = nil
         musicLink = nil; linkedMusicItem = nil; musicLinkError = nil
@@ -441,6 +455,22 @@ final class HistorySearchViewModel: ObservableObject {
         let allowsURL = !trimmed.isEmpty && resultFilter == .all && directPath == nil
             && !DirectFilePathResolver.looksLikePath(trimmed)
         openURL = allowsURL ? DirectURLResolver.url(from: trimmed) : nil
+        if isInlineOpeningScope {
+            openURL = activeScope == .url ? DirectURLResolver.url(from: trimmed) : nil
+            selectedID = itemIDs.first
+            isHistorySearching = true
+            let kind: HistoryContentKind = activeScope == .url ? .web : .terminal
+            searchTask = Task { [weak self] in
+                guard let self else { return }
+                let values = await self.openingHistorySearch(trimmed, kind)
+                guard !Task.isCancelled, currentGeneration == self.generation else { return }
+                let previousIndex = self.selectedIndex
+                self.results = values
+                self.isHistorySearching = false
+                self.reconcileSelection(previousIndex: previousIndex)
+            }
+            return
+        }
         if musicLibraryEnabled(), let url = DirectURLResolver.url(from: trimmed), let link = AppleMusicLink(url: url) {
             musicLink = link
             openURL = nil
@@ -465,6 +495,20 @@ final class HistorySearchViewModel: ObservableObject {
             return
         }
         selectedID = itemIDs.first
+        if trimmed.isEmpty && activeScope == .history {
+            historyDisplayCount = 50
+            isHistorySearching = true
+            searchTask = Task { [weak self] in
+                guard let self else { return }
+                let values = await self.historySearch("")
+                guard !Task.isCancelled, currentGeneration == self.generation else { return }
+                let previousIndex = self.selectedIndex
+                self.results = Array(values.lazy.filter { self.musicLibraryEnabled() || !$0.isAppleMusic }.prefix(50))
+                self.isHistorySearching = false
+                self.reconcileSelection(previousIndex: previousIndex)
+            }
+            return
+        }
         guard !trimmed.isEmpty else { return }
         if mode == .history && (resultFilter == .all || resultFilter.musicCategory != nil) && isMusicSearchEnabled && isMusicAuthorized {
             isMusicSearching = true

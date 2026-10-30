@@ -8,6 +8,7 @@ nonisolated public struct HistorySearchResult: Identifiable, Sendable, Equatable
     public let matchedSnippet: String?
     public let matchedPageNumber: Int?
     public let score: Double
+    public var terminalConfiguration: TerminalLaunchConfiguration? = nil
     public var sourcePath: String? = nil
     public var isAppleMusic: Bool = false
     public var isClipboardContent: Bool = false

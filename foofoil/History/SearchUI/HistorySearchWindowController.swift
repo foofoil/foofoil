@@ -29,8 +29,8 @@ final class HistorySearchPanel: NSPanel {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let isControlOnly = modifiers.contains(.control) && !modifiers.contains(.command) && !modifiers.contains(.option)
         let keyChar = event.charactersIgnoringModifiers?.lowercased()
-        let isDown = event.keyCode == 125 || (isControlOnly && (keyChar == "n" || event.keyCode == 45))
-        let isUp = event.keyCode == 126 || (isControlOnly && (keyChar == "p" || event.keyCode == 35))
+        let isDown = event.keyCode == 125 || (isControlOnly && (keyChar == "n" || (model.isInlineOpeningScope && keyChar == "f") || event.keyCode == 45))
+        let isUp = event.keyCode == 126 || (isControlOnly && (keyChar == "p" || (model.isInlineOpeningScope && keyChar == "b") || event.keyCode == 35))
         if model.isPickingScope {
             if event.keyCode == 36 || event.keyCode == 76 || event.keyCode == 48 {
                 model.selectHighlightedScope()
@@ -47,6 +47,10 @@ final class HistorySearchPanel: NSPanel {
         }
         if event.keyCode == 51 && model.query.isEmpty && model.activeScope != nil {
             model.clearActiveScope()
+            return true
+        }
+        if model.isInlineOpeningScope && (event.keyCode == 123 || event.keyCode == 124) {
+            model.moveSelection(by: event.keyCode == 123 ? -1 : 1)
             return true
         }
         if isDown { model.moveSelection(by: 1); return true }
@@ -214,9 +218,9 @@ final class HistorySearchWindowController: ObservableObject {
         show(mode: .history)
     }
 
-    func showURLInput(initialQuery: String? = nil, target: AppState? = nil) {
+    func showURLInput(target: AppState? = nil) {
         configureOpening(isIncognito: target?.isIncognito == true, target: target)
-        show(mode: .url, initialQuery: initialQuery)
+        show(mode: .history, scope: .url)
     }
 
     // 模式在入口处固定，文件授权面板与异步搜索不会改变本次打开的隐私属性。
@@ -226,7 +230,7 @@ final class HistorySearchWindowController: ObservableObject {
         model.opensIncognito = isIncognito
     }
 
-    private func show(mode: HistorySearchMode, initialQuery: String? = nil) {
+    private func show(mode: HistorySearchMode, initialQuery: String? = nil, scope: SearchScope? = nil) {
         HistoryManager.shared.checkFileReferences()
         guard let panel = window else { return }
 
@@ -241,6 +245,7 @@ final class HistorySearchWindowController: ObservableObject {
 
         if SettingsStore.shared.appleMusicLibraryEnabled { AppleMusicLibrary.shared.refreshAuthorization() }
         model.reset(mode: mode, initialQuery: initialQuery)
+        if let scope { model.selectScope(scope) }
         NSApp.activate(ignoringOtherApps: true)
 
         let screen = activeWindow?.screen

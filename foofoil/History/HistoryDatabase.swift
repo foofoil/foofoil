@@ -247,6 +247,12 @@ nonisolated final class HistoryDatabase {
         }
     }
 
+    func configs(kind: HistoryContentKind) throws -> [WindowConfig] {
+        try queue.sync {
+            try queryConfigs("SELECT * FROM history_items WHERE content_kind = ? ORDER BY last_opened_at DESC", bindings: [kind.rawValue])
+        }
+    }
+
     /// 创建终端只读取可能复用的记录，避免为目录匹配解码全部历史正文。
     func untitledTerminalCandidates() throws -> [WindowConfig] {
         try queue.sync {

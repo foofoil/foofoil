@@ -4,6 +4,51 @@ import Testing
 
 @MainActor
 struct FoilExposeViewTests {
+    @Test func terminalScopeUsesTwoWideHistoryCardsAndASeparateCreationRow() throws {
+        let configuration = TerminalLaunchConfiguration(workingDirectory: "/srv/project", ssh: .init(host: "192.0.2.10", username: "dev", port: 2222))
+        let history = (0..<3).map { index in
+            FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true, title: "Remote \(index)",
+                           symbolName: "terminal", contentKind: .terminal, thumbnailPath: nil,
+                           terminalConfiguration: configuration)
+        }
+        let model = FoilExposeModel(items: [], historyItems: history, fileSearch: { _, _ in },
+                                    cancelFiles: {}, cameraAvailable: { false }, musicEnabled: { false })
+        defer { model.stopFileSearch() }
+        model.selectScope(.terminal)
+        let controller = FoilExposeViewController(model: model)
+        controller.view.frame = NSRect(x: 0, y: 0, width: 1200, height: 800)
+        controller.synchronize()
+        controller.view.layoutSubtreeIfNeeded()
+        let collection = try #require(descendants(controller.view).compactMap { $0 as? NSCollectionView }.first)
+        collection.layoutSubtreeIfNeeded()
+        let creation = try #require(collection.layoutAttributesForItem(at: IndexPath(item: 0, section: 0)))
+        let first = try #require(collection.layoutAttributesForItem(at: IndexPath(item: 0, section: 1)))
+        let second = try #require(collection.layoutAttributesForItem(at: IndexPath(item: 1, section: 1)))
+        let third = try #require(collection.layoutAttributesForItem(at: IndexPath(item: 2, section: 1)))
+        #expect(creation.frame.size == first.frame.size)
+        #expect(creation.frame.minY < first.frame.minY)
+        #expect(first.frame.height == 80 && first.frame.width > first.frame.height * 3)
+        #expect(first.frame.minY == second.frame.minY)
+        #expect(third.frame.minY > second.frame.minY)
+        let cell = try #require(collection.dataSource).collectionView(collection, itemForRepresentedObjectAt: IndexPath(item: 0, section: 1))
+        cell.view.frame.size = first.frame.size
+        cell.view.layoutSubtreeIfNeeded()
+        let labels = descendants(cell.view).compactMap { $0 as? NSTextField }
+        #expect(labels.contains { $0.stringValue == "Remote 0" && $0.font?.pointSize == 17 })
+        #expect(labels.contains { $0.stringValue == "192.0.2.10:2222 · /srv/project" && !$0.isHidden })
+        model.selectedIndex = 0
+        model.moveSelection(.down)
+        #expect(model.selectedIndex == 1)
+        model.moveSelection(.right)
+        #expect(model.selectedIndex == 2)
+        model.moveSelection(.down)
+        #expect(model.selectedIndex == 3)
+        model.moveSelection(.up)
+        #expect(model.selectedIndex == 1)
+        model.moveSelection(.up)
+        #expect(model.selectedIndex == 0)
+    }
+
     @Test func refreshingOverviewKeepsSearchEditingSessionAndSelection() throws {
         let model = model()
         model.searchText = "stable query"

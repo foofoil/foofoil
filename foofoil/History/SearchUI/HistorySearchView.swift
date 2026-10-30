@@ -30,8 +30,10 @@ struct HistorySearchView: View {
                 TextField(showsQuickOpenPrompt ? "" : placeholder, text: $model.query)
                     .overlay(alignment: .leading) {
                         if showsQuickOpenPrompt, model.query.isEmpty {
-                            QuickOpenSearchPrompt(musicLibraryEnabled: SettingsStore.shared.appleMusicSearchEnabled, compact: embedded)
-                                .allowsHitTesting(false)
+                            QuickOpenSearchPrompt(musicLibraryEnabled: SettingsStore.shared.appleMusicSearchEnabled, compact: embedded) {
+                                model.query = "/"
+                                focused = true
+                            }
                         }
                     }
                     .textFieldStyle(.plain).font(.title3).focused($focused)
@@ -101,7 +103,7 @@ struct HistorySearchView: View {
             } else if model.activeScope == .clipboard {
                 Divider()
                 ClipboardSearchResults(search: model.clipboardSearch, selectedID: model.selectedID) { model.openClipboardEntry?($0) }
-            } else if !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            } else if model.isInlineOpeningScope || model.activeScope == .history || !model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Divider()
                 if let link = model.musicLink {
                     VStack(alignment: .leading, spacing: 8) {
@@ -121,6 +123,16 @@ struct HistorySearchView: View {
                     ScrollViewReader { proxy in
                         ScrollView {
                             VStack(alignment: .leading, spacing: 2) {
+                                if model.showsNewTerminal {
+                                    NewTerminalSearchResultRow(isSelected: model.selectedID == "terminal")
+                                        .id("terminal")
+                                        .onTapGesture { model.openCommand?(.terminal) }
+                                }
+                                if model.isInlineOpeningScope, let url = model.openURL {
+                                    OpenURLSearchResultRow(url: url, isSelected: model.selectedID == "url:\(url.absoluteString)")
+                                        .id("url:\(url.absoluteString)")
+                                        .onTapGesture { model.openURLResult() }
+                                }
                                 if let directPath = model.directPath {
                                     DirectFilePathSearchResultRow(file: directPath, isSelected: model.selectedID == directPath.id)
                                         .id(directPath.id)
@@ -157,7 +169,7 @@ struct HistorySearchView: View {
                                     Button(NSLocalizedString("Search More History", comment: "")) { model.expandHistoryResults() }
                                         .font(.caption).padding(10)
                                 }
-                                if model.mode == .history && model.resultFilter.includesFiles {
+                                if !model.isInlineOpeningScope && model.mode == .history && model.resultFilter.includesFiles {
                                     sectionLabel(model.resultFilter.fileSectionLocalizationKey)
                                     ForEach(Array(model.visibleFiles.enumerated()), id: \.element.id) { index, file in
                                         SpotlightFileResultRow(file: file, isSelected: model.selectedID == "file:\(file.id)")
@@ -183,7 +195,7 @@ struct HistorySearchView: View {
                                             .foregroundStyle(.secondary).padding(10)
                                     }
                                 }
-                                if model.mode == .history, (model.resultFilter == .all || model.resultFilter.musicCategory != nil), model.isMusicSearchEnabled, model.isMusicAuthorized {
+                                if !model.isInlineOpeningScope, model.mode == .history, (model.resultFilter == .all || model.resultFilter.musicCategory != nil), model.isMusicSearchEnabled, model.isMusicAuthorized {
                                     ForEach(AppleMusicSearchCategory.allCases.filter { model.resultFilter.includes($0) }) { category in
                                         if !model.musicResults(in: category).isEmpty {
                                             sectionLabel(category.sectionLocalizationKey)
@@ -211,7 +223,7 @@ struct HistorySearchView: View {
                                     Text(String(format: NSLocalizedString("Search Result Limit Notice Format", comment: ""), model.resultCount))
                                         .font(.caption).foregroundStyle(.secondary).padding(10)
                                 }
-                                if let url = model.openURL {
+                                if !model.isInlineOpeningScope, let url = model.openURL {
                                     OpenURLSearchResultRow(url: url, isSelected: model.selectedID == "url:\(url.absoluteString)")
                                         .id("url:\(url.absoluteString)")
                                         .onTapGesture { model.openURLResult() }
@@ -230,13 +242,13 @@ struct HistorySearchView: View {
                 }
             }
             // ⌘P 面板只提供开启文件搜索的入口；关闭文件搜索在设置中完成。
-            if model.activeScope != .clipboard, !model.isPickingScope, (!embedded || !model.query.isEmpty || model.activeScope != nil), model.musicLink == nil, model.mode == .history, model.resultFilter.includesFiles, !model.isFileSearchEnabled {
+            if !model.isInlineOpeningScope, model.activeScope != .clipboard, !model.isPickingScope, (!embedded || !model.query.isEmpty || model.activeScope != nil), model.musicLink == nil, model.mode == .history, model.resultFilter.includesFiles, !model.isFileSearchEnabled {
                 HStack {
                     Button(NSLocalizedString("Enable File Search", comment: "")) { model.enableFileSearch?() }
                     Spacer()
                 }.font(.caption).padding(.horizontal, 18).padding(.bottom, 12)
             }
-            if model.activeScope != .clipboard, !model.isPickingScope, (!embedded || !model.query.isEmpty || model.activeScope != nil), (model.musicLink != nil || (model.mode == .history && (model.resultFilter == .all || model.resultFilter.musicCategory != nil) && model.isMusicSearchEnabled)), !model.isMusicAuthorized {
+            if !model.isInlineOpeningScope, model.activeScope != .clipboard, !model.isPickingScope, (!embedded || !model.query.isEmpty || model.activeScope != nil), (model.musicLink != nil || (model.mode == .history && (model.resultFilter == .all || model.resultFilter.musicCategory != nil) && model.isMusicSearchEnabled)), !model.isMusicAuthorized {
                 HStack {
                     Button(NSLocalizedString(model.musicLink == nil ? "Music Enable Search" : "Music Authorize", comment: "")) { model.enableMusicSearch?() }
                     Spacer()
@@ -293,7 +305,7 @@ struct HistorySearchView: View {
         }
         if model.opensIncognito { return NSLocalizedString("Quick Open Incognito...", comment: "") }
         if let scope = model.activeScope {
-            return String(format: NSLocalizedString("Search In Scope Placeholder", comment: ""), scope.displayName)
+            return scope.inputPlaceholder
         }
         switch model.mode {
         case .history:

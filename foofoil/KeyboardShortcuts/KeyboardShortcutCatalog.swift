@@ -96,7 +96,7 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("history.search", "Search History Menu Item", "p", [.command], "Shortcut Quick Open Purpose"),
         definition("file.openFile", "Open File...", "o", [.command]),
         definition("file.openDirectory", "Open Directory...", "o", [.command, .shift]),
-        definition("file.openURL", "Open URL Menu Item", "l", [.command]),
+        definition("file.openURL", "Open URL Menu Item", nil, []),
         definition("file.openTerminal", "Open Terminal Menu Item", nil, []),
         definition("file.openCamera", "Open Camera", nil, []),
         openClipboardContent

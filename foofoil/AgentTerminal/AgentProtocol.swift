@@ -84,6 +84,16 @@ nonisolated public struct TerminalLaunchConfiguration: Codable, Sendable, Equata
         NSString(string: workingDirectory ?? FileManager.default.homeDirectoryForCurrentUser.path).standardizingPath
     }
 
+    /// 搜索结果展示连接地址与实际目录；SSH 未指定目录时使用远端主目录，不套用本机路径。
+    var historySubtitle: String {
+        if let ssh {
+            let host = ssh.port == 22 ? ssh.host : "\(ssh.host):\(ssh.port)"
+            let directory = workingDirectory?.trimmingCharacters(in: .whitespacesAndNewlines)
+            return host + " · " + (directory.flatMap { $0.isEmpty ? nil : $0 } ?? "~")
+        }
+        return (resolvedWorkingDirectory as NSString).abbreviatingWithTildeInPath
+    }
+
     var abbreviatedWorkingDirectory: String {
         if let ssh {
             let path = workingDirectory.flatMap { $0.isEmpty ? nil : $0 }

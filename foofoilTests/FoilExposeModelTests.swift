@@ -42,6 +42,79 @@ struct FoilExposeModelTests {
         FoilExposeModel(items: items, historyItems: historyItems, fileSearch: { _, _ in }, cancelFiles: {}, musicEnabled: { false })
     }
 
+    @Test func urlScopeMatchesAddressesAndNavigatesTheDirectURL() {
+        var first = FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true,
+                                  title: "Reference", symbolName: "globe", contentKind: .web, thumbnailPath: nil)
+        first.webURLString = "https://example.com/docs"
+        first.actualWebURLString = "https://redirect.example.org/guide"
+        let second = FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true,
+                                   title: "Example reference", symbolName: "globe", contentKind: .web, thumbnailPath: nil)
+        let model = makeModel(items: [makeItem()], historyItems: [first, second, makeItem(isHistoryEntry: true)])
+        var command: SearchScope?
+        model.onOpenCommand = { command = $0 }
+        model.selectScope(.url)
+        #expect(command == nil)
+        #expect(model.activeScope == .url)
+        #expect(model.currentItems.map(\.id) == [first.id, second.id])
+        model.searchText = "redirect"
+        #expect(model.currentItems.map(\.id) == [first.id])
+        #expect(model.highlightedItem?.id == first.id)
+        model.searchText = "example.com"
+        #expect(model.currentItems.count == 2)
+        #expect(model.highlightedItem?.commandURL?.absoluteString == "https://example.com")
+        #expect(!model.isChoosingScope)
+        #expect(!model.showsFileResults && !model.showsMusicResults)
+        model.moveSelection(.right)
+        #expect(model.highlightedItem?.id == first.id)
+        var restored: UUID?
+        model.onSelect = { restored = $0.id }
+        model.openHighlightedResult()
+        #expect(restored == first.id)
+        model.moveSelection(.left)
+        var opened: URL?
+        model.onOpenURL = { opened = $0 }
+        model.openHighlightedResult()
+        #expect(opened?.absoluteString == "https://example.com")
+        model.searchText = "unmatched keyword"
+        #expect(model.currentItems.isEmpty)
+        #expect(model.selectedIndex == 0)
+    }
+
+    @Test func terminalScopeKeepsCreationFirstAndSelectsMatchingHistory() {
+        let history = (0..<5).map { index in
+            FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true,
+                           title: "Shell \(index)", symbolName: "terminal", contentKind: .terminal, thumbnailPath: nil)
+        }
+        let model = makeModel(items: [makeItem()], historyItems: history + [makeItem(isHistoryEntry: true)])
+        var command: SearchScope?
+        model.onOpenCommand = { command = $0 }
+        model.searchText = "/terminal "
+        #expect(model.activeScope == .terminal)
+        #expect(command == nil)
+        #expect(model.currentItems.first?.id == FoilExposeItem.terminalCommandID)
+        #expect(model.currentItems.count == 6)
+        #expect(model.selectedIndex == 0)
+        model.openHighlightedResult()
+        #expect(command == .terminal)
+        model.searchText = "Shell"
+        #expect(model.selectedIndex == 1)
+        model.columnCount = 2
+        model.moveSelection(.down)
+        #expect(model.selectedIndex == 3)
+        model.moveSelection(.up)
+        #expect(model.selectedIndex == 1)
+        model.moveSelection(.left)
+        #expect(model.selectedIndex == 0)
+        model.moveSelection(.right)
+        #expect(model.highlightedItem?.id == history[0].id)
+        model.searchText = "no match"
+        #expect(model.currentItems.count == 1)
+        #expect(model.selectedIndex == 0)
+        model.searchText = ""
+        #expect(model.selectedIndex == 0)
+        #expect(model.currentItems.count == 6)
+    }
+
     @Test func renameRefreshKeepsSelectionAndUpdatesSearchMatches() {
         let open = makeItem(title: "Old title")
         let history = makeItem(title: "History title", isHistoryEntry: true)

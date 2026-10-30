@@ -173,14 +173,17 @@ final class FoilExposeViewController: NSViewController, NSTextFieldDelegate {
             editor?.string = model.searchText
         }
         let placeholder = model.activeScope.map {
-            String(format: NSLocalizedString("Search In Scope Placeholder", comment: ""), $0.displayName)
+            $0.inputPlaceholder
         } ?? ""
         // AppKit 改写占位文字会重启 field editor；只提交最终值且跳过同值，
         // 避免编辑结束 → 请求聚焦 → 刷新占位文字的输入服务重建循环。
         if searchField.placeholderString != placeholder {
             searchField.placeholderString = placeholder
         }
-        searchPrompt.rootView = QuickOpenSearchPrompt(musicLibraryEnabled: SettingsStore.shared.appleMusicSearchEnabled)
+        searchPrompt.rootView = QuickOpenSearchPrompt(musicLibraryEnabled: SettingsStore.shared.appleMusicSearchEnabled) { [weak self] in
+            self?.model.searchText = "/"
+            self?.focusSearch()
+        }
         searchPrompt.isHidden = !model.searchText.isEmpty || model.activeScope != nil
         searchField.setAccessibilityLabel(QuickOpenSearchPrompt.title(musicLibraryEnabled: SettingsStore.shared.appleMusicSearchEnabled))
         scopeButton.isHidden = model.activeScope == nil

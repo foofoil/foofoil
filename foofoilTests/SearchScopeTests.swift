@@ -121,7 +121,7 @@ struct SearchScopeTests {
         defer { quick.stop() }
         quick.query = "/"
         quick.selectScope(.url)
-        #expect(quick.mode == .url && quick.query.isEmpty && quick.activeScope == nil)
+        #expect(quick.mode == .history && quick.query.isEmpty && quick.activeScope == .url)
         quick.reset()
         quick.query = "/"
         var quickAction: SearchScope?
@@ -134,9 +134,9 @@ struct SearchScopeTests {
         var exposeAction: SearchScope?
         expose.onOpenCommand = { exposeAction = $0 }
         expose.selectScope(.url)
-        #expect(exposeAction == .url && expose.activeScope == nil)
+        #expect(exposeAction == nil && expose.activeScope == .url)
         expose.selectScope(.clipboard)
-        #expect(exposeAction == .url && expose.activeScope == .clipboard)
+        #expect(exposeAction == nil && expose.activeScope == .clipboard)
     }
 
     @Test func clipboardScopeIsAvailableEvenWhenCurrentClipboardIsEmpty() {
@@ -170,8 +170,120 @@ struct SearchScopeTests {
         #expect(quick.activeScope == nil && quick.query == "clipboard regression query")
     }
 
+    @Test func quickOpenOpeningScopesShowHistoryAndChooseDefaults() async throws {
+        let web = HistorySearchResult(id: UUID(), title: "Website", contentKind: .web,
+                                      thumbnailPath: nil, matchedSnippet: nil, matchedPageNumber: nil, score: 0)
+        let terminal = HistorySearchResult(id: UUID(), title: "Project shell", contentKind: .terminal,
+                                           thumbnailPath: nil, matchedSnippet: nil, matchedPageNumber: nil, score: 0)
+        let model = HistorySearchViewModel(historySearch: { _ in Issue.record("Unscoped history queried"); return [] },
+            openingHistorySearch: { query, kind in
+                if query == "no match" { return [] }
+                return kind == .web ? [web] : [terminal]
+            }, fileSearch: { _, _ in Issue.record("Files queried in opening scope") }, cameraAvailable: { false },
+            musicEnabled: { false })
+        defer { model.stop() }
+        model.selectScope(.url)
+        try await eventually { !model.isSearching }
+        #expect(model.itemIDs == ["history:\(web.id)"])
+        #expect(model.selectedID == model.itemIDs.first)
+        model.query = "example.com"
+        try await eventually { !model.isSearching }
+        #expect(model.itemIDs == ["url:https://example.com", "history:\(web.id)"])
+        #expect(model.selectedID == "url:https://example.com")
+        model.moveSelection(by: 1)
+        var restored: UUID?
+        model.openResult = { restored = $0 }
+        model.openSelected()
+        #expect(restored == web.id)
+        model.selectScope(.terminal)
+        try await eventually { !model.isSearching }
+        #expect(model.itemIDs == ["terminal", "history:\(terminal.id)"])
+        #expect(model.selectedID == "terminal")
+        model.query = "Project"
+        try await eventually { !model.isSearching }
+        #expect(model.selectedID == "history:\(terminal.id)")
+        for (key, code, delta) in [("b", UInt16(11), -1), ("f", 3, 1), ("p", 35, -1), ("n", 45, 1)] {
+            let before = model.selectedIndex ?? 0
+            let event = try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .control,
+                timestamp: 0, windowNumber: 0, context: nil, characters: key, charactersIgnoringModifiers: key,
+                isARepeat: false, keyCode: code))
+            #expect(HistorySearchPanel.handleSearchKey(event, model: model, dismiss: {}))
+            #expect(model.selectedIndex == before + delta)
+        }
+        model.query = "no match"
+        try await eventually { !model.isSearching }
+        #expect(model.itemIDs == ["terminal"] && model.selectedID == "terminal")
+        var command: SearchScope?
+        model.openCommand = { command = $0 }
+        model.openSelected()
+        #expect(command == .terminal)
+        #expect(SearchScope.url.inputPlaceholder == NSLocalizedString("Enter URL Placeholder", comment: ""))
+        #expect(SearchScope.terminal.inputPlaceholder == NSLocalizedString("Search Or Create Terminal Placeholder", comment: ""))
+    }
+
+    @Test func openingScopeLateHistoryPreservesUserNavigation() async throws {
+        var finish: CheckedContinuation<[HistorySearchResult], Never>?
+        let row = HistorySearchResult(id: UUID(), title: "Web", contentKind: .web,
+                                      thumbnailPath: nil, matchedSnippet: nil, matchedPageNumber: nil, score: 0)
+        let model = HistorySearchViewModel(openingHistorySearch: { _, _ in
+            await withCheckedContinuation { finish = $0 }
+        }, musicEnabled: { false })
+        defer { model.stop() }
+        model.selectScope(.url)
+        try await eventually { finish != nil }
+        finish?.resume(returning: []); finish = nil
+        model.query = "example.com"
+        try await eventually { finish != nil }
+        model.moveSelection(by: 1)
+        finish?.resume(returning: [row]); finish = nil
+        try await eventually { !model.isSearching }
+        #expect(model.selectedID == "url:https://example.com")
+    }
+
+    @Test func terminalHistoryIncludesConnectionAndDirectoryDetails() async throws {
+        let local = TerminalLaunchConfiguration(workingDirectory: "/tmp/project")
+        let remote = TerminalLaunchConfiguration(workingDirectory: "/srv/project", ssh: .init(host: "192.0.2.10", username: "dev", port: 2222))
+        #expect(local.historySubtitle == "/tmp/project")
+        #expect(remote.historySubtitle == "192.0.2.10:2222 · /srv/project")
+        #expect(TerminalLaunchConfiguration(ssh: .init(host: "remote.example", username: "dev")).historySubtitle == "remote.example · ~")
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = HistoryRepository(databaseURL: directory.appendingPathComponent("history.sqlite3"))
+        var config = WindowConfig(id: UUID(), contentKind: .terminal)
+        config.customTitle = "Remote project"
+        config.terminalConfiguration = remote
+        #expect(repository.upsert(config))
+        for query in ["", "192.0.2.10", "/srv/project", "Remote project"] {
+            let rows = await repository.searchOpeningHistory(query, kind: .terminal)
+            #expect(rows.first?.terminalConfiguration == remote)
+        }
+        let generic = await repository.search("Remote project")
+        #expect(generic.first?.terminalConfiguration == remote)
+    }
+
+    @Test func openingHistoryMatchesTitleAndBothAddressesWithoutOtherTypes() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let repository = HistoryRepository(databaseURL: directory.appendingPathComponent("history.sqlite3"))
+        var web = WindowConfig(id: UUID(), contentKind: .web)
+        web.customTitle = "Reference website"
+        web.webURLString = "https://example.com/docs"
+        web.actualWebURLString = "https://redirect.test/guide"
+        let terminal = WindowConfig(id: UUID(), contentKind: .terminal)
+        #expect(repository.upsert(web))
+        #expect(repository.upsert(terminal))
+        #expect(await repository.searchOpeningHistory("", kind: .web).map(\.id) == [web.id])
+        for query in ["REFERENCE", "example.com", "redirect.test"] {
+            #expect(await repository.searchOpeningHistory(query, kind: .web).map(\.id) == [web.id])
+        }
+        #expect(await repository.searchOpeningHistory("no match", kind: .web).isEmpty)
+        #expect(await repository.searchOpeningHistory("", kind: .terminal).map(\.id) == [terminal.id])
+    }
+
     @Test func openingCommandsExecuteWithoutActivatingScope() {
-        for scope in [SearchScope.terminal, .camera] {
+        for scope in [SearchScope.camera] {
             let quickOpen = HistorySearchViewModel()
             var quickCommand: SearchScope?
             quickOpen.openCommand = { quickCommand = $0 }
@@ -224,6 +336,17 @@ struct SearchScopeTests {
         // 前缀缩小范围包含多项时保留顺序
         let fScopes = allScopes.filter { $0.matches(filter: "f") }
         #expect(fScopes == [.file, .folder])
+    }
+
+    @Test func emptyHistoryScopeShowsFiftyRecentResults() async throws {
+        let rows = (0..<55).map { index in
+            HistorySearchResult(id: UUID(), title: "\(index)", contentKind: .note,
+                                thumbnailPath: nil, matchedSnippet: nil, matchedPageNumber: nil, score: 0)
+        }
+        let model = HistorySearchViewModel(historySearch: { _ in rows }, cameraAvailable: { false }, musicEnabled: { false })
+        model.selectScope(.history)
+        try await eventually { !model.isHistorySearching }
+        #expect(model.visibleResults.map(\.id) == rows.prefix(50).map(\.id))
     }
 
     @Test func historySearchScopePickingAndFolderTargetWorkflow() async throws {

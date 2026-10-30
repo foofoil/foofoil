@@ -3,6 +3,7 @@ import SwiftUI
 /// 空箔的打开入口直接绑定来源状态，避免主窗口变化导致无痕内容进入普通箔。
 struct BlankOpenButtons: View {
     @ObservedObject var appState: AppState
+    let search: HistorySearchWindowController
     @State private var hovered: Int?
     @State private var shortcutRevision = 0
     @State private var clipboardContent: ClipboardOpenableContent?
@@ -167,7 +168,10 @@ struct BlankOpenButtons: View {
             let target = appState.isTemporaryIncognito ? temporaryTarget : appState
             delegate.openContentPanel(directory: index == 1, target: target)
         case 2:
-            HistorySearchWindowController.shared.showURLInput(target: appState.isTemporaryIncognito ? temporaryTarget : appState)
+            if let temporaryTarget {
+                search.configureOpening(isIncognito: true, target: temporaryTarget)
+            }
+            search.model.selectScope(.url)
         case 3:
             delegate.openTerminal(isIncognito: opensIncognito)
         default:

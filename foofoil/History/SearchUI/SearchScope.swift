@@ -34,6 +34,14 @@ enum SearchScope: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
+    var inputPlaceholder: String {
+        switch self {
+        case .url: return NSLocalizedString("Enter URL Placeholder", comment: "")
+        case .terminal: return NSLocalizedString("Search Or Create Terminal Placeholder", comment: "")
+        default: return String(format: NSLocalizedString("Search In Scope Placeholder", comment: ""), displayName)
+        }
+    }
+
     var englishName: String {
         switch self {
         case .history: return "history"

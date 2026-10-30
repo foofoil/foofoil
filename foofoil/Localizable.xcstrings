@@ -1,6 +1,19 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Search Or Create Terminal Placeholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Search terminals or create a new terminal" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "在终端中搜索或新建终端" } }
+      }
+    },
+    "Expose New Terminal": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "New Terminal" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "新建终端" } }
+      }
+    },
     "Browse Clipboard History": {
       "extractionState": "manual",
       "localizations": {

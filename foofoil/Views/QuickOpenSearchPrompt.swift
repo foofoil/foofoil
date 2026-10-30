@@ -5,6 +5,7 @@ import SwiftUI
 struct QuickOpenSearchPrompt: View {
     let musicLibraryEnabled: Bool
     var compact = false
+    var onSlash: () -> Void = {}
 
     static func title(musicLibraryEnabled: Bool) -> String {
         NSLocalizedString(musicLibraryEnabled ? "Quick Open Prompt With Music" : "Quick Open Prompt", comment: "")
@@ -24,13 +25,18 @@ struct QuickOpenSearchPrompt: View {
             HStack(spacing: 6) {
                 Text(compact ? NSLocalizedString("Blank Foil Open Prompt", comment: "") : Self.title(musicLibraryEnabled: musicLibraryEnabled))
                     .font(.system(size: 13))
-                Text("/")
+                    .allowsHitTesting(false)
+                Button(action: onSlash) { Text("/")
                     .font(.system(size: 11, weight: .medium, design: .monospaced))
                     .frame(width: 16, height: 17)
                     .background(.quaternary, in: RoundedRectangle(cornerRadius: 3))
                     .overlay(RoundedRectangle(cornerRadius: 3).stroke(.secondary.opacity(0.3)))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(NSLocalizedString("Quick Open More Options", comment: ""))
                 Text(NSLocalizedString("Quick Open More Options", comment: ""))
                     .font(.system(size: 11))
+                    .allowsHitTesting(false)
             }
             .lineLimit(1)
             .fixedSize()
@@ -38,11 +44,18 @@ struct QuickOpenSearchPrompt: View {
             .scaleEffect(scale, anchor: .leading)
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .leading)
         }
-        .accessibilityHidden(true)
     }
 }
 
-/// 提示覆盖在原生输入框上方，但点击仍穿透到输入框。
+/// 仅键帽接收点击，其余提示区域继续交给输入框。
 final class QuickOpenPromptHostingView: NSHostingView<QuickOpenSearchPrompt> {
-    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let local = convert(point, from: superview)
+        let prompt = rootView
+        let title = prompt.compact ? NSLocalizedString("Blank Foil Open Prompt", comment: "") : QuickOpenSearchPrompt.title(musicLibraryEnabled: prompt.musicLibraryEnabled)
+        let titleWidth = (title as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 13)]).width
+        let scale = min(1, max(0, bounds.width) / QuickOpenSearchPrompt.idealWidth(musicLibraryEnabled: prompt.musicLibraryEnabled, compact: prompt.compact))
+        guard local.x >= (titleWidth + 6) * scale, local.x <= (titleWidth + 22) * scale else { return nil }
+        return super.hitTest(point)
+    }
 }

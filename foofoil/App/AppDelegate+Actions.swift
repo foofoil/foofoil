@@ -398,12 +398,7 @@ extension AppDelegate {
     }
 
     @objc func openWebURLAction() {
-        let currentURLString: String? = {
-            guard let appState = activeAppState,
-                  let url = appState.actualWebURL ?? appState.webURL else { return nil }
-            return url.absoluteString
-        }()
-        HistorySearchWindowController.shared.showURLInput(initialQuery: currentURLString)
+        HistorySearchWindowController.shared.showURLInput()
     }
 
     /// 在空白窗口中打开网页；若没有空白窗口，则创建新窗口。

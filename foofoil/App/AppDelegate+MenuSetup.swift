@@ -142,7 +142,7 @@ extension AppDelegate {
         openDirectoryItem.target = self
         fileMenu.addItem(openDirectoryItem)
 
-        let openWebURLItem = NSMenuItem(title: NSLocalizedString("Open URL Menu Item", comment: ""), action: #selector(openWebURLAction), keyEquivalent: "l")
+        let openWebURLItem = NSMenuItem(title: NSLocalizedString("Open URL Menu Item", comment: ""), action: #selector(openWebURLAction), keyEquivalent: "")
         openWebURLItem.withSymbol("link")
         openWebURLItem.representedObject = "file.openURL"
         openWebURLItem.target = self

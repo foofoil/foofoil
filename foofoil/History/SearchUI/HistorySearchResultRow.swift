@@ -10,13 +10,25 @@ struct HistorySearchResultRow: View {
         SearchResultRow(
             symbolName: result.symbolName,
             title: result.title,
-            snippet: result.isClipboardContent ? NSLocalizedString("From Clipboard", comment: "") : result.matchedSnippet,
+            snippet: result.terminalConfiguration?.historySubtitle ?? (result.isClipboardContent ? NSLocalizedString("From Clipboard", comment: "") : result.matchedSnippet),
             pageNumber: result.matchedPageNumber,
             thumbnailPath: result.thumbnailPath,
             showsInlineIcon: true,
             isSelected: isSelected,
-            historyIsPinned: result.historyIsPinned
+            historyIsPinned: result.historyIsPinned,
+            isRemoteTerminal: result.terminalConfiguration?.ssh != nil,
+            faviconID: result.contentKind == .web ? result.id : nil
         )
+    }
+}
+
+struct NewTerminalSearchResultRow: View {
+    let isSelected: Bool
+
+    var body: some View {
+        SearchResultRow(symbolName: "terminal", title: NSLocalizedString("Expose New Terminal", comment: ""),
+                        snippet: nil, pageNumber: nil, thumbnailPath: nil,
+                        showsInlineIcon: false, isSelected: isSelected)
     }
 }
 
@@ -68,13 +80,17 @@ private struct SearchResultRow: View {
     let showsInlineIcon: Bool
     let isSelected: Bool
     var historyIsPinned = false
+    var isRemoteTerminal = false
+    var faviconID: UUID? = nil
     @StateObject private var thumbnail = HistorySearchThumbnailLoader()
 
     var body: some View {
         HStack(spacing: 12) {
             ZStack {
                 RoundedRectangle(cornerRadius: 7).fill(Color.secondary.opacity(0.12))
-                if let image = thumbnail.image {
+                if let faviconID, let image = WebFaviconCache.image(for: faviconID) {
+                    Image(nsImage: image).resizable().scaledToFit().padding(10)
+                } else if let image = thumbnail.image {
                     Image(nsImage: image).resizable().scaledToFill()
                 } else if symbolName == AppleMusicReference.symbolName {
                     AppleMusicTypeIcon(size: 28)
@@ -103,6 +119,11 @@ private struct SearchResultRow: View {
                         } else {
                             Image(systemName: symbolName).foregroundStyle(.secondary)
                         }
+                    }
+                    if isRemoteTerminal {
+                        Image(systemName: "network").foregroundStyle(.secondary)
+                            .help(Text("Terminal SSH"))
+                            .accessibilityLabel(Text("Terminal SSH"))
                     }
                     Text(title).font(.headline).lineLimit(1)
                     if let page = pageNumber {
