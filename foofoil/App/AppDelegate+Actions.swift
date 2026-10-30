@@ -658,8 +658,9 @@ extension AppDelegate {
     }
 
     @objc func resetContentAction() {
-        if activeAppState?.terminalSession?.needsCloseConfirmation == true, !TerminalSession.confirmTermination() { return }
-        activeAppState?.resetContent()
+        guard let state = activeAppState, !state.isBlank else { return }
+        if state.terminalSession?.needsCloseConfirmation == true, !TerminalSession.confirmTermination() { return }
+        state.resetContent()
     }
 
     /// 只收起当前箔及其伴随面板，不关闭内容或中断播放；总览仍保留此箔。

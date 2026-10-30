@@ -40,7 +40,7 @@ Add ⌥ to the configured shortcut to open incognito.
 | Save As | ⇧⌘S | ⇧⌘S | Save the source file or complete text; clipboard images use the image export panel, and websites save a web archive. Unavailable for camera, CUE, SACD ISO, and Apple Music |
 {{file}}
 
-“Reset to Blank Foil” clears the current content and returns the window to a blank foil. Its default shortcut is ⇧⌘K; you can change it in Settings → Keyboard Shortcuts → Content Management.
+“Reset to Blank Foil” clears the current content and returns the window to a blank foil. It is unavailable when the foil is already blank. Its default shortcut is ⇧⌘K; you can change it in Settings → Keyboard Shortcuts → Content Management.
 
 In the Apple Music library window, Esc closes the window, including while the search field is focused. Drag the blank area of the sidebar to move the window.
 

@@ -1,9 +1,31 @@
+import AppKit
 import Foundation
 import Testing
 @testable import foofoil
 
 @MainActor
 struct FoilInformationTests {
+    @Test func blankFoilCannotShowInformation() {
+        _ = NSApplication.shared
+        let state = AppState()
+        let controller = FloatingWindowController(appState: state)
+        let delegate = AppDelegate()
+        delegate.windowControllers = [controller]
+        delegate.activeWindowProvider = { controller.window }
+        controller.window?.orderFront(nil)
+        defer { controller.window?.orderOut(nil) }
+        let menuItem = NSMenuItem(title: "", action: #selector(AppDelegate.showFoilInformationAction), keyEquivalent: "")
+        let item = FoilExposeItem(id: state.id, controller: controller, isHistoryEntry: false, title: "", symbolName: "", contentKind: .note, thumbnailPath: nil)
+        #expect(!delegate.validateMenuItem(menuItem))
+        #expect(!item.canShowInformation)
+        delegate.showFoilInformationAction()
+        #expect(controller.window?.attachedSheet == nil)
+
+        state.text = "Content"
+        #expect(delegate.validateMenuItem(menuItem))
+        #expect(item.canShowInformation)
+    }
+
     @Test func cameraAndEmptyFoilsRejectTitleChanges() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

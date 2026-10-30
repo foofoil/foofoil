@@ -78,14 +78,14 @@ nonisolated enum FoilInformation {
 
 extension AppDelegate {
     @objc func showFoilInformationAction() {
-        guard let controller = activeWindowController, let window = controller.window,
+        guard let controller = activeWindowController, !controller.appState.isBlank, let window = controller.window,
               window.attachedSheet == nil else { return }
         showFoilInformation(config: controller.appState.toConfig(), state: controller.appState, window: window)
     }
 
     /// 总览中的历史条目直接读取快照，不恢复窗口或改变访问记录。
     func showFoilInformation(config: WindowConfig, state: AppState?, window: NSWindow, foilWindow: NSWindow? = nil) {
-        guard window.attachedSheet == nil else { return }
+        guard state?.isBlank != true, window.attachedSheet == nil else { return }
         let kind = config.contentKind ?? HistoryContentKind.infer(from: config)
         let source = FoilInformation.sourceURL(for: config)
         let size = state == nil ? config.windowFrame.map { NSRectFromString($0).size } : (foilWindow ?? window).frame.size
@@ -152,7 +152,7 @@ extension AppDelegate {
                     rows.append(.init(key: "Foil Info Duration", value: Duration.seconds(duration.seconds).formatted(.time(pattern: .hourMinuteSecond))))
                 }
             }
-            guard (state == nil || state?.id == config.id), window.isVisible, window.attachedSheet == nil else { return }
+            guard (state == nil || (state?.id == config.id && state?.isBlank == false)), window.isVisible, window.attachedSheet == nil else { return }
             let unknown = NSLocalizedString("Foil Info Unknown", comment: "")
             rows.append(.init(key: "Foil Info First Visit", value: (visits?.first ?? config.createdAt)?.formatted(date: .numeric, time: .standard) ?? unknown))
             rows.append(.init(key: "Foil Info Last Visit", value: (visits?.last ?? config.createdAt)?.formatted(date: .numeric, time: .standard) ?? unknown))

@@ -867,7 +867,7 @@ private final class ExposeNativeCard: NSView {
                 key: foil.isHistoryEntry ? favorite?.keyEquivalent ?? "" : "", modifiers: foil.isHistoryEntry ? favorite?.modifiers ?? [] : [])
         }
         if foil.canRenameTitle { add("Change Title", #selector(rename), symbol: "pencil", key: foil.isHistoryEntry ? "e" : "", modifiers: .command) }
-        if foil.isHistoryEntry || foil.controller != nil { add("Foil Information Menu", #selector(showInformation), symbol: "info.circle", key: foil.isHistoryEntry ? "i" : "", modifiers: .command) }
+        if foil.canShowInformation { add("Foil Information Menu", #selector(showInformation), symbol: "info.circle", key: foil.isHistoryEntry ? "i" : "", modifiers: .command) }
         if foil.isHistoryEntry { add("Delete History Record", #selector(deleteHistory), symbol: "trash", key: "\u{8}", modifiers: .command) }
         return menu.items.isEmpty ? nil : menu
     }

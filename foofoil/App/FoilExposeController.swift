@@ -102,6 +102,7 @@ struct FoilExposeItem: Identifiable {
     }
 
     var requiresHistoryClearConfirmation: Bool { isHistoryEntry && historyIsPinned }
+    var canShowInformation: Bool { isHistoryEntry || (controller != nil && controller?.appState.isBlank == false) }
 
     var window: NSWindow? { controller?.window }
     var isNewFoil: Bool { controller == nil && !isHistoryEntry && musicItem == nil && clipboardEntry == nil && id != Self.cameraCommandID }
@@ -1032,7 +1033,7 @@ final class FoilExposeController {
         }
         model.onRenameItem = { [weak self] item in self?.renameItem(item) }
         model.onShowInformation = { [weak self] item in
-            guard let self, let panel = self.panels.first,
+            guard item.canShowInformation, let self, let panel = self.panels.first,
                   let delegate = NSApp.delegate as? AppDelegate,
                   let config = item.controller?.appState.toConfig() ?? HistoryRepository.shared.config(id: item.id) else { return }
             delegate.showFoilInformation(config: config, state: item.controller?.appState, window: panel, foilWindow: item.controller?.window)

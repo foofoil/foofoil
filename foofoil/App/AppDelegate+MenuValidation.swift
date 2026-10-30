@@ -246,8 +246,12 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             return true
         }
         if menuItem.action == #selector(showFoilInformationAction) {
-            return activeWindowController?.window?.isVisible == true
+            return activeWindowController?.appState.isBlank == false
+                && activeWindowController?.window?.isVisible == true
                 && activeWindowController?.window?.attachedSheet == nil
+        }
+        if menuItem.action == #selector(resetContentAction) {
+            return activeAppState?.isBlank == false
         }
         if menuItem.action == #selector(hideCurrentFoilAction) {
             return activeWindowController?.window?.isVisible == true

@@ -467,6 +467,7 @@ struct FoilContentView: View {
                 Label(NSLocalizedString("Reset to Blank Foil", comment: ""), systemImage: "arrow.counterclockwise")
             }
             .configuredKeyboardShortcut("file.reset")
+            .disabled(windowState.isBlank)
 
             Button(action: {
                 NotificationCenter.default.post(

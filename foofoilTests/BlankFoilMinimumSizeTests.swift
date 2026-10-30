@@ -6,6 +6,24 @@ import Testing
 @Suite(.sharedApplicationState, .serialized)
 struct BlankFoilMinimumSizeTests {
     @Test(arguments: [false, true])
+    func resetCommandIsDisabledForBlankFoils(isIncognito: Bool) {
+        _ = NSApplication.shared
+        let state = AppState(isIncognito: isIncognito)
+        let controller = FloatingWindowController(appState: state)
+        let delegate = AppDelegate()
+        delegate.windowControllers = [controller]
+        delegate.activeWindowProvider = { controller.window }
+        defer { controller.close() }
+        let item = NSMenuItem(title: "", action: #selector(AppDelegate.resetContentAction), keyEquivalent: "")
+        #expect(!delegate.validateMenuItem(item))
+        state.text = "Content"
+        #expect(delegate.validateMenuItem(item))
+        delegate.resetContentAction()
+        #expect(state.isBlank)
+        #expect(!delegate.validateMenuItem(item))
+    }
+
+    @Test(arguments: [false, true])
     func blankMinimumFitsFourHistoryCardsAndTracksContent(isIncognito: Bool) async throws {
         let state = AppState(isIncognito: isIncognito)
         let controller = FloatingWindowController(appState: state)
