@@ -231,7 +231,7 @@ xcodebuild test \
 
 Hi-Fi, EPUB, and video ship with the app. Users do not install, enable, or update plugins. Extensions/plugins in the source are an internal development mechanism; see the [module guide](docs/extension-support.zh-CN.md) (Chinese) for the ABI, manifests, and retained management implementation.
 
-`./package-dmg` builds the Release app, embeds these modules, and creates a DMG. Complete default packaging requires all five repositories above. Use `--without-video` to omit video, `--no-sign` for a local validation package, or `--sign` for Developer ID signing and notarization with the required credentials. See the script header for setup.
+`./package-dmg` builds the Release app, embeds these modules, and creates a DMG. Complete default packaging requires all five repositories above. Use `--without-video` to omit video, `--no-sign` for a local validation package, or `--sign` for Developer ID signing and notarization with the required credentials. After packaging, an interactive terminal offers to install the app into `/Applications`. See the script header for setup.
 
 ## Lightweight by Design, Open to Contributions
 

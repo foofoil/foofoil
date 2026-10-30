@@ -233,7 +233,7 @@ xcodebuild test \
 
 Hi-Fi、EPUB 和视频随应用统一交付，用户无需安装、启用或更新插件。源码中的扩展／插件是内部开发机制；相关 ABI、Manifest 和保留的管理代码见[模块开发说明](docs/extension-support.zh-CN.md)。
 
-`./package-dmg` 构建 Release 应用、嵌入上述模块并生成 DMG，完整默认打包需要上述五个仓库。`--without-video` 可排除视频模块；`--no-sign` 生成本地验证包，`--sign` 使用 Developer ID 签名与公证，需要配置相应凭据，见脚本头部。
+`./package-dmg` 构建 Release 应用、嵌入上述模块并生成 DMG，完整默认打包需要上述五个仓库。`--without-video` 可排除视频模块；`--no-sign` 生成本地验证包，`--sign` 使用 Developer ID 签名与公证，需要配置相应凭据，打包成功后，交互式终端会询问是否将应用安装到 `/Applications`。签名配置见脚本头部。
 
 ## 轻量化设计与贡献
 

@@ -18,6 +18,7 @@
 #     --sign        直接签名并公证，不询问
 #     --sign-only   仅签名，不做公证（本地验证用）
 #     --no-sign     直接打不签名包，不询问
+#     打包成功后，交互式终端会询问是否安装到 /Applications。
 #     -h, --help    显示帮助
 #
 # 环境变量:
@@ -58,6 +59,7 @@ usage() {
     print -r -- "  --no-sign    不签名，直接打包"
     print -r -- "  -h, --help   显示帮助"
     print -r -- ""
+    print -r -- "  打包成功后，交互式终端会询问是否安装到 /Applications。"
     print -r -- "  环境变量: SIGN_IDENTITY, NOTARY_PROFILE"
 }
 
@@ -151,7 +153,7 @@ fi
 xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration "$CONFIGURATION" \
     -derivedDataPath "$DERIVED_DATA" -destination "$DESTINATION" \
     CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-    CURRENT_PROJECT_VERSION="$(date +%Y%m%d%H%M%S)" FOOFOIL_BUILD_SOURCE=dmg \
+    CURRENT_PROJECT_VERSION="$(date +%Y%m%d%H%M)" FOOFOIL_BUILD_SOURCE=dmg \
     build
 
 APP_PATH="$DERIVED_DATA/Build/Products/$CONFIGURATION/$APP_NAME.app"
@@ -268,5 +270,39 @@ print "Signed/notarized: $([[ $SIGN_ENABLED -eq 1 ]] && print yes || print no)$(
 print "Bundled plugins:"
 ls -1 "$APP_PATH/Contents/PlugIns"
 
-# 8. 在 Finder 中打开 DMG 所在目录并选中它，方便直接分发。
-open -R "$DMG_PATH" 2>/dev/null || true
+# 8. 先复制完整应用，再替换旧版本；复制失败时保留原有应用。
+if [[ -t 0 && -t 1 ]]; then
+    print -n "是否立即安装到 /Applications/foofoil.app？已有版本将被替换 (y/N) "
+    read -r reply || reply=""
+    if [[ "$reply" == [yY]* ]]; then
+        install_tmp="$(mktemp -d /Applications/.foofoil-install.XXXXXXXX)" || {
+            print -u2 "无法在 /Applications 创建临时目录，请检查写入权限。"
+            exit 1
+        }
+        if ! ditto "$APP_PATH" "$install_tmp/$APP_NAME.app"; then
+            rm -rf "$install_tmp"
+            print -u2 "复制应用失败，原有版本未更改。"
+            exit 1
+        fi
+        if [[ -e "/Applications/$APP_NAME.app" || -L "/Applications/$APP_NAME.app" ]]; then
+            if ! mv "/Applications/$APP_NAME.app" "$install_tmp/previous.app"; then
+                rm -rf "$install_tmp"
+                print -u2 "无法替换现有应用，请检查写入权限。"
+                exit 1
+            fi
+        fi
+        if ! mv "$install_tmp/$APP_NAME.app" "/Applications/$APP_NAME.app"; then
+            if [[ -e "$install_tmp/previous.app" || -L "$install_tmp/previous.app" ]]; then
+                mv "$install_tmp/previous.app" "/Applications/$APP_NAME.app" || {
+                    print -u2 "恢复原应用失败，备份保留在 $install_tmp/previous.app"
+                    exit 1
+                }
+            fi
+            rm -rf "$install_tmp"
+            print -u2 "安装失败。"
+            exit 1
+        fi
+        rm -rf "$install_tmp"
+        print "已安装: /Applications/$APP_NAME.app"
+    fi
+fi
