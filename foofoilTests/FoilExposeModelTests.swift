@@ -158,22 +158,27 @@ struct FoilExposeModelTests {
         let document = WindowConfig(id: UUID(), text: "Document", contentKind: .text)
         let camera = WindowConfig(id: UUID(), isCamera: true, contentKind: .camera)
         let configs = [open, note, inferred, document, camera]
-        #expect(FoilExposeModel.historyToClear(configs, category: .documents, openIDs: [open.id]).map(\.id) == [inferred.id, document.id])
-        #expect(FoilExposeModel.historyToClear(configs, category: .notes, openIDs: [open.id]).map(\.id) == [note.id])
+        #expect(FoilExposeModel.historyToClear(configs, category: .documents, openIDs: [open.id]).map(\.id) == [note.id, inferred.id, document.id])
         #expect(FoilExposeModel.historyToClear(configs, category: .all, openIDs: [open.id]).count == 4)
     }
 
+    @Test func clipboardTextIsClassifiedAsDocument() {
+        let path = AppState.getFoofoilDirectoryURL()!.appendingPathComponent("managed_body_test.txt").path
+        let config = WindowConfig(id: UUID(), text: "Clipboard text", textPath: path)
+        #expect(HistoryContentKind.infer(from: config) == .text)
+        #expect(HistoryContentKind.infer(from: WindowConfig(id: UUID(), text: "Text")) == .text)
+    }
+
     @Test func historyCategoriesCoverSupportedKinds() {
-        #expect(FoilExposeHistoryCategory.allCases.count == 7)
+        #expect(FoilExposeHistoryCategory.allCases.count == 6)
         for kind in [HistoryContentKind.audio, .video] {
             #expect(FoilExposeHistoryCategory.media.includes(kind))
         }
-        for kind in [HistoryContentKind.text, .markdown, .csv, .pdf, .quickLook, .ebook] {
+        for kind in [HistoryContentKind.note, .text, .markdown, .csv, .pdf, .quickLook, .ebook] {
             #expect(FoilExposeHistoryCategory.documents.includes(kind))
         }
         #expect(FoilExposeHistoryCategory.images.includes(.image))
         #expect(FoilExposeHistoryCategory.web.includes(.web))
-        #expect(FoilExposeHistoryCategory.notes.includes(.note))
         #expect(FoilExposeHistoryCategory.terminal.includes(.terminal))
         for kind in [HistoryContentKind.camera, .extensionContent] {
             #expect(FoilExposeHistoryCategory.all.includes(kind))
@@ -197,7 +202,7 @@ struct FoilExposeModelTests {
         model.searchText = "Archive"
         #expect(model.historyCount(in: .all) == 2)
         #expect(model.currentItems.map(\.id) == [image.id])
-        model.historyCategory = .notes
+        model.historyCategory = .terminal
         #expect(model.currentItems.isEmpty)
         #expect(model.showsHistorySection)
         #expect(model.historyCount(in: .images) == 1)

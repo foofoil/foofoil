@@ -37,7 +37,7 @@ enum FoilExposeMoveDirection: Equatable {
 
 /// 总览历史的内容分类；摄像头和未归类内容只出现在“全部”。
 enum FoilExposeHistoryCategory: String, CaseIterable, Identifiable {
-    case all, images, media, web, documents, notes, terminal
+    case all, images, media, web, documents, terminal
 
     var id: Self { self }
     var localizationKey: String { "Expose History Category " + rawValue }
@@ -48,7 +48,6 @@ enum FoilExposeHistoryCategory: String, CaseIterable, Identifiable {
         case .media: "play.rectangle"
         case .web: "globe"
         case .documents: "doc.text"
-        case .notes: "note.text"
         case .terminal: "terminal"
         }
     }
@@ -65,8 +64,7 @@ enum FoilExposeHistoryCategory: String, CaseIterable, Identifiable {
         case .images: kind == .image
         case .media: kind == .audio || kind == .video
         case .web: kind == .web
-        case .documents: [.text, .markdown, .csv, .pdf, .quickLook, .ebook].contains(kind)
-        case .notes: kind == .note
+        case .documents: [.note, .text, .markdown, .csv, .pdf, .quickLook, .ebook].contains(kind)
         case .terminal: kind == .terminal
         }
     }
@@ -90,7 +88,7 @@ struct FoilExposeItem: Identifiable {
     var clipboardEntry: ClipboardSearchEntry? = nil
     var isClipboardContent: Bool = false
     var sourcePath: String? = nil
-    /// 文档型箔片（笔记/文本/Markdown/CSV）的截断正文，供缩略图位置直接展示内容；其余类型为 nil。
+    /// 文档型箔片（文本/Markdown/CSV）的截断正文，供缩略图位置直接展示内容；其余类型为 nil。
     var bodyPreview: String? = nil
     var musicItem: AppleMusicLibraryItem? = nil
     var allowsTitleEditing: Bool = true
@@ -394,9 +392,9 @@ final class FoilExposeModel: ObservableObject {
                 let id = self.clipboardIDs[entry.id] ?? UUID()
                 self.clipboardIDs[entry.id] = id
                 var item = FoilExposeItem(id: id, controller: nil, isHistoryEntry: false, title: entry.title,
-                                          symbolName: entry.symbolName, contentKind: .note, thumbnailPath: nil)
+                                          symbolName: entry.symbolName, contentKind: .text, thumbnailPath: nil)
                 item.clipboardEntry = entry; item.isClipboardContent = true
-                if case .text(let text) = entry.content { item.bodyPreview = FoilExposeItem.makeBodyPreview(kind: .note, text: text) }
+                if case .text(let text) = entry.content { item.bodyPreview = FoilExposeItem.makeBodyPreview(kind: .text, text: text) }
                 return item
             }
             self.selectedIndex = min(self.selectedIndex, max(0, self.displayedResultCount - 1))

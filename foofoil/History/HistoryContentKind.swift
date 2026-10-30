@@ -2,7 +2,7 @@ import Foundation
 import UniformTypeIdentifiers
 
 nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
-    case note = 0
+    case note = 0 // 旧历史记录的类型，显示时归入文档。
     case text = 1
     case markdown = 2
     case csv = 3
@@ -72,10 +72,6 @@ nonisolated public enum HistoryContentKind: Int, Codable, Sendable {
         }
         if name.hasSuffix(".md") || name.hasSuffix(".markdown") { return .markdown }
         if name.hasSuffix(".csv") { return .csv }
-        if let path = config.textPath {
-            if AppState.isManagedCacheURL(URL(fileURLWithPath: path)), config.originalImageName == nil { return .note }
-            return .text
-        }
-        return .note
+        return .text
     }
 }

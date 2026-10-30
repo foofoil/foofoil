@@ -8,7 +8,7 @@ import AppKit
 import Foundation
 
 extension AppState {
-    /// 剪贴板纯文本的 Markdown 启发式判断：只统计强语法特征，避免把普通笔记误判为 Markdown。
+    /// 剪贴板纯文本的 Markdown 启发式判断：只统计强语法特征，避免把普通文本误判为 Markdown。
     nonisolated static func looksLikeMarkdown(_ text: String) -> Bool {
         let lines = text.components(separatedBy: .newlines)
         var score = 0
@@ -127,7 +127,7 @@ extension AppState {
         return URL(string: title)?.scheme != nil
     }
 
-    /// 打开剪贴板等无来源文件的文本；`isMarkdown` 决定进入 Markdown 预览还是普通笔记。
+    /// 打开剪贴板等无来源文件的文本；`isMarkdown` 决定进入 Markdown 预览还是普通文本。
     public func openText(_ content: String, isMarkdown: Bool, isClipboard: Bool = true) {
         clearArchiveForNewContent()
         resetFileList()

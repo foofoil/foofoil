@@ -1775,7 +1775,7 @@ struct ExtensionKitTests {
         #expect(HistoryContentKind.infer(from: WindowConfig(
             id: UUID(), imagePath: "/tmp/one.flac", originalImageName: "one.flac"
         )) == .audio)
-        #expect(HistoryContentKind.infer(from: WindowConfig(id: UUID(), text: "hello")) == .note)
+        #expect(HistoryContentKind.infer(from: WindowConfig(id: UUID(), text: "hello")) == .text)
     }
 
     /// EPUB 历史按电子书归类，标题取原始文件名而不是"无标题笔记"。

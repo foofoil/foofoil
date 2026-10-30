@@ -228,9 +228,9 @@ struct FoilExposeViewTests {
         controller.view.frame = NSRect(x: 0, y: 0, width: 1240, height: 900)
         controller.synchronize()
         let buttons = descendants(controller.view).compactMap { $0 as? NSButton }
-        let notes = try #require(buttons.first { $0.accessibilityIdentifier() == "expose.category.notes" })
-        notes.performClick(nil)
-        #expect(model.historyCategory == .notes)
+        let documents = try #require(buttons.first { $0.accessibilityIdentifier() == "expose.category.documents" })
+        documents.performClick(nil)
+        #expect(model.historyCategory == .documents)
         let favorite = try #require(buttons.first { $0.accessibilityIdentifier() == "expose.favorites" })
         favorite.performClick(nil)
         #expect(model.pinnedOnly)

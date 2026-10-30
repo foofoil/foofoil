@@ -3434,23 +3434,6 @@
         }
       }
     },
-    "Expose History Category notes": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Text"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "文本"
-          }
-        }
-      }
-    },
     "Expose History Category terminal": {
       "extractionState": "manual",
       "localizations": {
