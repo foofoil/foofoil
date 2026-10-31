@@ -8,9 +8,32 @@ nonisolated enum FoilInformation {
     struct Row: Sendable {
         let key: String
         let value: String
+        var isCurrentFileDetail = false
+    }
+
+    struct Details {
+        let rows: [Row]
+        let source: URL?
+        let available: Bool
     }
 
     @MainActor static func sourceURL(for config: WindowConfig) -> URL? {
+        if config.isFolderCollection, let collection = config.archiveSource {
+            let files = collection.localFiles ?? []
+            if collection.volumes.count == 1, let root = collection.volumes.first,
+               !files.contains(where: { $0.path == root.path }) {
+                return FileReference.resolve(URL(fileURLWithPath: root.path), bookmark: root.bookmark).url
+            }
+            // 多文件拖放没有显式目录，展示这些文件共同所在的文件夹。
+            let urls = files.map { file in
+                file.bookmark.flatMap(AppState.resolveVideoBookmark) ?? URL(fileURLWithPath: file.path)
+            }
+            guard var common = urls.first?.deletingLastPathComponent().pathComponents else { return nil }
+            for url in urls.dropFirst() {
+                while !url.pathComponents.starts(with: common), !common.isEmpty { common.removeLast() }
+            }
+            return URL(fileURLWithPath: NSString.path(withComponents: common), isDirectory: true)
+        }
         if config.isClipboardContent { return nil }
         if let bookmark = config.videoBookmark,
            let fallback = config.textPath ?? config.imagePath ?? config.webURLString.flatMap({ URL(string: $0)?.path }) {
@@ -45,9 +68,9 @@ nonisolated enum FoilInformation {
                     let accessing = source.startAccessingSecurityScopedResource()
                     defer { if accessing { source.stopAccessingSecurityScopedResource() } }
                     do {
-                        let values = try source.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
-                        available = values.isRegularFile == true
-                        if let size = values.fileSize {
+                        let values = try source.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey, .isDirectoryKey])
+                        available = values.isRegularFile == true || values.isDirectory == true
+                        if values.isDirectory != true, let size = values.fileSize {
                             rows.append(Row(key: "Foil Info File Size", value: ByteCountFormatter.string(fromByteCount: Int64(size), countStyle: .file)))
                         }
                     } catch {
@@ -74,23 +97,14 @@ nonisolated enum FoilInformation {
             }
         }
     }
-}
 
-extension AppDelegate {
-    @objc func showFoilInformationAction() {
-        guard let controller = activeWindowController, !controller.appState.isBlank, let window = controller.window,
-              window.attachedSheet == nil else { return }
-        showFoilInformation(config: controller.appState.toConfig(), state: controller.appState, window: window)
-    }
-
-    /// 总览中的历史条目直接读取快照，不恢复窗口或改变访问记录。
-    func showFoilInformation(config: WindowConfig, state: AppState?, window: NSWindow, foilWindow: NSWindow? = nil) {
-        guard state?.isBlank != true, window.attachedSheet == nil else { return }
+    /// 文件夹与当前文件使用相同的信息构建入口，保留单文件的类型特征、访问时间和来源规则。
+    @MainActor static func details(config: WindowConfig, state: AppState?, windowSize: NSSize?) async -> Details {
         let kind = config.contentKind ?? HistoryContentKind.infer(from: config)
         let source = FoilInformation.sourceURL(for: config)
-        let size = state == nil ? config.windowFrame.map { NSRectFromString($0).size } : (foilWindow ?? window).frame.size
+        let size = windowSize
         var rows = [FoilInformation.Row(key: "Foil Info Title", value: config.historyMenuDisplayName),
-                    .init(key: "Foil Info Type", value: NSLocalizedString("Foil Info Type \(kind.rawValue)", comment: ""))]
+                    .init(key: "Foil Info Type", value: NSLocalizedString(config.isFolderCollection ? "Foil Info Type Folder" : "Foil Info Type \(kind.rawValue)", comment: ""))]
         if let size {
             rows.append(.init(key: "Foil Info Window Size", value: "\(Int(size.width.rounded())) × \(Int(size.height.rounded())) pt"))
         }
@@ -105,7 +119,7 @@ extension AppDelegate {
         if config.isClipboardContent {
             rows.append(.init(key: "Foil Info Source", value: NSLocalizedString("From Clipboard", comment: "")))
         } else if let source {
-            rows.append(.init(key: "Foil Info File Path", value: source.path))
+            rows.append(.init(key: config.isFolderCollection ? "Foil Info Folder Path" : "Foil Info File Path", value: source.path))
         } else if config.appleMusicReference != nil {
             rows.append(.init(key: "Foil Info Source", value: "Apple Music"))
             if let item = state?.appleMusicItem {
@@ -139,29 +153,76 @@ extension AppDelegate {
         }
         let contentURL = config.imagePath.map { URL(fileURLWithPath: $0) } ?? source
         let historyID = config.id
-        Task { @MainActor in
-            let visits = await withCheckedContinuation { continuation in
-                DispatchQueue.global(qos: .userInitiated).async {
-                    continuation.resume(returning: HistoryRepository.shared.visitDates(id: historyID))
-                }
+        let visits = await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(returning: HistoryRepository.shared.visitDates(id: historyID))
             }
-            let metadata = await FoilInformation.fileRows(source: source, contentURL: contentURL, kind: kind)
-            if (kind == .audio || kind == .video), let contentURL {
-                let asset = AVURLAsset.media(url: contentURL)
-                if let duration = try? await asset.load(.duration), duration.seconds.isFinite {
-                    rows.append(.init(key: "Foil Info Duration", value: Duration.seconds(duration.seconds).formatted(.time(pattern: .hourMinuteSecond))))
-                }
+        }
+        let metadata = await fileRows(source: source, contentURL: contentURL, kind: kind)
+        if (kind == .audio || kind == .video), let contentURL {
+            let asset = AVURLAsset.media(url: contentURL)
+            if let duration = try? await asset.load(.duration), duration.seconds.isFinite {
+                rows.append(.init(key: "Foil Info Duration", value: Duration.seconds(duration.seconds).formatted(.time(pattern: .hourMinuteSecond))))
+            }
+        }
+        let unknown = NSLocalizedString("Foil Info Unknown", comment: "")
+        rows.append(.init(key: "Foil Info First Visit", value: (visits?.first ?? config.createdAt)?.formatted(date: .numeric, time: .standard) ?? unknown))
+        rows.append(.init(key: "Foil Info Last Visit", value: (visits?.last ?? config.createdAt)?.formatted(date: .numeric, time: .standard) ?? unknown))
+        rows.append(contentsOf: metadata.rows)
+        return Details(rows: rows, source: source, available: metadata.available)
+    }
+
+    @MainActor static func currentFileConfig(for state: AppState) -> WindowConfig? {
+        guard state.archiveSession?.source.localFiles != nil else { return nil }
+        let current = state.readingState
+        guard current !== state, current.hasOpenedContent else { return nil }
+        var config = current.toConfig()
+        if let list = config.fileList, let item = list.currentItem {
+            let source = sourceURL(for: config)
+            config.contentKind = config.contentKind ?? HistoryContentKind.infer(from: config)
+            config.fileList = nil
+            config.customTitle = nil
+            config.originalImageName = item.displayName
+            config.sourceFingerprint = source.map { "file:" + $0.path }
+        }
+        return config
+    }
+}
+
+extension AppDelegate {
+    @objc func showFoilInformationAction() {
+        guard let controller = activeWindowController, !controller.appState.isBlank, let window = controller.window,
+              window.attachedSheet == nil else { return }
+        showFoilInformation(config: controller.appState.toConfig(), state: controller.appState, window: window)
+    }
+
+    /// 总览中的历史条目直接读取快照，不恢复窗口或改变访问记录。
+    func showFoilInformation(config: WindowConfig, state: AppState?, window: NSWindow, foilWindow: NSWindow? = nil) {
+        guard state?.isBlank != true, window.attachedSheet == nil else { return }
+        let size = state == nil ? config.windowFrame.map { NSRectFromString($0).size } : (foilWindow ?? window).frame.size
+        let currentConfig = state.flatMap(FoilInformation.currentFileConfig)
+        let currentState = currentConfig == nil ? nil : state?.readingState
+        Task { @MainActor in
+            let information = await FoilInformation.details(config: config, state: state, windowSize: size)
+            var rows = information.rows
+            var currentInformation: FoilInformation.Details?
+            if let currentConfig {
+                let detail = await FoilInformation.details(config: currentConfig, state: currentState, windowSize: size)
+                currentInformation = detail
+                rows.append(.init(key: "Foil Info Current File", value: ""))
+                rows.append(contentsOf: detail.rows.map { row in
+                    var result = row
+                    result.isCurrentFileDetail = true
+                    return result
+                })
             }
             guard (state == nil || (state?.id == config.id && state?.isBlank == false)), window.isVisible, window.attachedSheet == nil else { return }
-            let unknown = NSLocalizedString("Foil Info Unknown", comment: "")
-            rows.append(.init(key: "Foil Info First Visit", value: (visits?.first ?? config.createdAt)?.formatted(date: .numeric, time: .standard) ?? unknown))
-            rows.append(.init(key: "Foil Info Last Visit", value: (visits?.last ?? config.createdAt)?.formatted(date: .numeric, time: .standard) ?? unknown))
-            rows.append(contentsOf: metadata.rows)
-            presentFoilInformation(rows: rows, source: source, available: metadata.available, window: window, state: state)
+            presentFoilInformation(rows: rows, source: information.source, available: information.available,
+                currentInformation: currentInformation, window: window, state: state)
         }
     }
 
-    private func presentFoilInformation(rows: [FoilInformation.Row], source: URL?, available: Bool, window: NSWindow, state: AppState?) {
+    private func presentFoilInformation(rows: [FoilInformation.Row], source: URL?, available: Bool, currentInformation: FoilInformation.Details?, window: NSWindow, state: AppState?) {
         let panel = FoilInformationPanel(
             contentRect: NSRect(x: 0, y: 0, width: 560, height: 360),
             styleMask: [.titled], backing: .buffered, defer: false
@@ -186,6 +247,18 @@ extension AppDelegate {
         stack.alignment = .leading
         stack.spacing = 14
         for row in rows {
+            if row.key == "Foil Info Current File" {
+                let divider = NSBox()
+                divider.boxType = .separator
+                divider.widthAnchor.constraint(equalToConstant: 488).isActive = true
+                stack.addArrangedSubview(divider)
+                let title = NSTextField(labelWithString: NSLocalizedString(row.key, comment: ""))
+                title.font = .systemFont(ofSize: 14, weight: .semibold)
+                stack.addArrangedSubview(title)
+                continue
+            }
+            let rowSource = row.isCurrentFileDetail ? currentInformation?.source : source
+            let rowAvailable = row.isCurrentFileDetail ? currentInformation?.available == true : available
             let label = NSTextField(wrappingLabelWithString: NSLocalizedString(row.key, comment: ""))
             label.font = .systemFont(ofSize: 12)
             label.textColor = .secondaryLabelColor
@@ -200,7 +273,7 @@ extension AppDelegate {
             let entry = NSStackView(views: [label, value])
             entry.alignment = .firstBaseline
             entry.spacing = 16
-            if row.key == "Foil Info Title", let state, state.toConfig().canRenameTitle {
+            if !row.isCurrentFileDetail, row.key == "Foil Info Title", let state, state.toConfig().canRenameTitle {
                 let button = FoilTitleEditButton(title: "", target: self, action: #selector(editFoilTitle(_:)))
                 button.image = NSImage(systemSymbolName: "pencil", accessibilityDescription: NSLocalizedString("Change Title", comment: ""))
                 button.bezelStyle = .accessoryBarAction
@@ -224,21 +297,23 @@ extension AppDelegate {
                 button.widthAnchor.constraint(equalToConstant: 28).isActive = true
                 entry.addArrangedSubview(button)
                 value.widthAnchor.constraint(equalToConstant: 288).isActive = true
-            } else if row.key == "Foil Info File Path", let source {
+            } else if ["Foil Info File Path", "Foil Info Folder Path"].contains(row.key), let rowSource {
                 let button = SourceRevealButton(title: "", target: self, action: #selector(revealFoilSource(_:)))
-                button.image = NSImage(systemSymbolName: "folder", accessibilityDescription: NSLocalizedString("Show in Finder", comment: ""))
+                let help = NSLocalizedString(row.key == "Foil Info Folder Path" ? "Open Folder in Finder" : "Show in Finder", comment: "")
+                button.image = NSImage(systemSymbolName: "folder", accessibilityDescription: help)
                 button.bezelStyle = .accessoryBarAction
-                button.toolTip = NSLocalizedString("Show in Finder", comment: "")
-                button.setAccessibilityLabel(NSLocalizedString("Show in Finder", comment: ""))
-                button.isEnabled = available
-                button.sourceURL = source
+                button.toolTip = help
+                button.setAccessibilityLabel(help)
+                button.isEnabled = rowAvailable
+                button.sourceURL = rowSource
+                button.opensDirectory = row.key == "Foil Info Folder Path"
                 button.widthAnchor.constraint(equalToConstant: 28).isActive = true
                 entry.addArrangedSubview(button)
                 value.widthAnchor.constraint(equalToConstant: 288).isActive = true
             } else {
                 value.widthAnchor.constraint(equalToConstant: 332).isActive = true
             }
-            value.preferredMaxLayoutWidth = row.key == "Foil Info Title" || TerminalConfigurationField(rawValue: row.key) != nil ? 288 : 332
+            value.preferredMaxLayoutWidth = entry.arrangedSubviews.count > 2 ? 288 : 332
             stack.addArrangedSubview(entry)
         }
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -384,7 +459,8 @@ extension AppDelegate {
 
     @objc private func revealFoilSource(_ sender: SourceRevealButton) {
         guard let url = sender.sourceURL else { return }
-        NSWorkspace.shared.activateFileViewerSelecting([url])
+        if sender.opensDirectory { NSWorkspace.shared.open(url) }
+        else { NSWorkspace.shared.activateFileViewerSelecting([url]) }
     }
 }
 
@@ -401,6 +477,7 @@ private final class FoilTerminalEditButton: NSButton {
 
 private final class SourceRevealButton: NSButton {
     var sourceURL: URL?
+    var opensDirectory = false
 }
 
 /// 长内容从第一行开始显示，保持与常见信息面板一致的滚动方向。
