@@ -13,7 +13,8 @@ nonisolated public struct HistorySearchResult: Identifiable, Sendable, Equatable
     public var isAppleMusic: Bool = false
     public var isClipboardContent: Bool = false
     public var historyIsPinned: Bool = false
-    public var symbolName: String { isAppleMusic ? AppleMusicReference.symbolName : contentKind.symbolName }
+    public var isFolderCollection: Bool = false
+    public var symbolName: String { isFolderCollection ? "folder" : (isAppleMusic ? AppleMusicReference.symbolName : contentKind.symbolName) }
 }
 
 nonisolated struct HistorySearchCandidate: Sendable {
@@ -28,4 +29,5 @@ nonisolated struct HistorySearchCandidate: Sendable {
     var sourceFingerprint: String? = nil
     var isAppleMusic: Bool = false
     var historyIsPinned: Bool = false
+    var isFolderCollection: Bool = false
 }

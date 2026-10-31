@@ -129,7 +129,8 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                                             sourcePath: config.sourceFingerprint.flatMap { $0.hasPrefix("file:") ? String($0.dropFirst(5)) : nil },
                                             isAppleMusic: config.appleMusicReference != nil,
                                             isClipboardContent: config.isClipboardContent,
-                                            historyIsPinned: config.historyIsPinned)
+                                            historyIsPinned: config.historyIsPinned,
+                                            isFolderCollection: config.isFolderCollection)
                     }
                 } catch {
                     NSLog("最近历史读取失败：%@", error.localizedDescription)
@@ -165,7 +166,8 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                         sourcePath: best.sourceFingerprint.flatMap { $0.hasPrefix("file:") ? String($0.dropFirst(5)) : nil },
                         isAppleMusic: best.isAppleMusic,
                         isClipboardContent: best.sourceFingerprint?.hasPrefix("clipboard:") == true,
-                        historyIsPinned: best.historyIsPinned
+                        historyIsPinned: best.historyIsPinned,
+                        isFolderCollection: best.isFolderCollection
                     ))
                 }
                 return results.sorted { lhs, rhs in
@@ -193,7 +195,8 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                     return HistorySearchResult(id: config.id, title: title, contentKind: kind,
                                                thumbnailPath: config.thumbnailPath,
                                                matchedSnippet: addresses.first, matchedPageNumber: nil, score: 0,
-                                               terminalConfiguration: config.terminalConfiguration, historyIsPinned: config.historyIsPinned)
+                                               terminalConfiguration: config.terminalConfiguration, historyIsPinned: config.historyIsPinned,
+                                            isFolderCollection: config.isFolderCollection)
                 }
             } catch {
                 NSLog("打开范围历史读取失败：%@", error.localizedDescription)

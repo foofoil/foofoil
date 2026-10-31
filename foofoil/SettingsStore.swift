@@ -416,7 +416,11 @@ nonisolated public struct WindowConfig: Codable, Identifiable, Sendable {
         return name.hasSuffix(".md") || name.hasSuffix(".markdown")
     }
 
+    /// 本地混合集合复用包浏览状态，历史仍使用文件夹图标。
+    public var isFolderCollection: Bool { archiveSource?.localFiles != nil }
+
     public var historyMenuSymbolName: String {
+        if isFolderCollection { return "folder" }
         if terminalConfiguration != nil { return "terminal" }
         if appleMusicReference != nil { return AppleMusicReference.symbolName }
         if let fileList, fileList.isPresentable {

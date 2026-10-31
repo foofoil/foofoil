@@ -357,7 +357,8 @@ nonisolated final class HistoryDatabase {
             var values: [HistorySearchCandidate] = []
             try withStatement("""
                 SELECT h.id, h.display_title, h.content_kind, COALESCE(h.thumbnail_path, h.image_path),
-                       c.original_text, c.normalized_text, c.page_number, h.last_opened_at, h.source_fingerprint, h.apple_music_reference IS NOT NULL, h.history_is_pinned
+                       c.original_text, c.normalized_text, c.page_number, h.last_opened_at, h.source_fingerprint, h.apple_music_reference IS NOT NULL, h.history_is_pinned,
+                       CASE WHEN json_type(h.archive_source, '$.localFiles') = 'array' THEN 1 ELSE 0 END
                 FROM search_fts f
                 JOIN search_chunks c ON c.id = f.rowid
                 JOIN history_items h ON h.id = c.history_id
@@ -378,7 +379,8 @@ nonisolated final class HistoryDatabase {
                         lastOpenedAt: Date(timeIntervalSince1970: sqlite3_column_double(statement, 7)),
                         sourceFingerprint: optionalText(statement, 8),
                         isAppleMusic: sqlite3_column_int(statement, 9) != 0,
-                        historyIsPinned: sqlite3_column_int(statement, 10) != 0
+                        historyIsPinned: sqlite3_column_int(statement, 10) != 0,
+                        isFolderCollection: sqlite3_column_int(statement, 11) != 0
                     ))
                 }
             }

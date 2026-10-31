@@ -264,7 +264,7 @@ struct HistoryCardView: View {
     private func historyCardContent(for config: WindowConfig) -> some View {
         Group {
             if historyKind == .archive {
-                mediaPlaceholder(systemName: "archivebox")
+                mediaPlaceholder(systemName: config.historyMenuSymbolName)
             } else if isCameraHistory {
                 cameraPlaceholder
             } else if isTerminalHistory {
