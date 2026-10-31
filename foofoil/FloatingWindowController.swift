@@ -604,6 +604,11 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
                 self.updateWindowShadow()
 
+                // 音频封面随窗口铺满；切换边框只改变内部留白，避免重复切换时窗口尺寸累积。
+                if self.appState.readingState.isAudioDocument {
+                    self.applyWindowSizeLimits()
+                    return
+                }
                 guard self.isImageMode else { return }
                 let showBorder = targetState.showBorder
                 // 无边框画面由窗口决定尺寸，切换前同步实际显示比例，避免跳回原图大小。

@@ -5,6 +5,38 @@ import FoofoilExtensionKit
 
 @MainActor @Suite(.sharedApplicationState, .serialized)
 struct CollectionSidebarTests {
+    @Test func folderAudioBorderToggleSynchronizesPreviewAndWindow() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let audio = directory.appendingPathComponent("track.mp3")
+        let secondAudio = directory.appendingPathComponent("track2.mp3")
+        try Data().write(to: audio)
+        try Data().write(to: secondAudio)
+        let state = AppState(isIncognito: true)
+        defer { state.resetContent() }
+        state.openFileCollection([audio, secondAudio], roots: [directory])
+        let session = try #require(state.archiveSession)
+        try await settle(session)
+        session.setSidebarMode(.audio)
+        try await settle(session)
+        let preview = state.readingState
+        #expect(preview !== state && preview.isAudioDocument)
+        state.showBorder = true
+        let controller = FloatingWindowController(appState: state)
+        defer { controller.close() }
+        let window = try #require(controller.window)
+        let initialSize = window.frame.size
+        for _ in 0..<3 {
+            state.showBorder = false
+            #expect(!state.showBorder && !preview.showBorder)
+            #expect(window.frame.size == initialSize)
+            preview.showBorder = true
+            #expect(state.showBorder && preview.showBorder)
+            #expect(window.frame.size == initialSize)
+        }
+    }
+
     private func fixture() throws -> (URL, [URL]) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let nested = directory.appendingPathComponent("nested")
