@@ -25,7 +25,7 @@ extension AppState {
         }
 
         public func handleNavigatorDrop(providers: [NSItemProvider], completion: @escaping (Bool) -> Void = { _ in }) {
-            handleDrop(providers: providers, appendToFileList: true, completion: completion)
+            completion(false)
         }
 
         /// 窗口从 Finder 粘贴板一次性取得完整文件批次后直接处理，避免 NSItemProvider 丢失多选项。
@@ -99,7 +99,8 @@ extension AppState {
             let matching = Set(openable.map(\.path))
             reportFileOpenFeedback(remaining.filter { !matching.contains($0.path) }.map { .init(url: $0, reason: .differentType) })
             if listableKind != nil {
-                return appendMatchingDroppedFiles(urls: openable) || consumedCover || openable.count < remaining.count
+                if !openable.isEmpty { postGroupedFileOpen(urls: openable, append: true) }
+                return !openable.isEmpty || consumedCover || openable.count < remaining.count
             }
 
             guard !openable.isEmpty else { return !remaining.isEmpty }
@@ -166,7 +167,8 @@ extension AppState {
                     let matching = Set(openable.map(\.path))
                     self.reportFileOpenFeedback(remaining.filter { !matching.contains($0.path) }.map { .init(url: $0, reason: .differentType) })
                     if self.listableKind != nil {
-                        completion(self.appendMatchingDroppedFiles(urls: openable) || consumedCover || openable.count < remaining.count)
+                        if !openable.isEmpty { self.postGroupedFileOpen(urls: openable, append: true) }
+                        completion(!openable.isEmpty || consumedCover || openable.count < remaining.count)
                         return
                     }
                     if appendToFileList, !openable.isEmpty {

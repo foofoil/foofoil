@@ -159,6 +159,13 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     @Published var builtInNavigatorContributions: [NavigatorContribution] = []
     @Published var pdfNavigator: PDFNavigator?
     var navigatorContributions: [NavigatorContribution] {
+        availableNavigatorContributions.map { contribution in
+            var result = contribution
+            result.allowedActions.removeAll { $0 == .remove }
+            return result
+        }
+    }
+    private var availableNavigatorContributions: [NavigatorContribution] {
         if let archiveSession { return archiveSession.displayedContributions }
         if isPDFDocument, let pdfNavigator, pdfNavigator.url == imageURL { return pdfNavigator.contributions }
         if !builtInNavigatorContributions.isEmpty { return builtInNavigatorContributions }

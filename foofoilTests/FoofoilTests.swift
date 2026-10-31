@@ -462,14 +462,9 @@ struct FoofoilTests {
         defer { HistoryManager.shared.removeFromHistory(state.toConfig()) }
         state.openAudio(url: firstAudio)
         #expect(state.handleDroppedFileURLs([cover, secondAudio]))
-        #expect(state.fileList?.items.count == 2)
-        #expect(state.fileList?.items.contains(where: { $0.path == cover.path }) == false)
-        let coverURL = try #require(state.customCoverURL)
-
-        let secondID = try #require(state.fileList?.items.last?.id)
-        state.presentFileListItem(id: secondID, rotatesIdentity: false)
-        #expect(state.customCoverURL == coverURL)
-        #expect(state.imageURL?.resolvingSymlinksInPath() == secondAudio.resolvingSymlinksInPath())
+        #expect(state.fileList == nil)
+        #expect(state.customCoverURL != nil)
+        #expect(TestFileIdentity.equals(state.imageURL, firstAudio))
     }
 
     @Test func blankDropStillOpensImageInsteadOfAudioCover() throws {
@@ -2150,7 +2145,7 @@ struct FoofoilTests {
                 NavigatorAction(contributionID: AppState.fileListNavigatorID, kind: .remove, itemIDs: [removeID])
             )
         }
-        #expect(state.fileList?.items.count == 2)
+        #expect(state.fileList?.items.count == 3)
         #expect(state.id == originalID)
 
         if let remainingExtra = state.fileList?.items.first(where: { $0.id != state.fileList?.currentID })?.id {
@@ -2158,8 +2153,8 @@ struct FoofoilTests {
                 NavigatorAction(contributionID: AppState.fileListNavigatorID, kind: .remove, itemIDs: [remainingExtra])
             )
         }
-        #expect(state.fileList == nil)
-        #expect(state.navigatorContributions.isEmpty)
+        #expect(state.fileList?.items.count == 3)
+        #expect(!state.navigatorContributions.isEmpty)
         #expect(state.isNavigatorPanelExplicitlyVisible == false)
         #expect(state.id == originalID)
     }
@@ -2469,7 +2464,7 @@ struct FoofoilTests {
         #expect(files.contains { TestFileIdentity.equals($0.path, second.path) })
     }
 
-    @Test func windowFileDropCreatesAndExtendsHomogeneousImageListsInAllThreeStates() throws {
+    @Test func windowFileDropCreatesListsWithoutEditingExistingLists() throws {
         let first = try writeTestPNG(name: "native-drop-a.png")
         let second = try writeTestPNG(name: "native-drop-b.png")
         let third = try writeTestPNG(name: "native-drop-c.png")
@@ -2489,10 +2484,12 @@ struct FoofoilTests {
         defer { HistoryManager.shared.removeFromHistory(single.toConfig()) }
         single.openFile(url: first)
         #expect(single.handleDroppedFileURLs([second]))
-        #expect(single.fileList?.items.count == 2)
+        #expect(single.fileList == nil)
+        #expect(TestFileIdentity.equals(single.imageURL, first))
 
         #expect(single.handleDroppedFileURLs([third, fourth]))
-        #expect(single.fileList?.items.count == 4)
+        #expect(single.fileList == nil)
+        #expect(TestFileIdentity.equals(single.imageURL, first))
     }
 
     @Test func rootHostingViewOwnsNativeFileDropDestination() {

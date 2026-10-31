@@ -250,30 +250,6 @@ extension AppDelegate {
         openContentPanel(directory: true, target: target)
     }
 
-    @objc func addToFileListAction() {
-        guard let appState = activeAppState, let kind = appState.listableKind else { return }
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        panel.canChooseFiles = true
-        var contentTypes = kind.allowedContentTypes
-        if kind == .audio {
-            contentTypes.append(contentsOf: ExtensionHost.shared.additionalContentTypes(for: .audio))
-        }
-        if kind == .video {
-            contentTypes.append(contentsOf: ExtensionHost.shared.additionalContentTypes(for: .video))
-        }
-        panel.allowedContentTypes = Array(Dictionary(grouping: contentTypes, by: \.identifier).compactMap(\.value.first))
-
-        panel.begin { response in
-            if response == .OK {
-                DispatchQueue.main.async {
-                    self.openGroupedFiles(panel.urls, into: appState, append: true)
-                }
-            }
-        }
-    }
-
     @objc func handleOpenGroupedFiles(_ notification: Notification) {
         guard let urls = notification.userInfo?["urls"] as? [URL] else { return }
         let windowID = notification.userInfo?["windowID"] as? UUID
@@ -300,31 +276,8 @@ extension AppDelegate {
         var groups = FileListGrouper.groups(from: openable)
         guard !groups.isEmpty else { return false }
 
-        if append, let target {
-            if let kind = target.listableKind {
-                let matching: [URL]
-                if kind == .audio {
-                    let cues = groups.filter { $0.kind == .cueSheets }.flatMap(\.urls)
-                    matching = cues.isEmpty
-                        ? groups.filter { $0.kind == .listable(.audio) }.flatMap(\.urls)
-                        : cues
-                } else {
-                    matching = groups.filter { $0.kind == .listable(kind) }.flatMap(\.urls)
-                }
-                if !matching.isEmpty {
-                    target.appendToFileList(urls: matching)
-                }
-                groups.removeAll { group in
-                    switch group.kind {
-                    case .cueSheets:
-                        return kind == .audio
-                    case .listable(let listKind):
-                        return listKind == kind
-                    case .other:
-                        return false
-                    }
-                }
-            }
+        // 已有列表不再编辑；拖入的同类文件作为独立批次打开。
+        if append {
             for group in groups {
                 openGroupInNewWindow(group, feedbackBatchID: probe.fileOpenFeedbackBatchID, isIncognito: probe.isIncognito)
             }
@@ -382,7 +335,10 @@ extension AppDelegate {
             let matching = target.matchingDroppedFiles(urls: remaining)
             let paths = Set(matching.map(\.path))
             target.reportFileOpenFeedback(remaining.filter { !paths.contains($0.path) }.map { .init(url: $0, reason: .differentType) })
-            guard target.appendMatchingDroppedFiles(urls: matching) || consumedCover else { return }
+            guard !matching.isEmpty || consumedCover else { return }
+            if !matching.isEmpty {
+                openGroupedFiles(matching, into: target, append: true, feedbackBatchID: probe.fileOpenFeedbackBatchID)
+            }
         } else {
             let matching = target.matchingDroppedFiles(urls: urls)
             let paths = Set(matching.map(\.path))

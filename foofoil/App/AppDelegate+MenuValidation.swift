@@ -354,10 +354,6 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
             return hasOpenableClipboardContent(using: activeAppState)
         }
 
-        if menuItem.action == #selector(addToFileListAction) {
-            return activeAppState?.listableKind != nil
-        }
-
         if menuItem.action == #selector(toggleShowBorderAction) {
             // 音频也走通用视觉边框，包括无磁盘路径的资料库内容。
             guard let appState = activeReadingState,

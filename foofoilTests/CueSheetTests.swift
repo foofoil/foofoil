@@ -229,6 +229,10 @@ struct CueSheetTests {
 
         let image = try writeDummyPNG(in: directory)
         #expect(state.handleDroppedFileURLs([secondCue, image, firstAudio]))
+        #expect(state.fileList?.sections.count == 1)
+        #expect(state.fileList?.items.count == 2)
+        // 新批次安装时可以形成多分区列表，已有列表不通过拖放追加。
+        state.installAudioList(urls: [firstCue, secondCue], preservesIdentity: true)
         #expect(state.fileList?.sections.count == 2)
         #expect(state.fileList?.items.count == 3)
         #expect(state.fileList?.items.map(\.displayName) == ["Intro", "Song", "Only"])

@@ -755,13 +755,7 @@ extension AppState {
                 }
             }
         case .remove:
-            var ids = action.itemIDs
-            if let list = fileList {
-                for id in action.itemIDs where list.sections.contains(where: { $0.id == id }) {
-                    ids.append(contentsOf: list.items.compactMap { $0.resolvedSectionID == id ? $0.id : nil })
-                }
-            }
-            removeFileListItems(ids: ids)
+            break
         case .move:
             if let list = fileList,
                action.itemIDs.allSatisfy({ id in list.sections.contains(where: { $0.id == id }) }) {
@@ -996,7 +990,7 @@ extension AppState {
                 selectionMode: .single,
                 items: items,
                 selectedItemIDs: [list.currentID],
-                allowedActions: canMove ? [.activate, .remove, .move] : [.activate, .remove],
+                allowedActions: canMove ? [.activate, .move] : [.activate],
                 revision: fileListRevision
             )
         ]

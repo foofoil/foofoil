@@ -188,16 +188,6 @@ extension AppDelegate {
         packageContentsItem.target = self
         fileMenu.addItem(packageContentsItem)
 
-        let addToListItem = NSMenuItem(
-            title: NSLocalizedString("Add to List...", comment: ""),
-            action: #selector(addToFileListAction),
-            keyEquivalent: ""
-        )
-        addToListItem.withSymbol("plus.rectangle.on.folder")
-        addToListItem.representedObject = "file.addToList"
-        addToListItem.target = self
-        fileMenu.addItem(addToListItem)
-
         let saveImageItem = NSMenuItem(title: NSLocalizedString("Save Content Image", comment: ""),
                                       action: #selector(saveContentImageAction), keyEquivalent: "s")
         saveImageItem.withSymbol("photo")

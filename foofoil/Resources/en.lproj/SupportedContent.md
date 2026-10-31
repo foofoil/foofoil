@@ -165,3 +165,6 @@ Clipboard result titles use one line. Older items have a copy icon on the right;
 
 Clipboard images show thumbnails, while other content uses larger type icons. When the source app is known and installed, its icon appears at the lower-right corner.
 
+## File Lists
+
+Lists keep the files collected when opened. Add to List and Remove from List are unavailable, and dropping additional files opens a separate batch. Dragging rows to reorder remains available.

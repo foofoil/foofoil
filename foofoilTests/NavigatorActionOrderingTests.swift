@@ -36,7 +36,7 @@ extension ExtensionKitTests {
             #expect(state.extensionSession?.navigatorContributions.first?.selectedItemIDs == ["item-c"])
         }
 
-        @Test func activateMoveAndRemoveQueueInOrder() async throws {
+        @Test func activateAndMoveQueueInOrderWhileRemovalIsRejected() async throws {
             let provider = NavigatorOrderingTestProvider()
             let host = ExtensionHost.shared
             host.resolver.register(provider)
@@ -63,9 +63,9 @@ extension ExtensionKitTests {
             ))
             await waitForIdle(state)
 
-            #expect(provider.actions == ["activate:item-b", "move:item-c", "remove:item-a"])
+            #expect(provider.actions == ["activate:item-b", "move:item-c"])
             let queue = try #require(state.extensionSession?.navigatorContributions.first)
-            #expect(queue.items.map(\.id) == ["item-c", "item-b"])
+            #expect(queue.items.map(\.id) == ["item-c", "item-a", "item-b"])
         }
 
         @Test func sessionReplacementDiscardsInFlightAndQueuedActions() async throws {

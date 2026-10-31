@@ -98,10 +98,6 @@ struct NavigatorPanelView: View {
             y: isFullScreenOverlay ? 0 : 4
         )
         .onHover { appState.isNavigatorPanelHovered = $0 }
-        .onDrop(of: [.fileURL], isTargeted: nil) { providers in
-            appState.handleNavigatorDrop(providers: providers)
-            return true
-        }
         // 空白处默认右键菜单；行与标题各自提供更具体的菜单覆盖此处。
         .contextMenu {
             if !contributions.isEmpty {
@@ -733,19 +729,6 @@ struct NavigatorPanelView: View {
                             archive.selectNavigatorItem(row.item.id)
                             archive.saveSelected()
                         }
-                    }
-                }
-                if contribution.allowedActions.contains(.remove) {
-                    Button(role: .destructive) {
-                        appState.performNavigatorAction(
-                            NavigatorAction(
-                                contributionID: contribution.id,
-                                kind: .remove,
-                                itemIDs: [row.item.id]
-                            )
-                        )
-                    } label: {
-                        Label(NSLocalizedString("Remove Navigator Item", comment: ""), systemImage: "trash")
                     }
                 }
             }
