@@ -772,10 +772,10 @@ private final class ExposeNativeCard: NSView {
         updateAppearance()
     }
     private func updateAppearance(animated: Bool = true) {
-        thumbnail.layer?.borderColor = NSColor.white.withAlphaComponent(highlighted ? 0.85 : (hovered ? 0.5 : 0.16)).cgColor
-        thumbnail.layer?.borderWidth = dashedBorder.isHidden ? (highlighted ? 2 : 1) : 0
-        dashedBorder.strokeColor = NSColor.white.withAlphaComponent(highlighted ? 0.85 : (hovered ? 0.5 : 0.24)).cgColor
-        dashedBorder.lineWidth = highlighted ? 2 : 1
+        thumbnail.layer?.borderColor = (highlighted ? NSColor.systemBlue : NSColor.white.withAlphaComponent(hovered ? 0.5 : 0.16)).cgColor
+        thumbnail.layer?.borderWidth = dashedBorder.isHidden ? (highlighted ? 3 : 1) : 0
+        dashedBorder.strokeColor = (highlighted ? NSColor.systemBlue : NSColor.white.withAlphaComponent(hovered ? 0.5 : 0.24)).cgColor
+        dashedBorder.lineWidth = highlighted ? 3 : 1
         setAccessibilitySelected(highlighted)
         updateEmphasisTransform(animated: animated)
     }
