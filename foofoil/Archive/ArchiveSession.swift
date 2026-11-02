@@ -50,6 +50,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
     private var nestedArchives: [String: NestedArchive] = [:]
     private var archiveNodeIDs: Set<String> = []
     private var projectedMediaKinds: [String: FileListKind] = [:]
+    private var mediaEntryIDsByPath: [String: String] = [:]
     private var itemParents: [String: String] = [:]
     private var itemLocations: [String: (origin: ArchiveSession?, entry: ArchiveEntry)] = [:]
     private var retry: (() -> Void)?
@@ -394,6 +395,9 @@ nonisolated final class ArchivePreviewLease: Sendable {
                 }
                 let mediaURLs = ids.compactMap { resolvedURLs[$0] }
                 guard !Task.isCancelled, self.generation == token, let kind = mode.kind else { return }
+                self.mediaEntryIDsByPath = Dictionary(ids.compactMap { id in
+                    resolvedURLs[id].map { ($0.standardizedFileURL.path, id) }
+                }, uniquingKeysWith: { first, _ in first })
                 let lease = leases.first.map { first in
                     ArchivePreviewLease(directory: first.directory, byteCount: total, retaining: leases, removesDirectory: false)
                 }
@@ -417,6 +421,35 @@ nonisolated final class ArchivePreviewLease: Sendable {
             return windowState.initialFileOpenFailure(url) == nil
         }
         return true
+    }
+
+    func isFileEntry(_ id: String) -> Bool { itemLocations[id]?.entry.isRegular == true }
+
+    func mediaEntryID(for url: URL) -> String? {
+        mediaEntryIDsByPath[url.standardizedFileURL.path]
+    }
+
+    func fileInformation(_ id: String) async throws -> FoilInformation.Details? {
+        guard let location = itemLocations[id], location.entry.isRegular else { return nil }
+        if let url = localURL(for: id) {
+            return await FoilInformation.fileDetails(url: url, displayName: location.entry.name)
+        }
+        let origin = location.origin ?? self
+        guard let index = origin.index else { return nil }
+        let lease = try? await origin.workQueue.preview(urls: origin.urls, index: index, entry: location.entry,
+                                                        password: origin.password, limit: ArchiveReader.maximumExportBytes)
+        let url = (lease?.directory ?? FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString))
+            .appendingPathComponent(location.entry.name)
+        var components: [String] = []
+        var current: String? = id
+        while let item = current, let entry = itemLocations[item]?.entry {
+            if entry.id != "root" { components.append(entry.name) }
+            current = itemParents[item]
+        }
+        let details = await FoilInformation.fileDetails(url: url, displayName: location.entry.name,
+            archivePath: ([source.name] + components.reversed()).joined(separator: "/"), archiveSize: location.entry.size)
+        withExtendedLifetime(lease) {}
+        return details
     }
 
     func openInNewFoil(_ id: String) {

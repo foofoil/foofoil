@@ -101,7 +101,7 @@ struct NavigatorPanelView: View {
         // 空白处默认右键菜单；行与标题各自提供更具体的菜单覆盖此处。
         .contextMenu {
             if !contributions.isEmpty {
-                navigatorVisibilityMenu
+                navigatorVisibilityItems
             }
             moveToOppositeSideMenuItem
         }
@@ -333,21 +333,22 @@ struct NavigatorPanelView: View {
         // 整条标题区命中悬停，与列表行的整行命中保持一致。
         .onHover { isHoveringNavigatorHeader = $0 }
         .contextMenu {
-            navigatorVisibilityMenu
-            moveToOppositeSideMenuItem
             if contribution.id == AppState.fileListNavigatorID {
                 Button {
                     beginListTitleRename()
                 } label: {
                     Label(NSLocalizedString("Change Title", comment: ""), systemImage: "pencil")
                 }
+                Divider()
             }
+            navigatorVisibilityItems
+            moveToOppositeSideMenuItem
         }
     }
 
-    /// 显示模式子菜单，与视图菜单同构：循环切换项带快捷键，下面是三个单选模式。
-    private var navigatorVisibilityMenu: some View {
-        Menu(NSLocalizedString("Navigator Visibility", comment: "")) {
+    /// 显示方式平铺在菜单中，单选项缩进并与循环切换快捷键保持一致。
+    private var navigatorVisibilityItems: some View {
+        Group {
             Button {
                 appState.cycleNavigatorPanelVisibilityMode()
             } label: {
@@ -358,7 +359,6 @@ struct NavigatorPanelView: View {
             }
             // 挂在控件本身而非标题 Label 上，右键菜单才会渲染出快捷键提示；键位取自快捷键配置。
             .optionalKeyboardShortcut(configuredShortcut("view.toggleNavigator"))
-            Divider()
             Picker(
                 selection: Binding(
                     get: { appState.navigatorPanelVisibilityMode },
@@ -366,7 +366,7 @@ struct NavigatorPanelView: View {
                 )
             ) {
                 ForEach([NavigatorPanelVisibilityMode.always, .onHover, .hidden], id: \.self) { mode in
-                    Text(mode.localizedTitle).tag(mode)
+                    Text("\u{2003}" + mode.localizedTitle).tag(mode)
                 }
             } label: {
                 Text(NSLocalizedString("Navigator", comment: ""))
@@ -400,8 +400,8 @@ struct NavigatorPanelView: View {
             Label(
                 NSLocalizedString(
                     appState.navigatorPanelSide == .left
-                        ? "Move to Right Side"
-                        : "Move to Left Side",
+                        ? "Move Navigator to Right Side"
+                        : "Move Navigator to Left Side",
                     comment: ""
                 ),
                 systemImage: appState.navigatorPanelSide == .left ? "sidebar.right" : "sidebar.left"
@@ -717,21 +717,61 @@ struct NavigatorPanelView: View {
                     .accessibilityLabel(NSLocalizedString("Toggle Navigator Group", comment: ""))
                 }
             }
-            .contextMenu {
-                if let archive = appState.archiveSession(forNavigatorID: contribution.id) {
-                    if archive.canOpenInNewFoil(row.item.id) {
-                        Button(NSLocalizedString("Open in New Foil", comment: "")) {
-                            archive.openInNewFoil(row.item.id)
-                        }
+        }
+        .contentShape(Rectangle())
+        .contextMenu {
+            if let archive = appState.archiveSession(forNavigatorID: contribution.id) {
+                if archive.isFileEntry(row.item.id) {
+                    Button {
+                        archive.openInNewFoil(row.item.id)
+                    } label: {
+                        Label(NSLocalizedString("Open in New Foil", comment: ""), systemImage: "macwindow.badge.plus")
                     }
-                    if archive.source.localFiles == nil {
-                        Button(NSLocalizedString("Save As...", comment: "")) {
-                            archive.selectNavigatorItem(row.item.id)
-                            archive.saveSelected()
-                        }
+                    .disabled(!archive.canOpenInNewFoil(row.item.id))
+                    Button {
+                        showFileInformation { try await archive.fileInformation(row.item.id) }
+                    } label: {
+                        Label(NSLocalizedString("File Information", comment: ""), systemImage: "info.circle")
                     }
                 }
+                if archive.source.localFiles == nil {
+                    Button {
+                        archive.selectNavigatorItem(row.item.id)
+                        archive.saveSelected()
+                    } label: {
+                        Label(NSLocalizedString("Save As...", comment: ""), systemImage: "square.and.arrow.down")
+                    }
+                }
+            } else if let item = appState.navigatorFileItem(contributionID: contribution.id, itemID: row.item.id) {
+                let session = appState.archiveSession
+                let archiveID = session?.mediaEntryID(for: item.url)
+                Button {
+                    if let session, let archiveID { session.openInNewFoil(archiveID) }
+                    else if session == nil {
+                        let url = item.bookmark.flatMap(AppState.resolveVideoBookmark) ?? item.url
+                        let state = AppState(isIncognito: appState.isIncognito)
+                        state.openFile(url: url)
+                        (NSApp.delegate as? AppDelegate)?.showNewWindow(with: state)
+                    }
+                } label: { Label(NSLocalizedString("Open in New Foil", comment: ""), systemImage: "macwindow.badge.plus") }
+                .disabled(session != nil && archiveID == nil)
+                Button {
+                    if let session, let archiveID {
+                        showFileInformation { try await session.fileInformation(archiveID) }
+                    } else if session == nil {
+                        let url = item.bookmark.flatMap(AppState.resolveVideoBookmark) ?? item.url
+                        showFileInformation { await FoilInformation.fileDetails(url: url, displayName: url.lastPathComponent) }
+                    }
+                } label: { Label(NSLocalizedString("File Information", comment: ""), systemImage: "info.circle") }
+                .disabled(session != nil && archiveID == nil)
             }
+            if let archive = appState.archiveSession(forNavigatorID: contribution.id) {
+                if archive.isFileEntry(row.item.id) || archive.source.localFiles == nil { Divider() }
+            } else if appState.navigatorFileItem(contributionID: contribution.id, itemID: row.item.id) != nil {
+                Divider()
+            }
+            navigatorVisibilityItems
+            moveToOppositeSideMenuItem
         }
         .background(
             isSelected ? selectionColor : Color.clear,
@@ -760,6 +800,12 @@ struct NavigatorPanelView: View {
                 hoveringNavigatorRowID = nil
             }
         }
+    }
+
+    private func showFileInformation(_ load: @escaping @MainActor () async throws -> FoilInformation.Details?) {
+        guard let delegate = NSApp.delegate as? AppDelegate,
+              let window = delegate.windowControllers.first(where: { $0.appState === appState })?.window else { return }
+        delegate.showFileInformation(window: window, load: load)
     }
 
     /// 平面列表可拖动项目；层级播放列表只允许拖动顶层 CUE / SACD 子目录。

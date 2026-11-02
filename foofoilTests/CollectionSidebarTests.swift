@@ -237,6 +237,34 @@ struct CollectionSidebarTests {
         #expect(!session.canOpenInNewFoil(entry.id))
     }
 
+    @Test func archiveMediaRowsResolveToTheirOriginalEntries() async throws {
+        let (directory, _) = try fixture()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let zip = directory.appendingPathComponent("collection.zip")
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        process.currentDirectoryURL = directory
+        process.arguments = ["-q", "-r", zip.path, "one.png", "nested"]
+        try process.run(); process.waitUntilExit()
+        #expect(process.terminationStatus == 0)
+        let state = AppState(isIncognito: true)
+        defer { state.resetContent() }
+        state.openFile(url: zip)
+        let session = try #require(state.archiveSession)
+        try await settle(session)
+        session.setSidebarMode(.image)
+        try await settle(session)
+        let item = try #require(state.readingState.fileList?.items.last)
+        #expect(state.navigatorFileItem(contributionID: AppState.fileListNavigatorID, itemID: item.id)?.path == item.path)
+        let id = try #require(session.mediaEntryID(for: item.url))
+        let details = try #require(try await session.fileInformation(id))
+        #expect(details.rows.contains { $0.key == "Foil Info Title" && $0.value == item.displayName })
+        #expect(details.rows.contains { $0.key == "Foil Info File Path" && $0.value.contains("collection.zip/") })
+        #expect(details.rows.contains { $0.key == "Foil Info Pixels" })
+        #expect(details.source == nil)
+        #expect(!details.rows.contains { ["Foil Info Window Size", "Foil Info First Visit", "Foil Info Last Visit"].contains($0.key) })
+    }
+
     @Test func homogeneousFilesKeepExistingGrouping() {
         #expect(!AppState.needsCollectionTree([URL(fileURLWithPath: "/one.png"), URL(fileURLWithPath: "/two.jpg")]))
         #expect(AppState.needsCollectionTree([URL(fileURLWithPath: "/one.pdf"), URL(fileURLWithPath: "/two.txt")]))

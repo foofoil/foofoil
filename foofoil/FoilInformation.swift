@@ -190,6 +190,14 @@ nonisolated enum FoilInformation {
 }
 
 extension AppDelegate {
+    func showFileInformation(window: NSWindow, load: @escaping @MainActor () async throws -> FoilInformation.Details?) {
+        guard window.attachedSheet == nil else { return }
+        Task { @MainActor in
+            guard let details = try? await load(), window.isVisible, window.attachedSheet == nil else { return }
+            presentFoilInformation(rows: details.rows, source: details.source, available: details.available,
+                currentInformation: nil, window: window, state: nil, titleKey: "File Information")
+        }
+    }
     @objc func showFoilInformationAction() {
         guard let controller = activeWindowController, !controller.appState.isBlank, let window = controller.window,
               window.attachedSheet == nil else { return }
@@ -222,12 +230,12 @@ extension AppDelegate {
         }
     }
 
-    private func presentFoilInformation(rows: [FoilInformation.Row], source: URL?, available: Bool, currentInformation: FoilInformation.Details?, window: NSWindow, state: AppState?) {
+    private func presentFoilInformation(rows: [FoilInformation.Row], source: URL?, available: Bool, currentInformation: FoilInformation.Details?, window: NSWindow, state: AppState?, titleKey: String = "Foil Information") {
         let panel = FoilInformationPanel(
             contentRect: NSRect(x: 0, y: 0, width: 560, height: 360),
             styleMask: [.titled], backing: .buffered, defer: false
         )
-        panel.title = NSLocalizedString("Foil Information", comment: "")
+        panel.title = NSLocalizedString(titleKey, comment: "")
         panel.isReleasedWhenClosed = false
         panel.appearance = window.effectiveAppearance
 

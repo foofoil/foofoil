@@ -65,6 +65,12 @@
         }
       }
     },
+    "File Information": {
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "File Information" } },
+        "zh-Hans": { "stringUnit": { "state": "translated", "value": "文件信息" } }
+      }
+    },
     "Open in New Foil": {
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": "Open in New Foil" } },
@@ -6401,7 +6407,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "循环切换导航面板显示"
+            "value": "切换导航面板显示方式"
           }
         }
       }
@@ -9017,7 +9023,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "导航面板移到左侧"
+            "value": "将导航面板移到左侧"
           }
         }
       }
@@ -9034,7 +9040,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "导航面板移到右侧"
+            "value": "将导航面板移到右侧"
           }
         }
       }
@@ -12457,13 +12463,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Automatic"
+            "value": "Show on Hover"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "自动"
+            "value": "悬停时显示"
           }
         }
       }
@@ -12474,13 +12480,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Hidden"
+            "value": "Hide"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "不显示"
+            "value": "隐藏"
           }
         }
       }
@@ -12497,7 +12503,7 @@
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "始终保持显示"
+            "value": "始终显示"
           }
         }
       }

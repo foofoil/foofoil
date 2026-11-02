@@ -415,8 +415,7 @@ extension AppDelegate {
         viewMenu.addItem(toggleFullScreenItem)
         viewMenu.addItem(NSMenuItem.separator())
 
-        // 侧边栏显示模式收进子菜单：顶部为循环切换项（带快捷键），下面是三个单选模式；换边项仍在视图菜单一层。
-        let navigatorMenu = NSMenu(title: NSLocalizedString("Navigator Visibility", comment: ""))
+        // 循环切换与三个缩进的单选模式位于同一级，和侧边栏右键菜单一致。
         let cycleNavigatorItem = NSMenuItem(
             title: NSLocalizedString("Cycle Navigator Visibility", comment: ""),
             action: #selector(toggleNavigatorPanelAction),
@@ -425,8 +424,7 @@ extension AppDelegate {
         cycleNavigatorItem.withSymbol("sidebar.squares.leading")
         cycleNavigatorItem.representedObject = "view.toggleNavigator"
         cycleNavigatorItem.target = self
-        navigatorMenu.addItem(cycleNavigatorItem)
-        navigatorMenu.addItem(NSMenuItem.separator())
+        viewMenu.addItem(cycleNavigatorItem)
         for mode in [NavigatorPanelVisibilityMode.always, .onHover, .hidden] {
             let modeItem = NSMenuItem(
                 title: mode.localizedTitle,
@@ -435,19 +433,16 @@ extension AppDelegate {
             )
             modeItem.representedObject = mode.rawValue
             modeItem.target = self
-            navigatorMenu.addItem(modeItem)
+            modeItem.indentationLevel = 1
+            viewMenu.addItem(modeItem)
         }
-        let navigatorMenuItem = NSMenuItem(title: NSLocalizedString("Navigator Visibility", comment: ""), action: nil, keyEquivalent: "")
-        navigatorMenuItem.withSymbol("sidebar.squares.leading")
-        navigatorMenuItem.submenu = navigatorMenu
-        viewMenu.addItem(navigatorMenuItem)
 
         let moveNavigatorSideItem = NSMenuItem(
             title: NSLocalizedString("Move Navigator to Right Side", comment: ""),
             action: #selector(moveNavigatorToOppositeSideAction),
             keyEquivalent: ""
         )
-        moveNavigatorSideItem.withSymbol("arrow.left.arrow.right")
+        moveNavigatorSideItem.withSymbol("sidebar.right")
         moveNavigatorSideItem.representedObject = "view.moveNavigatorSide"
         moveNavigatorSideItem.target = self
         viewMenu.addItem(moveNavigatorSideItem)

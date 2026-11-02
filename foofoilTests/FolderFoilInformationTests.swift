@@ -28,6 +28,23 @@ struct FolderFoilInformationTests {
         Issue.record("Folder did not finish opening")
     }
 
+    @Test func fileInformationDescribesTheTargetWithoutWindowOrHistoryRows() async throws {
+        let (root, urls) = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = AppState(isIncognito: true)
+        defer { state.resetContent() }
+        state.openFileCollection(urls, roots: [root])
+        let session = try #require(state.archiveSession)
+        try await settle(session)
+        let target = try #require(session.contribution.items.first { $0.title == "two.tiff" })
+        let details = try #require(try await session.fileInformation(target.id))
+        #expect(TestFileIdentity.equals(details.source, urls[1]))
+        #expect(details.rows.contains { $0.key == "Foil Info Pixels" && $0.value == "20 × 30 px" })
+        #expect(details.rows.contains { $0.key == "Foil Info File Size" })
+        #expect(!details.rows.contains { ["Foil Info Window Size", "Foil Info First Visit", "Foil Info Last Visit"].contains($0.key) })
+        #expect(session.selectedID == nil)
+    }
+
     @Test func explicitFolderAndMultiFileBatchResolveToDirectories() async throws {
         let (root, urls) = try fixture()
         defer { try? FileManager.default.removeItem(at: root) }

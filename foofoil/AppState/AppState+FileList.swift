@@ -11,6 +11,15 @@ import UniformTypeIdentifiers
 import FoofoilExtensionKit
 
 extension AppState {
+    /// 导航行可能来自宿主列表或扩展队列，两者都必须映射回实际文件。
+    func navigatorFileItem(contributionID: String, itemID: String) -> FileListItem? {
+        guard let list = readingState.fileList else { return nil }
+        if contributionID == Self.fileListNavigatorID {
+            return list.items.first { $0.id == itemID }
+        }
+        guard readingState.extensionSession?.navigatorContributions.contains(where: { $0.id == contributionID }) == true else { return nil }
+        return list.items.first { $0.extensionItemID == itemID }
+    }
     static let fileListNavigatorID = "builtin.file-list"
 
     var hasOpenedContent: Bool {
