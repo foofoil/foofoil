@@ -101,7 +101,7 @@ The Share menu filters attachments with a known content type. Apps that supply o
 
 Files that cannot be opened from drag and drop, the clipboard, or sharing appear in a separate bordered feedback foil with their system icons, filenames, and reason. Existing foils are preserved, even if blank. Feedback foils are excluded from history and restart restoration; failures from the same batch are collected together. Known Quick Look documents retain their preview; unknown formats are previewed only when the system can generate a content thumbnail.
 
-Apple Music Library is disabled by default. Enable it in Settings → Types → Audio and Video to reveal its library entry, search options, and sharing guidance. Turning it off hides music history and search results without deleting saved history; Apple Music links open as ordinary web pages.
+Apple Music Library is disabled by default. Enable it in Settings → Types → Audio to reveal its library entry, search options, and sharing guidance. Turning it off hides music history and search results without deleting saved history; Apple Music links open as ordinary web pages.
 
 All video foils can load external SRT, ASS/SSA, and WebVTT subtitles using the subtitle menu, the context menu, the View menu, or drag and drop. Matching same-folder filenames are discovered automatically after folder access is available. Loaded files are saved with video history; subtitle visibility is temporary. Fonts, colors, background, shadow, bottom position and delay are global settings. ASS uses the global text style; PGS supports position and delay but keeps its bitmap appearance.
 

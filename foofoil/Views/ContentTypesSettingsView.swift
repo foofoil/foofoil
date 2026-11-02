@@ -38,6 +38,17 @@ struct ContentTypesSettingsView: View {
                         note: NSLocalizedString("Bottom Progress Bar Note", comment: "")
                     )
                 }
+                SettingsSliderRow(
+                    title: NSLocalizedString("Seek Step", comment: ""),
+                    note: NSLocalizedString("Seek Step Note", comment: ""),
+                    valueLabel: seekStepLabel,
+                    value: $mediaSeekStep,
+                    range: MediaSeekStep.minInterval...MediaSeekStep.maxInterval
+                )
+            } header: {
+                Text(NSLocalizedString("Audio and Video", comment: ""))
+            }
+            Section {
                 Toggle(isOn: $keepAudioPlayingInBackground) {
                     SettingsRowLabel(
                         title: NSLocalizedString("Keep Audio Playing in Background", comment: ""),
@@ -51,13 +62,6 @@ struct ContentTypesSettingsView: View {
                     )
                 }
                 .disabled(keepAudioPlayingInBackground)
-                SettingsSliderRow(
-                    title: NSLocalizedString("Seek Step", comment: ""),
-                    note: NSLocalizedString("Seek Step Note", comment: ""),
-                    valueLabel: seekStepLabel,
-                    value: $mediaSeekStep,
-                    range: MediaSeekStep.minInterval...MediaSeekStep.maxInterval
-                )
                 Toggle(isOn: $appleMusicLibraryEnabled) {
                     SettingsRowLabel(
                         title: NSLocalizedString("Music Enable Library", comment: ""),
@@ -65,7 +69,7 @@ struct ContentTypesSettingsView: View {
                     )
                 }
             } header: {
-                Text(NSLocalizedString("Audio and Video", comment: ""))
+                Text(NSLocalizedString("Audio", comment: ""))
             }
             Section {
                 SettingsSliderRow(

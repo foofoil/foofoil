@@ -102,7 +102,7 @@ Play MP4, MOV, and M4V, plus MKV and AVI through the video module shipped with t
 
 Load external SRT, ASS/SSA, and WebVTT subtitles through automatic filename matching, manual selection, or drag and drop. Subtitle file associations are saved in history. Customize text subtitle fonts, size, colors, background, shadow, position, and delay; PGS subtitles retain their graphic appearance with position and delay adjustments. Use ⌘S to save a video frame, optionally including subtitles.
 
-Apple Music supports library browsing and search, and opens shared song, album, and public playlist links as music foils without requiring them to be added to your library first. It is off by default; enable it in **Settings → Types → Audio & Video**. Access requires authorization; playback depends on account eligibility and regional availability.
+Apple Music supports library browsing and search, and opens shared song, album, and public playlist links as music foils without requiring them to be added to your library first. It is off by default; enable it in **Settings → Types → Audio**. Access requires authorization; playback depends on account eligibility and regional availability.
 
 ## CLI and Agent Collaboration
 

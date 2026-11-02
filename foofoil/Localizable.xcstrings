@@ -6876,6 +6876,23 @@
         }
       }
     },
+    "Audio": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音频"
+          }
+        }
+      }
+    },
     "Keep Audio Playing in Background": {
       "extractionState": "manual",
       "localizations": {
@@ -6933,13 +6950,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Would you like to keep the audio playing in the background? The foil will be hidden. Click the foofoil icon in the Dock to restore it. You can change this behavior in Settings → Types → Audio and Video."
+            "value": "Would you like to keep the audio playing in the background? The foil will be hidden. Click the foofoil icon in the Dock to restore it. You can change this behavior in Settings → Types → Audio."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "是否保持音频在后台播放？箔片将被隐藏，点击 Dock 上的浮箔图标即可恢复原窗口。之后可在「设置 → 类型 → 音频与视频」中更改此行为。"
+            "value": "是否保持音频在后台播放？箔片将被隐藏，点击 Dock 上的浮箔图标即可恢复原窗口。之后可在「设置 → 类型 → 音频」中更改此行为。"
           }
         }
       }
