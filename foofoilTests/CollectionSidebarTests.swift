@@ -58,6 +58,46 @@ struct CollectionSidebarTests {
         Issue.record("Collection did not settle")
     }
 
+    @Test(arguments: [("png", CollectionSidebarMode.image), ("mp3", .audio), ("mp4", .video)])
+    func dominantMediaIsSelectedForDirectories(_ ext: String, _ expected: CollectionSidebarMode) async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let urls = (0..<3).map { directory.appendingPathComponent("\($0).\(ext)") }
+            + [directory.appendingPathComponent("other.txt")]
+        for url in urls { try Data().write(to: url) }
+        let state = AppState(isIncognito: true)
+        defer { state.resetContent() }
+        state.openFileCollection(urls, roots: [directory])
+        let session = try #require(state.archiveSession)
+        try await settle(session)
+        #expect(session.sidebarMode == expected)
+        session.setSidebarMode(.folder)
+        session.load()
+        try await settle(session)
+        #expect(session.sidebarMode == .folder)
+    }
+
+    @Test func dominantMediaIsSelectedForArchives() async throws {
+        let (directory, _) = try fixture()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.copyItem(at: directory.appendingPathComponent("one.png"), to: directory.appendingPathComponent("three.png"))
+        let zip = directory.appendingPathComponent("collection.zip")
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        process.currentDirectoryURL = directory
+        process.arguments = ["-q", "-r", zip.path, "one.png", "three.png", "nested"]
+        try process.run(); process.waitUntilExit()
+        #expect(process.terminationStatus == 0)
+        let state = AppState(isIncognito: true)
+        defer { state.resetContent() }
+        state.openFile(url: zip)
+        let session = try #require(state.archiveSession)
+        try await settle(session)
+        #expect(session.sidebarMode == .image)
+        #expect(state.readingState.fileList?.items.count == 3)
+    }
+
     @Test func mixedFilesKeepTheirTreeAndSwitchToAnImageList() async throws {
         let (directory, urls) = try fixture()
         defer { try? FileManager.default.removeItem(at: directory) }

@@ -517,6 +517,15 @@ nonisolated final class ArchivePreviewLease: Sendable {
                 self.index = result
                 self.projectIndex()
                 self.busy = false
+                // 仅在首次打开时按普通文件占比选择；恢复或手动选择的模式优先。
+                if self.windowState != nil, self.source.sidebarMode == nil {
+                    let total = result.entries.filter(\.isRegular).count
+                    let counts = self.projectedMediaKinds.values.reduce(into: [FileListKind: Int]()) { $0[$1, default: 0] += 1 }
+                    self.source.sidebarMode = CollectionSidebarMode.allCases.first {
+                        guard let kind = $0.kind, total > 0 else { return false }
+                        return counts[kind, default: 0] > total * 2 / 3
+                    } ?? .folder
+                }
                 self.onChange?()
                 if self.sidebarMode != .folder {
                     if self.availableSidebarModes.contains(self.sidebarMode) { self.setSidebarMode(self.sidebarMode, restoring: true) }
