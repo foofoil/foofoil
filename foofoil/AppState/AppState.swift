@@ -270,6 +270,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     @Published var isNavigatorFocused = false
     @Published var navigatorFocusRequest: UInt64 = 0
     @Published var navigatorFocusedItemID: String?
+    var pdfThumbnailColumnCount = 1
     @Published var activeNavigatorContributionID: String?
     @Published var expandedNavigatorItemIDs: Set<String> = [] {
         didSet {

@@ -67,6 +67,31 @@ struct NavigatorFocusTests {
         #expect(!state.handleNavigatorKeyDown(try event(126)))
     }
 
+    @Test func pdfThumbnailsNavigateGridAndChangePage() throws {
+        let state = AppState(isIncognito: true)
+        state.builtInNavigatorContributions = [.init(id: PDFNavigator.pagesID, titleLocalizationKey: "Pages", style: .flat,
+            items: (0..<8).map { .init(id: "page-\($0)", title: "\($0)") },
+            selectedItemIDs: ["page-0"], allowedActions: [.activate])]
+        state.isNavigatorFocused = true
+        state.pdfThumbnailColumnCount = 3
+        var activated: [String] = []
+        state.builtInNavigatorActionHandler = { activated.append(contentsOf: $0.itemIDs) }
+        #expect(state.handleNavigatorKeyDown(try event(124)))
+        #expect(state.navigatorFocusedItemID == "page-1")
+        #expect(state.handleNavigatorKeyDown(try event(45, modifiers: .control)))
+        #expect(state.navigatorFocusedItemID == "page-4")
+        #expect(state.handleNavigatorKeyDown(try event(11, modifiers: .control)))
+        #expect(state.navigatorFocusedItemID == "page-3")
+        #expect(state.handleNavigatorKeyDown(try event(35, modifiers: .control)))
+        #expect(state.navigatorFocusedItemID == "page-0")
+        #expect(state.handleNavigatorKeyDown(try event(3, modifiers: .control)))
+        #expect(state.navigatorFocusedItemID == "page-1")
+        #expect(activated == ["page-1", "page-4", "page-3", "page-0", "page-1"])
+        #expect(state.handleNavigatorKeyDown(try event(36, modifiers: [])))
+        #expect(activated.last == "page-1")
+        #expect(!state.handleNavigatorKeyDown(try event(3, modifiers: .command)))
+    }
+
     @Test func archiveTreeUsesFocusAndDoesNotReadCollapsedChildren() async throws {
         let fixture = try ArchiveTests.Fixture([("folder/a.txt", Data("A".utf8)), ("folder/b.txt", Data("B".utf8))])
         defer { fixture.remove() }

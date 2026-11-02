@@ -31,13 +31,24 @@ import FoofoilExtensionKit
     var contributions: [NavigatorContribution] {
         guard let document = view?.document else { return [] }
         let current = view?.currentPage.map { document.index(for: $0) }
+        // 同页多个目录目标按文档顺序取最后一个；没有更早目标时不选中目录。
+        let currentOutline = current.flatMap { currentPage in
+            outlineItems.compactMap { item -> (String, Int)? in
+                guard let page = destinations[item.id]?.page else { return nil }
+                let index = document.index(for: page)
+                guard index != NSNotFound, index <= currentPage else { return nil }
+                return (item.id, index)
+            }.enumerated().max { lhs, rhs in
+                lhs.element.1 == rhs.element.1 ? lhs.offset < rhs.offset : lhs.element.1 < rhs.element.1
+            }?.element.0
+        }
         let pages = (0..<document.pageCount).map { index in
             NavigatorItem(id: "pdf-page-\(index)", title: document.page(at: index)?.label ?? "\(index + 1)",
                           symbolName: "doc", isCurrent: current == index)
         }
         return [
             .init(id: Self.outlineID, titleLocalizationKey: "PDF Table of Contents", style: .outline,
-                  items: outlineItems, allowedActions: [.activate]),
+                  items: outlineItems, selectedItemIDs: currentOutline.map { [$0] } ?? [], allowedActions: [.activate]),
             .init(id: Self.pagesID, titleLocalizationKey: "PDF Page Thumbnails", style: .flat,
                   items: pages, selectedItemIDs: current.map { ["pdf-page-\($0)"] } ?? [], allowedActions: [.activate])
         ]

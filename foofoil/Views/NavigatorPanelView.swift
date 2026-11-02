@@ -510,6 +510,28 @@ struct NavigatorPanelView: View {
                             delegate: navigatorEndDropDelegate(for: contribution)
                         )
                     }
+                    .onAppear {
+                        if contribution.id == PDFNavigator.pagesID {
+                            updatePDFColumns(width: geo.size.width)
+                            if let id = contribution.selectedItemIDs.first {
+                                Task { @MainActor in proxy.scrollTo(id) }
+                            }
+                        }
+                        revealPDFOutlineSelection(contribution, proxy: proxy)
+                    }
+                    .onChange(of: geo.size.width) { _, width in
+                        if contribution.id == PDFNavigator.pagesID { updatePDFColumns(width: width) }
+                    }
+                    .onChange(of: contribution.id) { _, _ in
+                        if contribution.id == PDFNavigator.pagesID {
+                            updatePDFColumns(width: geo.size.width)
+                            if let id = contribution.selectedItemIDs.first {
+                                Task { @MainActor in proxy.scrollTo(id) }
+                            }
+                        } else {
+                            revealPDFOutlineSelection(contribution, proxy: proxy)
+                        }
+                    }
                     .onChange(of: appState.navigatorSearchCurrentMatchID) { _, id in
                         guard let id, appState.isNavigatorSearchActive else { return }
                         // 等展开折叠分段后的目标行实际进入 LazyVStack 再滚动。
@@ -526,6 +548,16 @@ struct NavigatorPanelView: View {
                     // 目录随正文滚动时，把当前节滚入可见区；未指定 anchor 时只做最小滚动，避免列表跳动。
                     .onChange(of: contribution.selectedItemIDs) { _, ids in
                         if !appState.isNavigatorFocused { appState.navigatorFocusedItemID = nil }
+                        if contribution.id == PDFNavigator.outlineID {
+                            appState.navigatorFocusedItemID = nil
+                            revealPDFOutlineSelection(contribution, proxy: proxy)
+                            return
+                        }
+                        if contribution.id == PDFNavigator.pagesID, !appState.isNavigatorFocused,
+                           let id = ids.first {
+                            Task { @MainActor in proxy.scrollTo(id) }
+                            return
+                        }
                         guard contribution.id == AppState.markdownOutlineNavigatorID, let id = ids.first else { return }
                         Task { @MainActor in
                             withAnimation(.easeInOut(duration: 0.18)) {
@@ -536,6 +568,24 @@ struct NavigatorPanelView: View {
                 }
             }
         }
+    }
+
+    private func updatePDFColumns(width: CGFloat) {
+        // 与缩略图网格的最小宽度、间距和两侧内边距保持一致。
+        appState.pdfThumbnailColumnCount = max(1, Int((max(0, width - 12) + 6) / 84))
+    }
+
+    private func revealPDFOutlineSelection(_ contribution: NavigatorContribution, proxy: ScrollViewProxy) {
+        guard contribution.id == PDFNavigator.outlineID, !appState.isNavigatorSearchActive,
+              let id = contribution.selectedItemIDs.first else { return }
+        let items = Dictionary(contribution.items.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var parent = items[id]?.parentID
+        var ancestors = Set<String>()
+        while let current = parent, ancestors.insert(current).inserted {
+            parent = items[current]?.parentID
+        }
+        appState.expandedNavigatorItemIDs.formUnion(ancestors)
+        Task { @MainActor in proxy.scrollTo(id) }
     }
 
     private func pdfThumbnailCell(_ row: VisibleRow, contribution: NavigatorContribution) -> some View {

@@ -22,6 +22,11 @@ extension AppState {
     func handleNavigatorKeyDown(_ event: NSEvent) -> Bool {
         guard event.type == .keyDown, isNavigatorFocused else { return false }
         if handleNavigatorSearchKey(event) { return true }
+        if !isNavigatorSearchActive, let contribution = activeNavigatorContribution,
+           contribution.id == PDFNavigator.pagesID,
+           !((NSApp.keyWindow?.firstResponder as? NSTextView)?.isEditable ?? false) {
+            return handlePDFThumbnailKeyDown(event, contribution: contribution)
+        }
         guard !isNavigatorSearchActive,
               KeyboardShortcut.effectiveModifiers(for: event).isEmpty,
               [123, 124, 125, 126, 36, 76, 49].contains(event.keyCode),
@@ -63,6 +68,48 @@ extension AppState {
             }
         default:
             if let selected { activate(selected) }
+        }
+        return true
+    }
+
+    private func handlePDFThumbnailKeyDown(_ event: NSEvent, contribution: NavigatorContribution) -> Bool {
+        let modifiers = KeyboardShortcut.effectiveModifiers(for: event)
+        let key: UInt16
+        if modifiers.isEmpty { key = event.keyCode }
+        else if modifiers == .control {
+            switch event.keyCode {
+            case 3: key = 124  // Ctrl-F
+            case 11: key = 123 // Ctrl-B
+            case 35: key = 126 // Ctrl-P
+            case 45: key = 125 // Ctrl-N
+            default: return false
+            }
+        } else { return false }
+        let items = contribution.items
+        guard !items.isEmpty else { return false }
+        let selectedID = navigatorFocusedItemID ?? contribution.selectedItemIDs.first
+        let index = selectedID.flatMap { id in items.firstIndex { $0.id == id } } ?? 0
+        if [36, 76, 49].contains(key) {
+            let item = items[index]
+            if item.isEnabled, contribution.allowedActions.contains(.activate) {
+                performNavigatorAction(.init(contributionID: contribution.id, kind: .activate, itemIDs: [item.id]))
+            }
+            return true
+        }
+        let next: Int
+        switch key {
+        case 123: next = index - 1
+        case 124: next = index + 1
+        case 126: next = index - max(1, pdfThumbnailColumnCount)
+        case 125: next = index + max(1, pdfThumbnailColumnCount)
+        default: return false
+        }
+        if items.indices.contains(next) {
+            let item = items[next]
+            navigatorFocusedItemID = item.id
+            if item.isEnabled, contribution.allowedActions.contains(.activate) {
+                performNavigatorAction(.init(contributionID: contribution.id, kind: .activate, itemIDs: [item.id]))
+            }
         }
         return true
     }

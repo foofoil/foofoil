@@ -1,5 +1,6 @@
 import Testing
 import PDFKit
+import FoofoilExtensionKit
 @testable import foofoil
 
 @MainActor
@@ -54,4 +55,26 @@ struct PDFDisplayModeTests {
         #expect(PDFModeView.displayedPageSize(page, box: .cropBox) == NSSize(width: 700, height: 400))
     }
 
+    @Test func outlineSelectionTracksCurrentPageAndNestedDestinations() throws {
+        let document = PDFDocument()
+        let pages = (0..<4).map { _ in PDFPage() }
+        for (index, page) in pages.enumerated() { document.insert(page, at: index) }
+        let root = PDFOutline()
+        let chapter = PDFOutline()
+        chapter.label = "Chapter"
+        chapter.destination = PDFDestination(page: pages[0], at: .zero)
+        let section = PDFOutline()
+        section.label = "Section"
+        section.destination = PDFDestination(page: pages[2], at: .zero)
+        chapter.insertChild(section, at: 0)
+        root.insertChild(chapter, at: 0)
+        document.outlineRoot = root
+        let view = PDFView()
+        view.document = document
+        let navigator = PDFNavigator(view: view, url: URL(fileURLWithPath: "/test.pdf"))
+        view.go(to: pages[1])
+        #expect(navigator.contributions.first?.selectedItemIDs == ["pdf-outline.0"])
+        view.go(to: pages[3])
+        #expect(navigator.contributions.first?.selectedItemIDs == ["pdf-outline.0.0"])
+    }
 }
