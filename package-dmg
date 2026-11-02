@@ -251,7 +251,11 @@ ditto "$APP_PATH" "$STAGING/$APP_NAME.app"
 ln -s /Applications "$STAGING/Applications"
 
 DMG_PATH="$OUTPUT_DIR/$DMG_NAME"
-hdiutil create -volname "$APP_NAME" -srcfolder "$STAGING" -ov -format UDZO "$DMG_PATH"
+if diskutil image create from --help >/dev/null 2>&1; then
+    diskutil image create from --volumeName "$APP_NAME" --format UDZO "$STAGING" "$DMG_PATH"
+else
+    hdiutil create -volname "$APP_NAME" -srcfolder "$STAGING" -ov -format UDZO "$DMG_PATH"
+fi
 
 # 7. 公证并 staple DMG。
 if (( NOTARIZE_ENABLED )); then
