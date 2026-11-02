@@ -2520,7 +2520,7 @@ struct FoofoilTests {
         ))
     }
 
-    @Test func navigatorAutoSwapsSideWhenPanelMostlyOffscreen() {
+    @Test func navigatorAutoSwapsSideAtScreenEdge() {
         let screen = NSRect(x: 0, y: 0, width: 1000, height: 800)
         let panelWidth: CGFloat = 200
 
@@ -2528,38 +2528,44 @@ struct FoofoilTests {
             NSRect(x: minX, y: 100, width: panelWidth, height: 400)
         }
 
-        // 左挂面板被推出屏幕超过 1/3，右侧完整放得下 → 换到右侧。
+        // 左挂面板超出屏幕，右侧完整放得下 → 换到右侧。
         let clippedLeft = panel(minX: -panelWidth * 2 / 3)
         #expect(NavigatorPanelMetrics.autoSwapTargetSide(
             current: .left,
             panelFrame: clippedLeft,
             windowFrame: NSRect(x: 0, y: 0, width: 300, height: 400),
-            screenVisibleFrames: [screen]
+            screenVisibleFrame: screen
         ) == .right)
 
-        // 超界不足 1/3 → 不换。
+        // 即使只超出一小部分，也换到另一侧。
         #expect(NavigatorPanelMetrics.autoSwapTargetSide(
             current: .left,
             panelFrame: panel(minX: -panelWidth / 4),
             windowFrame: NSRect(x: 0, y: 0, width: 300, height: 400),
-            screenVisibleFrames: [screen]
-        ) == nil)
+            screenVisibleFrame: screen
+        ) == .right)
 
         // 另一侧放不下（窗口几乎占满屏幕宽，换边后依旧出屏）→ 不换。
         #expect(NavigatorPanelMetrics.autoSwapTargetSide(
             current: .right,
             panelFrame: panel(minX: 950),
             windowFrame: NSRect(x: 40, y: 0, width: 950, height: 400),
-            screenVisibleFrames: [screen]
+            screenVisibleFrame: screen
         ) == nil)
 
-        // 面板横跨两块相邻屏幕时整体可见 → 不换。
-        let secondScreen = NSRect(x: -600, y: 0, width: 600, height: 800)
+        // 相邻屏幕可显示侧栏时，仍以主窗口所在屏幕为准。
         #expect(NavigatorPanelMetrics.autoSwapTargetSide(
             current: .left,
             panelFrame: panel(minX: -100),
             windowFrame: NSRect(x: 0, y: 0, width: 300, height: 400),
-            screenVisibleFrames: [screen, secondScreen]
+            screenVisibleFrame: screen
+        ) == .right)
+        // 已完整位于主窗口所在屏幕内时保持当前方向。
+        #expect(NavigatorPanelMetrics.autoSwapTargetSide(
+            current: .left,
+            panelFrame: panel(minX: 0),
+            windowFrame: NSRect(x: 208, y: 0, width: 300, height: 400),
+            screenVisibleFrame: screen
         ) == nil)
     }
 
@@ -2570,17 +2576,17 @@ struct FoofoilTests {
         let right = NSRect(x: 358, y: 0, width: 200, height: 800)
         #expect(NavigatorPanelMetrics.autoSwapTargetSide(
             current: .left, panelFrame: left, windowFrame: window,
-            screenVisibleFrames: [screen, screen]
+            screenVisibleFrame: screen
         ) == .right)
         #expect(NavigatorPanelMetrics.autoSwapTargetSide(
             current: .right, panelFrame: right, windowFrame: window,
-            screenVisibleFrames: [screen]
+            screenVisibleFrame: screen
         ) == nil)
         let mirroredWindow = NSRect(x: 650, y: 0, width: 300, height: 800)
         #expect(NavigatorPanelMetrics.autoSwapTargetSide(
             current: .right,
             panelFrame: NSRect(x: 958, y: 0, width: 200, height: 800),
-            windowFrame: mirroredWindow, screenVisibleFrames: [screen]
+            windowFrame: mirroredWindow, screenVisibleFrame: screen
         ) == .left)
     }
 

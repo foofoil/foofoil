@@ -2256,7 +2256,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
               !isTransitioningFullScreen,
               !appState.navigatorContributions.isEmpty,
               appState.navigatorPanelVisibilityMode != .hidden,
-              let window else { return }
+              let window, let screen = window.screen else { return }
         let width = CGFloat(NavigatorPanelMetrics.clampWidth(appState.navigatorPanelWidth))
         let gap = CGFloat(NavigatorPanelMetrics.attachmentGap)
         let x = appState.navigatorPanelSide == .left
@@ -2266,7 +2266,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
             current: appState.navigatorPanelSide,
             panelFrame: panelFrame,
             windowFrame: window.frame,
-            screenVisibleFrames: NSScreen.screens.map(\.visibleFrame)
+            screenVisibleFrame: screen.visibleFrame
         ) else { return }
         appState.navigatorPanelSide = target
         navigatorPanelController.updateFrame(relativeTo: window)

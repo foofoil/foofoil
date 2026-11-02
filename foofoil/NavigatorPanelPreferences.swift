@@ -52,19 +52,16 @@ nonisolated enum NavigatorPanelMetrics {
     static let edgeTriggerWidth = 12.0
     static let widthResizeHandleThickness = 8.0
     static let hoverHideDelay = 0.08
-    /// 面板横向可见宽度低于此比例（即被推出屏幕超过 1/3）时视为超界，可自动换边。
-    static let autoSwapMinVisibleRatio: CGFloat = 2.0 / 3.0
-
-    /// 面板被推出屏幕超过 1/3、且挂到另一侧后横向能完整放进屏幕可见区域时，
-    /// 返回换边目标；否则返回 nil。纯几何判定，供窗口移动时调用与单元测试。
+    /// 侧栏超出主窗口所在屏幕时，若另一侧完整可见则换边。
+    /// 换边后仍以同一屏幕判定，避免相邻显示器使侧栏跨屏。
     static func autoSwapTargetSide(
         current: NavigatorPanelSide,
         panelFrame: NSRect,
         windowFrame: NSRect,
-        screenVisibleFrames: [NSRect]
+        screenVisibleFrame: NSRect
     ) -> NavigatorPanelSide? {
-        let visibleWidth = horizontallyVisibleWidth(of: panelFrame, in: screenVisibleFrames)
-        guard visibleWidth < panelFrame.width * autoSwapMinVisibleRatio else { return nil }
+        let visibleWidth = horizontallyVisibleWidth(of: panelFrame, in: screenVisibleFrame)
+        guard visibleWidth < panelFrame.width - 0.5 else { return nil }
 
         let gap = CGFloat(attachmentGap)
         let candidateFrame: NSRect
@@ -84,24 +81,13 @@ nonisolated enum NavigatorPanelMetrics {
                 height: panelFrame.height
             )
         }
-        guard horizontallyVisibleWidth(of: candidateFrame, in: screenVisibleFrames) >= candidateFrame.width - 0.5 else { return nil }
+        guard horizontallyVisibleWidth(of: candidateFrame, in: screenVisibleFrame) >= candidateFrame.width - 0.5 else { return nil }
         return current == .left ? .right : .left
     }
 
     /// 只检查横向裁切；顶部菜单栏、底部 Dock 不应阻止横向换边。
-    /// 合并屏幕交集，避免镜像或重叠屏幕重复计入可见宽度。
-    private static func horizontallyVisibleWidth(of frame: NSRect, in screens: [NSRect]) -> CGFloat {
-        let intervals = screens.filter { $0.maxY > frame.minY && $0.minY < frame.maxY }
-            .map { (max(frame.minX, $0.minX), min(frame.maxX, $0.maxX)) }
-            .filter { $0.1 > $0.0 }
-            .sorted { $0.0 < $1.0 }
-        var end = frame.minX
-        var width: CGFloat = 0
-        for (lower, upper) in intervals {
-            width += max(0, upper - max(lower, end))
-            end = max(end, upper)
-        }
-        return width
+    private static func horizontallyVisibleWidth(of frame: NSRect, in screen: NSRect) -> CGFloat {
+        max(0, min(frame.maxX, screen.maxX) - max(frame.minX, screen.minX))
     }
 
     /// 嵌平悬停模式的显隐几何：`triggered` 表示指针处于“唤出/保持”区域
