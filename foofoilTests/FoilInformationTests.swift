@@ -5,6 +5,36 @@ import Testing
 
 @MainActor
 struct FoilInformationTests {
+    @Test func informationShortcutIsConfigurable() throws {
+        let definition = try #require(KeyboardShortcutCatalog.definition(withID: "file.showInformation"))
+        let defaultShortcut = KeyboardShortcut(keyEquivalent: "i", modifiers: [.command, .shift])
+        #expect(definition.defaultShortcut == defaultShortcut)
+        #expect(KeyboardShortcutCatalog.file.contains { $0.id == definition.id })
+
+        let store = KeyboardShortcutStore.shared
+        let wasCustomized = store.isCustomized(definition)
+        let previous = store.shortcut(for: definition)
+        defer {
+            if wasCustomized { store.setShortcut(previous, for: definition) }
+            else { store.reset(definition) }
+        }
+        store.reset(definition)
+        let item = NSMenuItem(title: "", action: #selector(AppDelegate.showFoilInformationAction), keyEquivalent: "")
+        item.representedObject = definition.id
+        let menu = NSMenu()
+        menu.addItem(item)
+        let delegate = AppDelegate()
+        delegate.applyKeyboardShortcuts(to: menu)
+        #expect(item.keyEquivalent == "i")
+        #expect(item.keyEquivalentModifierMask == [.command, .shift])
+
+        let custom = KeyboardShortcut(keyEquivalent: "j", modifiers: [.command, .option])
+        #expect(store.setShortcut(custom, for: definition))
+        delegate.applyKeyboardShortcuts(to: menu)
+        #expect(item.keyEquivalent == "j")
+        #expect(item.keyEquivalentModifierMask == [.command, .option])
+    }
+
     @Test func blankFoilCannotShowInformation() {
         _ = NSApplication.shared
         let state = AppState()

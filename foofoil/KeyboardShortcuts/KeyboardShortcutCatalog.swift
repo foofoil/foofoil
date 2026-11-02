@@ -106,6 +106,7 @@ nonisolated enum KeyboardShortcutCatalog {
         definition("file.newIncognito", "New Incognito Foil", "n", [.command, .option]),
         definition("file.toggleIncognito", "Toggle Incognito Mode", "\u{1B}", [.option]),
         definition("file.share", "Share...", nil, []),
+        definition("file.showInformation", "Foil Information", "i", [.command, .shift]),
         definition("file.reset", "Reset to Blank Foil", "k", [.command, .shift])
     ]
 

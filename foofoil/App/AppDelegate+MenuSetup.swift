@@ -232,6 +232,7 @@ extension AppDelegate {
 
         let informationItem = NSMenuItem(title: NSLocalizedString("Foil Information Menu", comment: ""), action: #selector(showFoilInformationAction), keyEquivalent: "")
         informationItem.withSymbol("info.circle")
+        informationItem.representedObject = "file.showInformation"
         informationItem.target = self
         fileMenu.addItem(informationItem)
 
