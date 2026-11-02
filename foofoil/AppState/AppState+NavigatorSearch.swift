@@ -24,9 +24,14 @@ extension AppState {
     }
 
     var canSearchActiveNavigator: Bool {
-        isNavigatorSearchActive
-            || (isExtensionDocument && !(activeNavigatorContribution?.items.isEmpty ?? true))
-            || (activeNavigatorContribution?.items.count ?? 0) > Self.navigatorSearchMinimumItemCount
+        isNavigatorSearchActive || activeNavigatorContribution.map { canSearchNavigator($0) } == true
+    }
+
+    func canSearchNavigator(_ contribution: NavigatorContribution) -> Bool {
+        if contribution.id == PDFNavigator.pagesID { return false }
+        if contribution.id == PDFNavigator.outlineID { return !contribution.items.isEmpty }
+        return (isExtensionDocument && !contribution.items.isEmpty)
+            || contribution.items.count > Self.navigatorSearchMinimumItemCount
     }
 
     /// 非空关键字在标题中的匹配（忽略大小写与变音符号）。

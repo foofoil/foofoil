@@ -939,7 +939,7 @@ extension AppDelegate {
         submenu.addItem(findPreviousItem)
 
         if activeAppState?.canSearchActiveNavigator == true {
-            let directoryItem = NSMenuItem(title: NSLocalizedString(activeAppState?.isExtensionDocument == true ? "Search Table of Contents" : "Search List", comment: ""), action: #selector(findNavigatorAction), keyEquivalent: "f")
+            let directoryItem = NSMenuItem(title: NSLocalizedString((activeAppState?.isExtensionDocument == true || activeAppState?.activeNavigatorContribution?.id == PDFNavigator.outlineID) ? "Search Table of Contents" : "Search List", comment: ""), action: #selector(findNavigatorAction), keyEquivalent: "f")
             directoryItem.keyEquivalentModifierMask = [.command, .shift]
             directoryItem.target = self
             submenu.addItem(directoryItem)

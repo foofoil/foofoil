@@ -52,6 +52,8 @@ Quick Open and the overview’s search also search songs, albums, and playlists 
 
 ## Navigation
 
+In PDFs, sidebar search is available on the Table of Contents tab and searches outline titles.
+
 | Action | Default shortcut | Current shortcut | Notes |
 | --- | --- | --- | --- |
 {{go}}

@@ -59,8 +59,11 @@ struct NavigatorPanelView: View {
                 if let contribution = activeContribution {
                     // 标题区位于滚动区域之外，列表滚动时保持固定；
                     // 多个贡献时由选择器兼任标题与切换，避免重复展示同一名称。
-                    if contributions.count > 1 {
-                        // PDF 模式选择器始终留在最上方，搜索栏也不能替换它。
+                    if isPDFNavigator && appState.isNavigatorSearchActive {
+                        navigatorSearchBar
+                    } else if isPDFNavigator {
+                        pdfTabs
+                    } else if contributions.count > 1 {
                         contributionPicker
                         if appState.isNavigatorSearchActive { navigatorSearchBar }
                     } else if appState.isNavigatorSearchActive {
@@ -156,6 +159,39 @@ struct NavigatorPanelView: View {
         NSLocalizedString(contribution.titleLocalizationKey, comment: "")
     }
 
+    private var isPDFNavigator: Bool {
+        contributions.contains { $0.id == PDFNavigator.outlineID }
+            && contributions.contains { $0.id == PDFNavigator.pagesID }
+    }
+
+    private var pdfTabs: some View {
+        HStack(spacing: 4) {
+            ForEach(contributions) { contribution in
+                Button {
+                    appState.activeNavigatorContributionID = contribution.id
+                } label: {
+                    Text(localizedTitle(for: contribution))
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 26)
+                        .contentShape(Rectangle())
+                        .foregroundStyle(activeContribution?.id == contribution.id ? Color.primary : Color.secondary)
+                        .background(activeContribution?.id == contribution.id ? Color.primary.opacity(0.12) : .clear,
+                                    in: RoundedRectangle(cornerRadius: 5))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(activeContribution?.id == contribution.id ? .isSelected : [])
+            }
+            if let contribution = activeContribution, canSearch(contribution) {
+                navigatorSearchButton
+            }
+        }
+        .padding(.horizontal, 8)
+        .frame(height: 32)
+        .background(NonMovableBackground())
+    }
+
     private var contributionPicker: some View {
         HStack(spacing: 0) {
             Picker(
@@ -185,7 +221,7 @@ struct NavigatorPanelView: View {
 
     /// 列表项超过阈值时才显示搜索入口；标题栏右侧按钮点击后进入搜索状态。
     private func canSearch(_ contribution: NavigatorContribution) -> Bool {
-        (appState.isExtensionDocument && !contribution.items.isEmpty) || contribution.items.count > AppState.navigatorSearchMinimumItemCount
+        appState.canSearchNavigator(contribution)
     }
 
     private var navigatorSearchButton: some View {
@@ -199,8 +235,8 @@ struct NavigatorPanelView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(NSLocalizedString(appState.isExtensionDocument ? "Search Table of Contents" : "Search List", comment: ""))
-        .accessibilityLabel(NSLocalizedString(appState.isExtensionDocument ? "Search Table of Contents" : "Search List", comment: ""))
+        .help(NSLocalizedString((appState.isExtensionDocument || activeContribution?.id == PDFNavigator.outlineID) ? "Search Table of Contents" : "Search List", comment: ""))
+        .accessibilityLabel(NSLocalizedString((appState.isExtensionDocument || activeContribution?.id == PDFNavigator.outlineID) ? "Search Table of Contents" : "Search List", comment: ""))
     }
 
     /// 搜索栏：关键字输入 + 上一个/下一个定位；没有匹配时定位按钮禁用。
@@ -211,14 +247,14 @@ struct NavigatorPanelView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             TextField(
-                NSLocalizedString(appState.isExtensionDocument ? "Search Table of Contents" : "Search List", comment: ""),
+                NSLocalizedString((appState.isExtensionDocument || activeContribution?.id == PDFNavigator.outlineID) ? "Search Table of Contents" : "Search List", comment: ""),
                 text: $appState.navigatorSearchQuery
             )
             .textFieldStyle(.plain)
             .font(.caption)
             .focused($isSearchFieldFocused)
             .onSubmit { appState.openNavigatorSearchMatch() }
-            .accessibilityLabel(NSLocalizedString(appState.isExtensionDocument ? "Search Table of Contents" : "Search List", comment: ""))
+            .accessibilityLabel(NSLocalizedString((appState.isExtensionDocument || activeContribution?.id == PDFNavigator.outlineID) ? "Search Table of Contents" : "Search List", comment: ""))
 
             Button {
                 appState.advanceNavigatorSearchMatch(delta: -1)
@@ -451,9 +487,19 @@ struct NavigatorPanelView: View {
             GeometryReader { geo in
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 2) {
-                            ForEach(visibleRows(for: contribution)) { row in
-                                navigatorRow(row, contribution: contribution)
+                        Group {
+                            if contribution.id == PDFNavigator.pagesID {
+                                LazyVGrid(columns: [GridItem(.adaptive(minimum: 78), spacing: 6)], spacing: 6) {
+                                    ForEach(visibleRows(for: contribution)) { row in
+                                        pdfThumbnailCell(row, contribution: contribution)
+                                    }
+                                }
+                            } else {
+                                LazyVStack(spacing: 2) {
+                                    ForEach(visibleRows(for: contribution)) { row in
+                                        navigatorRow(row, contribution: contribution)
+                                    }
+                                }
                             }
                         }
                         .padding(6)
@@ -492,6 +538,36 @@ struct NavigatorPanelView: View {
         }
     }
 
+    private func pdfThumbnailCell(_ row: VisibleRow, contribution: NavigatorContribution) -> some View {
+        let isSelected = appState.navigatorFocusedItemID.map { $0 == row.item.id }
+            ?? contribution.selectedItemIDs.contains(row.item.id)
+        let selectionColor = appState.isNavigatorFocused && controlActiveState != .inactive
+            ? Color.accentColor.opacity(0.20) : Color(nsColor: .unemphasizedSelectedContentBackgroundColor)
+        return Button {
+            appState.navigatorFocusRequest &+= 1
+            appState.navigatorFocusedItemID = nil
+            appState.performNavigatorAction(.init(contributionID: contribution.id, kind: .activate, itemIDs: [row.item.id]))
+        } label: {
+            VStack(spacing: 4) {
+                if let page = appState.pdfNavigator?.page(for: row.item.id) {
+                    PDFNavigatorThumbnail(page: page)
+                }
+                Text(row.item.title)
+                    .font(.caption.monospacedDigit())
+                    .lineLimit(1)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!row.item.isEnabled || !contribution.allowedActions.contains(.activate))
+        .accessibilityLabel(row.item.title)
+        .background(isSelected ? selectionColor : Color.clear, in: RoundedRectangle(cornerRadius: 7))
+        .background(NonMovableBackground())
+        .id(row.id)
+    }
+
     private func navigatorRow(_ row: VisibleRow, contribution: NavigatorContribution) -> some View {
         let isSelected = appState.navigatorFocusedItemID != nil
             ? appState.navigatorFocusedItemID == row.item.id : contribution.selectedItemIDs.contains(row.item.id)
@@ -514,9 +590,7 @@ struct NavigatorPanelView: View {
                 )
             } label: {
                 HStack(spacing: 8) {
-                    if contribution.id == PDFNavigator.pagesID, let page = appState.pdfNavigator?.page(for: row.item.id) {
-                        PDFNavigatorThumbnail(page: page)
-                    } else if let thumbnailPath {
+                    if let thumbnailPath {
                         NavigatorImageThumbnail(
                             path: thumbnailPath,
                             fallbackSymbolName: row.item.symbolName ?? "photo",

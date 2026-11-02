@@ -63,6 +63,20 @@ struct NavigatorSearchTests {
         #expect(thirteen.isNavigatorSearchActive)
     }
 
+    @Test func pdfSearchIsAvailableOnlyForNonemptyOutline() {
+        let state = AppState()
+        let items = (0..<13).map { NavigatorItem(id: "\($0)", title: "\($0)", symbolName: "doc") }
+        let outline = NavigatorContribution(id: PDFNavigator.outlineID, titleLocalizationKey: "PDF Table of Contents", style: .outline, items: Array(items.prefix(1)))
+        let pages = NavigatorContribution(id: PDFNavigator.pagesID, titleLocalizationKey: "PDF Page Thumbnails", style: .flat, items: items)
+        state.builtInNavigatorContributions = [outline, pages]
+        state.activeNavigatorContributionID = PDFNavigator.outlineID
+        #expect(state.canSearchActiveNavigator)
+        state.activeNavigatorContributionID = PDFNavigator.pagesID
+        #expect(!state.canSearchActiveNavigator)
+        state.beginNavigatorSearch()
+        #expect(!state.isNavigatorSearchActive)
+    }
+
     @Test func matchesIgnoreCaseAndDiacriticsInDisplayOrder() {
         let titles = ["Alpha", "álbum", "beta", "ALPINE"]
             + (4..<16).map { "Track \($0)" }
