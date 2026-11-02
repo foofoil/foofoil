@@ -68,7 +68,7 @@ These are selected defaults. Except for global Overview, use them while foofoil 
 | Fit window to image / image to window width (visible border required) | ⌘[ / ⌘] |
 | Find in current content / next, previous match | ⌘F / ⌘G, ⇧⌘G |
 | Previous / next EPUB chapter | ← / → |
-| Play / pause; seek backward / forward (audio and video) | Space; ← / → |
+| Play / pause; seek backward / forward (audio and video) | Space; ← / → (sidebar: Space / Return toggles the highlighted item) |
 | Document or subtitle style (supported content) | ⌘I |
 | Reload a local file or web page | ⌘R |
 | Favorite current foil | ⌘D |

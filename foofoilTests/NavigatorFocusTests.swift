@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Testing
 import FoofoilExtensionKit
 @testable import foofoil
@@ -9,6 +10,132 @@ struct NavigatorFocusTests {
         try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers,
                                       timestamp: 0, windowNumber: 0, context: nil, characters: "",
                                       charactersIgnoringModifiers: "", isARepeat: false, keyCode: code))
+    }
+
+    @Test(arguments: [FileListKind.audio, .video]) func mediaRowsTogglePlaybackFromKeyboard(kind: FileListKind) throws {
+        let state = AppState(isIncognito: true)
+        defer { state.resetContent() }
+        let items = [FileListItem(id: "one", path: "/tmp/one.mp3", displayName: "one"),
+                     FileListItem(id: "two", path: "/tmp/two.mp3", displayName: "two")]
+        state.fileList = FileListState(kind: kind, items: items, currentID: "one")
+        state.builtInNavigatorContributions = [.init(id: AppState.fileListNavigatorID, titleLocalizationKey: "Navigator", style: .flat,
+            items: [.init(id: "one", title: "one"), .init(id: "two", title: "two")], selectedItemIDs: ["one"], allowedActions: [.activate])]
+        state.activeNavigatorContributionID = AppState.fileListNavigatorID
+        state.isNavigatorFocused = true
+        var toggled: [UUID] = []
+        let observer = NotificationCenter.default.addObserver(forName: .shouldToggleVideoPlayback, object: nil, queue: .main) { notification in
+            MainActor.assumeIsolated { if let id = notification.userInfo?["id"] as? UUID, id == state.id { toggled.append(id) } }
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+        for key: UInt16 in [49, 36, 76] {
+            #expect(state.handleNavigatorKeyDown(try event(key, modifiers: [])))
+        }
+        #expect(toggled == [state.id, state.id, state.id])
+        state.isMediaPlaying = true
+        #expect(state.performNavigatorMediaPlayback(contributionID: AppState.fileListNavigatorID, itemID: "one", toggle: false))
+        #expect(toggled.count == 3)
+        state.isMediaPlaying = false
+        state.noteUserPausedMediaPlayback()
+        #expect(state.performNavigatorMediaPlayback(contributionID: AppState.fileListNavigatorID, itemID: "one", toggle: false))
+        #expect(state.resumesMediaPlaybackOnActivation && toggled.count == 4)
+        state.isLoading = true
+        state.noteUserPausedMediaPlayback()
+        #expect(state.performNavigatorMediaPlayback(contributionID: AppState.fileListNavigatorID, itemID: "one", toggle: false))
+        #expect(state.resumesMediaPlaybackOnActivation && toggled.count == 4)
+        #expect(state.handleNavigatorKeyDown(try event(49, modifiers: [])))
+        #expect(!state.resumesMediaPlaybackOnActivation && toggled.count == 4)
+        state.isLoading = false
+        var activated: [String] = []
+        state.builtInNavigatorActionHandler = { activated.append(contentsOf: $0.itemIDs) }
+        state.navigatorFocusedItemID = "two"
+        state.noteUserPausedMediaPlayback()
+        #expect(state.handleNavigatorKeyDown(try event(49, modifiers: [])))
+        #expect(activated == ["two"] && state.resumesMediaPlaybackOnActivation)
+        state.isNavigatorFocused = false
+        #expect(!state.handleNavigatorKeyDown(try event(49, modifiers: [])))
+    }
+
+    @Test func directoryTreeDistinguishesMediaFromOtherFiles() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let audio = root.appendingPathComponent("track.wav")
+        let note = root.appendingPathComponent("note.txt")
+        let format = try #require(AVAudioFormat(standardFormatWithSampleRate: 44_100, channels: 1))
+        do {
+            let file = try AVAudioFile(forWriting: audio, settings: format.settings)
+            let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 100))
+            buffer.frameLength = 100
+            try file.write(from: buffer)
+        }
+        try Data("note".utf8).write(to: note)
+        let state = AppState(isIncognito: true)
+        defer { state.resetContent() }
+        state.openFileCollection([audio, note], roots: [root])
+        let session = try #require(state.archiveSession)
+        for _ in 0..<300 where session.busy { try await Task.sleep(for: .milliseconds(10)) }
+        let media = try #require(session.contribution.items.first { $0.title == "track.wav" })
+        let text = try #require(session.contribution.items.first { $0.title == "note.txt" })
+        #expect(session.isMediaEntry(media.id))
+        #expect(!session.isMediaEntry(text.id))
+        #expect(!state.performNavigatorMediaPlayback(contributionID: session.navigatorContributionID, itemID: text.id, toggle: true))
+        #expect(state.performNavigatorMediaPlayback(contributionID: session.navigatorContributionID, itemID: media.id, toggle: false))
+        #expect(session.selectedID == media.id)
+        let preview = try #require(session.preview)
+        for _ in 0..<300 where !preview.isAudioDocument || preview.isLoading { try await Task.sleep(for: .milliseconds(10)) }
+        #expect(preview.isAudioDocument)
+        #expect(!preview.isLoading)
+        state.isNavigatorFocused = true
+        state.navigatorFocusedItemID = media.id
+        var toggled: [UUID] = []
+        let observer = NotificationCenter.default.addObserver(forName: .shouldToggleVideoPlayback, object: nil, queue: .main) { notification in
+            MainActor.assumeIsolated { if let id = notification.userInfo?["id"] as? UUID, id == preview.id { toggled.append(id) } }
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+        #expect(state.handleNavigatorKeyDown(try event(49, modifiers: [])))
+        #expect(state.handleNavigatorKeyDown(try event(36, modifiers: [])))
+        #expect(toggled == [preview.id, preview.id])
+    }
+
+    @Test func appleMusicQueueUsesTheSamePlaybackKeys() throws {
+        let state = AppState(isIncognito: true)
+        defer { state.resetContent() }
+        state.builtInNavigatorContributions = [.init(id: AppleMusicNavigator.contributionID, titleLocalizationKey: "Music Queue", style: .flat,
+            items: [.init(id: "one", title: "one"), .init(id: "two", title: "two")], selectedItemIDs: ["one"], allowedActions: [.activate])]
+        state.activeNavigatorContributionID = AppleMusicNavigator.contributionID
+        state.isNavigatorFocused = true
+        var toggled: [UUID] = []
+        let observer = NotificationCenter.default.addObserver(forName: .shouldToggleVideoPlayback, object: nil, queue: .main) { notification in
+            MainActor.assumeIsolated { if let id = notification.userInfo?["id"] as? UUID, id == state.id { toggled.append(id) } }
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
+        #expect(state.handleNavigatorKeyDown(try event(49, modifiers: [])))
+        #expect(state.handleNavigatorKeyDown(try event(36, modifiers: [])))
+        #expect(toggled == [state.id, state.id])
+        var activated: [String] = []
+        state.builtInNavigatorActionHandler = { activated.append(contentsOf: $0.itemIDs) }
+        state.navigatorFocusedItemID = "two"
+        #expect(state.handleNavigatorKeyDown(try event(36, modifiers: [])))
+        #expect(activated == ["two"])
+    }
+
+    @Test func archiveMediaPlaybackIntentSurvivesExtraction() async throws {
+        let fixture = try ArchiveTests.Fixture([("track.mp3", Data()), ("note.txt", Data("note".utf8))])
+        defer { fixture.remove() }
+        let state = AppState(isIncognito: true)
+        defer { state.resetContent() }
+        state.openFile(url: fixture.url)
+        let session = try #require(state.archiveSession)
+        for _ in 0..<300 where session.busy { try await Task.sleep(for: .milliseconds(10)) }
+        let track = try #require(session.contribution.items.first { $0.title == "track.mp3" })
+        session.select(track.id)
+        #expect(session.busy)
+        state.isNavigatorFocused = true
+        state.navigatorFocusedItemID = track.id
+        #expect(state.handleNavigatorKeyDown(try event(49, modifiers: [])))
+        for _ in 0..<300 where session.busy { try await Task.sleep(for: .milliseconds(10)) }
+        let preview = try #require(session.preview)
+        #expect(!preview.resumesMediaPlaybackOnActivation)
     }
 
     @Test func arrowsFollowVisibleRowsOnlyWhileSidebarFocused() throws {

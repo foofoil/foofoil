@@ -627,6 +627,11 @@ struct NavigatorPanelView: View {
             Button {
                 appState.navigatorFocusRequest &+= 1
                 appState.navigatorFocusedItemID = nil
+                if let event = NSApp.currentEvent, [.leftMouseDown, .leftMouseUp].contains(event.type), event.clickCount >= 2,
+                   appState.performNavigatorMediaPlayback(contributionID: contribution.id, itemID: row.item.id, toggle: false) {
+                    return
+                }
+                if appState.isCurrentNavigatorMedia(contributionID: contribution.id, itemID: row.item.id) { return }
                 appState.performNavigatorAction(
                     NavigatorAction(
                         contributionID: contribution.id,

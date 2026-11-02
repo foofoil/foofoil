@@ -2,6 +2,82 @@ import AppKit
 import FoofoilExtensionKit
 
 extension AppState {
+    func isCurrentNavigatorMedia(contributionID: String, itemID: String) -> Bool {
+        if let archive = archiveSession(forNavigatorID: contributionID) {
+            return archive.selectedID == itemID && archive.isMediaEntry(itemID)
+        }
+        if contributionID == AppleMusicNavigator.contributionID {
+            return activeNavigatorContribution?.selectedItemIDs.contains(itemID) == true
+        }
+        guard let list = readingState.fileList, list.kind == .audio || list.kind == .video,
+              let item = navigatorFileItem(contributionID: contributionID, itemID: itemID) else { return false }
+        return list.currentID == item.id
+    }
+
+    /// 对媒体行统一路由播放请求；切换到其他文件时先恢复自动播放意图。
+    @discardableResult
+    func performNavigatorMediaPlayback(contributionID: String, itemID: String, toggle: Bool) -> Bool {
+        if let archive = archiveSession(forNavigatorID: contributionID) {
+            guard archive.isMediaEntry(itemID) else { return false }
+            if archive.selectedID != itemID || (archive.preview == nil && !archive.busy) {
+                archive.selectNavigatorItem(itemID)
+                return true
+            }
+            if archive.preview == nil && archive.busy {
+                archive.requestPendingMediaPlayback(toggle: toggle)
+                return true
+            }
+            guard let preview = archive.preview?.readingState else { return true }
+            if !preview.isExternalMediaDocument {
+                setPendingNavigatorPlayback(on: preview, toggle: toggle)
+                return true
+            }
+            requestNavigatorPlayback(on: preview, toggle: toggle)
+            return true
+        }
+        if contributionID == AppleMusicNavigator.contributionID,
+           let contribution = navigatorContributions.first(where: { $0.id == contributionID }),
+           contribution.items.contains(where: { $0.id == itemID }) {
+            if contribution.selectedItemIDs.contains(itemID) {
+                let state = readingState
+                if toggle || !state.isMediaPlaying {
+                    NotificationCenter.default.post(name: .shouldToggleVideoPlayback, object: nil, userInfo: ["id": state.id])
+                }
+            } else {
+                performNavigatorAction(.init(contributionID: contributionID, kind: .activate, itemIDs: [itemID]))
+            }
+            return true
+        }
+        guard let list = readingState.fileList, list.kind == .audio || list.kind == .video,
+              let item = navigatorFileItem(contributionID: contributionID, itemID: itemID) else { return false }
+        let state = readingState
+        if list.currentID != item.id {
+            state.noteUserStartedMediaPlayback()
+            performNavigatorAction(.init(contributionID: contributionID, kind: .activate, itemIDs: [itemID]))
+        } else {
+            requestNavigatorPlayback(on: state, toggle: toggle)
+        }
+        return true
+    }
+
+    private func requestNavigatorPlayback(on state: AppState, toggle: Bool) {
+        if state.isLoading {
+            setPendingNavigatorPlayback(on: state, toggle: toggle)
+            return
+        }
+        if !toggle {
+            state.noteUserStartedMediaPlayback()
+        }
+        if toggle || !state.isMediaPlaying {
+            NotificationCenter.default.post(name: .shouldToggleVideoPlayback, object: nil, userInfo: ["id": state.id])
+        }
+    }
+
+    private func setPendingNavigatorPlayback(on state: AppState, toggle: Bool) {
+        if toggle && state.resumesMediaPlaybackOnActivation { state.noteUserPausedMediaPlayback() }
+        else { state.noteUserStartedMediaPlayback() }
+    }
+
     /// 目录键只处理已展开的可见行，不因上下移动读取尚未展开的内层包。
     func visibleNavigatorItems(in contribution: NavigatorContribution) -> [NavigatorItem] {
         guard contribution.style == .outline else { return contribution.items }
@@ -32,6 +108,17 @@ extension AppState {
               [123, 124, 125, 126, 36, 76, 49].contains(event.keyCode),
               !((NSApp.keyWindow?.firstResponder as? NSTextView)?.isEditable ?? false),
               let contribution = activeNavigatorContribution else { return false }
+        if [36, 76, 49].contains(event.keyCode),
+           let id = navigatorFocusedItemID ?? contribution.selectedItemIDs.first,
+           contribution.items.contains(where: { $0.id == id && $0.isEnabled }) {
+            if event.isARepeat {
+                let kind = readingState.fileList?.kind
+                if contribution.id == AppleMusicNavigator.contributionID || archiveSession(forNavigatorID: contribution.id)?.isMediaEntry(id) == true ||
+                    ((kind == .audio || kind == .video) && navigatorFileItem(contributionID: contribution.id, itemID: id) != nil) { return true }
+            } else if performNavigatorMediaPlayback(contributionID: contribution.id, itemID: id, toggle: true) {
+                return true
+            }
+        }
         if archiveSession(forNavigatorID: contribution.id) != nil {
             let handled = handleArchiveTreeKeyDown(event)
             navigatorFocusedItemID = activeNavigatorContribution?.selectedItemIDs.first

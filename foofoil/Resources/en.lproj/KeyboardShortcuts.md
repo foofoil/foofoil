@@ -64,7 +64,7 @@ EPUB chapter navigation follows reading order and skips subsections. Use Go → 
 Apple Music queues also use the common list navigation shortcuts and list search. Apple Music foils support the common border toggle shortcut. In an audio foil, ⌘C (Edit → Copy Cover, or the context menu) copies the current cover image; it is disabled when the foil has no cover. Video foils keep their existing behavior.
 
 
-When the sidebar has keyboard focus, ↑ / ↓ navigate visible rows and open the selected file; ← collapses a directory or moves to its parent. → and Return both expand a directory, or enter its first child when already expanded; Return on a file opens it. This applies to archive trees and other navigation sidebars, in both windowed and full-screen foils. Selection uses the accent color while focused and gray when focus moves to the content or another window. Search fields keep their normal text-editing keys.
+When the sidebar has keyboard focus, ↑ / ↓ navigate visible rows and open the selected file; ← collapses a directory or moves to its parent. → and Return expand a directory, or enter its first child when already expanded. Space or Return toggles playback on the highlighted audio or video item; double-clicking one starts playback. Return opens other files. This applies to archive trees and other navigation sidebars, in both windowed and full-screen foils. Selection uses the accent color while focused and gray when focus moves to the content or another window. Search fields keep their normal text-editing keys.
 
 In PDF page thumbnails, arrow keys or Ctrl+F/B/P/N move the highlight through the grid and immediately open the selected page.
 

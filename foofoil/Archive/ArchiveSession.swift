@@ -36,6 +36,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
     @Published var passwordInput = ""
     private let workQueue = ArchiveWorkQueue()
     private var password: String?
+    private var pendingMediaPlayback: Bool?
     private weak var passwordTarget: ArchiveSession?
     private var passwordNodeID: String?
     /// 内层包的来源必须覆盖异步扫描、预览与导出的整个生命周期。
@@ -120,6 +121,15 @@ nonisolated final class ArchivePreviewLease: Sendable {
     func selectNavigatorItem(_ id: String) { select(id) }
 
     func isArchiveNode(_ id: String) -> Bool { archiveNodeIDs.contains(id) }
+
+    func isMediaEntry(_ id: String) -> Bool {
+        projectedMediaKinds[id] == .audio || projectedMediaKinds[id] == .video
+    }
+
+    /// 解压期间保留播放意图，预览建成时应用最近一次操作。
+    func requestPendingMediaPlayback(toggle: Bool) {
+        pendingMediaPlayback = toggle ? !(pendingMediaPlayback ?? true) : true
+    }
 
     func isLoadingArchiveNode(_ id: String) -> Bool {
         guard let node = nestedArchives[id] else { return false }
@@ -595,6 +605,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
         generation = UUID()
         task?.cancel()
         task = nil
+        pendingMediaPlayback = nil
         previewObservation = nil
         if let preview {
             let delegate = NSApp.delegate as? AppDelegate
@@ -674,6 +685,8 @@ nonisolated final class ArchivePreviewLease: Sendable {
                 state.archiveWindowOwner = self.windowState
                 state.isFullScreen = self.windowState?.isFullScreen ?? false
                 state.archivePreviewLease = lease
+                if self.pendingMediaPlayback == false { state.noteUserPausedMediaPlayback() }
+                self.pendingMediaPlayback = nil
                 self.preview = state
                 self.previewObservation = state.objectWillChange
                     .debounce(for: .milliseconds(50), scheduler: RunLoop.main)
