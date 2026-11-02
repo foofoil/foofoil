@@ -514,6 +514,11 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
                 self.isFirstImageURLChange = false
 
                 DispatchQueue.main.async {
+                    // 有边框 PDF 使用独立阅读倍率，不按窗口或首页尺寸初始化缩放。
+                    if self.appState.readingState.isPDFDocument && self.appState.showBorder {
+                        if !self.isRestoringFrame { self.pendingSavedFrameRestore = false }
+                        return
+                    }
                     if self.appState.readingState.isExternalMediaDocument {
                         self.fetchMediaPresentationSize(for: url) { size in
                             guard self.appState.readingState.imageURL == url, let size else { return }
@@ -676,8 +681,18 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
 
                 self.currentPDFPageSize = pageSize
                 self.currentImageSize = pageSize
-                if !self.appState.showBorder {
+                if !self.appState.showBorder && !self.appState.isFullScreen {
                     self.fitWindowToCurrentImageSize(animated: false)
+                    // 窗口可能受屏幕或最小尺寸限制；布局完成后按实际空间重新适配页面。
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self, self.appState.readingState.isPDFDocument,
+                              !self.appState.showBorder, !self.appState.isFullScreen else { return }
+                        NotificationCenter.default.post(
+                            name: .shouldApplyPDFScaleToWindow,
+                            object: nil,
+                            userInfo: ["id": self.appState.readingState.id]
+                        )
+                    }
                 }
             }
             .store(in: &cancellables)

@@ -46,6 +46,13 @@ struct PDFModeView: NSViewRepresentable {
         if let destination { view.go(to: destination) }
     }
 
+    static func displayedPageSize(_ page: PDFPage, box: PDFDisplayBox) -> NSSize {
+        let size = page.bounds(for: box).size
+        let rotation = ((page.rotation % 360) + 360) % 360
+        return rotation == 90 || rotation == 270
+            ? NSSize(width: size.height, height: size.width) : size
+    }
+
     func updateNSView(_ pdfView: PDFView, context: Context) {
         Self.applyDisplayMode(to: pdfView, showBorder: appState.showBorder)
         if context.coordinator.loadedURL != url {
@@ -55,17 +62,19 @@ struct PDFModeView: NSViewRepresentable {
             context.coordinator.restoreReadingPosition()
             context.coordinator.postCurrentPageSize()
         }
-        if appState.isFullScreen {
-            // 全屏只改变展示倍率，不写回窗口态缩放偏好。
-            pdfView.autoScales = true
-        } else {
-            pdfView.autoScales = false
-            let targetScale = CGFloat(appState.imageScale)
-            if abs(pdfView.scaleFactor - targetScale) > 0.0001 {
-                pdfView.scaleFactor = targetScale
-            }
-        }
+        context.coordinator.isApplyingScale = true
+        Self.applyScale(to: pdfView, scale: CGFloat(appState.imageScale),
+                        autoFit: appState.isFullScreen && !appState.showBorder)
+        context.coordinator.isApplyingScale = false
         applyBackgroundColor(to: pdfView, defaultColor: context.coordinator.defaultBackgroundColor)
+    }
+
+    static func applyScale(to view: PDFView, scale: CGFloat, autoFit: Bool) {
+        // 有边框阅读保留用户倍率，窗口和全屏尺寸变化都不触发自动适配。
+        view.autoScales = autoFit
+        if !autoFit, abs(view.scaleFactor - scale) > 0.0001 {
+            view.scaleFactor = scale
+        }
     }
 
     private func applyBackgroundColor(to pdfView: PDFView, defaultColor: NSColor?) {
@@ -82,6 +91,7 @@ struct PDFModeView: NSViewRepresentable {
         weak var pdfView: PDFView?
         var loadedURL: URL?
         var defaultBackgroundColor: NSColor?
+        var isApplyingScale = false
         private let appState: AppState
         private var observers: [NSObjectProtocol] = []
 
@@ -94,6 +104,7 @@ struct PDFModeView: NSViewRepresentable {
                 center.addObserver(forName: .shouldGoToNextPDFPage, object: nil, queue: .main) { [weak self] in self?.navigate($0, previous: false) },
                 center.addObserver(forName: .shouldPromptForPDFPage, object: nil, queue: .main) { [weak self] in self?.promptForPage($0) },
                 center.addObserver(forName: .PDFViewPageChanged, object: nil, queue: .main) { [weak self] in self?.handlePageChange($0) },
+                center.addObserver(forName: .PDFViewScaleChanged, object: nil, queue: .main) { [weak self] in self?.handleScaleChange($0) },
                 center.addObserver(forName: .shouldFitPDFToWindow, object: nil, queue: .main) { [weak self] in self?.beginFitToWindow($0) },
                 center.addObserver(forName: .shouldApplyPDFScaleToWindow, object: nil, queue: .main) { [weak self] in self?.applyFitToWindow($0) }
             ]
@@ -124,7 +135,7 @@ struct PDFModeView: NSViewRepresentable {
             NotificationCenter.default.post(
                 name: .shouldMatchPDFWindowAspectRatio,
                 object: nil,
-                userInfo: ["id": appState.id, "size": currentPage.bounds(for: .mediaBox).size]
+                userInfo: ["id": appState.id, "size": PDFModeView.displayedPageSize(currentPage, box: pdfView.displayBox)]
             )
         }
 
@@ -166,9 +177,18 @@ struct PDFModeView: NSViewRepresentable {
             postPageIndicator()
         }
 
+        private func handleScaleChange(_ notification: Notification) {
+            guard let pdfView, notification.object as? PDFView === pdfView,
+                  appState.showBorder, !pdfView.autoScales, !isApplyingScale else { return }
+            let scale = Double(pdfView.scaleFactor)
+            guard scale.isFinite, scale > 0, abs(appState.imageScale - scale) > 0.0001 else { return }
+            // PDFKit 的捏合和原生缩放绕过应用的缩放命令；刷新视图前须保存其倍率。
+            appState.imageScale = scale
+        }
+
         func postCurrentPageSize() {
             guard let page = pdfView?.currentPage else { return }
-            let pageSize = page.bounds(for: .mediaBox).size
+            let pageSize = PDFModeView.displayedPageSize(page, box: pdfView?.displayBox ?? .cropBox)
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 NotificationCenter.default.post(

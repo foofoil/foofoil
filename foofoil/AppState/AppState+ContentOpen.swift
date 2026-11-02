@@ -101,6 +101,7 @@ extension AppState {
             // 列表内切项保留边框；新 PDF 默认有边框，普通图片默认无边框。
             if clearsFileList || imageURL == nil {
                 self.showBorder = self.isPDFDocument
+                if self.isPDFDocument { self.imageScale = 1.0 }
             }
             self.createdAt = Date()
             self.stopCamera()
