@@ -13,6 +13,7 @@ import UniformTypeIdentifiers
 /// 从音频文件提取的展示信息；封面优先使用内嵌 artwork，其次同目录匹配的封面图。
 nonisolated struct AudioTrackInfo {
     var title: String
+    var taggedTitle: String?
     var artist: String?
     var album: String?
     var albumArtist: String?
@@ -21,6 +22,8 @@ nonisolated struct AudioTrackInfo {
     var year: String?
     var trackNumber: String?
     var formatName: String?
+    /// 从音轨格式描述读取的编码名称，不使用文件扩展名推测。
+    var codecName: String?
     /// MusicKit 的音质标签；不代替实际采样率、位深或编码格式。
     var qualitySummary: String?
     var qualityIsLossless = false
@@ -95,13 +98,13 @@ nonisolated enum AudioMetadataLoader {
         "cover", "folder", "artwork", "albumart", "front", "AlbumArt", "AlbumArtSmall", "封面"
     ]
 
-    static func load(from url: URL) async -> AudioTrackInfo {
+    static func load(from url: URL, includeArtwork: Bool = true) async -> AudioTrackInfo {
         var info = AudioTrackInfo.fallback(fileName: url.lastPathComponent)
         info.formatName = formatName(for: url)
         let asset = AVURLAsset.media(url: url)
         let metadata = ((try? await asset.load(.commonMetadata)) ?? [])
             + ((try? await asset.load(.metadata)) ?? [])
-        await applyMetadata(metadata, to: &info)
+        await applyMetadata(metadata, to: &info, includeArtwork: includeArtwork)
 
         if let tracks = try? await asset.loadTracks(withMediaType: .audio), let track = tracks.first {
             if let rate = try? await track.load(.estimatedDataRate), rate > 0 {
@@ -115,7 +118,7 @@ nonisolated enum AudioMetadataLoader {
             info.bitDepth = flacBitDepth(for: url)
         }
 
-        if info.artwork == nil,
+        if includeArtwork, info.artwork == nil,
            let sidecar = sidecarCoverImageAndURL(for: url) {
             info.artwork = sidecar.image
             info.sidecarCoverURL = sidecar.url
@@ -343,9 +346,10 @@ nonisolated enum AudioMetadataLoader {
         String(format: NSLocalizedString("Track %@", comment: ""), value)
     }
 
-    private static func applyMetadata(_ items: [AVMetadataItem], to info: inout AudioTrackInfo) async {
+    private static func applyMetadata(_ items: [AVMetadataItem], to info: inout AudioTrackInfo, includeArtwork: Bool) async {
         if let title = await stringValue(items, identifiers: [.commonIdentifierTitle]), !title.isEmpty {
             info.title = title
+            info.taggedTitle = title
         }
         info.artist = await stringValue(items, identifiers: [.commonIdentifierArtist])
         info.album = await stringValue(items, identifiers: [.commonIdentifierAlbumName])
@@ -354,8 +358,12 @@ nonisolated enum AudioMetadataLoader {
             .commonIdentifierType,
             AVMetadataIdentifier(rawValue: "org.id3/TCON")
         ])
-        info.composer = await stringValue(items, identifiers: [.commonIdentifierCreator, .iTunesMetadataComposer])
-        info.albumArtist = await stringValue(items, identifiers: [.iTunesMetadataAlbumArtist])
+        info.composer = await stringValue(items, identifiers: [
+            .iTunesMetadataComposer, AVMetadataIdentifier(rawValue: "org.id3/TCOM"), .commonIdentifierCreator
+        ])
+        info.albumArtist = await stringValue(items, identifiers: [
+            .iTunesMetadataAlbumArtist, AVMetadataIdentifier(rawValue: "org.id3/TPE2")
+        ])
 
         if let dateString = await stringValue(items, identifiers: [
             .commonIdentifierCreationDate,
@@ -373,7 +381,7 @@ nonisolated enum AudioMetadataLoader {
             info.trackNumber = trackNumber(from: trackData)
         }
 
-        if info.artwork == nil, let artworkData = await dataValue(items, identifiers: [.commonIdentifierArtwork]) {
+        if includeArtwork, info.artwork == nil, let artworkData = await dataValue(items, identifiers: [.commonIdentifierArtwork]) {
             info.artwork = NSImage(data: artworkData)
         }
     }
@@ -392,6 +400,7 @@ nonisolated enum AudioMetadataLoader {
                 info.channelCount = Int(asbd.mChannelsPerFrame)
             }
             let codec = fourCC(asbd.mFormatID)
+            if !codec.isEmpty { info.codecName = displayName(forCodec: codec) ?? codec }
             if info.formatName == nil || info.formatName?.isEmpty == true {
                 info.formatName = displayName(forCodec: codec) ?? codec
             } else if let codecName = displayName(forCodec: codec) {

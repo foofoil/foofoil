@@ -17,6 +17,28 @@ nonisolated enum FoilInformation {
         let available: Bool
     }
 
+    static func audioRows(_ info: AudioTrackInfo) -> [Row] {
+        var rows: [Row] = []
+        func add(_ key: String, _ value: String?) {
+            guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return }
+            rows.append(Row(key: key, value: value))
+        }
+        add("Foil Info Track Title", info.taggedTitle)
+        add("Foil Info Album", info.album)
+        add("Foil Info Artist", info.artist)
+        add("Foil Info Album Artist", info.albumArtist)
+        add("Foil Info Composer", info.composer)
+        add("Foil Info Genre", info.genre)
+        add("Foil Info Year", info.year)
+        add("Foil Info Track Number", info.trackNumber)
+        add("Foil Info Audio Codec", info.codecName)
+        if let rate = info.sampleRate, rate.isFinite, rate > 0 { add("Foil Info Sample Rate", AudioMetadataLoader.formatSampleRate(rate)) }
+        if let depth = info.bitDepth, depth > 0 { add("Foil Info Bit Depth", AudioMetadataLoader.formatBitDepth(depth)) }
+        if let rate = info.bitRate, rate.isFinite, rate > 0 { add("Foil Info Bit Rate", AudioMetadataLoader.formatBitRate(rate)) }
+        if let count = info.channelCount, count > 0 { add("Foil Info Channels", AudioMetadataLoader.formatChannels(count)) }
+        return rows
+    }
+
     @MainActor static func sourceURL(for config: WindowConfig) -> URL? {
         if config.isFolderCollection, let collection = config.archiveSource {
             let files = collection.localFiles ?? []
@@ -99,7 +121,7 @@ nonisolated enum FoilInformation {
     }
 
     /// 文件夹与当前文件使用相同的信息构建入口，保留单文件的类型特征、访问时间和来源规则。
-    @MainActor static func details(config: WindowConfig, state: AppState?, windowSize: NSSize?) async -> Details {
+    @MainActor static func details(config: WindowConfig, state: AppState?, windowSize: NSSize?, audioCue: FileListCueInfo? = nil) async -> Details {
         let kind = config.contentKind ?? HistoryContentKind.infer(from: config)
         let source = FoilInformation.sourceURL(for: config)
         let size = windowSize
@@ -159,6 +181,12 @@ nonisolated enum FoilInformation {
             }
         }
         let metadata = await fileRows(source: source, contentURL: contentURL, kind: kind)
+        if kind == .audio, let contentURL {
+            let accessing = contentURL.startAccessingSecurityScopedResource()
+            let info = await AudioMetadataLoader.load(from: contentURL, includeArtwork: false)
+            if accessing { contentURL.stopAccessingSecurityScopedResource() }
+            rows.append(contentsOf: audioRows(AudioModeView.overlay(info, with: audioCue ?? config.fileList?.currentItem?.cue)))
+        }
         if (kind == .audio || kind == .video), let contentURL {
             let asset = AVURLAsset.media(url: contentURL)
             if let duration = try? await asset.load(.duration), duration.seconds.isFinite {
@@ -215,7 +243,8 @@ extension AppDelegate {
             var rows = information.rows
             var currentInformation: FoilInformation.Details?
             if let currentConfig {
-                let detail = await FoilInformation.details(config: currentConfig, state: currentState, windowSize: size)
+                let detail = await FoilInformation.details(config: currentConfig, state: currentState, windowSize: size,
+                                                           audioCue: currentState?.fileList?.currentItem?.cue)
                 currentInformation = detail
                 rows.append(.init(key: "Foil Info Current File", value: ""))
                 rows.append(contentsOf: detail.rows.map { row in
@@ -338,7 +367,10 @@ extension AppDelegate {
         let height = document.fittingSize.height
         document.setFrameSize(NSSize(width: 520, height: height))
         let scroll = NSScrollView()
+        scroll.contentView = FoilInformationClipView()
         scroll.hasVerticalScroller = true
+        scroll.hasHorizontalScroller = false
+        scroll.horizontalScrollElasticity = .none
         scroll.scrollerStyle = .overlay
         scroll.drawsBackground = false
         scroll.documentView = document
@@ -491,6 +523,15 @@ private final class SourceRevealButton: NSButton {
 /// 长内容从第一行开始显示，保持与常见信息面板一致的滚动方向。
 private final class FoilInformationDocumentView: NSView {
     override var isFlipped: Bool { true }
+}
+
+/// 固定横向位置，同时保留正常的纵向滚动和弹性效果。
+private final class FoilInformationClipView: NSClipView {
+    override func constrainBoundsRect(_ proposedBounds: NSRect) -> NSRect {
+        var bounds = super.constrainBoundsRect(proposedBounds)
+        bounds.origin.x = 0
+        return bounds
+    }
 }
 
 private final class FoilInformationPanel: NSPanel {

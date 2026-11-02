@@ -1,4 +1,5 @@
 import AppKit
+import AVFoundation
 import Testing
 import FoofoilExtensionKit
 @testable import foofoil
@@ -87,6 +88,38 @@ struct FolderFoilInformationTests {
         }
     }
 
+    @Test func currentAudioUsesTheSameDetailsAsAnOrdinaryFile() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let url = root.appendingPathComponent("track.wav")
+        let format = try #require(AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 48000, channels: 2, interleaved: true))
+        do {
+            let file = try AVAudioFile(forWriting: url, settings: format.settings, commonFormat: .pcmFormatInt16, interleaved: true)
+            let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4800))
+            buffer.frameLength = 4800
+            try file.write(from: buffer)
+        }
+        let state = AppState(isIncognito: true)
+        defer { state.resetContent() }
+        state.openFileCollection([url], roots: [root])
+        let session = try #require(state.archiveSession)
+        try await settle(session)
+        session.select(try #require(session.contribution.items.first { $0.title == "track.wav" }).id)
+        for _ in 0..<300 {
+            if FoilInformation.currentFileConfig(for: state) != nil { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        let config = try #require(FoilInformation.currentFileConfig(for: state))
+        let details = await FoilInformation.details(config: config, state: state.readingState, windowSize: nil)
+        let ordinary = WindowConfig(id: UUID(), imagePath: url.path, originalImageName: url.lastPathComponent, contentKind: .audio)
+        let standalone = await FoilInformation.details(config: ordinary, state: nil, windowSize: nil)
+        for key in ["Foil Info Audio Codec", "Foil Info Sample Rate", "Foil Info Bit Depth", "Foil Info Channels"] {
+            let value = try #require(standalone.rows.first { $0.key == key }?.value)
+            #expect(details.rows.first { $0.key == key }?.value == value)
+        }
+    }
+
     @Test func mediaModeDescribesTheCurrentImageInsteadOfTheWholeList() async throws {
         let (root, urls) = try fixture()
         defer { try? FileManager.default.removeItem(at: root) }
@@ -132,6 +165,13 @@ struct FolderFoilInformationTests {
         defer { window.endSheet(sheet) }
         func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
         let views = descendants(try #require(sheet.contentView))
+        let scroll = try #require(views.compactMap { $0 as? NSScrollView }.first)
+        #expect(scroll.hasVerticalScroller)
+        #expect(!scroll.hasHorizontalScroller)
+        #expect(scroll.horizontalScrollElasticity == .none)
+        var proposed = scroll.contentView.bounds
+        proposed.origin.x = 50
+        #expect(scroll.contentView.constrainBoundsRect(proposed).origin.x == 0)
         let fields = views.compactMap { $0 as? NSTextField }.map(\.stringValue)
         let buttons = views.compactMap { $0 as? NSButton }
         #expect(fields.contains(NSLocalizedString("Foil Info Current File", comment: "")))

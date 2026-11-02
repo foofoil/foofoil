@@ -194,6 +194,7 @@ struct AudioModeView: View {
         var merged = info
         if let title = cue.title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
             merged.title = title
+            merged.taggedTitle = title
         }
         if let artist = cue.artist?.trimmingCharacters(in: .whitespacesAndNewlines), !artist.isEmpty {
             merged.artist = artist

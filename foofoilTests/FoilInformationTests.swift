@@ -1,10 +1,62 @@
 import AppKit
+import AVFoundation
 import Foundation
 import Testing
 @testable import foofoil
 
 @MainActor
 struct FoilInformationTests {
+    @Test func audioRowsShowAvailableTagsAndSourceProperties() {
+        var info = AudioTrackInfo.fallback(fileName: "fallback.wav")
+        info.taggedTitle = "Track"
+        info.album = "Album"
+        info.artist = "Artist"
+        info.albumArtist = "Album Artist"
+        info.composer = "Composer"
+        info.genre = "Classical"
+        info.year = "2024"
+        info.trackNumber = "3"
+        info.codecName = "PCM"
+        info.sampleRate = 48000
+        info.bitDepth = 24
+        info.bitRate = 2304000
+        info.channelCount = 2
+        let rows = Dictionary(uniqueKeysWithValues: FoilInformation.audioRows(info).map { ($0.key, $0.value) })
+        #expect(rows["Foil Info Track Title"] == "Track")
+        #expect(rows["Foil Info Album Artist"] == "Album Artist")
+        #expect(rows["Foil Info Composer"] == "Composer")
+        #expect(rows["Foil Info Audio Codec"] == "PCM")
+        #expect(rows["Foil Info Sample Rate"] == AudioMetadataLoader.formatSampleRate(48000))
+        #expect(rows["Foil Info Bit Depth"] == AudioMetadataLoader.formatBitDepth(24))
+        #expect(rows["Foil Info Bit Rate"] == AudioMetadataLoader.formatBitRate(2304000))
+        #expect(rows["Foil Info Channels"] == AudioMetadataLoader.formatChannels(2))
+        let empty = FoilInformation.audioRows(.fallback(fileName: "untagged.mp3"))
+        #expect(empty.isEmpty)
+    }
+
+    @Test func audioDetailsReadSourceFileProperties() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".wav")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let format = try #require(AVAudioFormat(commonFormat: .pcmFormatInt16, sampleRate: 48000, channels: 2, interleaved: true))
+        do {
+            let file = try AVAudioFile(forWriting: url, settings: format.settings, commonFormat: .pcmFormatInt16, interleaved: true)
+            let buffer = try #require(AVAudioPCMBuffer(pcmFormat: format, frameCapacity: 4800))
+            buffer.frameLength = 4800
+            try file.write(from: buffer)
+        }
+        let config = WindowConfig(id: UUID(), imagePath: url.path, originalImageName: url.lastPathComponent, contentKind: .audio)
+        let details = await FoilInformation.details(config: config, state: nil, windowSize: nil)
+        let rows = Dictionary(uniqueKeysWithValues: details.rows.map { ($0.key, $0.value) })
+        #expect(rows["Foil Info Audio Codec"] == "PCM")
+        #expect(rows["Foil Info Sample Rate"] == AudioMetadataLoader.formatSampleRate(48000))
+        #expect(rows["Foil Info Channels"] == AudioMetadataLoader.formatChannels(2))
+        #expect(rows["Foil Info Track Title"] == nil)
+        let cue = FileListCueInfo(startCueFrames: 0, title: "Cue track", artist: "Cue artist")
+        let cueDetails = await FoilInformation.details(config: config, state: nil, windowSize: nil, audioCue: cue)
+        #expect(cueDetails.rows.contains { $0.key == "Foil Info Track Title" && $0.value == "Cue track" })
+        #expect(cueDetails.rows.contains { $0.key == "Foil Info Artist" && $0.value == "Cue artist" })
+    }
+
     @Test func informationShortcutIsConfigurable() throws {
         let definition = try #require(KeyboardShortcutCatalog.definition(withID: "file.showInformation"))
         let defaultShortcut = KeyboardShortcut(keyEquivalent: "i", modifiers: [.command, .shift])
