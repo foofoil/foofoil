@@ -9,6 +9,7 @@ import Cocoa
 import PDFKit
 import SwiftUI
 import WebKit
+import QuartzCore
 
 public class FloatingWindow: NSWindow {
     struct ResizeEdges: OptionSet {
@@ -22,6 +23,20 @@ public class FloatingWindow: NSWindow {
 
     private var threeFingerWindowDrag = ThreeFingerWindowDrag()
     private var threeFingerCursorAnchor: (position: CGPoint, windowOrigin: NSPoint)?
+    private var pendingThreeFingerOrigin: NSPoint?
+    private var threeFingerDisplayLink: CADisplayLink?
+
+    // DisplayLink 持有 target；弱引用窗口，避免手势中关闭窗口时形成保留环。
+    private final class DragDisplayTarget: NSObject {
+        weak var window: FloatingWindow?
+
+        init(window: FloatingWindow) { self.window = window }
+
+        @objc func update(_ link: CADisplayLink) {
+            guard let window else { link.invalidate(); return }
+            window.flushPendingWindowDrag()
+        }
+    }
     private var isCommandDragCursorVisible = false
     private var isCommandWindowDragInProgress = false
     private(set) var isActivatingForWindowDrag = false
@@ -154,8 +169,34 @@ public class FloatingWindow: NSWindow {
     }
 
     func resetWindowDragTouches(keepingScrollSuppression: Bool = false) {
+        finishWindowDragUpdates()
         threeFingerWindowDrag.reset(keepingScrollSuppression: keepingScrollSuppression)
         threeFingerCursorAnchor = nil
+    }
+
+    public override func close() {
+        resetWindowDragTouches()
+        super.close()
+    }
+
+    private func finishWindowDragUpdates() {
+        flushPendingWindowDrag()
+        threeFingerDisplayLink?.invalidate()
+        threeFingerDisplayLink = nil
+    }
+
+    func flushPendingWindowDrag() {
+        threeFingerDisplayLink?.isPaused = true
+        guard let origin = pendingThreeFingerOrigin else { return }
+        pendingThreeFingerOrigin = nil
+        guard origin != frame.origin else { return }
+        setFrameOrigin(origin)
+        if let anchor = threeFingerCursorAnchor {
+            // 用起始锚点避免像素取整累积漂移；Warp 不派发正文鼠标事件。
+            let target = ThreeFingerWindowDrag.cursorPosition(
+                anchor.position, followingWindowFrom: anchor.windowOrigin, to: frame.origin)
+            _ = CGWarpMouseCursorPosition(target)
+        }
     }
 
     func handleWindowDragTouches(_ event: NSEvent, in sourceView: NSView) {
@@ -179,23 +220,32 @@ public class FloatingWindow: NSWindow {
 
     func handleWindowDragContacts(_ contacts: [ThreeFingerWindowDrag.Contact]) {
         let wasDragging = threeFingerWindowDrag.isDragging
-        let origin = threeFingerWindowDrag.update(contacts: contacts, windowOrigin: frame.origin)
+        let origin = threeFingerWindowDrag.update(
+            contacts: contacts, windowOrigin: pendingThreeFingerOrigin ?? frame.origin)
         guard threeFingerWindowDrag.isTracking else {
+            finishWindowDragUpdates()
             threeFingerCursorAnchor = nil
             return
         }
         if !threeFingerWindowDrag.isDragging {
+            finishWindowDragUpdates()
             threeFingerCursorAnchor = CGEvent(source: nil).map { ($0.location, frame.origin) }
         }
         if let origin {
-            if !wasDragging { activateForWindowDrag() }
-            setFrameOrigin(origin)
-            if let anchor = threeFingerCursorAnchor {
-                // 三指不会驱动系统指针；用起始锚点跟随窗口，避免逐帧像素取整累积漂移。
-                // Warp 不生成鼠标事件，避免触发正文悬停、选区或额外拖动。
-                let target = ThreeFingerWindowDrag.cursorPosition(
-                    anchor.position, followingWindowFrom: anchor.windowOrigin, to: frame.origin)
-                _ = CGWarpMouseCursorPosition(target)
+            if !wasDragging {
+                activateForWindowDrag()
+                pendingThreeFingerOrigin = origin
+                flushPendingWindowDrag()
+            } else {
+                // 一帧内只提交最新触点位置，避免堆积窗口/侧栏移动与指针同步。
+                pendingThreeFingerOrigin = origin
+                if threeFingerDisplayLink == nil {
+                    let target = DragDisplayTarget(window: self)
+                    let link = displayLink(target: target, selector: #selector(DragDisplayTarget.update(_:)))
+                    threeFingerDisplayLink = link
+                    link.add(to: .main, forMode: .common)
+                }
+                threeFingerDisplayLink?.isPaused = false
             }
         }
     }

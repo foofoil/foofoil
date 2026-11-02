@@ -131,6 +131,12 @@ struct SidebarThreeFingerWindowDragTests {
         var activationRequests = 0
         var wasActivatedWhenDragStarted = false
         var onActivation: (() -> Void)?
+        var originUpdates = 0
+
+        override func setFrameOrigin(_ point: NSPoint) {
+            originUpdates += 1
+            super.setFrameOrigin(point)
+        }
 
         override func makeKeyAndOrderFront(_ sender: Any?) {
             activationRequests += 1
@@ -198,8 +204,75 @@ struct SidebarThreeFingerWindowDragTests {
         #expect(target.activationRequests == 1)
         #expect(target.frame.origin == NSPoint(x: origin.x + 15, y: origin.y))
         target.handleWindowDragContacts(contacts(6))
+        target.flushPendingWindowDrag()
         #expect(target.frame.origin == NSPoint(x: origin.x + 30, y: origin.y))
         #expect(target.activationRequests == 1)
+    }
+
+    @Test func touchBurstsCommitLatestPositionAndLiftFlushesFinalMovement() {
+        let target = DragWindow(contentRect: NSRect(x: 200, y: 200, width: 300, height: 200), defer: false)
+        target.isReleasedWhenClosed = false
+        let cursor = CGEvent(source: nil)?.location
+        defer {
+            target.close()
+            if let cursor { CGWarpMouseCursorPosition(cursor) }
+        }
+        func contacts(_ x: CGFloat, ids: [Int] = [1, 2, 3]) -> [ThreeFingerWindowDrag.Contact] {
+            ids.map { .init(identity: $0, position: NSPoint(x: x, y: 0)) }
+        }
+        let origin = target.frame.origin
+        target.handleWindowDragContacts(contacts(0))
+        target.handleWindowDragContacts(contacts(3))
+        let firstUpdates = target.originUpdates
+        for x in 4...20 { target.handleWindowDragContacts(contacts(CGFloat(x))) }
+        #expect(target.originUpdates == firstUpdates)
+        target.flushPendingWindowDrag()
+        #expect(target.originUpdates == firstUpdates + 1)
+        #expect(target.frame.origin.x == origin.x + 100)
+        target.handleWindowDragContacts(contacts(21))
+        target.handleWindowDragContacts([])
+        #expect(target.frame.origin.x == origin.x + 105)
+        let finalUpdates = target.originUpdates
+        target.flushPendingWindowDrag()
+        #expect(target.originUpdates == finalUpdates)
+
+        // 换指时先提交旧序列末尾，再从已提交位置重新锚定。
+        target.handleWindowDragContacts(contacts(0))
+        target.handleWindowDragContacts(contacts(3))
+        target.handleWindowDragContacts(contacts(6))
+        target.handleWindowDragContacts(contacts(40, ids: [1, 2, 4]))
+        #expect(target.frame.origin.x == origin.x + 135)
+        target.handleWindowDragContacts(contacts(43, ids: [1, 2, 4]))
+        #expect(target.frame.origin.x == origin.x + 150)
+        target.handleWindowDragContacts(contacts(46, ids: [1, 2, 4]))
+        target.resetWindowDragTouches(keepingScrollSuppression: true)
+        #expect(target.frame.origin.x == origin.x + 165)
+        let resetUpdates = target.originUpdates
+        target.flushPendingWindowDrag()
+        #expect(target.originUpdates == resetUpdates)
+    }
+
+    @Test func displayRefreshAppliesQueuedMovement() async throws {
+        let target = DragWindow(contentRect: NSRect(x: 200, y: 200, width: 300, height: 200), defer: false)
+        target.isReleasedWhenClosed = false
+        let cursor = CGEvent(source: nil)?.location
+        defer {
+            target.close()
+            if let cursor { CGWarpMouseCursorPosition(cursor) }
+        }
+        target.orderFront(nil)
+        func contacts(_ x: CGFloat) -> [ThreeFingerWindowDrag.Contact] {
+            (1...3).map { .init(identity: $0, position: NSPoint(x: x, y: 0)) }
+        }
+        let origin = target.frame.origin
+        target.handleWindowDragContacts(contacts(0))
+        target.handleWindowDragContacts(contacts(3))
+        target.handleWindowDragContacts(contacts(8))
+        for _ in 0..<100 {
+            if target.frame.origin.x == origin.x + 40 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(target.frame.origin.x == origin.x + 40)
     }
 
     @Test func sidebarRoutesToItsOwnFoilAndMovesWithIt() throws {

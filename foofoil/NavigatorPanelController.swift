@@ -336,6 +336,7 @@ final class NavigatorPanelController: NSWindowController {
             panel.widthResizeOnLeadingEdge = appState.navigatorPanelSide == .left
         }
         let frame = NSRect(x: x, y: parent.frame.minY, width: width, height: parent.frame.height)
-        panel.setFrame(frame, display: true)
+        // 子窗口通常已由 AppKit 跟随父窗口移动，避免重复设帧与同步显示。
+        if panel.frame != frame { panel.setFrame(frame, display: true) }
     }
 }
