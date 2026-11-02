@@ -318,7 +318,11 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        if !flag {
+        // 即使还有其他可见箔，也恢复通过 ⌘W 留在后台的音频箔。
+        let backgroundFoils = windowControllers.filter(\.isHiddenForBackgroundAudio)
+        if !backgroundFoils.isEmpty {
+            for controller in backgroundFoils { controller.restoreBackgroundAudioFoil() }
+        } else if !flag {
             newWindowAction()
         }
         return true

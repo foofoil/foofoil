@@ -15,6 +15,7 @@ struct ContentTypesSettingsView: View {
     @State private var mediaSeekStep = SettingsStore.shared.mediaSeekStepInterval
     @State private var showsBottomProgress = SettingsStore.shared.showsMediaBottomProgressBar
     @State private var appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
+    @State private var keepAudioPlayingInBackground = SettingsStore.shared.keepAudioPlayingInBackground
     @State private var confirmClosingPlayingAudio = SettingsStore.shared.confirmClosingPlayingAudio
 
     var body: some View {
@@ -37,12 +38,19 @@ struct ContentTypesSettingsView: View {
                         note: NSLocalizedString("Bottom Progress Bar Note", comment: "")
                     )
                 }
+                Toggle(isOn: $keepAudioPlayingInBackground) {
+                    SettingsRowLabel(
+                        title: NSLocalizedString("Keep Audio Playing in Background", comment: ""),
+                        note: NSLocalizedString("Keep Audio Playing in Background Note", comment: "")
+                    )
+                }
                 Toggle(isOn: $confirmClosingPlayingAudio) {
                     SettingsRowLabel(
                         title: NSLocalizedString("Confirm Before Closing Playing Audio", comment: ""),
                         note: NSLocalizedString("Confirm Before Closing Playing Audio Note", comment: "")
                     )
                 }
+                .disabled(keepAudioPlayingInBackground)
                 SettingsSliderRow(
                     title: NSLocalizedString("Seek Step", comment: ""),
                     note: NSLocalizedString("Seek Step Note", comment: ""),
@@ -79,6 +87,7 @@ struct ContentTypesSettingsView: View {
             mediaSeekStep = SettingsStore.shared.mediaSeekStepInterval
             showsBottomProgress = SettingsStore.shared.showsMediaBottomProgressBar
             appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
+            keepAudioPlayingInBackground = SettingsStore.shared.keepAudioPlayingInBackground
             confirmClosingPlayingAudio = SettingsStore.shared.confirmClosingPlayingAudio
         }
         .onChange(of: appleMusicLibraryEnabled) { _, value in
@@ -93,6 +102,9 @@ struct ContentTypesSettingsView: View {
         }
         .onChange(of: showsBottomProgress) { _, value in
             SettingsStore.shared.showsMediaBottomProgressBar = value
+        }
+        .onChange(of: keepAudioPlayingInBackground) { _, value in
+            SettingsStore.shared.keepAudioPlayingInBackground = value
         }
         .onChange(of: confirmClosingPlayingAudio) { _, value in
             SettingsStore.shared.confirmClosingPlayingAudio = value

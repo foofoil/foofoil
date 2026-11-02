@@ -676,6 +676,7 @@ public class SettingsStore {
         static let mediaPlaybackControlsAutoHideInterval = "mediaPlaybackControlsAutoHideInterval"
         static let mediaSeekStepInterval = "mediaSeekStepInterval"
         static let showsMediaBottomProgressBar = "showsMediaBottomProgressBar"
+        static let keepAudioPlayingInBackground = "keepAudioPlayingInBackground"
         static let confirmClosingPlayingAudio = "confirmClosingPlayingAudio"
         static let documentFontsChineseOnly = "documentFontsChineseOnly"
         static let documentFontsMonospacedOnly = "documentFontsMonospacedOnly"
@@ -884,7 +885,13 @@ public class SettingsStore {
         }
     }
 
-    /// 音频播放中按 ⌘W 是否先询问关闭还是隐藏；全局偏好，默认开启。
+    /// 开启后 ⌘W 仅隐藏播放音频的箔；优先于关闭确认设置。
+    var keepAudioPlayingInBackground: Bool {
+        get { userDefaults.bool(forKey: Keys.keepAudioPlayingInBackground) }
+        set { userDefaults.set(newValue, forKey: Keys.keepAudioPlayingInBackground) }
+    }
+
+    /// 音频播放中按 ⌘W 是否询问后台播放；全局偏好，默认开启。
     /// 询问框里的“不再提示”与设置面板共用这一项。
     var confirmClosingPlayingAudio: Bool {
         get { userDefaults.object(forKey: Keys.confirmClosingPlayingAudio) as? Bool ?? true }

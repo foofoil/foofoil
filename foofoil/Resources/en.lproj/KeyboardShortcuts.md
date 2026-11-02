@@ -125,7 +125,7 @@ Three-finger drag: with the pointer over foil content or its sidebar, move three
 | --- | --- | --- | --- |
 | Hide current foil | ⌘H | ⌘H | Restore from overview |
 | Hide all foils | ⇧⌘H | ⇧⌘H | Switch back to restore |
-| Close current window | ⌘W | ⌘W | May prompt to close or hide playing audio |
+| Close current window | ⌘W | ⌘W | Asks whether to keep playing audio in the background; remembers your choice when requested. Click the Dock icon to restore the foil. |
 {{window}}
 
 Default window positioning keys (see the table for custom bindings): Control–Option + Q/W/E selects the top row, A/S/D the middle, and Z/X/C the bottom. These default keys form the leftmost 3×3 grid in the keyboard’s letter area.

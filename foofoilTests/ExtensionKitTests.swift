@@ -1278,6 +1278,106 @@ struct ExtensionKitTests {
         #expect(changeCount == 2)
     }
 
+    @Test func playingAudioCloseRemembersOnlyConfirmedChoices() throws {
+        let settings = SettingsStore.shared
+        let keep = settings.keepAudioPlayingInBackground
+        let confirm = settings.confirmClosingPlayingAudio
+        defer {
+            settings.keepAudioPlayingInBackground = keep
+            settings.confirmClosingPlayingAudio = confirm
+        }
+        let state = AppState(isIncognito: true)
+        let controller = FloatingWindowController(appState: state)
+        defer { controller.close() }
+        let delegate = AppDelegate()
+        settings.keepAudioPlayingInBackground = false
+        settings.confirmClosingPlayingAudio = true
+        #expect(!delegate.applyPlayingAudioCloseResponse(.alertThirdButtonReturn, rememberChoice: true, for: controller))
+        #expect(settings.confirmClosingPlayingAudio)
+        #expect(!settings.keepAudioPlayingInBackground)
+        #expect(!delegate.applyPlayingAudioCloseResponse(.alertFirstButtonReturn, rememberChoice: false, for: controller))
+        #expect(settings.confirmClosingPlayingAudio)
+        #expect(!settings.keepAudioPlayingInBackground)
+        #expect(!delegate.applyPlayingAudioCloseResponse(.alertFirstButtonReturn, rememberChoice: true, for: controller))
+        #expect(settings.keepAudioPlayingInBackground)
+        #expect(!settings.confirmClosingPlayingAudio)
+        #expect(UserDefaults.standard.bool(forKey: "keepAudioPlayingInBackground"))
+        #expect(delegate.applyPlayingAudioCloseResponse(.alertSecondButtonReturn, rememberChoice: true, for: controller))
+        #expect(!settings.keepAudioPlayingInBackground)
+        #expect(!settings.confirmClosingPlayingAudio)
+    }
+
+    @Test func backgroundAudioCloseUsesCurrentFolderContentAndDockRestoresOriginalWindow() async throws {
+        let settings = SettingsStore.shared
+        let keep = settings.keepAudioPlayingInBackground
+        let confirm = settings.confirmClosingPlayingAudio
+        defer {
+            settings.keepAudioPlayingInBackground = keep
+            settings.confirmClosingPlayingAudio = confirm
+        }
+        settings.keepAudioPlayingInBackground = true
+        // 后台播放开关优先于询问设置。
+        settings.confirmClosingPlayingAudio = true
+        let root = try temporaryDirectory()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let note = root.appendingPathComponent("note.txt")
+        try "folder preview".write(to: note, atomically: true, encoding: .utf8)
+        let state = AppState(isIncognito: true)
+        state.openFileCollection([note], roots: [root])
+        defer { state.resetContent() }
+        let session = try #require(state.archiveSession)
+        for _ in 0..<300 where session.busy { try await Task.sleep(for: .milliseconds(10)) }
+        let item = try #require(session.contribution.items.first { $0.title == "note.txt" })
+        session.select(item.id)
+        for _ in 0..<300 where session.preview == nil { try await Task.sleep(for: .milliseconds(10)) }
+        let preview = try #require(session.preview)
+        // 避免启动实际解码器，模拟目录当前内容的播放状态。
+        preview.imageURL = root.appendingPathComponent("track.mp3")
+        preview.originalImageName = "track.mp3"
+        preview.isMediaPlaying = true
+        #expect(state.readingState === preview)
+        #expect(!state.isMediaPlaying)
+        try verifyBackgroundAudioCloseAndReopen(state)
+
+        let standalone = AppState(isIncognito: true)
+        standalone.imageURL = root.appendingPathComponent("standalone.mp3")
+        standalone.originalImageName = "standalone.mp3"
+        standalone.isMediaPlaying = true
+        try verifyBackgroundAudioCloseAndReopen(standalone)
+    }
+
+    private func verifyBackgroundAudioCloseAndReopen(_ state: AppState) throws {
+        let controller = FloatingWindowController(appState: state)
+        let other = FloatingWindowController(appState: AppState(isIncognito: true))
+        defer { controller.close(); other.close() }
+        let delegate = AppDelegate()
+        delegate.windowControllers = [controller, other]
+        controller.showWindow(nil)
+        other.showWindow(nil)
+        let window = try #require(controller.window)
+        let frame = window.frame
+        let readingState = state.readingState
+        #expect(!delegate.confirmClosingPlayingAudio(for: controller))
+        #expect(controller.isHiddenForBackgroundAudio)
+        #expect(!window.isVisible)
+        #expect(readingState.isMediaPlaying)
+        #expect(delegate.applicationShouldHandleReopen(NSApp, hasVisibleWindows: true))
+        #expect(controller.window === window)
+        #expect(window.isVisible)
+        #expect(window.frame == frame)
+        #expect(state.readingState === readingState)
+        #expect(readingState.isMediaPlaying)
+        #expect(!controller.isHiddenForBackgroundAudio)
+        #expect(delegate.windowControllers.count == 2)
+
+        readingState.isMediaPlaying = false
+        #expect(delegate.confirmClosingPlayingAudio(for: controller))
+        readingState.isMediaPlaying = true
+        readingState.imageURL = URL(fileURLWithPath: "/tmp/video.mp4")
+        readingState.originalImageName = "video.mp4"
+        #expect(delegate.confirmClosingPlayingAudio(for: controller))
+    }
+
     @Test func confirmClosingPlayingAudioDefaultsOnAndPersists() {
         let original = SettingsStore.shared.confirmClosingPlayingAudio
         defer { SettingsStore.shared.confirmClosingPlayingAudio = original }

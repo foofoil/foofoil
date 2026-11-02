@@ -633,55 +633,52 @@ extension AppDelegate {
         }
         guard let controller = activeWindowController else { return }
         // 音频播放中先确认关闭还是隐藏，避免误关导致音乐中断。
-        guard confirmClosingPlayingAudio(for: controller.appState) else { return }
+        guard confirmClosingPlayingAudio(for: controller) else { return }
         controller.close()
     }
 
-    /// 音频播放中按 ⌘W：询问是关闭还是隐藏，避免误关导致音乐中断。
-    /// 返回 true 表示继续关闭箔片；选择隐藏或取消则返回 false。
-    func confirmClosingPlayingAudio(for appState: AppState) -> Bool {
-        guard appState.isAudioDocument,
-              appState.isMediaPlaying,
-              SettingsStore.shared.confirmClosingPlayingAudio else { return true }
+    /// 使用当前阅读内容判断，目录里的音频也应遵循同一关闭策略。
+    /// 返回 false 时保留原控制器和播放会话，只隐藏窗口。
+    func confirmClosingPlayingAudio(for controller: FloatingWindowController) -> Bool {
+        let state = controller.appState.readingState
+        guard state.isAudioDocument, state.isMediaPlaying else { return true }
+        let settings = SettingsStore.shared
+        if settings.keepAudioPlayingInBackground {
+            controller.hideFoil(keepingAudioPlaying: true)
+            return false
+        }
+        guard settings.confirmClosingPlayingAudio else { return true }
 
         let alert = NSAlert()
         alert.messageText = NSLocalizedString("Close Playing Audio Title", comment: "")
         alert.informativeText = NSLocalizedString("Close Playing Audio Message", comment: "")
         alert.alertStyle = .informational
-        // 默认按钮放在隐藏上：隐藏不中断播放，是更安全的选择。
-        alert.addButton(withTitle: NSLocalizedString("Hide Current Foil", comment: ""))
-        alert.addButton(withTitle: NSLocalizedString("Close foofoil", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Keep Audio Playing in Background", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Stop Audio and Close Foil", comment: ""))
         alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
         alert.showsSuppressionButton = true
         alert.suppressionButton?.title = NSLocalizedString("Do Not Ask Again", comment: "")
         NSApp.activate(ignoringOtherApps: true)
         let response = alert.runModal()
-
-        // 勾选“不再提示”与设置面板共用同一个偏好项。
-        if alert.suppressionButton?.state == .on {
-            SettingsStore.shared.confirmClosingPlayingAudio = false
-        }
-
-        switch response {
-        case .alertFirstButtonReturn:
-            hideCurrentFoilKeepingAudioPlaying()
-            return false
-        case .alertSecondButtonReturn:
-            return true
-        default:
-            return false
-        }
+        return applyPlayingAudioCloseResponse(response, rememberChoice: alert.suppressionButton?.state == .on, for: controller)
     }
 
-    /// 选择隐藏后先说明 ⌘H：隐藏让音乐继续播放，下次可直接按 ⌘H 而不必关闭箔片。
-    private func hideCurrentFoilKeepingAudioPlaying() {
-        let hint = NSAlert()
-        hint.messageText = NSLocalizedString("Audio Hidden Hint Title", comment: "")
-        hint.informativeText = NSLocalizedString("Audio Hidden Hint Message", comment: "")
-        hint.alertStyle = .informational
-        hint.addButton(withTitle: NSLocalizedString("OK", comment: ""))
-        hint.runModal()
-        hideCurrentFoilAction()
+    func applyPlayingAudioCloseResponse(
+        _ response: NSApplication.ModalResponse, rememberChoice: Bool, for controller: FloatingWindowController
+    ) -> Bool {
+        let settings = SettingsStore.shared
+        guard response == .alertFirstButtonReturn || response == .alertSecondButtonReturn else { return false }
+
+        // 仅在用户确认选择后记住答案；取消不改变偏好。
+        if rememberChoice {
+            settings.keepAudioPlayingInBackground = response == .alertFirstButtonReturn
+            settings.confirmClosingPlayingAudio = false
+        }
+        if response == .alertFirstButtonReturn {
+            controller.hideFoil(keepingAudioPlaying: true)
+            return false
+        }
+        return true
     }
 
     @discardableResult

@@ -391,10 +391,22 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         super.close()
     }
 
+    private(set) var isHiddenForBackgroundAudio = false
+
     /// 隐藏时先拆除伴随窗口和监听，防止后台状态更新重新显示导航面板。
-    func hideFoil() {
+    func hideFoil(keepingAudioPlaying: Bool = false) {
+        isHiddenForBackgroundAudio = keepingAudioPlaying
         prepareForApplicationHide()
         window?.orderOut(nil)
+    }
+
+    /// Dock 恢复同一窗口，保留原来的内容、位置和播放会话。
+    func restoreBackgroundAudioFoil() {
+        guard isHiddenForBackgroundAudio else { return }
+        isHiddenForBackgroundAudio = false
+        showWindow(nil)
+        window?.makeKeyAndOrderFront(nil)
+        restoreAfterApplicationUnhide()
     }
 
     /// ⌘H 前停掉 hover 监听并拆掉目录伴随窗口，避免隐藏后再被 orderFront 拉回来。
