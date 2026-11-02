@@ -1170,7 +1170,7 @@ final class FoilExposeController {
             let contentKind = config.contentKind ?? HistoryContentKind.infer(from: config)
             // 与 HistoryCardView 的缩略图兜底一致：网页整页截图、PDF 与图片原文件都在 imagePath；
             // 音视频原文件不是图片，摄像头箔的 imagePath 只是保存的截图，均不回退。
-            var thumbnailPath = contentKind == .archive ? nil : config.thumbnailPath
+            var thumbnailPath = contentKind == .archive && config.archiveSource?.dominantMediaMode == nil ? nil : config.thumbnailPath
             if thumbnailPath == nil, contentKind != .audio, contentKind != .video, contentKind != .camera, contentKind != .archive {
                 thumbnailPath = config.imagePath
             }
@@ -1209,7 +1209,7 @@ final class FoilExposeController {
             let contentKind = config.contentKind ?? HistoryContentKind.infer(from: config)
             // 与 HistoryCardView 的缩略图兜底一致：网页整页截图、PDF 与图片原文件都在 imagePath；
             // 音视频原文件不是图片，摄像头箔的 imagePath 只是保存的截图，均不回退。
-            var thumbnailPath = contentKind == .archive ? nil : config.thumbnailPath
+            var thumbnailPath = contentKind == .archive && config.archiveSource?.dominantMediaMode == nil ? nil : config.thumbnailPath
             if thumbnailPath == nil, contentKind != .audio, contentKind != .video, contentKind != .camera, contentKind != .archive {
                 thumbnailPath = config.imagePath
             }

@@ -56,6 +56,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
     private var retry: (() -> Void)?
     private var previewObservation: AnyCancellable?
     private var task: Task<Void, Never>?
+    private var thumbnailTask: Task<Void, Never>?
     private var exportTask: Task<Void, Never>?
     private var generation = UUID()
     private var cachedContribution = NavigatorContribution(id: navigatorID, titleLocalizationKey: "Archive Contents", style: .outline, items: [], allowedActions: [.activate])
@@ -101,6 +102,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
 
     deinit {
         task?.cancel()
+        thumbnailTask?.cancel()
         exportTask?.cancel()
         let nodes = Array(nestedArchives.values)
         Task { @MainActor in
@@ -518,13 +520,17 @@ nonisolated final class ArchivePreviewLease: Sendable {
                 self.projectIndex()
                 self.busy = false
                 // 仅在首次打开时按普通文件占比选择；恢复或手动选择的模式优先。
-                if self.windowState != nil, self.source.sidebarMode == nil {
+                if self.windowState != nil {
                     let total = result.entries.filter(\.isRegular).count
                     let counts = self.projectedMediaKinds.values.reduce(into: [FileListKind: Int]()) { $0[$1, default: 0] += 1 }
-                    self.source.sidebarMode = CollectionSidebarMode.allCases.first {
+                    let dominant = CollectionSidebarMode.allCases.first {
                         guard let kind = $0.kind, total > 0 else { return false }
                         return counts[kind, default: 0] > total * 2 / 3
-                    } ?? .folder
+                    }
+                    self.source.dominantMediaMode = dominant
+                    if self.source.sidebarMode == nil { self.source.sidebarMode = dominant ?? .folder }
+                    self.windowState?.saveState()
+                    self.prepareHistoryThumbnail(index: result, mode: dominant)
                 }
                 self.onChange?()
                 if self.sidebarMode != .folder {
@@ -538,6 +544,51 @@ nonisolated final class ArchivePreviewLease: Sendable {
             }
         }
         onChange?()
+    }
+
+    private func prepareHistoryThumbnail(index: ArchiveIndex, mode: CollectionSidebarMode?) {
+        thumbnailTask?.cancel()
+        guard let owner = windowState, !owner.isIncognito else { return }
+        HistoryRepository.shared.updateThumbnailPath(id: owner.id, path: nil)
+        HistoryManager.shared.refresh()
+        guard let mode, let kind = mode.kind else { return }
+        let matches = index.entries.filter { projectedMediaKinds[$0.id] == kind }
+        let candidates = (mode == .audio ? matches : Array(matches.prefix(1))).map { ($0, localURL(for: $0.id)) }
+        guard !candidates.isEmpty else { return }
+        let id = owner.id
+        let thumbnailSource = source
+        let urls = urls, password = password, workQueue = workQueue
+        thumbnailTask = Task { [self] in
+            defer { withExtendedLifetime(self) {} }
+            do {
+                let destination = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                    .appendingPathComponent("foofoil/Thumbnails/\(id.uuidString).heic")
+                let temporary = FileManager.default.temporaryDirectory.appendingPathComponent("foofoil-thumbnail-\(UUID().uuidString).heic")
+                defer { try? FileManager.default.removeItem(at: temporary) }
+                let historyKind: HistoryContentKind = mode == .image ? .image : (mode == .audio ? .audio : .video)
+                var generated = false
+                for (entry, local) in candidates {
+                    guard !Task.isCancelled else { return }
+                    let lease = local == nil ? try? await workQueue.preview(urls: urls, index: index, entry: entry, password: password,
+                                                                            limit: ArchiveReader.maximumExportBytes) : nil
+                    guard let url = local ?? lease?.directory.appendingPathComponent(entry.name) else { continue }
+                    generated = await Task.detached(priority: .utility) {
+                        let accessed = url.startAccessingSecurityScopedResource()
+                        defer { if accessed { url.stopAccessingSecurityScopedResource() }; withExtendedLifetime(lease) {} }
+                        return HistoryThumbnailGenerator.generateThumbnail(for: url, kind: historyKind, destinationURL: temporary)
+                    }.value
+                    if generated { break }
+                }
+                guard generated, !Task.isCancelled,
+                      let current = HistoryRepository.shared.config(id: id)?.archiveSource,
+                      current.volumes == thumbnailSource.volumes, current.localFiles == thumbnailSource.localFiles,
+                      current.dominantMediaMode == mode else { return }
+                let data = try Data(contentsOf: temporary)
+                try ContentCache.shared.write(data, to: destination)
+                HistoryRepository.shared.updateThumbnailPath(id: id, path: destination.path)
+                HistoryManager.shared.refresh()
+            } catch { /* 无法预览时保留类型图标。 */ }
+        }
     }
 
     func cancelPreview() {

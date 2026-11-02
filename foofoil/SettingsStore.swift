@@ -420,6 +420,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable, Sendable {
     public var isFolderCollection: Bool { archiveSource?.localFiles != nil }
 
     public var historyMenuSymbolName: String {
+        if let mode = archiveSource?.dominantMediaMode { return mode.folderHistorySymbol }
         if isFolderCollection { return "folder" }
         if terminalConfiguration != nil { return "terminal" }
         if appleMusicReference != nil { return AppleMusicReference.symbolName }

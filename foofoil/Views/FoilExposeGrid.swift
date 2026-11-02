@@ -721,14 +721,14 @@ private final class ExposeNativeCard: NSView {
             .paragraphStyle: paragraph
         ])
         preview.isHidden = compact || preview.stringValue.isEmpty
-        icon.image = NSImage(systemSymbolName: foil?.isNewFoil == true ? "plus" : symbol, accessibilityDescription: nil)
+        icon.image = NSImage.historySymbol(named: foil?.isNewFoil == true ? "plus" : symbol)
         icon.isHidden = foil?.clipboardEntry != nil || (!compact && !preview.isHidden)
         if let entry = foil?.clipboardEntry {
             clipboardArtwork.isHidden = false; clipboardArtwork.configure(entry)
         }
         favicon.image = foil.flatMap { $0.contentKind == .web && $0.controller?.appState.isIncognito != true ? WebFaviconCache.image(for: $0.id) : nil }
         favicon.isHidden = compact || favicon.image == nil
-        typeIcon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
+        typeIcon.image = NSImage.historySymbol(named: symbol)
         typeIcon.isHidden = compact || foil?.isNewFoil != false
         if terminalStyle, foil?.terminalConfiguration?.ssh != nil {
             typeIcon.image = NSImage(systemSymbolName: "network", accessibilityDescription: NSLocalizedString("Terminal SSH", comment: ""))

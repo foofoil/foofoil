@@ -98,6 +98,43 @@ struct CollectionSidebarTests {
         #expect(state.readingState.fileList?.items.count == 3)
     }
 
+    @Test(arguments: [false, true]) func dominantImageProducesFolderHistoryArtwork(archive: Bool) async throws {
+        let (directory, urls) = try fixture()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let third = directory.appendingPathComponent("three.png")
+        try FileManager.default.copyItem(at: urls[0], to: third)
+        let state = AppState(isIncognito: false)
+        defer {
+            state.resetContent()
+            if let config = HistoryRepository.shared.config(id: state.id) { HistoryManager.shared.removeFromHistory(config) }
+        }
+        if archive {
+            let zip = directory.appendingPathComponent("images.zip")
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+            process.currentDirectoryURL = directory
+            process.arguments = ["-q", "-r", zip.path, "one.png", "three.png", "nested"]
+            try process.run(); process.waitUntilExit()
+            #expect(process.terminationStatus == 0)
+            state.openFile(url: zip)
+        } else {
+            state.openFileCollection(urls + [third], roots: [directory])
+        }
+        let session = try #require(state.archiveSession)
+        try await settle(session)
+        for _ in 0..<300 {
+            if HistoryRepository.shared.config(id: state.id)?.thumbnailPath != nil { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let config = try #require(HistoryRepository.shared.config(id: state.id))
+        #expect(config.archiveSource?.dominantMediaMode == .image)
+        #expect(config.historyMenuSymbolName == CollectionSidebarMode.image.folderHistorySymbol)
+        let path = try #require(config.thumbnailPath)
+        #expect(NSImage(contentsOfFile: path) != nil)
+        session.setSidebarMode(.folder)
+        #expect(state.toConfig().archiveSource?.dominantMediaMode == .image)
+    }
+
     @Test func mixedFilesKeepTheirTreeAndSwitchToAnImageList() async throws {
         let (directory, urls) = try fixture()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -308,5 +345,22 @@ struct CollectionSidebarTests {
     @Test func homogeneousFilesKeepExistingGrouping() {
         #expect(!AppState.needsCollectionTree([URL(fileURLWithPath: "/one.png"), URL(fileURLWithPath: "/two.jpg")]))
         #expect(AppState.needsCollectionTree([URL(fileURLWithPath: "/one.pdf"), URL(fileURLWithPath: "/two.txt")]))
+    }
+
+    @Test func homogeneousDirectoryKeepsFolderIdentity() async throws {
+        let (directory, urls) = try fixture()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        try FileManager.default.removeItem(at: urls[2])
+        let state = AppState(isIncognito: true)
+        defer { state.resetContent() }
+        #expect(state.handleDroppedFileURLs([directory]))
+        for _ in 0..<300 {
+            if state.archiveSession != nil { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let session = try #require(state.archiveSession)
+        try await settle(session)
+        #expect(session.source.dominantMediaMode == .image)
+        #expect(state.toConfig().isFolderCollection)
     }
 }

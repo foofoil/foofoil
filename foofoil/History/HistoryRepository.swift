@@ -55,7 +55,7 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
 
     public func touch(id: UUID) { try? database?.touch(id: id) }
     public func remove(id: UUID) { _ = remove(ids: [id]) }
-    public func updateThumbnailPath(id: UUID, path: String) { try? database?.updateThumbnailPath(id: id, path: path) }
+    public func updateThumbnailPath(id: UUID, path: String?) { try? database?.updateThumbnailPath(id: id, path: path) }
 
     @discardableResult
     func remove(ids: Set<UUID>) -> Bool {
@@ -130,7 +130,8 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                                             isAppleMusic: config.appleMusicReference != nil,
                                             isClipboardContent: config.isClipboardContent,
                                             historyIsPinned: config.historyIsPinned,
-                                            isFolderCollection: config.isFolderCollection)
+                                            isFolderCollection: config.isFolderCollection,
+                                            folderMediaSymbol: config.archiveSource?.dominantMediaMode?.folderHistorySymbol)
                     }
                 } catch {
                     NSLog("最近历史读取失败：%@", error.localizedDescription)
@@ -167,7 +168,8 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                         isAppleMusic: best.isAppleMusic,
                         isClipboardContent: best.sourceFingerprint?.hasPrefix("clipboard:") == true,
                         historyIsPinned: best.historyIsPinned,
-                        isFolderCollection: best.isFolderCollection
+                        isFolderCollection: best.isFolderCollection,
+                        folderMediaSymbol: try database.config(id: best.id)?.archiveSource?.dominantMediaMode?.folderHistorySymbol
                     ))
                 }
                 return results.sorted { lhs, rhs in
@@ -196,7 +198,8 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                                                thumbnailPath: config.thumbnailPath,
                                                matchedSnippet: addresses.first, matchedPageNumber: nil, score: 0,
                                                terminalConfiguration: config.terminalConfiguration, historyIsPinned: config.historyIsPinned,
-                                            isFolderCollection: config.isFolderCollection)
+                                            isFolderCollection: config.isFolderCollection,
+                                            folderMediaSymbol: config.archiveSource?.dominantMediaMode?.folderHistorySymbol)
                 }
             } catch {
                 NSLog("打开范围历史读取失败：%@", error.localizedDescription)

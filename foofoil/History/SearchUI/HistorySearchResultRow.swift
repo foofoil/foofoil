@@ -94,6 +94,8 @@ private struct SearchResultRow: View {
                     Image(nsImage: image).resizable().scaledToFill()
                 } else if symbolName == AppleMusicReference.symbolName {
                     AppleMusicTypeIcon(size: 28)
+                } else if symbolName.hasPrefix("foofoil.folder."), let icon = NSImage.historySymbol(named: symbolName) {
+                    Image(nsImage: icon).resizable().renderingMode(.template).scaledToFit().foregroundStyle(.secondary).padding(12)
                 } else {
                     Image(systemName: symbolName).font(.title2).foregroundStyle(.secondary)
                 }
@@ -116,6 +118,8 @@ private struct SearchResultRow: View {
                     if showsInlineIcon {
                         if symbolName == AppleMusicReference.symbolName {
                             AppleMusicTypeIcon(size: 14)
+                        } else if symbolName.hasPrefix("foofoil.folder."), let icon = NSImage.historySymbol(named: symbolName) {
+                            Image(nsImage: icon).resizable().renderingMode(.template).scaledToFit().frame(width: 16, height: 16).foregroundStyle(.secondary)
                         } else {
                             Image(systemName: symbolName).foregroundStyle(.secondary)
                         }

@@ -251,7 +251,9 @@ struct TextContentView: View {
                                             let title = config.historyMenuDisplayName
                                             let url = config.historyWebURLDisplayString
                                             HStack(spacing: 4) {
-                                                Image(systemName: config.historyMenuSymbolName)
+                                                if let icon = NSImage.historySymbol(named: config.historyMenuSymbolName) {
+                                                    Image(nsImage: icon).resizable().renderingMode(.template).scaledToFit().frame(width: 14, height: 14)
+                                                }
                                                 if let url = url {
                                                     Text("\(title) (\(url))")
                                                 } else {

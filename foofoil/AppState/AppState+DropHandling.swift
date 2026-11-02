@@ -78,7 +78,7 @@ extension AppState {
         ) -> Bool {
             guard !fileURLs.isEmpty else { return false }
             // 混合目录保留完整文件树；不支持的条目留在树中，选择时再反馈。
-            if directorySourced, Self.needsCollectionTree(fileURLs) {
+            if directorySourced, Self.needsDirectoryCollection(fileURLs) {
                 openFileCollection(fileURLs, roots: collectionRoots, title: fileListTitle)
                 return true
             }
@@ -145,7 +145,7 @@ extension AppState {
                         completion(false)
                         return
                     }
-                    if directorySourced, !appendToFileList, Self.needsCollectionTree(urls) {
+                    if directorySourced, !appendToFileList, Self.needsDirectoryCollection(urls) {
                         self.openFileCollection(urls)
                         completion(true)
                         return

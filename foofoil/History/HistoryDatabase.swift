@@ -324,7 +324,7 @@ nonisolated final class HistoryDatabase {
         }
     }
 
-    func updateThumbnailPath(id: UUID, path: String) throws {
+    func updateThumbnailPath(id: UUID, path: String?) throws {
         try queue.sync {
             try executePrepared("UPDATE history_items SET thumbnail_path = ? WHERE id = ?", bindings: [path, id.uuidString])
         }

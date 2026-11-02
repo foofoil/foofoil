@@ -14,7 +14,8 @@ nonisolated public struct HistorySearchResult: Identifiable, Sendable, Equatable
     public var isClipboardContent: Bool = false
     public var historyIsPinned: Bool = false
     public var isFolderCollection: Bool = false
-    public var symbolName: String { isFolderCollection ? "folder" : (isAppleMusic ? AppleMusicReference.symbolName : contentKind.symbolName) }
+    public var folderMediaSymbol: String? = nil
+    public var symbolName: String { folderMediaSymbol ?? (isFolderCollection ? "folder" : (isAppleMusic ? AppleMusicReference.symbolName : contentKind.symbolName)) }
 }
 
 nonisolated struct HistorySearchCandidate: Sendable {

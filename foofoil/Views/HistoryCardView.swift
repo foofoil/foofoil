@@ -237,7 +237,7 @@ struct HistoryCardView: View {
 
     private func loadImageAsync() {
         // 摄像头箔不展示保存的截图，统一使用摄像机图标占位
-        guard !isCameraHistory, historyKind != .archive else { return }
+        guard !isCameraHistory, historyKind != .archive || config.archiveSource?.dominantMediaMode != nil else { return }
         // 优先使用已生成且单独存储的正方形 HEIC 缩略图，避免加载超大原图
         let path: String
         if let thumbnailPath = config.thumbnailPath, FileManager.default.fileExists(atPath: thumbnailPath) {
@@ -264,7 +264,17 @@ struct HistoryCardView: View {
     private func historyCardContent(for config: WindowConfig) -> some View {
         Group {
             if historyKind == .archive {
-                mediaPlaceholder(systemName: config.historyMenuSymbolName)
+                ZStack {
+                    if let cardImage {
+                        Image(nsImage: cardImage).resizable().aspectRatio(contentMode: .fill)
+                            .frame(width: 60, height: 60).clipped()
+                    }
+                    if let icon = NSImage.historySymbol(named: config.historyMenuSymbolName) {
+                        Image(nsImage: icon).resizable().renderingMode(.template).scaledToFit()
+                            .foregroundStyle(cardImage == nil ? Color.secondary : Color.white.opacity(0.9))
+                            .frame(width: 28, height: 28).shadow(color: .black.opacity(0.6), radius: 3)
+                    }
+                }
             } else if isCameraHistory {
                 cameraPlaceholder
             } else if isTerminalHistory {

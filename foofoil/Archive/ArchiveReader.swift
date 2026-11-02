@@ -9,6 +9,7 @@ nonisolated public struct ArchiveSource: Codable, Sendable, Equatable {
     var displayName: String? = nil
     var localFiles: [Volume]? = nil
     var sidebarMode: CollectionSidebarMode? = nil
+    var dominantMediaMode: CollectionSidebarMode? = nil
     var name: String { displayName ?? primaryURL.lastPathComponent }
     var primaryURL: URL { URL(fileURLWithPath: volumes[0].path) }
 }

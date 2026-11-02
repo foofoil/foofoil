@@ -28,6 +28,8 @@ nonisolated enum CollectionSidebarMode: String, Codable, CaseIterable, Sendable 
         case .video: "Video List"
         }
     }
+
+    var folderHistorySymbol: String { "foofoil.folder." + rawValue }
 }
 
 extension AppState {
@@ -36,6 +38,13 @@ extension AppState {
         guard let first = urls.first else { return false }
         let firstKind = FileListGrouper.dropKind(url: first)
         return urls.dropFirst().contains { FileListGrouper.dropKind(url: $0) != firstKind }
+    }
+
+    static func needsDirectoryCollection(_ urls: [URL]) -> Bool {
+        if needsCollectionTree(urls) { return true }
+        guard let first = urls.first else { return false }
+        if case .listable = FileListGrouper.classify(url: first) { return true }
+        return false
     }
 
     func openFileCollection(_ urls: [URL], roots: [URL]? = nil, title: String? = nil) {
