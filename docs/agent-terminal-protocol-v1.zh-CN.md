@@ -1,5 +1,8 @@
 # Agent terminal v1：S07 原型记录与规格状态
 
+> 2026-11-03：新增 Agent CLI 与接入管理，请先看 [当前 CLI 契约与工作流](agent-cli-reference.zh-CN.md)。下文的旧阶段限制只适用于其原始实现，不代表新增 open/read/media 等入口。
+
+
 > 2026-10-20 更新：主应用已取消沙盒；旧 Agent 命令保持作用域，新增通用窗口控制与交互式终端。当前行为以 [终端箔与通用控制](terminal-foil-usage.zh-CN.md) 为准。下文中的沙盒实验为历史记录。
 
 > 2026-10-17。本机开发协议 v1 已实现。Developer ID／公证／Gatekeeper 验收独立保留在 S13；下方早期原型失败记录保留作设计依据。
@@ -113,3 +116,19 @@ PROTOCOL_MISMATCH、INVALID_REQUEST、INVALID_ACTION、PERMISSION_DENIED、BOARD
 ## 尚待验收
 
 以实施计划的实际测试记录为准。Developer ID、公证、Gatekeeper、干净机器首次启动／安装、正式签名后的书签／授权／升级回归保留到 S13 分发验收。多显示器、全屏 Space、真实存储离线和长时间资源曲线没有证据时不得勾选完成。
+
+普通窗口控制的 `open` 请求可设置 `incognito`；窗口快照返回该状态。异步打开返回 `accepted`，不保证内容加载完成。透明度范围为 0.3～1。
+
+`capabilities` 查询应用或指定窗口已开放的窗口操作；`set` 的 `incognito` 属性以 `boolean_value` 指定目标状态，收藏历史阻止转无痕并返回 `HISTORY_FAVORITED`。
+
+窗口快照包含 `pinned` 和 `border`；set 使用 `boolean_value` 设置对应目标状态。
+
+`read` 返回内存文本的 Unicode scalar 分页，非零偏移须携带上次返回的内容版本。窗口级能力仅在正文当前可读时包含 `content.read.original`。
+
+`set` 的 `title` 属性使用请求的 `title` 字段设置自定义标题，空字符串恢复自动标题。
+
+窗口快照的 `observed_at` 是 UTC ISO 8601 采样时间，`is_loading` 为当前状态标记，不构成操作完成或成功的凭据。
+
+`outline` 返回有界导航项目分页，包含贡献 ID、节点 ID、父 ID 和内容版本；非零偏移必须携带版本。
+
+`navigate` 接受目录分页返回的 `target_id` 和 `content_version`，检查节点与版本后提交既有导航动作并返回 `accepted`；不保证异步滚动已完成。

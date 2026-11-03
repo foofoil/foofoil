@@ -32,3 +32,19 @@ General settings provides Pause Agent Control and Revoke Agent Sessions. Pausing
 CLI calls share `~/.local/state/foofoil/session.json` by default. Use separate private `--session FILE` paths for separate callers. `--caller` is only a label. Do not disclose credential files. Development builds can be selected using `--app /absolute/foofoil.app` or FOIL_APP; FOIL_SESSION selects a credential file.
 
 The bundled Skill at `foofoil.app/Contents/Resources/AgentSkills/foofoil/SKILL.md` ([source](../skills/foofoil/SKILL.md)) can be copied to an agent's supported skill directory. Only the native CLI is verified here; installation compatibility with other agents is not promised. See the [protocol](agent-terminal-protocol-v1.zh-CN.md) for limits, readiness, and pending distribution checks.
+
+Use `foil open FILE --incognito` to open a file privately. Window snapshots include `incognito`; `accepted` means the request was accepted, not that loading finished. `foil set ID opacity VALUE` accepts values from 0.3 to 1.
+
+Use `foil guide [presentation|windows|terminal|privacy]` and `foil schema [COMMAND]` offline to explore current commands. `foil capabilities [WINDOW_ID]` queries application or window capabilities. `foil set WINDOW_ID incognito true|false` sets the desired privacy state; a favorited history item returns `HISTORY_FAVORITED` when converting to incognito.
+
+Set window pinning and borders with `foil set WINDOW_ID pinned true|false` and `foil set WINDOW_ID border true|false`. Window snapshots report `pinned` and `border`.
+
+`foil read WINDOW_ID --source original --offset 0 --limit 3000` reads the current in-memory text or Markdown using Unicode scalar offsets. Continue with `next_offset` and `content_version`; changed content returns `STALE_CONTENT`. Other content types are not supported by this entry point.
+
+Application capabilities include `content.read.original`; window capabilities include it only when current text is readable. Nonzero offsets require `--content-version`.
+
+`foil set WINDOW_ID title TITLE` sets a custom window title; an empty title restores the automatic title.
+
+Window snapshots include `observed_at` and the current `is_loading` flag. `is_loading: false` does not establish that an asynchronous open succeeded or finished rendering.
+
+`foil outline WINDOW_ID` pages through existing outline navigation items. Continue with `next_offset` and `content_version`; changed outlines return `STALE_CONTENT`. Use the returned `target_id` and `content_version` with `foil navigate WINDOW_ID --target TARGET_ID --content-version VERSION`. Navigation returns `accepted`, which does not mean asynchronous scrolling has completed.
