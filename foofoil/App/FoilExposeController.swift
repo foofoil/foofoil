@@ -1510,7 +1510,7 @@ final class FoilExposeController {
                 self.openClipboard()
                 return nil
             }
-            // ⌘O/⌘P/⌘L 会打开文件对话框、历史搜索等新视图：先收起覆盖层再放行给菜单，
+            // 打开文件对话框、历史搜索等新视图时，先收起覆盖层再放行给菜单，
             // 避免打开的内容被覆盖层挡住。
             let opensAnotherView = (Array(IncognitoOpening.titles.keys) + ["history.search", "file.newIncognito", "file.openClipboardIncognito"]).contains {
                 KeyboardShortcutStore.shared.matches(event, identifier: $0)

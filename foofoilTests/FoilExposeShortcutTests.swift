@@ -343,7 +343,7 @@ struct FoilExposeShortcutTests {
         let text = SupportedContentOverview.markdown { definition in
             definition.id == "file.openClipboardContent" ? custom : definition.defaultShortcut
         }
-        #expect(text.contains("⌘L"))
+        #expect(!text.contains("⌘L"))
         #expect(text.components(separatedBy: "⌥⌘J").count == 4)
         #expect(!text.contains("{{"))
         let disabled = SupportedContentOverview.markdown { _ in nil }

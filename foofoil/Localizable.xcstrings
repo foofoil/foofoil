@@ -13684,23 +13684,6 @@
         }
       }
     },
-    "Tip: Command-L opens a web link": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "⌘L → Open a web link"
-          }
-        },
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "⌘L → 打开网页链接"
-          }
-        }
-      }
-    },
     "Tip: Command-T keeps the window on top": {
       "extractionState": "manual",
       "localizations": {
