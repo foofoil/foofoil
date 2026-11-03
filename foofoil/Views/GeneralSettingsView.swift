@@ -214,6 +214,9 @@ struct GeneralSettingsView: View {
             appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
             appleMusicSearchEnabled = SettingsStore.shared.appleMusicSearchEnabled
         }
+        .onReceive(NotificationCenter.default.publisher(for: .agentConfigurationDidChange)) { _ in
+            startupBehavior = SettingsStore.shared.startupBehavior
+        }
         .onReceive(NotificationCenter.default.publisher(for: .localFileSearchDidChange)) { _ in
             isFileSearchEnabled = LocalFileSearchSettings.shared.isEnabled
         }

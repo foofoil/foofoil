@@ -275,6 +275,8 @@ struct WebView: NSViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            parent.appState.agentWebLoadFinished = false
+            parent.appState.agentLoadError = nil
             scrollTracker.beginLoading()
             parent.appState.contentSearch.resetWebFrames(webView: webView)
             DispatchQueue.main.async {
@@ -290,6 +292,7 @@ struct WebView: NSViewRepresentable {
                 return // 忽略取消事件，避免在前一请求被覆盖时弹窗报错
             }
             DispatchQueue.main.async {
+                self.parent.appState.agentLoadError = "CONTENT_LOAD_FAILED"
                 self.parent.loadError = error
                 self.parent.isLoading = false
             }
@@ -301,6 +304,7 @@ struct WebView: NSViewRepresentable {
                 return // 忽略取消事件
             }
             DispatchQueue.main.async {
+                self.parent.appState.agentLoadError = "CONTENT_LOAD_FAILED"
                 self.parent.loadError = error
                 self.parent.isLoading = false
             }
@@ -315,6 +319,7 @@ struct WebView: NSViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            parent.appState.agentWebLoadFinished = true
             scrollTracker.restore()
             if let currentURL = webView.url {
                 DispatchQueue.main.async {
@@ -401,6 +406,7 @@ struct WebView: NSViewRepresentable {
                     code: WKError.webContentProcessTerminated.rawValue,
                     userInfo: [NSLocalizedDescriptionKey: NSLocalizedString("WebContent process terminated unexpectedly.", comment: "")]
                 )
+                self.parent.appState.agentLoadError = "CONTENT_LOAD_FAILED"
                 self.parent.loadError = error
                 self.parent.isLoading = false
             }

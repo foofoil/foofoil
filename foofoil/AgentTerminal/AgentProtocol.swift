@@ -32,6 +32,26 @@ nonisolated struct AgentRequest: Codable, Sendable {
     var terminal: TerminalLaunchConfiguration?
     var property: String?
     var value: Double?
+    var boolean_value: Bool?
+    var offset: Int?
+    var limit: Int?
+    var content_version: String?
+    var target_id: String?
+    var source: String?
+    var query: String?
+    var operation_id: String?
+    var page: Int?
+    var line: Int?
+    var progress: Double?
+    var tail: Int?
+    var url: String?
+    var clipboard: Bool?
+    var output: String?
+    var format: String?
+    var overwrite: Bool?
+    var text_value: String?
+    var screen_id: String?
+    var frame: AgentFrame?
 }
 
 nonisolated struct AgentBoard: Codable, Sendable {
@@ -54,7 +74,57 @@ nonisolated struct AgentResponse: Codable, Sendable {
     var capabilities: [String]?
     var socket_path: String?
     var windows: [ControlWindow]?
+    var next_offset: Int?
+    var content_version: String?
     var window: ControlWindow?
+    var text_page: AgentTextPage?
+    var outline: AgentOutlinePage?
+    var operation: AgentOperation?
+    var availability: [AgentCapability]?
+    var media: AgentMediaState?
+    var configuration: [AgentConfiguration]?
+    var permissions: [AgentPermission]?
+    var history: [AgentHistoryItem]?
+    var search: AgentSearchPage?
+    var screens: [AgentScreen]?
+    var output: String?
+    var privacy: AgentPrivacyResult?
+    var app_version: String?
+    var app_build: String?
+    var retryable: Bool?
+    var recovery: String?
+}
+
+nonisolated struct AgentNavigationTarget: Codable, Sendable {
+    var contribution_id: String
+    var item_id: String
+}
+
+nonisolated struct AgentOutlineItem: Codable, Sendable {
+    var target_id: String
+    var contribution_id: String
+    var item_id: String
+    var parent_id: String?
+    var title: String
+    var enabled: Bool
+    var current: Bool
+}
+
+nonisolated struct AgentOutlinePage: Codable, Sendable {
+    var content_id: String
+    var content_version: String
+    var items: [AgentOutlineItem]
+    var next_offset: Int?
+}
+
+nonisolated struct AgentTextPage: Codable, Sendable {
+    var content_id: String
+    var content_version: String
+    var text: String
+    var offset: Int
+    var next_offset: Int?
+    var truncated: Bool
+    var offset_unit = "unicode_scalar"
 }
 
 /// 只持久化用户配置；不保存继承环境、终端输出、PID 或会话身份。
@@ -109,8 +179,107 @@ nonisolated struct ControlWindow: Codable, Sendable {
     var title: String
     var type: String
     var visible: Bool
+    var is_loading: Bool
+    var observed_at: String
+    var incognito: Bool
     var opacity: Double
+    var pinned: Bool
+    var border: Bool
     var terminal_state: String?
     var terminal_id: String?
     var board_id: String?
+    var content_revision: String? = nil
+    var state_revision: String? = nil
+    var read_only: Bool? = nil
+    var load_error: String? = nil
+    var location: AgentLocation? = nil
+    var screen_id: String? = nil
+    var zoom: Double? = nil
+    var navigator: String? = nil
+    var frame: AgentFrame? = nil
+}
+
+nonisolated struct AgentOperation: Codable, Sendable {
+    var id: String
+    var window_id: String
+    var status: String
+    var error: String?
+    var created_at: String
+}
+nonisolated struct AgentCapability: Codable, Sendable {
+    var name: String
+    var available: Bool
+    var reason: String?
+}
+nonisolated struct AgentMediaState: Codable, Sendable {
+    var playing: Bool
+    var current_time: Double?
+    var duration: Double?
+    var volume: Double?
+    var muted: Bool?
+    var mode: String
+    var pending: Bool
+    var state: String = "paused"
+    var error: String? = nil
+    var current_item_id: String? = nil
+}
+nonisolated struct AgentConfiguration: Codable, Sendable {
+    var key: String
+    var type: String
+    var value: String
+    var default_value: String
+    var minimum: Double? = nil
+    var maximum: Double? = nil
+    var choices: [String]? = nil
+    var dependencies: [String] = []
+    var scope = "application"
+    var immediate = true
+    var restart_required = false
+}
+nonisolated struct AgentPermission: Codable, Sendable {
+    var name: String
+    var status: String
+    var action_required: Bool
+}
+nonisolated struct AgentHistoryItem: Codable, Sendable {
+    var id: String
+    var title: String
+    var type: String
+    var snippet: String?
+}
+nonisolated struct AgentSearchMatch: Codable, Sendable {
+    var offset: Int
+    var length: Int
+    var snippet: String
+    var line: Int
+}
+nonisolated struct AgentSearchPage: Codable, Sendable {
+    var content_version: String
+    var matches: [AgentSearchMatch]
+    var next_offset: Int?
+    var offset_unit = "unicode_scalar"
+}
+nonisolated struct AgentFrame: Codable, Sendable {
+    var x: Double
+    var y: Double
+    var width: Double
+    var height: Double
+}
+nonisolated struct AgentScreen: Codable, Sendable {
+    var id: String
+    var frame: AgentFrame
+}
+nonisolated struct AgentPrivacyResult: Codable, Sendable {
+    var incognito: Bool
+    var history_action: String
+    var participates_in_restore: Bool
+    var terminal_output_persisted: Bool
+}
+
+nonisolated enum AgentRunIdentity { static let id = UUID().uuidString }
+
+nonisolated struct AgentLocation: Codable, Sendable {
+    var page: Int? = nil
+    var line: Int? = nil
+    var progress: Double? = nil
 }

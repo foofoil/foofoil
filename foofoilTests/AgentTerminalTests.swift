@@ -1,5 +1,6 @@
 import AppKit
 import Testing
+import FoofoilExtensionKit
 @testable import foofoil
 
 @MainActor
@@ -38,6 +39,117 @@ struct AgentTerminalTests {
         func authorize(_ token: String = String(repeating: "a", count: 64)) async {
             _ = await call(request("authorize", token: token))
         }
+    }
+
+    @Test func ordinaryOpenReportsIncognitoAndPreservesPrivacy() throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        var request = AgentRequest(action: "open")
+        request.path = f.url.path
+        request.incognito = true
+        var response = AgentResponse(request_id: request.request_id, run_id: f.terminal.runID, status: "ready")
+        try f.delegate.applicationControl.execute(request, response: &response)
+        #expect(response.status == "accepted")
+        #expect(response.window?.incognito == true)
+        #expect(response.window?.observed_at.isEmpty == false)
+        let state = try #require(f.delegate.windowControllers.first?.appState)
+        #expect(state.isIncognito)
+        #expect(HistoryRepository.shared.config(id: state.id) == nil)
+    }
+
+    @Test func incognitoSetterIsIdempotentAndCapabilitiesAreScoped() throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        let state = AppState(isIncognito: true)
+        let window = FloatingWindowController(appState: state)
+        f.delegate.addWindowController(window)
+        var request = AgentRequest(action: "set", board_id: window.controlID)
+        request.property = "incognito"
+        request.boolean_value = true
+        var response = AgentResponse(request_id: request.request_id, run_id: f.terminal.runID)
+        try f.delegate.applicationControl.execute(request, response: &response)
+        try f.delegate.applicationControl.execute(request, response: &response)
+        #expect(state.isIncognito)
+        request.boolean_value = false
+        try f.delegate.applicationControl.execute(request, response: &response)
+        #expect(!state.isIncognito)
+        request.property = "pinned"
+        request.boolean_value = false
+        try f.delegate.applicationControl.execute(request, response: &response)
+        #expect(response.window?.pinned == false)
+        request.property = "title"
+        request.boolean_value = nil
+        request.title = "参考资料"
+        try f.delegate.applicationControl.execute(request, response: &response)
+        #expect(response.window?.title == "参考资料")
+        request.title = nil
+        request.property = "border"
+        request.boolean_value = true
+        try f.delegate.applicationControl.execute(request, response: &response)
+        #expect(response.window?.border == true)
+        var query = AgentRequest(action: "capabilities", board_id: window.controlID)
+        response = AgentResponse(request_id: query.request_id, run_id: f.terminal.runID)
+        try f.delegate.applicationControl.execute(query, response: &response)
+        #expect(response.capabilities?.contains("window.incognito") == true)
+        var list = AgentRequest(action: "list")
+        list.incognito = true
+        try f.delegate.applicationControl.execute(list, response: &response)
+        #expect(response.windows?.isEmpty == true)
+        query.board_id = "missing"
+        #expect(throws: AgentFailure.self) { try f.delegate.applicationControl.execute(query, response: &response) }
+    }
+
+    @Test func readPagesUnicodeAndRejectsStaleContent() throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        let state = AppState(isIncognito: true)
+        state.text = "甲😀乙"
+        let window = FloatingWindowController(appState: state)
+        f.delegate.addWindowController(window)
+        var capabilities = AgentRequest(action: "capabilities", board_id: window.controlID)
+        var discovered = AgentResponse(request_id: capabilities.request_id, run_id: f.terminal.runID)
+        try f.delegate.applicationControl.execute(capabilities, response: &discovered)
+        #expect(discovered.capabilities?.contains("content.read.original") == true)
+        capabilities.board_id = nil
+        var request = AgentRequest(action: "read", board_id: window.controlID)
+        request.offset = 1; request.limit = 2
+        var response = AgentResponse(request_id: request.request_id, run_id: f.terminal.runID)
+        #expect(throws: AgentFailure.self) { try f.delegate.applicationControl.execute(request, response: &response) }
+        request.offset = 0
+        try f.delegate.applicationControl.execute(request, response: &response)
+        #expect(response.text_page?.text == "甲😀")
+        #expect(response.text_page?.next_offset == 2)
+        request.offset = 2; request.content_version = response.text_page?.content_version
+        try f.delegate.applicationControl.execute(request, response: &response)
+        #expect(response.text_page?.text == "乙")
+        state.text = "changed"
+        #expect(throws: AgentFailure.self) { try f.delegate.applicationControl.execute(request, response: &response) }
+    }
+
+    @Test func outlinePagesAndRejectsChangedNavigation() throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        let state = AppState(isIncognito: true)
+        state.builtInNavigatorContributions = [NavigatorContribution(id: "contents", titleLocalizationKey: "Contents", style: .outline, items: [NavigatorItem(id: "a", title: "甲"), NavigatorItem(id: "b", parentID: "a", title: "乙")])]
+        let window = FloatingWindowController(appState: state)
+        f.delegate.addWindowController(window)
+        var request = AgentRequest(action: "outline", board_id: window.controlID)
+        request.offset = 0; request.limit = 1
+        var response = AgentResponse(request_id: request.request_id, run_id: f.terminal.runID)
+        try f.delegate.applicationControl.execute(request, response: &response)
+        #expect(response.outline?.items.first?.item_id == "a")
+        #expect(response.outline?.next_offset == 1)
+        var activated: String?
+        state.builtInNavigatorActionHandler = { activated = $0.itemIDs.first }
+        var navigation = AgentRequest(action: "navigate", board_id: window.controlID)
+        navigation.content_version = response.outline?.content_version
+        navigation.target_id = response.outline?.items.first?.target_id
+        var navigationResponse = AgentResponse(request_id: navigation.request_id, run_id: f.terminal.runID)
+        try f.delegate.applicationControl.execute(navigation, response: &navigationResponse)
+        #expect(navigationResponse.status == "accepted")
+        #expect(activated == "a")
+        request.offset = 1; request.content_version = response.outline?.content_version
+        try f.delegate.applicationControl.execute(request, response: &response)
+        #expect(response.outline?.items.first?.parent_id == "a")
+        state.builtInNavigatorContributions[0].items.removeLast()
+        #expect(throws: AgentFailure.self) { try f.delegate.applicationControl.execute(request, response: &response) }
+        #expect(throws: AgentFailure.self) { try f.delegate.applicationControl.execute(navigation, response: &navigationResponse) }
     }
 
     @Test func stableIdentityDedupAndRevisionPreserveActualWindow() async throws {
@@ -223,7 +335,8 @@ struct AgentTerminalTests {
         _ = await f.call(f.request("update", board: shown.board_id))
         #expect(state.id == id)
         let config = try #require(HistoryRepository.shared.config(id: id))
-        #expect(config.textPath == f.url.path)
+        let savedURL = URL(fileURLWithPath: try #require(config.textPath)).resolvingSymlinksInPath()
+        #expect(savedURL == f.url.resolvingSymlinksInPath())
         #expect(config.text.isEmpty)
         let restored = AppState()
         #expect(restored.loadConfig(config))
@@ -328,4 +441,122 @@ struct AgentTerminalTests {
         #expect(result.value?.error == "TIMEOUT")
         #expect(f.delegate.windowControllers.isEmpty)
     }
+    @Test func operationsObserveOpenFailureAndClosedWindows() async throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        await f.authorize()
+        var open = f.request("open")
+        open.path = f.url.path; open.incognito = true
+        let accepted = await f.call(open)
+        let operation = try #require(accepted.operation)
+        #expect(accepted.status == "accepted")
+        try await Task.sleep(for: .milliseconds(150))
+        var wait = f.request("wait"); wait.operation_id = operation.id
+        let ready = await f.call(wait)
+        #expect(ready.operation?.status == "ready")
+        let window = try #require(f.delegate.windowControllers.first)
+        window.appState.agentLoadError = "CONTENT_LOAD_FAILED"
+        let failed = f.delegate.applicationControl.registerOperation(window) { false }
+        try await Task.sleep(for: .milliseconds(150))
+        wait.request_id = UUID().uuidString; wait.operation_id = failed.id
+        #expect(await f.call(wait).operation?.error == "CONTENT_LOAD_FAILED")
+        window.appState.agentLoadError = nil
+        let closed = f.delegate.applicationControl.registerOperation(window) { false }
+        window.close()
+        try await Task.sleep(for: .milliseconds(150))
+        wait.request_id = UUID().uuidString; wait.operation_id = closed.id
+        #expect(await f.call(wait).operation?.error == "WINDOW_CLOSED")
+        wait.request_id = UUID().uuidString; wait.operation_id = "previous-run:operation"
+        #expect(await f.call(wait).error == "HANDLE_EXPIRED")
+    }
+
+    @Test func itemsVersionIgnoresSelectionButRejectsReplacement() throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        let state = AppState(isIncognito: true)
+        state.builtInNavigatorContributions = [NavigatorContribution(id: "list", titleLocalizationKey: "Contents", style: .flat, items: [NavigatorItem(id: "a", title: "甲"), NavigatorItem(id: "b", title: "乙")], allowedActions: [.activate])]
+        let window = FloatingWindowController(appState: state); f.delegate.addWindowController(window)
+        var request = AgentRequest(action: "items", board_id: window.controlID)
+        request.offset = 0; request.limit = 1
+        var response = AgentResponse(request_id: request.request_id, run_id: f.terminal.runID)
+        try f.delegate.applicationControl.execute(request, response: &response)
+        request.content_version = response.outline?.content_version
+        state.builtInNavigatorContributions[0].items[0].isCurrent = true
+        state.builtInNavigatorContributions[0].selectedItemIDs = ["a"]
+        request.offset = 1
+        try f.delegate.applicationControl.execute(request, response: &response)
+        #expect(response.outline?.items.first?.item_id == "b")
+        state.id = UUID()
+        #expect(throws: AgentFailure.self) { try f.delegate.applicationControl.execute(request, response: &response) }
+    }
+
+    @Test func searchDoesNotNavigateAndExportRefusesOverwrite() async throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        let state = AppState(isIncognito: true); state.text = "甲😀乙\n甲😀丙"; state.agentKind = .text
+        let window = FloatingWindowController(appState: state); f.delegate.addWindowController(window)
+        var search = AgentRequest(action: "search", board_id: window.controlID)
+        search.query = "😀"; search.offset = 0; search.limit = 1
+        var response = AgentResponse(request_id: search.request_id, run_id: f.terminal.runID)
+        try await f.delegate.applicationControl.executeAsync(search, response: &response)
+        #expect(response.search?.matches.first?.offset == 1)
+        #expect(response.search?.next_offset == 5)
+        search.offset = response.search?.next_offset; search.content_version = response.search?.content_version
+        try await f.delegate.applicationControl.executeAsync(search, response: &response)
+        #expect(response.search?.matches.first?.line == 2)
+        var export = AgentRequest(action: "export", board_id: window.controlID)
+        export.format = "original"; export.output = f.root.appendingPathComponent("export.txt").path
+        try await f.delegate.applicationControl.executeAsync(export, response: &response)
+        #expect(try String(contentsOfFile: export.output!, encoding: .utf8) == state.text)
+        await #expect(throws: AgentFailure.self) { try await f.delegate.applicationControl.executeAsync(export, response: &response) }
+    }
+
+    @Test func configurationRejectsDependenciesAndPublishesUpdates() throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        let settings = SettingsStore.shared
+        let library = settings.appleMusicLibraryEnabled
+        let step = settings.mediaSeekStepInterval
+        defer { settings.appleMusicLibraryEnabled = library; settings.mediaSeekStepInterval = step }
+        settings.appleMusicLibraryEnabled = false
+        var request = AgentRequest(action: "config.set")
+        request.property = "search.apple-music.enabled"; request.text_value = "true"
+        var response = AgentResponse(request_id: request.request_id, run_id: f.terminal.runID)
+        #expect(throws: AgentFailure.self) { try f.delegate.applicationControl.execute(request, response: &response) }
+        #expect(!settings.appleMusicLibraryEnabled)
+        request.property = "media.seek-step"; request.text_value = "61"
+        #expect(throws: AgentFailure.self) { try f.delegate.applicationControl.execute(request, response: &response) }
+        request.text_value = "7"
+        try f.delegate.applicationControl.execute(request, response: &response)
+        #expect(settings.mediaSeekStepInterval == 7)
+        #expect(response.configuration?.first?.value == "7.0")
+        request.property = "arbitrary.defaults.key"
+        #expect(throws: AgentFailure.self) { try f.delegate.applicationControl.execute(request, response: &response) }
+    }
+
+    @Test func readOnlyQueriesDoNotWaitForPendingWrites() async throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        await f.authorize()
+        var preparation: CheckedContinuation<Void, Never>?
+        f.terminal.prepare = { url in
+            await withCheckedContinuation { preparation = $0 }
+            return try AgentContent.prepare(url)
+        }
+        let pending = Task { await f.call(f.request("show")) }
+        while preparation == nil { await Task.yield() }
+        let query = await f.call(f.request("capabilities"))
+        #expect(query.capabilities?.contains("operation.wait") == true)
+        preparation?.resume()
+        _ = await pending.value
+    }
+
+    @Test func pausingCancelsPendingOpenOperations() async throws {
+        let f = try Fixture(); defer { f.cleanup() }
+        let state = AppState(isIncognito: true)
+        state.isLoading = true
+        let window = FloatingWindowController(appState: state); f.delegate.addWindowController(window)
+        let operation = f.delegate.applicationControl.openOperation(window)
+        let generation = state.currentMediaRouteGeneration
+        f.terminal.paused = true
+        #expect(state.currentMediaRouteGeneration > generation)
+        #expect(state.agentLoadError == "CONTROL_PAUSED")
+        #expect(f.delegate.applicationControl.operations[operation.id]?.value.error == "CONTROL_PAUSED")
+    }
+
 }

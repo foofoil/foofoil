@@ -12,9 +12,14 @@ struct AgentOwnership {
 /// 复用 AppDelegate 的窗口集合；只保留授权和请求状态，不另建窗口生命周期。
 @MainActor
 final class AgentTerminal: ObservableObject {
-    let runID = UUID().uuidString
+    let runID = AgentRunIdentity.id
     @Published var paused = false {
-        didSet { if paused != oldValue { controlGeneration &+= 1 } }
+        didSet {
+            if paused != oldValue {
+                controlGeneration &+= 1
+                if paused { delegate?.applicationControl.cancelPendingOpens(error: "CONTROL_PAUSED") }
+            }
+        }
     }
     private(set) var controlGeneration: UInt64 = 0
     private var sessions = Set<String>()
@@ -35,6 +40,7 @@ final class AgentTerminal: ObservableObject {
     private var ledger: [String: Entry] = [:]
     private var jobs: [Job] = []
     private var draining = false
+    private var activeQueries = 0
     private var timeouts: [String: Task<Void, Never>] = [:]
     private let requestTimeout: TimeInterval
     weak var delegate: AppDelegate?
@@ -57,6 +63,7 @@ final class AgentTerminal: ObservableObject {
         revoked.formUnion(sessions)
         sessions.removeAll()
         controlGeneration &+= 1
+        delegate?.applicationControl.cancelPendingOpens(error: "PERMISSION_DENIED")
         for controller in delegate?.windowControllers ?? [] { controller.appState.agentOwnership = nil }
     }
 
@@ -64,7 +71,11 @@ final class AgentTerminal: ObservableObject {
     private func owner(_ request: AgentRequest) -> String { hash(Data((request.credential ?? "").utf8)) }
     private func response(_ request: AgentRequest, error: String? = nil) -> AgentResponse {
         var value = AgentResponse(request_id: request.request_id, run_id: runID)
-        if let error { value.status = "failed"; value.error = error }
+        if let error {
+            value.status = "failed"; value.error = error
+            value.retryable = ["TIMEOUT", "QUEUE_FULL", "NOT_READY", "CONTENT_LOADING"].contains(error)
+            value.recovery = "foil guide troubleshooting"
+        }
         return value
     }
 
@@ -76,7 +87,9 @@ final class AgentTerminal: ObservableObject {
         if request.action == "hello" {
             delegate?.startControlSocketIfNeeded()
             var hello = response(request)
-            hello.capabilities = ["application-control-v1", "terminal-v1"]
+            hello.capabilities = ["application-control-v1", "application-control-v2", "terminal-v1"]
+            hello.app_version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+            hello.app_build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String
             hello.socket_path = delegate?.controlSocket?.path
             if hello.socket_path != nil { hello.capabilities?.append("unix-socket-v1") }
             reply(hello); return
@@ -90,11 +103,12 @@ final class AgentTerminal: ObservableObject {
             reply(response(request)); return
         }
         guard sessions.contains(owner), !revoked.contains(owner) else { reply(response(request, error: "PERMISSION_DENIED")); return }
-        let general = request.scope == "all" || ["open", "reveal", "hide", "inspect", "set", "terminal.create"].contains(request.action)
+        let general = request.scope == "all" || AgentCommandCatalog.generalActions.contains(request.action)
         guard request.scope == nil || request.scope == "all" else { reply(response(request, error: "INVALID_REQUEST")); return }
-        guard ["show", "update", "list", "close", "open", "reveal", "hide", "inspect", "set", "terminal.create"].contains(request.action) else { reply(response(request, error: "INVALID_ACTION")); return }
-        guard general || request.action == "show" || (request.title == nil && request.incognito == nil),
+        guard (AgentCommandCatalog.generalActions.contains(request.action) || ["show", "update", "list", "close"].contains(request.action)) else { reply(response(request, error: "INVALID_ACTION")); return }
+        guard general || ["show", "list"].contains(request.action) || (request.title == nil && request.incognito == nil),
               general || ["show", "update"].contains(request.action) || request.path == nil else { reply(response(request, error: "INVALID_REQUEST")); return }
+        guard AgentCommandCatalog.valid(request) else { reply(response(request, error: "INVALID_REQUEST")); return }
         let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
         guard let encoded = try? encoder.encode(request) else { reply(response(request, error: "INVALID_REQUEST")); return }
         let fingerprint = hash(encoded)
@@ -112,6 +126,34 @@ final class AgentTerminal: ObservableObject {
         // 所有写操作共用有界 FIFO；同一窗口异步准备绝不越过先接受的操作。
         if ["show", "update"].contains(request.action), request.path == nil { reply(response(request, error: "CONTENT_UNREADABLE")); return }
         ledger[key] = Entry(fingerprint: fingerprint, expires: now.addingTimeInterval(AgentLimits.dedupSeconds), replies: [reply])
+        if general, AgentCommandCatalog.readOnly.contains(request.action) {
+            guard activeQueries < AgentLimits.queue else { ledger.removeValue(forKey: key); reply(response(request, error: "QUEUE_FULL")); return }
+            activeQueries += 1
+            self.timeouts[key] = Task { @MainActor in
+                do { try await Task.sleep(for: .seconds(self.requestTimeout)) } catch { return }
+                guard self.ledger[key]?.result == nil else { return }
+                let result = self.response(request, error: "TIMEOUT")
+                let replies = self.ledger[key]?.replies ?? []
+                self.ledger[key]?.result = result; self.ledger[key]?.replies = []
+                self.timeouts[key] = nil
+                replies.forEach { $0(result) }
+            }
+            Task { @MainActor in
+                defer { self.activeQueries -= 1; self.timeouts.removeValue(forKey: key)?.cancel() }
+                var result = self.response(request)
+                do {
+                    guard let service = self.delegate?.applicationControl else { throw AgentFailure("NOT_READY") }
+                    try await service.executeAsync(request, response: &result)
+                    guard self.sessions.contains(owner), !self.revoked.contains(owner) else { throw AgentFailure("PERMISSION_DENIED") }
+                    guard ((try? JSONEncoder().encode(result).count) ?? (AgentLimits.envelopeBytes + 1)) <= AgentLimits.envelopeBytes else { throw AgentFailure("RESPONSE_TOO_LARGE") }
+                } catch { result = self.response(request, error: (error as? AgentFailure)?.code ?? "EXTRACTION_FAILED") }
+                let replies = self.ledger[key]?.replies ?? []
+                if self.ledger[key]?.result == nil { self.ledger[key]?.result = result }
+                self.ledger[key]?.replies = []
+                replies.forEach { $0(result) }
+            }
+            return
+        }
         jobs.append(Job(request: request, key: key, generation: controlGeneration, deadline: now.addingTimeInterval(requestTimeout)))
         timeouts[key] = Task { [weak self] in
             do { try await Task.sleep(for: .seconds(self?.requestTimeout ?? AgentLimits.timeout)) } catch { return }
@@ -146,7 +188,7 @@ final class AgentTerminal: ObservableObject {
     }
 
     private func isGeneral(_ request: AgentRequest) -> Bool {
-        request.scope == "all" || ["open", "reveal", "hide", "inspect", "set", "terminal.create"].contains(request.action)
+        request.scope == "all" || AgentCommandCatalog.generalActions.contains(request.action)
     }
 
     private func drain() async {
@@ -156,20 +198,22 @@ final class AgentTerminal: ObservableObject {
             do {
                 if isGeneral(job.request) {
                     guard sessions.contains(owner(job.request)), !revoked.contains(owner(job.request)) else { throw AgentFailure("PERMISSION_DENIED") }
-                    if job.request.action != "list" && job.request.action != "inspect" { try validate(job) }
+                    if !AgentCommandCatalog.readOnly.contains(job.request.action) { try validate(job) }
                     guard let service = delegate?.applicationControl else { throw AgentFailure("NOT_READY") }
-                    let createsWindow = ["terminal.create", "open"].contains(job.request.action)
+                    let createsWindow = ["terminal.create", "open", "history.open"].contains(job.request.action)
                     if createsWindow {
                         creations.removeAll { Date().timeIntervalSince($0) > 60 }
                         guard creations.count < 12 else { throw AgentFailure("RATE_LIMITED") }
                     }
-                    try service.execute(job.request, response: &result)
+                    try await service.executeAsync(job.request, response: &result)
+                    guard sessions.contains(owner(job.request)), !revoked.contains(owner(job.request)) else { throw AgentFailure("PERMISSION_DENIED") }
                     if createsWindow { creations.append(Date()) }
                 } else if job.request.action == "list" {
                     guard sessions.contains(owner(job.request)) else { throw AgentFailure("PERMISSION_DENIED") }
                     result.boards = (delegate?.windowControllers ?? []).compactMap {
                         let state = $0.appState
-                        guard let ownership = state.agentOwnership, ownership.owner == owner(job.request) else { return nil }
+                        guard let ownership = state.agentOwnership, ownership.owner == owner(job.request),
+                              job.request.incognito != true || state.isIncognito else { return nil }
                         return AgentBoard(board_id: ownership.boardID, revision: ownership.revision,
                                           title: state.customTitle ?? state.originalImageName ?? "", incognito: state.isIncognito)
                     }
@@ -216,6 +260,9 @@ final class AgentTerminal: ObservableObject {
                 }
             } catch {
                 result = response(job.request, error: (error as? AgentFailure)?.code ?? "CONTENT_UNREADABLE")
+            }
+            if ((try? JSONEncoder().encode(result).count) ?? (AgentLimits.envelopeBytes + 1)) > AgentLimits.envelopeBytes {
+                result = response(job.request, error: "RESPONSE_TOO_LARGE")
             }
             let replies = ledger[job.key]?.replies ?? []
             if ledger[job.key]?.result == nil { ledger[job.key]?.result = result }

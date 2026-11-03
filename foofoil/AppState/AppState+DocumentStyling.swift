@@ -158,7 +158,7 @@ extension AppState {
               documentThemeId == nil, backgroundColorHex == nil, textColorHex == nil else { return }
         // 新终端固定采用暗色；其它文档继续跟随原有默认外观。
         if terminalConfiguration != nil { documentAppearance = .dark }
-        applyDocumentTheme(DocumentThemeCatalog.defaultTheme, isDark: documentUsesDarkAppearance)
+        applyDocumentTheme(SettingsStore.shared.defaultDocumentTheme, isDark: documentUsesDarkAppearance)
     }
 
     /// 将背景色恢复为默认样式（素笺）；若此时文字颜色亦为默认值（或不支持文字样式），则同步恢复默认主题。

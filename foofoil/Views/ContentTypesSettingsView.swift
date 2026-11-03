@@ -10,6 +10,8 @@ import SwiftUI
 /// 按内容类型分组的设置，包括图片轮播与音视频控制条行为。
 /// 设置项说明统一作为标题下的副标题展示，与快捷键面板的行文案保持一致。
 struct ContentTypesSettingsView: View {
+    @State private var defaultThemeID = SettingsStore.shared.defaultDocumentThemeID
+    @State private var defaultFontSize = SettingsStore.shared.defaultDocumentFontSize
     @State private var slideshowInterval = SettingsStore.shared.imageListSlideshowInterval
     @State private var mediaControlsAutoHideInterval = SettingsStore.shared.mediaPlaybackControlsAutoHideInterval
     @State private var mediaSeekStep = SettingsStore.shared.mediaSeekStepInterval
@@ -20,6 +22,14 @@ struct ContentTypesSettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                Picker("Default Document Theme", selection: $defaultThemeID) {
+                    ForEach(DocumentThemeCatalog.shared.presets, id: \.id) { theme in
+                        Text(NSLocalizedString(theme.name, comment: "")).tag(theme.id)
+                    }
+                }
+                SettingsSliderRow(title: NSLocalizedString("Default Document Font Size", comment: ""), note: NSLocalizedString("Default Document Style Note", comment: ""), valueLabel: String(Int(defaultFontSize)), value: $defaultFontSize, range: AppState.minTextFontSize...AppState.maxTextFontSize)
+            } header: { Text("Default Document Style") }
             Section {
                 SettingsSliderRow(
                     title: NSLocalizedString("Slideshow Interval", comment: ""),
@@ -86,6 +96,8 @@ struct ContentTypesSettingsView: View {
         .formStyle(.grouped)
         .frame(width: SettingsWindowMetrics.width, alignment: .top)
         .onAppear {
+            defaultThemeID = SettingsStore.shared.defaultDocumentThemeID
+            defaultFontSize = SettingsStore.shared.defaultDocumentFontSize
             slideshowInterval = SettingsStore.shared.imageListSlideshowInterval
             mediaControlsAutoHideInterval = SettingsStore.shared.mediaPlaybackControlsAutoHideInterval
             mediaSeekStep = SettingsStore.shared.mediaSeekStepInterval
@@ -94,6 +106,14 @@ struct ContentTypesSettingsView: View {
             keepAudioPlayingInBackground = SettingsStore.shared.keepAudioPlayingInBackground
             confirmClosingPlayingAudio = SettingsStore.shared.confirmClosingPlayingAudio
         }
+        .onReceive(NotificationCenter.default.publisher(for: .agentConfigurationDidChange)) { _ in
+            defaultThemeID = SettingsStore.shared.defaultDocumentThemeID
+            defaultFontSize = SettingsStore.shared.defaultDocumentFontSize
+            mediaSeekStep = SettingsStore.shared.mediaSeekStepInterval
+            mediaControlsAutoHideInterval = SettingsStore.shared.mediaPlaybackControlsAutoHideInterval
+        }
+        .onChange(of: defaultThemeID) { _, value in SettingsStore.shared.defaultDocumentThemeID = value }
+        .onChange(of: defaultFontSize) { _, value in SettingsStore.shared.defaultDocumentFontSize = value }
         .onChange(of: appleMusicLibraryEnabled) { _, value in
             SettingsStore.shared.appleMusicLibraryEnabled = value
             if value { AppleMusicLibrary.shared.refreshAuthorization() }

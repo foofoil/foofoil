@@ -66,6 +66,7 @@ extension AppState {
         }
 
         public func openImage(url: URL) {
+            agentLoadError = nil
             clearArchiveForNewContent()
             appleMusicItem = nil
             applyImage(url: url, originalName: url.lastPathComponent, rotatesIdentity: true, clearsFileList: true)
@@ -398,6 +399,8 @@ extension AppState {
         }
 
         public func openWeb(url: URL, originalName: String? = nil) {
+            agentLoadError = nil
+            agentWebLoadFinished = false
             clearArchiveForNewContent()
             let targetID = (imageURL != nil || webURL != nil || textURL != nil || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 ? UUID()
@@ -468,6 +471,7 @@ extension AppState {
         }
 
         public func openTextFile(url: URL) {
+            agentLoadError = nil
             clearArchiveForNewContent()
             let targetID = (imageURL != nil || webURL != nil || textURL != nil || !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 ? UUID()
@@ -580,6 +584,7 @@ extension AppState {
         }
 
         public func openFile(url: URL) {
+            agentLoadError = nil
             if let failure = initialFileOpenFailure(url) {
                 reportFileOpenFeedback([failure])
                 return

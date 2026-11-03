@@ -48,6 +48,70 @@ final class FoilContentSearch: ObservableObject {
     private var reader: SearchHTMLReader?
     private var activeSection: Int?
 
+    /// Agent 读取当前视图，不创建额外 WebKit 页面，也不执行来源文件中的新脚本。
+    private weak var agentRoot: NSView?
+    func agentBindRoot(_ root: NSView?) { agentRoot = root }
+    private var agentWeb: WKWebView? { agentRoot.flatMap { Self.descendants($0).compactMap { $0 as? WKWebView }.first } }
+    private var agentText: NSTextView? { agentRoot.flatMap { Self.descendants($0).compactMap { $0 as? NSTextView }.first { !$0.isFieldEditor && $0.identifier?.rawValue != "foil-search-field" } } }
+    var agentCanReadRendered: Bool { agentWeb != nil || agentText != nil }
+
+    func agentStopLoading() { agentWeb?.stopLoading() }
+
+    func agentWebArchive() async throws -> Data {
+        guard let webView = agentWeb else { throw AgentFailure("CAPABILITY_UNAVAILABLE") }
+        return try await withCheckedThrowingContinuation { continuation in
+            webView.createWebArchiveData { continuation.resume(with: $0) }
+        }
+    }
+
+    func agentRenderedText() async throws -> String {
+        if let webView = agentWeb {
+            return try await withCheckedThrowingContinuation { continuation in
+                webView.evaluateJavaScript("document.body ? (document.body.innerText.length <= 2097152 ? document.body.innerText : null) : ''", in: nil, in: .defaultClient) { result in
+                    switch result {
+                    case .success(let value):
+                        guard let text = value as? String else { continuation.resume(throwing: AgentFailure("CONTENT_TOO_LARGE")); return }
+                        continuation.resume(returning: text)
+                    case .failure: continuation.resume(throwing: AgentFailure("EXTRACTION_FAILED"))
+                    }
+                }
+            }
+        }
+        if let textView = agentText { return textView.string }
+        throw AgentFailure("CAPABILITY_UNAVAILABLE")
+    }
+
+    var agentLocation: AgentLocation? {
+        guard let textView = agentText, let scroll = textView.enclosingScrollView,
+              let layout = textView.layoutManager, let container = textView.textContainer else { return nil }
+        let point = NSPoint(x: scroll.contentView.bounds.minX, y: scroll.contentView.bounds.minY)
+        guard layout.numberOfGlyphs > 0 else { return AgentLocation(line: 1, progress: 0) }
+        let glyph = min(layout.numberOfGlyphs - 1, layout.glyphIndex(for: point, in: container))
+        let character = min((textView.string as NSString).length, layout.characterIndexForGlyph(at: glyph))
+        let prefix = (textView.string as NSString).substring(to: character)
+        let maximum = max(0, textView.bounds.height - scroll.contentView.bounds.height)
+        return AgentLocation(line: prefix.reduce(1) { $1 == "\n" ? $0 + 1 : $0 }, progress: maximum > 0 ? min(1, max(0, point.y / maximum)) : 0)
+    }
+
+    func agentNavigate(line: Int?, progress: Double?) throws {
+        guard let textView = agentText, let scroll = textView.enclosingScrollView else { throw AgentFailure("CAPABILITY_UNAVAILABLE") }
+        if let line {
+            let text = textView.string as NSString
+            var position = 0
+            for _ in 1..<line {
+                guard position < text.length else { throw AgentFailure("INVALID_REQUEST") }
+                position = NSMaxRange(text.lineRange(for: NSRange(location: position, length: 0)))
+            }
+            guard position <= text.length else { throw AgentFailure("INVALID_REQUEST") }
+            textView.scrollRangeToVisible(NSRange(location: position, length: 0))
+        } else if let progress {
+            guard (0...1).contains(progress) else { throw AgentFailure("INVALID_REQUEST") }
+            let maximum = max(0, textView.bounds.height - scroll.contentView.bounds.height)
+            scroll.contentView.scroll(to: NSPoint(x: scroll.contentView.bounds.minX, y: maximum * progress))
+            scroll.reflectScrolledClipView(scroll.contentView)
+        }
+    }
+
     nonisolated static func ranges(in text: String, query: String) -> [NSRange] {
         guard !query.isEmpty else { return [] }
         let source = text as NSString

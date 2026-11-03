@@ -54,12 +54,14 @@ struct AudioModeView: View {
             outputDeviceOverlay
         }
         .onAppear {
+            appState.agentMediaController = controller
             controller.isLooping = appState.shouldLoopCurrentItem
             if appState.resumesMediaPlaybackOnActivation {
                 controller.play()
             }
         }
         .onDisappear {
+            if appState.agentMediaController === controller { appState.agentMediaController = nil }
             controller.closeOutput()
             MediaRemoteCommandCoordinator.shared.deactivate(controller)
             appState.isMediaPlaying = false

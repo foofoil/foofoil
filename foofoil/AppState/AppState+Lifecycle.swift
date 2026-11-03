@@ -17,6 +17,9 @@ import FoofoilExtensionKit
 
 extension AppState {
         public func resetContent() {
+            agentLoadError = nil
+            agentWebLoadFinished = false
+            agentMediaController = nil
             terminalSession?.onOutputSnapshotChanged = nil
             terminalSession?.stop()
             terminalSession = nil

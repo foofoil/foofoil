@@ -42,6 +42,11 @@ public class AppState: NSObject, ObservableObject, Identifiable {
     @Published var terminalConfiguration: TerminalLaunchConfiguration?
     @Published var terminalSession: TerminalSession?
     var agentOwnership: AgentOwnership?
+    /// 运行期诊断只保留稳定错误码，不保存来源正文。
+    var agentTextRevision: UInt64 = 0
+    var agentLoadError: String?
+    var agentWebLoadFinished = false
+    weak var agentMediaController: (any MediaTransportControlling)?
     /// 只读展示策略可恢复；控制身份始终由上面的运行期归属单独决定。
     @Published var agentReadOnly = false
     var agentKind: AgentContentKind?
@@ -472,13 +477,14 @@ public class AppState: NSObject, ObservableObject, Identifiable {
 
     @Published public var text: String {
         didSet {
+            if text != oldValue { agentTextRevision &+= 1 }
             if !text.isEmpty { appleMusicItem = nil }
             updateRenderedMarkdown()
 
             // 空白箔在用户首次输入内容时成为文档类型，此时自动应用默认文档样式（素笺）。
             if oldValue.isEmpty && !text.isEmpty && !isBatchUpdating {
                 if documentThemeId == nil && backgroundColorHex == nil && textColorHex == nil {
-                    applyDocumentTheme(DocumentThemeCatalog.defaultTheme, isDark: documentUsesDarkAppearance)
+                    applyDocumentTheme(SettingsStore.shared.defaultDocumentTheme, isDark: documentUsesDarkAppearance)
                 }
             } else if text.isEmpty && textURL == nil && imageURL == nil && webURL == nil && extensionSession == nil {
                 if documentThemeId == DocumentThemeCatalog.defaultThemeId {
@@ -744,7 +750,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.showBorder = true
         self.showCodeLineNumbers = true
         self.imageScale = 1.0
-        self.textFontSize = Self.defaultTextFontSize
+        self.textFontSize = SettingsStore.shared.defaultDocumentFontSize
         self.webZoom = 1.0
         self.documentZoom = 1.0
         self.createdAt = Date()

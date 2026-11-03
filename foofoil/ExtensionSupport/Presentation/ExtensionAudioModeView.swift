@@ -33,6 +33,7 @@ struct ExtensionAudioModeView: View {
             statusOverlay
         }
         .onAppear {
+            appState.agentMediaController = controller
             appState.isMediaPlaybackControlsVisible = !appState.resumesMediaPlaybackOnActivation
                 || appState.presentationWindowState.isPointerInsideWindow
             controller.activateRemoteCommands()
@@ -41,6 +42,7 @@ struct ExtensionAudioModeView: View {
             }
         }
         .onDisappear {
+            if appState.agentMediaController === controller { appState.agentMediaController = nil }
             controller.stopOutput()
             MediaRemoteCommandCoordinator.shared.deactivate(controller)
             appState.isMediaPlaying = false

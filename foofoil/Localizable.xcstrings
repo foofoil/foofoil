@@ -1,6 +1,2230 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "Agent CLI Commands Link": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Command Reference"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令一览"
+          }
+        }
+      }
+    },
+    "Agent CLI Install Location Format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Command installation location: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令安装位置：%@"
+          }
+        }
+      }
+    },
+    "Foil CLI Command Column": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Command"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令"
+          }
+        }
+      }
+    },
+    "Foil CLI Description Column": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Purpose"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "说明"
+          }
+        }
+      }
+    },
+    "Foil CLI Command More Help": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use foil help for details."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "详情见 foil help。"
+          }
+        }
+      }
+    },
+    "Foil CLI Group Opening": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open and query"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开与查询"
+          }
+        }
+      }
+    },
+    "Foil CLI Group Windows": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Window control"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "窗口控制"
+          }
+        }
+      }
+    },
+    "Foil CLI Group Reading": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read, search and navigate"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读取、搜索与导航"
+          }
+        }
+      }
+    },
+    "Foil CLI Group Media": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Media control"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "媒体控制"
+          }
+        }
+      }
+    },
+    "Foil CLI Group Presentation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Owned Agent presentations"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent 所属展示"
+          }
+        }
+      }
+    },
+    "Foil CLI Group Terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interactive terminals"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "交互式终端"
+          }
+        }
+      }
+    },
+    "Foil CLI Group Configuration": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configuration and permissions"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配置与权限"
+          }
+        }
+      }
+    },
+    "Foil CLI Group History": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History and export"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "历史与导出"
+          }
+        }
+      }
+    },
+    "Foil CLI Group Integration": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installation and Agent access"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装与 Agent 接入"
+          }
+        }
+      }
+    },
+    "Foil CLI Group Other": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Other commands"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他命令"
+          }
+        }
+      }
+    },
+    "Foil CLI Command open": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a file, URL, directory, clipboard or stdin; use incognito for private content."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开文件、URL、目录、剪贴板或标准输入，可指定无痕。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command list": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "List owned boards, or ordinary windows with scope all; window results are paged."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认列出所属展示箔；scope all 查询普通窗口并支持分页。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command inspect": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read identity, versions, window properties, loading errors and reading position."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查询身份、版本、窗口属性、加载错误与阅读位置。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command capabilities": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Query application or window capabilities and availability."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查询应用或指定窗口的能力与当前可用性。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command wait": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait for the specified operation or the latest operation for a window."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待指定操作或窗口最近操作，超时不取消。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command reveal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show a window."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示窗口。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command focus": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Explicitly activate and focus a window."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显式激活应用并聚焦窗口。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command hide": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide a window while preserving terminal processes."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏窗口，保留终端进程。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command close": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close an owned board or an ordinary window with scope all."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭所属展示箔，或用 scope all 关闭普通窗口。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command set": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set window properties; query actual values and runtime ranges."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置窗口属性；以返回状态和运行时范围为准。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command screens": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "List available screens and their visible bounds."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查询屏幕与可用区域。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command window.frame": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set the frame relative to a screen and return the clamped result."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按指定屏幕设置窗口坐标与尺寸，返回实际钳制结果。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command read": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Page through supported loaded text, PDF pages, rendered content, OCR or terminal output."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分页读取已加载正文、PDF 页文本、渲染正文、已有 OCR 或终端输出。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command outline": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "List outline targets with a version-bound cursor."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分页查询目录和绑定版本的跳转目标。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command items": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "List loaded navigation, queue or tree items."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分页查询已加载的导航、队列或树项目。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command search": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Find snippets and locators without moving the reading position."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "搜索片段与定位信息，不改变阅读位置。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command navigate": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Navigate using exactly one target, page, line or progress locator."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用目标、页码、行号或比例中的一种定位。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command items.select": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activate an item using its opaque target and version."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "使用不透明目标及版本激活项目。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command media.status": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read playback state, progress, volume and pending actions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查询播放状态、进度、音量与在途操作。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command media.play": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Request playback through the existing playback coordinator."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复用既有播放协调器请求播放。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command media.pause": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Request pause and confirm the result."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请求暂停并确认结果。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command media.seek": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seek to an absolute time or by a relative offset, in seconds."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按秒进行绝对或相对跳转。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command media.next": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Advance to the next supported item."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按后端能力切换下一项。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command media.previous": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Return to the previous supported item."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按后端能力切换上一项。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command media.volume": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set volume from 0 to 1 when supported."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在支持时设置 0～1 的音量。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command media.mute": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set the desired mute state when supported."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在支持时设置目标静音状态。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command media.mode": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set sequential, sequential-loop, shuffle or repeat-one playback."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置顺序、顺序循环、随机或单曲循环模式。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command media.select": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a version-bound opaque queue target."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择绑定版本的不透明队列目标。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command show": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create a read-only Agent presentation and retain board_id and revision."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建只读 Agent 展示箔，保存 board_id 与 revision。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command update": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update an owned board while preserving its layout and hidden state."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新所属展示箔，保留布局与隐藏状态。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command terminal.create": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create a shell session and immediately run the optional startup script."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "创建 Shell 会话并立即运行可选初始化脚本。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command config.list": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "List the configuration whitelist, values, defaults and dependencies."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "列出配置白名单、值、默认值与依赖。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command config.get": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read one whitelisted configuration value."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查询一项白名单配置。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command config.set": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Set one whitelisted configuration value without enabling dependencies automatically."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置一项白名单配置，不自动开启依赖。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command permissions.status": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read permission status without requesting authorization."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查询权限状态，不发起授权。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command settings.open": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a selected settings section."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开指定设置页。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command history.search": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search bounded history metadata and snippets."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查询有界历史元数据与片段。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command history.open": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open a history item; incognito creates an independent copy."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开历史项；无痕模式创建独立副本。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command export": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export the original save representation or a PNG viewport; overwrite is explicit."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出原始另存内容或 PNG 视口，覆盖必须显式指定。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command install": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install the CLI and enable the General Skill."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装 CLI 并开启通用 Skill。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command uninstall": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove the managed CLI copy and receipt."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除已管理的 CLI 副本与收据。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command agent.setup": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install the CLI and explicitly selected Agent Skill targets."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "组合安装 CLI 与明确选择的 Agent Skill。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command agent.status": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Read detected Agent targets and separate Skill installation states."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查询 Agent 检测与独立的 Skill 安装状态。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command skill.install": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install the Skill for an explicit Agent, detected targets or a custom path."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向指定 Agent、检测目标或自定义路径安装 Skill。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command skill.check": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inspect Skill installation files and conflicts."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查 Skill 安装文件与冲突。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command skill.update": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update only managed, unmodified Skill installations."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅更新已管理且未修改的 Skill。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command skill.uninstall": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove a managed Skill reference while preserving other shared references."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除已管理的 Skill 引用，保留其他共享引用。"
+          }
+        }
+      }
+    },
+    "Foil CLI Command doctor": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnose local CLI paths and versions without launching the app or reading credentials."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "诊断本机 CLI 路径与版本，不启动应用或读取凭证。"
+          }
+        }
+      }
+    },
+    "Agent CLI Status External": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installed at another location"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装于其他位置"
+          }
+        }
+      }
+    },
+    "Agent CLI Section": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Command Line"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "命令行工具"
+          }
+        }
+      }
+    },
+    "Agent CLI Install Button": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install CLI Command"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装 CLI 命令"
+          }
+        }
+      }
+    },
+    "Agent CLI Reinstall Button": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reinstall"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新安装"
+          }
+        }
+      }
+    },
+    "Agent CLI Status Checking": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking installation…"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在检测安装状态…"
+          }
+        }
+      }
+    },
+    "Agent CLI Status Missing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not installed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未安装"
+          }
+        }
+      }
+    },
+    "Agent CLI Status Installed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装"
+          }
+        }
+      }
+    },
+    "Agent CLI Status Outdated": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installed · update available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装 · 可重新安装以更新"
+          }
+        }
+      }
+    },
+    "Agent CLI Status Not Executable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installed file cannot be executed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已安装文件无法执行"
+          }
+        }
+      }
+    },
+    "Agent CLI Status Conflict": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An unverified file occupies the installation path"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装位置存在未验证的同名文件"
+          }
+        }
+      }
+    },
+    "Agent CLI Status Unreadable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cannot read the installed file"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取已安装文件"
+          }
+        }
+      }
+    },
+    "Agent CLI Installed Successfully": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI command installed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI 命令已安装。"
+          }
+        }
+      }
+    },
+    "Agent CLI Reinstalled": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI command reinstalled."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI 命令已重新安装。"
+          }
+        }
+      }
+    },
+    "Agent CLI Install Conflict": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another or modified file occupies this path. It was preserved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "该位置存在其他或已修改的文件，已保留原文件。"
+          }
+        }
+      }
+    },
+    "Agent CLI Install Failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installation did not complete. Check write permissions for the installation directory."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装操作未完成，请检查安装目录的写入权限。"
+          }
+        }
+      }
+    },
+    "Agent CLI Not On PATH": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The current app environment cannot find foil in PATH. Terminal environments may differ; use the full path above."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前应用环境的 PATH 未找到 foil。终端环境可能不同，可使用上方完整路径。"
+          }
+        }
+      }
+    },
+    "Agent CLI Shadowed Format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "PATH currently finds another command first: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前 PATH 优先找到另一个命令：%@"
+          }
+        }
+      }
+    },
+    "Agent CLI Required For Skills": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install the CLI command first to enable Agent access. The first installation enables General automatically."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请先安装 CLI 命令，再启用 Agent 接入。首次安装后会自动开启“通用”。"
+          }
+        }
+      }
+    },
+    "Agent Common Group": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "General"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通用"
+          }
+        }
+      }
+    },
+    "Agent Common Includes Format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Includes %@, and others."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "包含：%@ 等。"
+          }
+        }
+      }
+    },
+    "Agent Toggle Reload Note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An existing Agent session may need to reload its skills."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已有 Agent 会话可能需要重新加载 Skill。"
+          }
+        }
+      }
+    },
+    "Agent Toggle Introduction": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Turn on an Agent to install the foofoil Skill. Turn it off to remove it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开开关安装浮箔 Skill，关闭开关移除。"
+          }
+        }
+      }
+    },
+    "Agent Toggle Shared Note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agents using the same Skill directory switch together. An existing Agent session may need to reload its skills."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "共用同一 Skill 目录的 Agent，开关会同步。已有会话可能需要重新加载 Skill。"
+          }
+        }
+      }
+    },
+    "Agent Toggle Conflict": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The Skill file was changed or belongs to another installation. Your file was preserved."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skill 文件已被修改或不属于浮箔管理，已保留原文件。"
+          }
+        }
+      }
+    },
+    "Agent Toggle Failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not change access. Check that the CLI and Skill directories are writable."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "操作未完成，请检查 CLI 和 Skill 目录是否可写。"
+          }
+        }
+      }
+    },
+    "Agent Toggle Unreadable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cannot read the Skill file. Check its file permissions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取 Skill 文件，请检查文件权限。"
+          }
+        }
+      }
+    },
+    "Agent Check Read Only Note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This check refreshes detection and installation status. It does not install files."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "此操作仅刷新检测与安装状态，不会安装文件。"
+          }
+        }
+      }
+    },
+    "Agent Check Completed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status check completed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接入状态检查完成"
+          }
+        }
+      }
+    },
+    "Agent Last Checked": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last checked"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查时间"
+          }
+        }
+      }
+    },
+    "Agent Check Summary Format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Found %ld Agent programs; %ld entries have configuration only. foofoil Skill is installed in %ld directories."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "找到 %ld 个 Agent 程序，%ld 项仅找到配置。浮箔 Skill 已安装到 %ld 个目录。"
+          }
+        }
+      }
+    },
+    "Agent Skill Explanation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The foofoil Skill is a SKILL.md guide that helps an Agent discover and use foofoil. “Not installed” means that guide is absent from the shown directory, not that the Agent is absent. Select Agents below and install the CLI and selected Skills. Agents sharing a directory need only one file. The foil CLI also works without a Skill."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浮箔 Skill 是一份 SKILL.md 使用说明，帮助 Agent 发现并调用浮箔。“尚未安装”表示上方目录里还没有这份说明，不代表 Agent 未安装。勾选下方 Agent，再点“安装 CLI 和所选 Skill”；共享目录只需安装一份。不安装 Skill 也能直接使用 foil CLI。"
+          }
+        }
+      }
+    },
+    "Agent Skill Installed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foofoil Skill installed · verify in a new session"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浮箔 Skill 已安装 · 请在新会话中验证"
+          }
+        }
+      }
+    },
+    "Agent Skill Not Installed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foofoil Skill not installed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浮箔 Skill 尚未安装"
+          }
+        }
+      }
+    },
+    "Agent Skill Update Available": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foofoil Skill update available"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浮箔 Skill 有可用更新"
+          }
+        }
+      }
+    },
+    "Agent Skill Unmanaged Conflict": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skill file already exists · not managed by foofoil"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skill 文件已存在 · 非浮箔管理"
+          }
+        }
+      }
+    },
+    "Agent Skill Modified": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foofoil Skill was modified · your changes are preserved"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浮箔 Skill 已被修改 · 将保留您的改动"
+          }
+        }
+      }
+    },
+    "Agent Skill Unreadable": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cannot read the foofoil Skill file"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法读取浮箔 Skill 文件"
+          }
+        }
+      }
+    },
+    "Agent Shared Directory": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shared Skill directory · no Agent program to detect"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通用 Skill 目录 · 不检测 Agent 程序"
+          }
+        }
+      }
+    },
+    "Agent Program Detected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent application or command detected"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已检测到 Agent 应用或命令"
+          }
+        }
+      }
+    },
+    "Agent Configuration Only": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent configuration detected · program installation unconfirmed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅检测到 Agent 配置 · 程序安装状态未确认"
+          }
+        }
+      }
+    },
+    "Agent Program Not Detected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent application and configuration not detected"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未检测到 Agent 应用或配置"
+          }
+        }
+      }
+    },
+    "Agent Detection Scope Note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent detection and foofoil Skill installation are separate. Not detected does not mean the Agent is absent; GUI apps may use a different PATH. Shared-directory installation applies to every listed Agent that supports it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent 检测与浮箔 Skill 安装状态分别显示。“未检测到”不代表 Agent 未安装，GUI 应用的 PATH 可能不同。共享目录中的一份 Skill 可供所有支持它的 Agent 使用。"
+          }
+        }
+      }
+    },
+    "Agent Check Diagnostics": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check Access Status"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "检查接入状态"
+          }
+        }
+      }
+    },
+    "Agent CLI installed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI installed and current"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI 已安装且为当前版本"
+          }
+        }
+      }
+    },
+    "Agent CLI outdated": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI needs an update. Use Install CLI and Selected Skills to refresh it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI 需要更新，可通过“安装 CLI 和所选 Skill”更新。"
+          }
+        }
+      }
+    },
+    "Agent CLI missing": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI is not installed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI 尚未安装"
+          }
+        }
+      }
+    },
+    "Agent CLI modified": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI conflict: the existing command will be preserved"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI 存在冲突：将保留现有命令"
+          }
+        }
+      }
+    },
+    "Default Document Theme": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Theme"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主题"
+          }
+        }
+      }
+    },
+    "Default Document Font Size": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Font Size"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "字号"
+          }
+        }
+      }
+    },
+    "Default Document Style Note": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Applies to new foils. Existing foils keep their saved styles."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅用于新箔，已有箔保留已保存的样式。"
+          }
+        }
+      }
+    },
+    "Default Document Style": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default Document Style"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文档默认样式"
+          }
+        }
+      }
+    },
+    "Agent Access": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent Access"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Agent 接入"
+          }
+        }
+      }
+    },
+    "Agent Access Description": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select where to install the shared foofoil skill. Installation also adds foil to ~/.local/bin. Start a new Agent session to verify discovery."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择浮箔 Skill 的安装位置，同时将 foil 安装到 ~/.local/bin。安装后须在新的 Agent 会话中验证发现与调用。"
+          }
+        }
+      }
+    },
+    "Agent Installed New Session": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foofoil Skill installed · verify in a new session"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浮箔 Skill 已安装 · 请在新会话中验证"
+          }
+        }
+      }
+    },
+    "Agent Installation Conflict": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foofoil Skill conflict · your files will be preserved"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浮箔 Skill 存在冲突 · 将保留您的文件"
+          }
+        }
+      }
+    },
+    "Agent Not Installed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foofoil Skill not installed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浮箔 Skill 尚未安装"
+          }
+        }
+      }
+    },
+    "Agent Custom Skill Path": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom skill directory (absolute path)"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自定义 Skill 目录（绝对路径）"
+          }
+        }
+      }
+    },
+    "Agent Install Selected": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Install CLI and Selected Skills"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装 CLI 和所选 Skill"
+          }
+        }
+      }
+    },
+    "Agent Update Managed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update Managed"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "更新已管理安装"
+          }
+        }
+      }
+    },
+    "Agent Uninstall Managed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove Managed Skills"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除已管理 Skill"
+          }
+        }
+      }
+    },
+    "Agent Detect Again": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Detect Again"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新检测"
+          }
+        }
+      }
+    },
+    "Agent CLI Install Hint": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "CLI installation path shown above. GUI Agents may use a different PATH; use the absolute path when necessary. Updates and removal preserve modified files."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上方为 CLI 安装路径。GUI Agent 的 PATH 可能不同，必要时使用绝对路径。更新与卸载会保留已修改的文件。"
+          }
+        }
+      }
+    },
+    "Agent Copy Prompt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Copy Trial Prompt"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "复制试用提示词"
+          }
+        }
+      }
+    },
+    "Agent Try Prompt": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use foofoil to display a temporary reference. Run foil guide first, query capabilities, open it incognito, and verify the operation result."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用浮箔显示一份临时参考资料。先运行 foil guide 了解接口，再查询能力、无痕打开并确认操作结果。"
+          }
+        }
+      }
+    },
+    "Agent Installation Failed": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Installation failed. Run foil doctor --json for diagnostics."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装失败，请运行 foil doctor --json 检查。"
+          }
+        }
+      }
+    },
+    "Agent CLI Overview": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foil — local reference content and window control"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "foil — 本机参考内容与窗口控制"
+          }
+        }
+      }
+    },
+    "Agent Guide start": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To open known content: foil open /absolute/path/file, then foil wait --operation ID from the response. File type is automatic; --type markdown is only for --stdin. For folders use foil open --directory /absolute/path/folder. Confirm and stop; no preliminary capabilities/list/inspect is needed. For existing content, list --scope all if the window is unknown and query capabilities WINDOW before content-dependent operations. Use foil help COMMAND or foil schema COMMAND for syntax and limits. Topics: presentation, reading, windows, media, privacy, config, terminal, integration, troubleshooting. Accepted is not completed."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开已知内容：foil open /absolute/path/file，再使用响应中的 operation.id 执行 foil wait --operation ID。文件自动识别类型；--type markdown 仅用于 --stdin。目录使用 foil open --directory /absolute/path/folder。确认完成后即停止，无须先查 capabilities/list/inspect。操作已有内容时，窗口未知才用 list --scope all；依赖内容能力的操作先查 capabilities WINDOW。语法与范围见 foil help COMMAND 或 foil schema COMMAND。主题：presentation、reading、windows、media、privacy、config、terminal、integration、troubleshooting。accepted 不代表完成。"
+          }
+        }
+      }
+    },
+    "Agent Guide presentation": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use show FILE for a new owned board; retain board_id and revision. Update with update BOARD FILE --expected-revision N. Keep source files available. Markdown external resources are blocked. Never recreate a user-closed board."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 show FILE 新建所属展示箔，保存 board_id 和 revision。用 update BOARD FILE --expected-revision N 更新。原始文件须持续可用，Markdown 外部资源会被阻止。不得自动重建用户关闭的箔。"
+          }
+        }
+      }
+    },
+    "Agent Guide reading": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Query capabilities WINDOW. Text offsets use Unicode scalars; limit is 1..3000. Nonzero offsets require --content-version. PDF requires --page (1 based). rendered reads the current loaded view; ocr reads an existing result. terminal --tail reads bounded retained output. outline/items limit is 1..20. search returns offsets and lines without navigating. navigate requires a version and one locator. Requery stale versions."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先查询 capabilities WINDOW。文本偏移按 Unicode scalar 计数，limit 为 1～3000，非零 offset 必须带 --content-version。PDF 使用从 1 开始的 --page；rendered 读取当前已加载视图，ocr 仅读取已有结果，terminal --tail 读取有界保留输出。outline/items 每页 1～20 项。search 返回偏移与行号，不改变阅读位置。navigate 需要版本与唯一定位参数。版本过期后重新查询。"
+          }
+        }
+      }
+    },
+    "Agent Guide windows": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discover window IDs with list --scope all and inspect. Handles expire on restart. reveal shows a window; focus explicitly activates. screens reports available screens; frame uses the selected screen’s visible top-left origin in logical points. Navigator values are visible, hidden, auto."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通过 list --scope all 和 inspect 发现窗口身份，应用重启后句柄失效。reveal 显示窗口，focus 显式激活。screens 查询屏幕；frame 使用所选屏幕可用区域左上角为原点的逻辑点坐标。navigator 可用值为 visible、hidden、auto。"
+          }
+        }
+      }
+    },
+    "Agent Guide media": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Query media status WINDOW and runtime capabilities. Times use seconds; volume is 0..1. Confirm accepted changes with wait and status. Backend and device availability apply; existing playback coordination is preserved. Selection requires a version-bound opaque target."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "先查询 media status WINDOW 与运行时能力。时间单位为秒，音量为 0～1。受理后的变更须通过 wait 与 status 确认。后端能力与设备状态仍生效，复用既有播放协调器。选择项目须使用绑定版本的不透明目标。"
+          }
+        }
+      }
+    },
+    "Agent Guide privacy": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All open sources, show, terminal create and history open accept --incognito. History copies do not touch the original. The incognito setter is idempotent; favorites refuse conversion. Derived foils inherit privacy. Incognito does not erase exports or Agent records. Never disclose credentials."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "所有打开来源、show、terminal create 与 history open 均可加 --incognito。无痕历史副本不更新原记录。incognito setter 幂等，收藏记录拒绝转换，派生箔继承无痕。无痕不会清除导出文件或 Agent 记录。不得披露凭证。"
+          }
+        }
+      }
+    },
+    "Agent Guide config": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "config list describes the whitelist, defaults, ranges and dependencies. Set does not enable prerequisites automatically. permissions status never requests permission. settings open opens a selected pane. History returns bounded metadata; export requires an absolute path and explicit --overwrite to replace a file."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "config list 返回白名单、默认值、范围与依赖，set 不自动开启前置配置。permissions status 不发起授权。settings open 打开指定设置页。历史查询仅返回有界元数据；导出需要绝对路径，只有显式 --overwrite 才覆盖目标。"
+          }
+        }
+      }
+    },
+    "Agent Guide terminal": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "terminal create starts the shell and optional --command immediately; only use when authorized. Commands and environment may persist: never include secrets. Existing-terminal input injection is unavailable. read --source terminal reads retained output. Busy close requires authorized --force."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "terminal create 会立即启动 shell 并执行可选 --command，仅在用户授权后使用。命令与环境可能持久化，不得包含秘密。不能向既有终端注入输入。read --source terminal 读取保留输出；忙碌终端仅在获授权后使用 --force 关闭。"
+          }
+        }
+      }
+    },
+    "Agent Guide integration": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "skill install requires --agent, --detected or --path. Agents: codex, claude, cursor, opencode (v1/v2; aliases opencode-v1/opencode-v2), pi, omp, workbuddy, qoder, qoder-cn, kimi, zcode, zed, shared. Codex/Cursor/Pi/OMP/Kimi/ZCode/Zed share ~/.agents/skills; OpenCode uses ~/.config/opencode/skills; WorkBuddy ~/.workbuddy/skills; Qoder ~/.qoder/skills; Qoder CN ~/.qoder-cn/skills; Claude Code ~/.claude/skills. Agent application/configuration detection is separate from foofoil Skill installation. Missing from detection is not proof the Agent is uninstalled. agent setup also installs foil to ~/.local/bin. Update/removal only touches managed, unmodified files. Verify discovery in a new Agent session."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "skill install 必须指定 --agent、--detected 或 --path。支持 codex、claude、cursor、opencode（v1/v2，别名 opencode-v1/opencode-v2）、pi、omp、workbuddy、qoder、qoder-cn、kimi、zcode、zed 和 shared。Codex/Cursor/Pi/OMP/Kimi/ZCode/Zed 共用 ~/.agents/skills；OpenCode 使用 ~/.config/opencode/skills；WorkBuddy 使用 ~/.workbuddy/skills；Qoder 与 Qoder CN 分别使用 ~/.qoder/skills 与 ~/.qoder-cn/skills；Claude Code 使用 ~/.claude/skills。Agent 应用／配置检测与浮箔 Skill 安装状态分别显示，未检测到不代表 Agent 未安装。agent setup 同时安装 CLI 到 ~/.local/bin。更新和卸载仅处理浮箔管理且未修改的文件；安装后须在新会话中验证发现与调用。"
+          }
+        }
+      }
+    },
+    "Agent Guide troubleshooting": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run foil doctor --json. Check PATH and absolute paths separately. Use --app to select a known app build. On TIMEOUT retry identical arguments and request ID within 600 seconds. wait timeout does not cancel the operation. Do not bypass pause, revocation or user closure. Explore foil --help, guide or schema."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行 foil doctor --json，分别检查 PATH 与绝对路径。用 --app 指定明确的应用构建。TIMEOUT 后在 600 秒内使用相同参数与 request ID 重试；wait 超时不取消操作。不得绕过暂停、撤销或用户关闭。通过 foil --help、guide 或 schema 继续探索。"
+          }
+        }
+      }
+    },
     "Foil Info Track Title": {
       "localizations": {
         "en": {
@@ -13247,13 +15471,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "foil — window control and terminal sessions, protocol 1\nfoil show FILE [--title TITLE] [--incognito] [--json]\nfoil update BOARD FILE [--expected-revision N] [--json]\nfoil list [--scope all] [--json]\nfoil open FILE | foil open --stdin --type markdown\nfoil reveal ID | foil hide ID | foil inspect ID\nfoil close ID --scope all [--force]\nfoil set ID opacity VALUE\nfoil terminal create [--title TITLE] [--cwd DIR] [--shell PATH]\n     [--command SCRIPT] [--env KEY=VALUE]\nfoil close BOARD [--expected-revision N] [--json]\nOptions: --request-id ID --caller NAME --session FILE --app APP\nA timeout may have committed. Retry with the same request ID and arguments within 600 seconds.\nKeep original files available. Markdown images are not loaded. User-closed boards must not be recreated automatically.\nfoil install [--directory DIR] | foil uninstall [--directory DIR]\nfoil --version"
+            "value": "foil — window control and terminal sessions, protocol 1\nfoil show FILE [--title TITLE] [--incognito] [--json]\nfoil update BOARD FILE [--expected-revision N] [--json]\nfoil list [--scope all] [--incognito] [--json]\nfoil open FILE [--incognito] | foil open --stdin --type markdown\nfoil reveal ID | foil hide ID | foil inspect ID\nfoil read WINDOW_ID [--offset N] [--limit N] [--content-version VERSION]\nfoil outline WINDOW_ID [--offset N] [--limit N] [--content-version VERSION]\nfoil navigate WINDOW_ID --target TARGET_ID --content-version VERSION\nfoil close ID --scope all [--force]\nfoil set ID opacity VALUE | foil set ID incognito|pinned|border true|false\nfoil set ID title TITLE\nfoil terminal create [--title TITLE] [--cwd DIR] [--shell PATH]\n     [--command SCRIPT] [--env KEY=VALUE]\nfoil close BOARD [--expected-revision N] [--json]\nOptions: --request-id ID --caller NAME --session FILE --app APP\nA timeout may have committed. Retry with the same request ID and arguments within 600 seconds.\nKeep original files available. Markdown images are not loaded. User-closed boards must not be recreated automatically.\nfoil install [--directory DIR] | foil uninstall [--directory DIR]\nfoil --version | foil guide [TOPIC] | foil schema [COMMAND] | foil capabilities [WINDOW_ID]"
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "foil — 窗口控制与终端会话，协议 1\nfoil show FILE [--title TITLE] [--incognito] [--json]\nfoil update BOARD FILE [--expected-revision N] [--json]\nfoil list [--scope all] [--json]\nfoil open FILE | foil open --stdin --type markdown\nfoil reveal ID | foil hide ID | foil inspect ID\nfoil close ID --scope all [--force]\nfoil set ID opacity VALUE\nfoil terminal create [--title TITLE] [--cwd DIR] [--shell PATH]\n     [--command SCRIPT] [--env KEY=VALUE]\nfoil close BOARD [--expected-revision N] [--json]\n选项： --request-id ID --caller NAME --session FILE --app APP\n超时可能已提交。请在 600 秒内以相同请求 ID 和参数重试。\n请保留原文件。Agent Markdown 不加载图片。用户关闭的窗口不得自动重建。\nfoil install [--directory DIR] | foil uninstall [--directory DIR]\nfoil --version"
+            "value": "foil — 窗口控制与终端会话，协议 1\nfoil show FILE [--title TITLE] [--incognito] [--json]\nfoil update BOARD FILE [--expected-revision N] [--json]\nfoil list [--scope all] [--incognito] [--json]\nfoil open FILE [--incognito] | foil open --stdin --type markdown\nfoil reveal ID | foil hide ID | foil inspect ID\nfoil read WINDOW_ID [--offset N] [--limit N] [--content-version VERSION]\nfoil outline WINDOW_ID [--offset N] [--limit N] [--content-version VERSION]\nfoil navigate WINDOW_ID --target TARGET_ID --content-version VERSION\nfoil close ID --scope all [--force]\nfoil set ID opacity VALUE | foil set ID incognito|pinned|border true|false\nfoil set ID title TITLE\nfoil terminal create [--title TITLE] [--cwd DIR] [--shell PATH]\n     [--command SCRIPT] [--env KEY=VALUE]\nfoil close BOARD [--expected-revision N] [--json]\n选项： --request-id ID --caller NAME --session FILE --app APP\n超时可能已提交。请在 600 秒内以相同请求 ID 和参数重试。\n请保留原文件。Agent Markdown 不加载图片。用户关闭的窗口不得自动重建。\nfoil install [--directory DIR] | foil uninstall [--directory DIR]\nfoil --version | foil guide [TOPIC] | foil schema [COMMAND] | foil capabilities [WINDOW_ID]"
           }
         }
       }

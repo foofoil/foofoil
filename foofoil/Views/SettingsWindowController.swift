@@ -17,6 +17,7 @@ final class SettingsWindowController: NSWindowController {
 
     private let tabController = SettingsTabViewController()
     private var hasCentered = false
+    private let agentIntegrationModel = AgentIntegrationSettingsModel()
 
     private init() {
         let window = NSWindow(
@@ -76,13 +77,16 @@ final class SettingsWindowController: NSWindowController {
                 )
             )
         }
+        tabController.addTabViewItem(makeTab(identifier: "agent", title: NSLocalizedString("Agent Access", comment: ""), symbolName: "terminal", rootView: AgentIntegrationSettingsView(model: agentIntegrationModel)))
         window.contentViewController = tabController
         applySelectedTabAppearance(animated: false)
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
-    func show() {
+    func show(section: String? = nil) {
+        if window?.isVisible != true { agentIntegrationModel.clearInstallationFeedback() }
+        if let section, let index = tabController.tabViewItems.firstIndex(where: { ($0.identifier as? String) == section }) { tabController.selectedTabViewItemIndex = index }
         guard let window else { return }
         NSApp.activate(ignoringOtherApps: true)
         if !hasCentered {

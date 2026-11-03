@@ -68,6 +68,7 @@ extension AppState {
 
     func reportFileOpenFeedback(_ failures: [FileOpenFeedback]) {
         guard !failures.isEmpty else { return }
+        agentLoadError = "CONTENT_LOAD_FAILED"
         if isArchivePreview { fileOpenFeedback = failures; return }
         NotificationCenter.default.post(name: .fileOpenFeedback, object: self,
             userInfo: ["failures": failures, "batchID": fileOpenFeedbackBatchID])

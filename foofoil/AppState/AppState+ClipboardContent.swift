@@ -129,6 +129,7 @@ extension AppState {
 
     /// 打开剪贴板等无来源文件的文本；`isMarkdown` 决定进入 Markdown 预览还是普通文本。
     public func openText(_ content: String, isMarkdown: Bool, isClipboard: Bool = true) {
+        agentLoadError = nil
         clearArchiveForNewContent()
         resetFileList()
         clearCustomCover()

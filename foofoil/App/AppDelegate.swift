@@ -162,6 +162,15 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        // 安装应用后的首次启动补齐通用 Skill；文件检查与写入不阻塞窗口启动。
+        Task.detached(priority: .utility) {
+            do {
+                if let code = try AgentIntegration().initializeDefaultSharedSkill() {
+                    NSLog("foofoil default Skill installation: %@", code)
+                }
+            } catch { NSLog("foofoil default Skill installation failed: %@", String(describing: error)) }
+        }
+
         startControlSocketIfNeeded()
         // 活跃窗口切换时立即同步 PDF 专用菜单，避免等待用户打开任意菜单后才更新。
         NotificationCenter.default.addObserver(

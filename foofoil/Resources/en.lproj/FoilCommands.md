@@ -1,79 +1,84 @@
 # foil Command Reference
 
-`foil` ships with foofoil and opens files, controls foils, and creates interactive terminals. It is already on PATH inside terminal foils. To use it from another terminal, install it into `~/.local/bin`:
+`foil` ships with foofoil. It opens and presents content, reads and navigates documents, controls windows and media, creates terminals, and queries configuration, history and Agent access. The syntax below comes from the current CLI; query `foil capabilities WINDOW` for actual runtime availability.
+
+## Installation and first steps
+
+Settings → Agent Access automatically checks the CLI installation and offers installation or reinstallation at `~/.local/bin/foil`. The first app launch installs the General Skill. Installing or reinstalling foil also installs and enables General; ordinary launches preserve your choices. Agent switches are disabled while the CLI is unavailable. To install manually:
 
 ```sh
 /Applications/foofoil.app/Contents/MacOS/foil install
+~/.local/bin/foil guide
 ~/.local/bin/foil --help
 ```
 
-Replace the app path if installed elsewhere. Add `~/.local/bin` to PATH or use the full path. Reinstall after upgrading the app. Installation does not overwrite another tool with the same name.
+Replace the application path when installed elsewhere. Use the full command path if PATH cannot find it. Installation preserves unknown third-party files with the same name. Terminal foils already include `foil` on PATH.
 
-## Opening files and controlling windows
-
-| Command | Usage |
+| Offline reference | Contents |
 | --- | --- |
-| `foil open FILE` | Open through the ordinary file pipeline. accepted does not mean loading finished. Directories are unsupported. |
-| `foil open --stdin --type markdown` | Display stdin as read-only incognito Markdown. |
-| `foil list --scope all` | List controllable windows and obtain `windows[].id`. |
-| `foil reveal ID` | Show a window. |
-| `foil hide ID` | Hide a window; terminal jobs keep running. |
-| `foil inspect ID` | Read metadata such as type, visibility, opacity, and terminal state, without terminal contents. |
-| `foil set ID opacity VALUE` | Supports 0.3–1.0, rounded to the window’s 10% steps; the response gives the actual value. |
-| `foil close ID --scope all` | Close a window; active terminals return CONFIRMATION_REQUIRED. |
-| `foil close ID --scope all --force` | Terminate managed terminal jobs and close the window. |
+| `foil --help` / `foil help` | Command summary |
+| `foil help COMMAND` | Command syntax, for example `foil help media seek` |
+| `foil guide [TOPIC]` | Getting started and focused workflows |
+| `foil schema [COMMAND]` | JSON contract, arguments and ranges; static schema is not runtime availability |
+| `foil --version` | CLI, entry, protocol and application build versions |
+
+These reference commands do not launch the app or require credentials. In the syntax, `[]` means optional and `|` separates alternatives or mutually exclusive inputs. Replace FILE, WINDOW, BOARD, VERSION and other placeholders.
+
+{{command_tables}}
+
+## Open, wait and read
 
 ```sh
-foil open "$HOME/Documents/reference.md"
-foil list --scope all --json
+foil open "$HOME/Documents/reference.pdf" --incognito
+foil wait --operation OPERATION_ID --timeout 30
+foil capabilities WINDOW_ID
 foil inspect WINDOW_ID
-foil set WINDOW_ID opacity 0.8
-foil hide WINDOW_ID
-foil reveal WINDOW_ID
-printf '# Temporary reference\n\nBody\n' | foil open --stdin --type markdown
+foil read WINDOW_ID --page 1 --limit 3000
+foil read WINDOW_ID --page 1 --offset 3000 --limit 3000 --content-version VERSION
+foil outline WINDOW_ID
+foil navigate WINDOW_ID --target TARGET_ID --content-version VERSION
+foil media status MEDIA_WINDOW_ID
+foil media pause MEDIA_WINDOW_ID
 ```
 
-Replace `WINDOW_ID` with an ID from the response. Window IDs expire when the window closes or the app restarts. `content_id` identifies history content and `terminal_id` identifies a session; these IDs are not interchangeable.
+Use identities and versions from earlier responses. An accepted open is not completed: retain `operation.id` and confirm with wait. Timeout does not cancel the operation. Quick Look returns COMPLETION_UNOBSERVABLE when completion cannot be confirmed. `is_loading: false` alone does not prove every asynchronous operation has completed.
 
-## Creating interactive terminals
+Window IDs expire on application restart. BOARD identifies an owned Agent presentation, content_id identifies content, and terminal_id identifies a terminal session; do not interchange them. list defaults to owned Agent boards; use `--scope all` to list or close ordinary windows.
+
+read uses currently loaded content. PDF requires a page number starting at 1; rendered extracts the current webpage/EPUB view; ocr only reads an existing result; terminal only reads bounded retained output, with tail from 1 to 2000 lines. Nonzero offsets require the previous content_version. Text offsets use Unicode scalars with at most 3000 per page. Outlines, items and window lists allow at most 20 entries per page and also enforce response byte limits. Continue with next_offset and the corresponding version; requery on STALE_CONTENT. Reads do not implicitly run OCR, recursively unpack archives or reread externally changed files.
+
+search returns snippets, offsets and lines without navigating. Navigation requires a version and exactly one locator; confirm asynchronous results with wait and inspect. Media times use seconds and volume ranges from 0 to 1. Unavailable backend actions are rejected. Window frame uses the selected screen's visible top-left origin in logical points and returns the actual clamped frame.
+
+## Presentations, terminals and privacy
 
 ```sh
+foil show ./report.md --title Report --incognito
+foil update BOARD_ID ./report.md --expected-revision 1
+printf '# Temporary reference\n\nBody\n' | foil open --stdin --type markdown
 foil terminal create --title Dev --cwd "$HOME/projects" --shell /bin/zsh
 foil terminal create --title Build --cwd /path/to/project --command 'pwd; swift build' --env MODE=debug
-foil terminal create --incognito --shell /bin/bash
 ```
 
-Supported shells are `/bin/zsh` and `/bin/bash`. `--cwd DIR` sets the working directory. `--command SCRIPT` runs a trusted startup script in the same shell. Repeat `--env KEY=VALUE` for environment overrides. `--title TITLE` sets the title; `--incognito` creates an incognito terminal. Ordinary history stores configuration and scripts, so do not put credentials in them. ready means the session object exists, not that the script finished; inspect reports its state.
+show/update support read-only Agent presentations: local UTF-8 text, code, Markdown, raster first frames and SVG. Ordinary open additionally accepts document/media formats supported by the host, directories, archives, URLs and clipboard content. Keep presentation source files available and explicitly update after changes. Markdown external images are blocked. show always creates a new foil; do not use it to bypass user closure or a failed update.
 
-## Read-only Agent presentation
+Terminals support `/bin/zsh` and `/bin/bash`. Creation runs the optional startup script immediately. Ordinary history stores configuration and environment, so never include credentials. ready does not mean the script completed. Existing-terminal input injection is unavailable. Closing an active terminal may return CONFIRMATION_REQUIRED; use force only when termination is authorized.
 
-| Command | Usage |
+Every open source, show, terminal create and history open accepts incognito. Incognito content does not enter history or restart recovery. Incognito history opening creates an independent copy without touching the original. Favorites refuse conversion; setting an existing target state is idempotent. Incognito does not erase exports, downloads or Agent records.
+
+## Configuration, export and Agent access
+
+config exposes a whitelist with types, defaults, ranges and dependencies; set does not enable prerequisites automatically. permissions status does not request authorization. History search returns bounded metadata. Export follows the host's save restrictions, requires an absolute output path, and refuses overwrite unless explicitly requested. Multi-node archive CLI export is unavailable.
+
+Settings switches immediately install/remove Skills and check automatically. General covers Codex, Cursor, Pi, OMP, Kimi Code, ZCode, Zed Agent and other clients sharing its directory; dedicated directories have separate switches. Existing Agent sessions may need to reload Skills. CLI skill/agent commands remain available for explicit targets and advanced custom paths. Writing files does not prove an Agent session discovered them.
+
+## Common options and recovery
+
+| Option | Meaning |
 | --- | --- |
-| `foil show FILE [--title TITLE] [--incognito]` | Create a read-only presentation foil. |
-| `foil update BOARD FILE [--expected-revision N]` | Update an Agent foil, preserving layout and hidden state. |
-| `foil list` | List only Agent foils owned by the current credential. |
-| `foil close BOARD [--expected-revision N]` | Close only an Agent foil owned by the current credential. |
+| `--json` | Business responses already use JSON; errors exit nonzero and print a code to stderr |
+| `--request-id ID` | Deduplication ID; TIMEOUT may have committed, so retry identical arguments and ID within 600 seconds |
+| `--caller NAME` | Display name, not authorization |
+| `--session FILE` | Separate credential file; also FOIL_SESSION |
+| `--app APP` | Explicit application path; also FOIL_APP |
 
-Supports local UTF-8 text, code, Markdown, raster images (first frame), and SVG. PDF, HTML, websites, media, directories, and archives are unsupported. Keep source files available and explicitly update after changes. Markdown images are blocked; show images separately. Ordinary foils enter history; incognito foils do not enter history or restart recovery. show always creates a window; do not replace a failed update with repeated show calls.
-
-```sh
-foil show ./report.md --title Report --json
-foil update BOARD_ID ./report.md --expected-revision 1
-foil close BOARD_ID
-```
-
-## Common options and installation
-
-| Option or command | Meaning |
-| --- | --- |
-| `--json` | Response format option; current success responses already use JSON. Failures exit nonzero and print an error code to stderr. |
-| `--request-id ID` | Deduplication ID. A timeout may have committed; retry with the same ID and arguments within 600 seconds. |
-| `--caller NAME` | Display name, not an authorization credential. |
-| `--session FILE` | Separate session credential file; also `FOIL_SESSION`. |
-| `--app APP` | Explicit app path; also `FOIL_APP`. |
-| `foil install [--directory DIR]` | Install CLI; defaults to `~/.local/bin`. |
-| `foil uninstall [--directory DIR]` | Remove installed CLI and receipt, preserving the app and documents. |
-| `foil --help` / `foil help` | Show command summary. |
-| `foil --version` | Show protocol version. |
-
-Default credentials live at `~/.local/state/foofoil/session.json`; do not share that file. General settings can pause Agent control or revoke sessions. Quote paths containing spaces. Commands control local foofoil windows; they cannot inject input into existing terminals.
+Default credentials are stored at `~/.local/state/foofoil/session.json`; never share them. Settings can pause Agent control or revoke sessions. Reconfirm state after version conflicts, user closure, pause or revocation instead of blindly recreating content. Quote paths containing spaces. For troubleshooting use `foil doctor --json` or `foil guide troubleshooting`.

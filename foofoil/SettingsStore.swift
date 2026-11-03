@@ -758,6 +758,24 @@ public class SettingsStore {
     }
 
 
+    /// 文档默认样式只影响之后创建的箔；已保存的文档样式继续按各自配置恢复。
+    var defaultDocumentThemeID: String {
+        get { userDefaults.string(forKey: "defaultDocumentThemeID") ?? DocumentThemeCatalog.defaultThemeId }
+        set { userDefaults.set(newValue, forKey: "defaultDocumentThemeID") }
+    }
+
+    var defaultDocumentFontSize: Double {
+        get {
+            guard userDefaults.object(forKey: "defaultDocumentFontSize") != nil else { return AppState.defaultTextFontSize }
+            return max(AppState.minTextFontSize, min(AppState.maxTextFontSize, userDefaults.double(forKey: "defaultDocumentFontSize")))
+        }
+        set { userDefaults.set(newValue, forKey: "defaultDocumentFontSize") }
+    }
+
+    var defaultDocumentTheme: DocumentTheme {
+        DocumentThemeCatalog.shared.theme(for: defaultDocumentThemeID) ?? DocumentThemeCatalog.defaultTheme
+    }
+
     public var startupBehavior: StartupBehavior {
         get {
             guard let raw = userDefaults.string(forKey: Keys.startupBehavior),

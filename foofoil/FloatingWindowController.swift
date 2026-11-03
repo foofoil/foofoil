@@ -372,7 +372,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
         fatalError("init(coder:) has not been implemented")
     }
 
-    let controlID = UUID().uuidString
+    let controlID = AgentRunIdentity.id + ":" + UUID().uuidString
     private var terminalCloseApproved = false
     func closeWithoutTerminalPrompt() {
         terminalCloseApproved = true

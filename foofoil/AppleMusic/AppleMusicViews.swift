@@ -400,7 +400,7 @@ struct AppleMusicModeView: View {
     var body: some View {
         AudioPresentationView(appState: appState, controller: controller, info: presentationInfo, shouldHideBorder: shouldHideBorder)
             .overlay(alignment: .topTrailing) { outputDeviceOverlay }
-            .onAppear { output.start() }
+            .onAppear { output.start(); appState.agentMediaController = controller }
             .overlay(alignment: .center) {
                 if controller.isLoading || (appState.appleMusicItem == nil && appState.appleMusicRestoreError == nil) { ProgressView().padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10)) }
                 else if let error = appState.appleMusicRestoreError ?? controller.error {
@@ -429,6 +429,7 @@ struct AppleMusicModeView: View {
                 controller.applyPlaybackMode(appState.mediaPlaybackMode)
             }
             .onDisappear {
+                if appState.agentMediaController === controller { appState.agentMediaController = nil }
                 output.stop()
                 appState.isMediaPlaying = false
                 let hasMusicWindow = (NSApp.delegate as? AppDelegate)?.windowControllers.contains { $0.appState.appleMusicReference != nil } ?? false

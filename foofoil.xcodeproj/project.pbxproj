@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        A81000000000000000000001 = {isa = PBXBuildFile; fileRef = A81000000000000000000002; };
+        A81000000000000000000003 = {isa = PBXBuildFile; fileRef = A81000000000000000000004; };
         A71000000000000000000004 = {isa = PBXBuildFile; fileRef = A71000000000000000000005; };
         A71000000000000000000001 = {isa = PBXBuildFile; productRef = A71000000000000000000002; };
         A61000000000000000000031 = {isa = PBXBuildFile; fileRef = A61000000000000000000032; };
@@ -71,6 +73,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+        A81000000000000000000002 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = foofoil/AgentTerminal/AgentIntegration.swift; sourceTree = SOURCE_ROOT; };
+        A81000000000000000000004 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = foofoil/AgentTerminal/AgentCommandCatalog.swift; sourceTree = SOURCE_ROOT; };
         A71000000000000000000005 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = foofoil/AgentTerminal/AgentSocketIO.swift; sourceTree = SOURCE_ROOT; };
         A61000000000000000000032 = {isa = PBXFileReference; lastKnownFileType = folder; path = skills/foofoil; sourceTree = SOURCE_ROOT; };
 
@@ -398,7 +402,7 @@
 
 
 /* Begin PBXSourcesBuildPhase section */
-        A61000000000000000000021 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A61000000000000000000011, A61000000000000000000013, A71000000000000000000004, ); runOnlyForDeploymentPostprocessing = 0; };
+        A61000000000000000000021 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (A81000000000000000000001, A81000000000000000000003, A61000000000000000000011, A61000000000000000000013, A71000000000000000000004, ); runOnlyForDeploymentPostprocessing = 0; };
 
 		AB7D0D072FFB8BC800ED4438 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;

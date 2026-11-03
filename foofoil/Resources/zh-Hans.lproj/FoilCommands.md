@@ -1,79 +1,84 @@
 # foil 终端命令一览
 
-`foil` 是随浮箔交付的本地命令行工具，用于打开文件、管理箔片和创建交互式终端。终端箔内可直接调用；其他终端可先安装到默认的 `~/.local/bin`：
+`foil` 是浮箔自带的本机命令行工具，可打开和展示内容、读取导航、控制窗口与媒体、创建终端，以及查询配置、历史和 Agent 接入。下方语法取自当前 CLI，具体能力以 `foil capabilities WINDOW` 为准。
+
+## 安装与起步
+
+设置 → Agent 接入中的“命令行工具”会自动检测安装状态，可安装或重新安装到 `~/.local/bin/foil`。首次启动浮箔时自动安装“通用”Skill。安装或重新安装 foil 工具也会安装并开启“通用”；普通启动保留已有开关选择。CLI 不可用时 Agent 开关禁用。命令也可以手动安装：
 
 ```sh
 /Applications/foofoil.app/Contents/MacOS/foil install
+~/.local/bin/foil guide
 ~/.local/bin/foil --help
 ```
 
-应用不在“应用程序”目录时替换上述路径。若命令未找到，将 `~/.local/bin` 加入 PATH，或使用完整路径。升级应用后可再次安装；不会覆盖第三方同名命令。
+应用位于其他位置时替换上述应用路径。若 PATH 找不到命令，可使用完整路径。安装不会覆盖未知的第三方同名文件。终端箔内已提供 `foil` 的 PATH。
 
-## 打开与窗口控制
-
-| 命令 | 用法 |
+| 离线说明 | 内容 |
 | --- | --- |
-| `foil open FILE` | 通过普通文件打开流程打开文件；返回 accepted 不代表装载完成，不支持目录 |
-| `foil open --stdin --type markdown` | 从标准输入展示只读无痕 Markdown |
-| `foil list --scope all` | 列出全部可控制窗口，取得 `windows[].id` |
-| `foil reveal ID` | 显示窗口 |
-| `foil hide ID` | 隐藏窗口，终端任务继续运行 |
-| `foil inspect ID` | 查询类型、可见性、透明度及终端状态等元数据，不读取终端正文 |
-| `foil set ID opacity VALUE` | 设置透明度，支持 0.3–1.0，按窗口现有的 10% 步进取整，以响应为准 |
-| `foil close ID --scope all` | 关闭指定窗口；活动终端返回 CONFIRMATION_REQUIRED |
-| `foil close ID --scope all --force` | 明确终止受管理的活动终端任务并关闭窗口 |
+| `foil --help` / `foil help` | 命令摘要 |
+| `foil help COMMAND` | 某条命令的语法，例如 `foil help media seek` |
+| `foil guide [TOPIC]` | 起步与按主题展开的工作流 |
+| `foil schema [COMMAND]` | JSON 契约、参数和范围；静态契约不代表某个窗口的运行时能力 |
+| `foil --version` | CLI、入口、协议与应用构建版本 |
+
+这些说明入口不启动应用、不要求凭证。语法中的 `[]` 表示可选项，`|` 表示备选值或互斥入口；请替换 FILE、WINDOW、BOARD、VERSION 等占位符。
+
+{{command_tables}}
+
+## 打开、等待与读取示例
 
 ```sh
-foil open "$HOME/Documents/参考.md"
-foil list --scope all --json
+foil open "$HOME/Documents/参考.pdf" --incognito
+foil wait --operation OPERATION_ID --timeout 30
+foil capabilities WINDOW_ID
 foil inspect WINDOW_ID
-foil set WINDOW_ID opacity 0.8
-foil hide WINDOW_ID
-foil reveal WINDOW_ID
-printf '# 临时参考\n\n正文\n' | foil open --stdin --type markdown
+foil read WINDOW_ID --page 1 --limit 3000
+foil read WINDOW_ID --page 1 --offset 3000 --limit 3000 --content-version VERSION
+foil outline WINDOW_ID
+foil navigate WINDOW_ID --target TARGET_ID --content-version VERSION
+foil media status MEDIA_WINDOW_ID
+foil media pause MEDIA_WINDOW_ID
 ```
 
-用实际返回的 ID 替换示例中的 `WINDOW_ID`。窗口 ID 只在当前应用运行期有效，关闭或重启后失效；`content_id` 是历史内容身份，`terminal_id` 是会话身份，不能混用。
+示例中的 ID 和版本取自前一步响应。`open` 的 accepted 仅表示受理，保存 `operation.id` 并用 `wait` 确认完成。超时不会取消操作；Quick Look 无可靠完成信号时返回 COMPLETION_UNOBSERVABLE，不冒充成功。`is_loading: false` 不代表所有异步操作已完成。
 
-## 创建交互式终端
+窗口 ID 只在本次应用运行期有效；BOARD 是所属 Agent 展示身份，`content_id` 是内容身份，`terminal_id` 是终端会话身份，不能混用。`list` 默认只列当前凭证所属展示箔；查询或关闭普通窗口须用 `--scope all`。
+
+正文来自当前已加载内容。PDF 指定从 1 开始的页码；`rendered` 读取当前网页／EPUB 等视图的可提取文本；`ocr` 仅读已有结果；`terminal` 仅读有界保留输出，`--tail` 为 1～2000 行。非零 offset 必须带上一页的 content_version。文本偏移使用 Unicode scalar，每页最多 3000；目录、项目和窗口列表每页最多 20 项，并另按响应字节限制分页。使用 next_offset 和对应版本续读，STALE_CONTENT 时重新查询。读取不隐式 OCR、递归解包或重读外部已修改文件。
+
+search 返回片段、偏移与行号，不移动阅读位置。导航必须携带版本且只选一种定位；异步操作使用 wait 与 inspect 确认实际结果。媒体时间单位为秒，音量为 0～1，不支持的后端操作会明确拒绝。窗口 frame 使用指定屏幕可用区左上角为原点的逻辑点，返回钳制后的实际坐标。
+
+## 展示、终端与无痕
 
 ```sh
+foil show ./report.md --title '报告' --incognito
+foil update BOARD_ID ./report.md --expected-revision 1
+printf '# 临时参考\n\n正文\n' | foil open --stdin --type markdown
 foil terminal create --title Dev --cwd "$HOME/projects" --shell /bin/zsh
 foil terminal create --title Build --cwd /path/to/project --command 'pwd; swift build' --env MODE=debug
-foil terminal create --incognito --shell /bin/bash
 ```
 
-支持 `/bin/zsh` 和 `/bin/bash`。`--cwd DIR` 设置工作目录，`--command SCRIPT` 在同一个 Shell 执行可信初始化脚本；`--env KEY=VALUE` 可重复传入，`--title TITLE` 设置标题，`--incognito` 创建无痕终端。配置和初始化脚本会保存到普通历史，不要写入口令。ready 表示会话对象已建立，不代表脚本完成；可用 inspect 查看状态。
+show／update 用于只读 Agent 展示，支持本地 UTF-8 文本、代码、Markdown、光栅图片首帧和 SVG；普通 open 还可打开宿主支持的文档、媒体、目录、压缩包、URL 和剪贴板。展示源文件须由调用方保留，变更后显式 update；Markdown 外部图片会被阻止。show 总是新建，不要用它绕过用户关闭或覆盖失败的更新。
 
-## Agent 只读展示
+终端支持 `/bin/zsh` 与 `/bin/bash`。创建时立即执行可选 startup script，普通历史会保存配置与环境，不要写入口令。ready 不代表脚本已经执行完成；已有终端不提供输入注入接口。关闭活动终端可能要求 CONFIRMATION_REQUIRED，只有获准终止时才使用 `--force`。
 
-| 命令 | 用法 |
+open 的各种来源、show、terminal create 和 history open 均支持 `--incognito`。无痕不进入历史或重启恢复；无痕历史打开是独立副本，不更新原记录。收藏历史拒绝转换，重复设置目标状态保持幂等。无痕不会删除导出、下载或 Agent 自己的记录。
+
+## 配置、导出与接入
+
+config 只开放白名单，list 返回类型、默认值、范围与依赖；set 不自动开启前置条件。permissions status 只查询，不发起系统授权。历史搜索返回有界元数据；导出复用宿主保存限制，要求绝对输出路径，默认不覆盖，只有显式 `--overwrite` 才替换。暂不提供压缩包多节点的 CLI 导出。
+
+设置中的开关即时安装／移除对应 Skill 并自动检查。“通用”包含 Codex、Cursor、Pi、OMP、Kimi Code、ZCode、Zed Agent 等共用目录的 Agent；其他目录单独管理。已有 Agent 会话可能需要重新加载 Skill。CLI 的 skill／agent 管理命令仍可用于指定目标或高级自定义路径；文件写入成功不代表 Agent 会话已经发现。
+
+## 通用选项与错误恢复
+
+| 选项 | 说明 |
 | --- | --- |
-| `foil show FILE [--title TITLE] [--incognito]` | 新建只读展示箔 |
-| `foil update BOARD FILE [--expected-revision N]` | 更新已有 Agent 箔，保留布局与隐藏状态 |
-| `foil list` | 只列出当前凭证拥有的 Agent 箔 |
-| `foil close BOARD [--expected-revision N]` | 只关闭当前凭证拥有的 Agent 箔 |
+| `--json` | 业务响应默认已是 JSON，失败退出非零并在 stderr 输出错误码 |
+| `--request-id ID` | 请求去重标识；TIMEOUT 可能已执行，600 秒内用相同 ID 和相同参数重试 |
+| `--caller NAME` | 调用方显示名称，不是授权凭证 |
+| `--session FILE` | 独立凭证文件，也可使用 FOIL_SESSION |
+| `--app APP` | 指定应用路径，也可使用 FOIL_APP |
 
-支持本地 UTF-8 文本、代码、Markdown、光栅图片首帧与 SVG；不支持 PDF、HTML、网址、媒体、目录或压缩包。调用方保留原文件，文件变更后显式 update。Markdown 不加载关联图片，图片可单独 show。普通箔进入历史；无痕箔不进入历史或重启恢复。show 总是新建，不要把 update 失败改为重复 show。
-
-```sh
-foil show ./report.md --title '报告' --json
-foil update BOARD_ID ./report.md --expected-revision 1
-foil close BOARD_ID
-```
-
-## 通用选项与安装
-
-| 选项或命令 | 说明 |
-| --- | --- |
-| `--json` | 响应格式选项；当前成功响应本来就输出 JSON，失败退出非零并在 stderr 输出错误码 |
-| `--request-id ID` | 请求去重标识；超时可能已执行，600 秒内用相同 ID 和相同参数重试 |
-| `--caller NAME` | 显示调用方名称，不是授权凭证 |
-| `--session FILE` | 使用独立会话凭证文件；也可设置 `FOIL_SESSION` |
-| `--app APP` | 指定应用路径；也可设置 `FOIL_APP` |
-| `foil install [--directory DIR]` | 安装 CLI，默认 `~/.local/bin` |
-| `foil uninstall [--directory DIR]` | 移除安装的 CLI 及收据，不删除应用或文档 |
-| `foil --help` / `foil help` | 查看命令摘要 |
-| `foil --version` | 查看协议版本 |
-
-默认凭证位于 `~/.local/state/foofoil/session.json`，不要分享该文件。通用设置可暂停 Agent 控制或撤销会话。路径含空格时使用引号。命令只控制本机浮箔，不提供向已有终端注入输入的接口。
+默认凭证是 `~/.local/state/foofoil/session.json`，不要分享。设置可暂停 Agent 控制或撤销会话。遇到版本冲突、用户关闭、暂停或撤销时重新确认状态，不要盲目重建。路径含空格时使用引号。进一步排错使用 `foil doctor --json` 或 `foil guide troubleshooting`。
