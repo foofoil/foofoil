@@ -65,7 +65,7 @@ nonisolated enum AgentCommandCatalog {
     static let readOnly = Set(["list", "inspect", "capabilities", "read", "outline", "items", "search", "wait", "media.status", "config.list", "config.get", "permissions.status", "history.search", "screens"])
     static let guides: [String: String] = [
         "start": """
-        foofoil displays and controls local reference content. To open known content: foil open /absolute/path/file, then foil wait --operation ID from the response; confirm and stop. File type is automatic; --type markdown is only for --stdin. For folders use foil open --directory /absolute/path/folder. No preliminary capabilities/list/inspect is needed for this fast path.
+        foofoil displays and controls local reference content. To open known content: foil /absolute/path/file (or foil open /absolute/path/file), then foil wait --operation ID from the response; confirm and stop. File type is automatic; --type markdown is only for --stdin. For folders use foil open --directory /absolute/path/folder. No preliminary capabilities/list/inspect is needed for this fast path.
         For existing content, use foil list --scope all when the target is unknown and foil capabilities WINDOW before content-dependent operations.
         Run foil help COMMAND or foil schema COMMAND for the local contract. Static schema is not runtime availability.
         Topics: presentation, reading, windows, media, privacy, config, terminal, integration, troubleshooting.

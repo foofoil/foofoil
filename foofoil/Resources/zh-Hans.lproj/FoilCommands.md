@@ -24,6 +24,8 @@
 
 这些说明入口不启动应用、不要求凭证。语法中的 `[]` 表示可选项，`|` 表示备选值或互斥入口；请替换 FILE、WINDOW、BOARD、VERSION 等占位符。
 
+可以省略 `open`：`foil document.pdf` 和 `foil --clipboard` 分别使用与 `foil open` 相同的打开流程。已有子命令优先于同名文件；打开名为 `list` 的文件可使用 `foil ./list` 或 `foil open list`。单独运行 `foil` 显示帮助。
+
 {{command_tables}}
 
 ## 打开、等待与读取示例

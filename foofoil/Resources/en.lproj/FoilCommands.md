@@ -24,6 +24,8 @@ Replace the application path when installed elsewhere. Use the full command path
 
 These reference commands do not launch the app or require credentials. In the syntax, `[]` means optional and `|` separates alternatives or mutually exclusive inputs. Replace FILE, WINDOW, BOARD, VERSION and other placeholders.
 
+You can omit `open`: `foil document.pdf` and `foil --clipboard` use the same opening flow as `foil open`. Existing subcommands take precedence over file names; use `foil ./list` or `foil open list` for a file named `list`. Running `foil` alone shows help.
+
 {{command_tables}}
 
 ## Open, wait and read

@@ -132,6 +132,8 @@ foil list --scope all --json
 foil terminal create --title Dev --cwd ~/project --command 'git status'
 ```
 
+可省略 `open`，例如 `foil ./report.md` 或 `foil --clipboard`。已有子命令优先；打开名为 `list` 的文件可使用 `foil ./list` 或 `foil open list`。单独运行 `foil` 显示帮助。
+
 `show` 返回的 `board_id` 可用于 `foil update BOARD_ID ./plan.md`，以及后续关闭操作。`show` / `update` 面向当前 Agent 所属的只读展示窗口，支持本地 UTF-8 文本、代码、Markdown、光栅图片和 SVG；Markdown 不加载关联图片，源文件须由调用方保留，文件变化后需显式更新。通用 `open`、`reveal`、`hide`、`inspect`、`set` 和 `terminal create` 则用于普通打开、窗口控制和终端创建；列出或关闭通用窗口需显式使用 `--scope all`。
 
 从 `foil guide` 开始探索全部已开放接口；`foil schema` 离线提供契约，`foil capabilities WINDOW_ID` 确认运行时能力。设置 → Agent 接入，或 `foil agent setup --agent codex`，可安装 CLI 与可选薄 Skill；Codex、Cursor、Pi、OMP、Kimi Code、ZCode 和 Zed Agent 共用通用目录，另支持 OpenCode v1/v2、Claude Code、WorkBuddy 和 Qoder 的接入目录。设置分别显示 Agent 检测结果与浮箔 Skill 安装状态。操作完成、读取导航、媒体、配置、历史与导出详见[当前 CLI 参考](docs/agent-cli-reference.zh-CN.md)。真实 Agent 新会话发现与调用、Developer ID、公证和干净机器分发仍待验收。

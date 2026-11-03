@@ -18,6 +18,7 @@ with tempfile.TemporaryDirectory(prefix="foil-cli-contract-") as directory:
             assert json.loads(result.stdout)["error"] == code, result.stdout
         assert not credential.exists(), "Offline command created credentials"
         return result.stdout
+    assert "foil [open] FILE" in call()
     call("--help")
     assert json.loads(call("--version"))["protocol_version"] == "1"
     schema = json.loads(call("schema"))
@@ -28,7 +29,13 @@ with tempfile.TemporaryDirectory(prefix="foil-cli-contract-") as directory:
     for topic in ["start", "presentation", "reading", "windows", "media", "privacy", "config", "terminal", "integration", "troubleshooting"]:
         assert 0 < len(call("guide", topic)) < 8000
     call("doctor", "--json")
-    call("unknown", ok=False, code="UNKNOWN_COMMAND")
+    call("media", "unknown", ok=False, code="UNKNOWN_COMMAND")
+    # Both forms must pass the same parsing and reach the same absent-app error.
+    for args in [["document.pdf"], ["--url", "https://example.com"], ["--directory", "./notes"], ["--clipboard"], ["--", "list"]]:
+        implicit = json.loads(call(*args, ok=False))
+        explicit = json.loads(call("open", *args, ok=False))
+        assert implicit["error"] == explicit["error"], (args, implicit, explicit)
+    call("list", "unexpected", ok=False, code="INVALID_ARGUMENTS")
     for arguments in [
         ["inspect", "id", "--incognito"],
         ["read", "id", "--limit", "3001"],
@@ -39,6 +46,8 @@ with tempfile.TemporaryDirectory(prefix="foil-cli-contract-") as directory:
         ["navigate", "id", "--page", "1", "--line", "2", "--content-version", "v"],
         ["media", "seek", "id", "--to", "1", "--by", "2"],
         ["open", "file", "--url", "https://example.com"],
+        ["file", "--url", "https://example.com"],
+        ["--unknown"],
         ["set", "id", "opacity", "nan"],
         ["set", "id", "opacity", "0.1"],
         ["export", "id", "--format", "original", "--output", "relative"],

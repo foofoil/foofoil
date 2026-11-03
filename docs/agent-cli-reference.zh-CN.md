@@ -9,7 +9,7 @@ foil schema read
 foil capabilities
 foil list --scope all --limit 20
 foil inspect WINDOW
-foil open /absolute/reference.pdf --incognito
+foil /absolute/reference.pdf --incognito # 等同于 foil open /absolute/reference.pdf --incognito
 foil wait --operation OPERATION --timeout 30
 foil read WINDOW --page 1 --limit 3000
 foil outline WINDOW

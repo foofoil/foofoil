@@ -130,6 +130,8 @@ foil list --scope all --json
 foil terminal create --title Dev --cwd ~/project --command 'git status'
 ```
 
+Omit `open` for the same behavior: `foil ./report.md` or `foil --clipboard`. Existing subcommands take precedence; use `./list` or `open list` for a file named `list`. Running `foil` alone shows help.
+
 Use the `board_id` returned by `show` with `foil update BOARD_ID ./plan.md` and subsequent close operations. `show` / `update` operate on the current agent’s owned read-only presentations, supporting local UTF-8 text, code, Markdown, raster images, and SVG. Markdown does not load linked images. Keep source files available and explicitly update after changing them. General `open`, `reveal`, `hide`, `inspect`, `set`, and `terminal create` commands handle ordinary opening, window control, and terminal creation; listing or closing general windows requires explicit `--scope all`.
 
 Start with `foil guide`; `foil schema` provides the offline contract and `foil capabilities WINDOW_ID` confirms runtime availability. Settings → Agent Access, or `foil agent setup --agent codex`, installs the CLI and optional thin Skill. Codex, Cursor, Pi, OMP, Kimi Code, ZCode and Zed Agent share one installation. OpenCode v1/v2, Claude Code, WorkBuddy and Qoder also have directory adapters. Agent detection and foofoil Skill installation are shown separately. Completion tracking, reading/navigation, media, configuration, history and export are described in the [current CLI reference](docs/agent-cli-reference.zh-CN.md) (Chinese). Discovery and real calls in fresh Agent sessions, Developer ID, notarization and clean-machine distribution checks remain pending.

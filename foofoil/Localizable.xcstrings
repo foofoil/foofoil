@@ -2070,13 +2070,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "To open known content: foil open /absolute/path/file, then foil wait --operation ID from the response. File type is automatic; --type markdown is only for --stdin. For folders use foil open --directory /absolute/path/folder. Confirm and stop; no preliminary capabilities/list/inspect is needed. For existing content, list --scope all if the window is unknown and query capabilities WINDOW before content-dependent operations. Use foil help COMMAND or foil schema COMMAND for syntax and limits. Topics: presentation, reading, windows, media, privacy, config, terminal, integration, troubleshooting. Accepted is not completed."
+            "value": "To open known content: foil /absolute/path/file (or foil open /absolute/path/file), then foil wait --operation ID from the response. File type is automatic; --type markdown is only for --stdin. For folders use foil open --directory /absolute/path/folder. Confirm and stop; no preliminary capabilities/list/inspect is needed. For existing content, list --scope all if the window is unknown and query capabilities WINDOW before content-dependent operations. Use foil help COMMAND or foil schema COMMAND for syntax and limits. Topics: presentation, reading, windows, media, privacy, config, terminal, integration, troubleshooting. Accepted is not completed."
           }
         },
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "打开已知内容：foil open /absolute/path/file，再使用响应中的 operation.id 执行 foil wait --operation ID。文件自动识别类型；--type markdown 仅用于 --stdin。目录使用 foil open --directory /absolute/path/folder。确认完成后即停止，无须先查 capabilities/list/inspect。操作已有内容时，窗口未知才用 list --scope all；依赖内容能力的操作先查 capabilities WINDOW。语法与范围见 foil help COMMAND 或 foil schema COMMAND。主题：presentation、reading、windows、media、privacy、config、terminal、integration、troubleshooting。accepted 不代表完成。"
+            "value": "打开已知内容：foil /absolute/path/file（也可用 foil open /absolute/path/file），再使用响应中的 operation.id 执行 foil wait --operation ID。文件自动识别类型；--type markdown 仅用于 --stdin。目录使用 foil open --directory /absolute/path/folder。确认完成后即停止，无须先查 capabilities/list/inspect。操作已有内容时，窗口未知才用 list --scope all；依赖内容能力的操作先查 capabilities WINDOW。语法与范围见 foil help COMMAND 或 foil schema COMMAND。主题：presentation、reading、windows、media、privacy、config、terminal、integration、troubleshooting。accepted 不代表完成。"
           }
         }
       }

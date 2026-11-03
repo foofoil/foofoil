@@ -24,7 +24,7 @@ struct FoilCLI {
                 return
             }
             if tokens.isEmpty || tokens == ["--help"] || tokens == ["help"] {
-                print(localized("Agent CLI Overview", fallback: "foil — local reference content and window control") + "\n" + AgentCommandCatalog.commands.sorted { $0.key < $1.key }.map { "foil " + $0.value.usage }.joined(separator: "\n") + "\nExplore: foil guide [TOPIC], foil help COMMAND, foil schema [COMMAND].")
+                print(localized("Agent CLI Overview", fallback: "foil — local reference content and window control") + "\nfoil [open] FILE | --url URL | --directory DIR | --clipboard | --stdin --type markdown [--incognito]\n" + AgentCommandCatalog.commands.sorted { $0.key < $1.key }.map { "foil " + $0.value.usage }.joined(separator: "\n") + "\nExplore: foil guide [TOPIC], foil help COMMAND, foil schema [COMMAND].")
                 return
             }
             if ["help", "schema", "guide"].contains(tokens[0]) {
@@ -43,7 +43,11 @@ struct FoilCLI {
                 }
                 return
             }
-            var action = tokens.removeFirst()
+            // 已知命令优先；其他输入复用 open 的参数校验和执行流程。
+            let commandGroups = ["terminal", "media", "config", "permissions", "settings", "history", "window", "agent", "skill"]
+            let first = tokens[0]
+            let isCommand = AgentCommandCatalog.commands[first] != nil || commandGroups.contains(first)
+            var action = isCommand ? tokens.removeFirst() : "open"
             if ["terminal", "media", "config", "permissions", "settings", "history", "window", "agent", "skill"].contains(action) || (action == "items" && tokens.first == "select") {
                 guard let sub = tokens.first else { throw CLIError(code: "UNKNOWN_COMMAND") }
                 tokens.removeFirst(); action += "." + sub
