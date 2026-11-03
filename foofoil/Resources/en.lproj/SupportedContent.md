@@ -143,9 +143,11 @@ Limits: 100,000 tree nodes, 128 path components, 32 MiB of path metadata, and 8 
 
 Files inside archives use the same file opening, themes, controls, and border options as ordinary foils, including text/source files, media, ISO, and nested archives. Tree previews extract only the selected file; related resources, subtitles, and covers are not extracted automatically. Audio lists extract audio and CUE files together while preserving their directory relationships. Other formats requiring sibling resources still need the directory saved first. Preview content is read-only; unsupported files and extraction limits offer Save As guidance. Passwords stay in the current session and are requested again after reopening. A directory containing different passwords must be saved in separate selections; one failed entry aborts the directory save.
 
-## Agent terminal
+## Agent read-only presentations
 
-The native `foil` CLI supports read-only local UTF-8 text/code/Markdown, raster images (first frame), and SVG. Keep originals available and explicitly update after changes. Markdown images are blocked with a visible unavailable marker; present images separately. PDF, HTML, websites, media, directories, and archives are not supported by the Agent interface. Ordinary boards retain file references in history; `--incognito` boards do not enter history or restart recovery.
+`foil show` and `foil update` provide dedicated read-only presentations of local UTF-8 text/code/Markdown, raster images (first frame), and SVG. Keep originals available and explicitly update after changes. Markdown images are blocked with a visible unavailable marker; present images separately. Ordinary presentation foils retain file references in history; `--incognito` presentation foils do not enter history or restart recovery.
+
+`foil open` uses the ordinary opening flow and also accepts supported PDF, HTML, websites, media, directories, and archives. Reading, navigation, and media controls depend on the current content and backend; query `foil capabilities WINDOW_ID` for availability.
 
 ## Interactive terminal foils
 
