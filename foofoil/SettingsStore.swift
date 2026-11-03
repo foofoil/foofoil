@@ -627,6 +627,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable, Sendable {
 
 public class SettingsStore {
     public static let shared = SettingsStore()
+    static let keepAudioPlayingInBackgroundKey = "keepAudioPlayingInBackground"
 
     var contentCacheLimitBytes: Int64 {
         (userDefaults.object(forKey: ContentCache.limitKey) as? NSNumber)?.int64Value ?? ContentCache.defaultLimit
@@ -676,7 +677,7 @@ public class SettingsStore {
         static let mediaPlaybackControlsAutoHideInterval = "mediaPlaybackControlsAutoHideInterval"
         static let mediaSeekStepInterval = "mediaSeekStepInterval"
         static let showsMediaBottomProgressBar = "showsMediaBottomProgressBar"
-        static let keepAudioPlayingInBackground = "keepAudioPlayingInBackground"
+        static let keepAudioPlayingInBackground = SettingsStore.keepAudioPlayingInBackgroundKey
         static let confirmClosingPlayingAudio = "confirmClosingPlayingAudio"
         static let documentFontsChineseOnly = "documentFontsChineseOnly"
         static let documentFontsMonospacedOnly = "documentFontsMonospacedOnly"

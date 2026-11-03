@@ -45,6 +45,7 @@ struct FoilContentView: View {
     @State private var pdfPageIndicator: String?
     @State private var pdfPageIndicatorDismissTask: DispatchWorkItem?
     @State private var flashOpacity: Double = 0.0
+    @AppStorage(SettingsStore.keepAudioPlayingInBackgroundKey) private var keepAudioPlayingInBackground = false
 
 
     public var body: some View {
@@ -418,6 +419,10 @@ struct FoilContentView: View {
             }
 
             if appState.isAudioDocument {
+                Toggle(isOn: $keepAudioPlayingInBackground) {
+                    Label(NSLocalizedString("Keep Audio Playing in Background", comment: ""), systemImage: "speaker.wave.2")
+                }
+
                 Button(action: {
                     appState.copyAudioCoverToPasteboard()
                 }) {
@@ -429,7 +434,7 @@ struct FoilContentView: View {
 
             if appState.isCamera {
                 if let camera = appState.cameraController { CameraDeviceContextMenu(controller: camera) }
-            } else if !appState.isVideoDocument && appState.terminalConfiguration == nil {
+            } else if !appState.isVideoDocument && !appState.isAudioDocument && appState.terminalConfiguration == nil {
                 // 提取文字：仅光栅图片箔可用；图中无字时也禁用，检测未完成前保持禁用。
                 Button(action: {
                     (NSApplication.shared.delegate as? AppDelegate)?.extractTextFromImage(from: appState)

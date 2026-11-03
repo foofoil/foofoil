@@ -17,7 +17,7 @@ struct ContentTypesSettingsView: View {
     @State private var mediaSeekStep = SettingsStore.shared.mediaSeekStepInterval
     @State private var showsBottomProgress = SettingsStore.shared.showsMediaBottomProgressBar
     @State private var appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
-    @State private var keepAudioPlayingInBackground = SettingsStore.shared.keepAudioPlayingInBackground
+    @AppStorage(SettingsStore.keepAudioPlayingInBackgroundKey) private var keepAudioPlayingInBackground = false
     @State private var confirmClosingPlayingAudio = SettingsStore.shared.confirmClosingPlayingAudio
 
     var body: some View {
@@ -103,7 +103,6 @@ struct ContentTypesSettingsView: View {
             mediaSeekStep = SettingsStore.shared.mediaSeekStepInterval
             showsBottomProgress = SettingsStore.shared.showsMediaBottomProgressBar
             appleMusicLibraryEnabled = SettingsStore.shared.appleMusicLibraryEnabled
-            keepAudioPlayingInBackground = SettingsStore.shared.keepAudioPlayingInBackground
             confirmClosingPlayingAudio = SettingsStore.shared.confirmClosingPlayingAudio
         }
         .onReceive(NotificationCenter.default.publisher(for: .agentConfigurationDidChange)) { _ in
@@ -126,9 +125,6 @@ struct ContentTypesSettingsView: View {
         }
         .onChange(of: showsBottomProgress) { _, value in
             SettingsStore.shared.showsMediaBottomProgressBar = value
-        }
-        .onChange(of: keepAudioPlayingInBackground) { _, value in
-            SettingsStore.shared.keepAudioPlayingInBackground = value
         }
         .onChange(of: confirmClosingPlayingAudio) { _, value in
             SettingsStore.shared.confirmClosingPlayingAudio = value
