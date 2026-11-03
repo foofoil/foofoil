@@ -1467,6 +1467,14 @@ final class FoilExposeController {
         if isPresentingSystemUI || panels.contains(where: { $0.attachedSheet != nil }) { return event }
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let key = event.charactersIgnoringModifiers?.lowercased()
+        if HistorySearchPanel.isSearchPaste(event),
+           panels.contains(where: { $0 === event.window }),
+           (event.window?.firstResponder as? NSTextView)?.isEditable == true,
+           let delegate = NSApp.delegate as? AppDelegate,
+           delegate.openClipboardContentInNewWindow(isIncognito: model.isOptionPressed) {
+            dismiss()
+            return nil
+        }
         if KeyboardShortcutStore.shared.matches(event, identifier: "window.showAllFoils") {
             if !event.isARepeat { toggle() }
             return nil

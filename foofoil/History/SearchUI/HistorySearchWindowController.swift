@@ -5,14 +5,24 @@ import Combine
 final class HistorySearchPanel: NSPanel {
     weak var searchModel: HistorySearchViewModel?
     var dismissSearch: (() -> Void)?
+    var pasteContent: (() -> Bool)?
     override var canBecomeKey: Bool { true }
 
     override func sendEvent(_ event: NSEvent) {
+        if Self.isSearchPaste(event), (firstResponder as? NSTextView)?.isEditable == true,
+           pasteContent?() == true { return }
         guard let model = searchModel,
               Self.handleSearchKey(event, model: model, dismiss: { self.dismissSearch?() }) else {
             super.sendEvent(event)
             return
         }
+    }
+
+    static func isSearchPaste(_ event: NSEvent) -> Bool {
+        event.type == .keyDown && !event.isARepeat
+            && event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command
+            && event.charactersIgnoringModifiers?.lowercased() == "v"
+            && (event.window?.firstResponder as? NSTextView)?.hasMarkedText() != true
     }
 
     /// 两种搜索入口共用按键路由，并保留输入法组合输入。
@@ -103,6 +113,7 @@ final class HistorySearchWindowController: ObservableObject {
             panel.delegate = delegate
         }
         panel?.dismissSearch = { [weak self] in self?.dismiss() }
+        panel?.pasteContent = { [weak self] in self?.openPastedContent() == true }
         model.enableFileSearch = { [weak self] in self?.enableFileSearch() }
         model.openMusicLink = { [weak self] url in (NSApp.delegate as? AppDelegate)?.openAppleMusicLink(url, isIncognito: self?.openingIsIncognito == true) }
         model.openMusic = { [weak self] item in (NSApp.delegate as? AppDelegate)?.openAppleMusic(item, isIncognito: self?.openingIsIncognito == true) }
@@ -197,11 +208,23 @@ final class HistorySearchWindowController: ObservableObject {
                 return event
             }
             guard (window.firstResponder as? NSTextView)?.isEditable == true else { return event }
+            if HistorySearchPanel.isSearchPaste(event), self.openPastedContent() { return nil }
             if event.modifierFlags.contains(.command) { return event }
             return HistorySearchPanel.handleSearchKey(event, model: self.model, preservesIncognitoShortcut: true, dismiss: {
                 self.model.reset()
             }) ? nil : event
         }
+    }
+
+    private func openPastedContent() -> Bool {
+        guard let delegate = NSApp.delegate as? AppDelegate else { return false }
+        if let target = openingTarget,
+           let controller = delegate.windowControllers.first(where: { $0.appState === target }) {
+            delegate.activateWindow(controller)
+        }
+        guard delegate.openClipboardContentInNewWindow(isIncognito: openingIsIncognito) else { return false }
+        dismiss()
+        return true
     }
 
     func endEmbeddedSearch() {

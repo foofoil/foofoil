@@ -678,3 +678,19 @@ struct SearchScopeTests {
         #expect(model.highlightedScopeIndex == 0)
     }
 }
+
+@Suite @MainActor
+struct SearchPasteRoutingTests {
+    @Test func recognizesOnlyStandardPasteShortcut() throws {
+        func event(_ modifiers: NSEvent.ModifierFlags, _ key: String, repeatKey: Bool = false) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers,
+                                         timestamp: 0, windowNumber: 0, context: nil,
+                                         characters: key, charactersIgnoringModifiers: key,
+                                         isARepeat: repeatKey, keyCode: 9))
+        }
+        #expect(HistorySearchPanel.isSearchPaste(try event(.command, "v")))
+        #expect(!HistorySearchPanel.isSearchPaste(try event([.command, .shift], "v")))
+        #expect(!HistorySearchPanel.isSearchPaste(try event(.command, "c")))
+        #expect(!HistorySearchPanel.isSearchPaste(try event(.command, "v", repeatKey: true)))
+    }
+}
