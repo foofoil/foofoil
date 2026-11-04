@@ -82,6 +82,21 @@ struct DocumentStyleView: View {
 
                     fontSection
 
+                    if appState.supportsDocumentAlignment {
+                        section(NSLocalizedString("Text Alignment", comment: "")) {
+                            Picker(NSLocalizedString("Text Alignment", comment: ""), selection: Binding(
+                                get: { appState.documentAlignment ?? "default" },
+                                set: { appState.documentAlignment = $0 == "default" ? nil : $0 }
+                            )) {
+                                Text("Default").tag("default")
+                                Text("Align Left").tag("left")
+                                Text("Justified").tag("justify")
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                        }
+                    }
+
                     if appState.supportsDocumentSpacing {
                         section(NSLocalizedString("Line Spacing", comment: "")) {
                             spacingRow(

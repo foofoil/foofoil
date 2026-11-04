@@ -113,6 +113,7 @@ extension AppState {
             self.documentFontName = config.documentFontName
             self.documentLineSpacing = config.documentLineSpacing
             self.documentParagraphSpacing = config.documentParagraphSpacing
+            self.documentAlignment = config.documentAlignment
             self.mediaPlaybackMode = config.mediaPlaybackMode
             self.extensionStateReference = config.extensionStateReference
             self.documentReadingPositions = config.documentReadingPositions ?? [:]
@@ -294,6 +295,7 @@ extension AppState {
                 documentFontName: documentFontName,
                 documentLineSpacing: documentLineSpacing,
                 documentParagraphSpacing: documentParagraphSpacing,
+                documentAlignment: documentAlignment,
                 documentThemeId: documentThemeId,
                 documentAppearance: documentAppearance,
                 textPath: textURL?.path,

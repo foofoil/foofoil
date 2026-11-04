@@ -14,6 +14,16 @@ import FoofoilExtensionKit
 @MainActor
 @Suite(.sharedApplicationState, .serialized)
 struct DocumentTextSpacingTests {
+    @Test func alignmentUpdatesExistingTextAndDefaultStyle() {
+        let view = NSTextView()
+        view.string = "正文测试"
+        DocumentTextSpacing.apply(to: view, lineHeightMultiple: nil, paragraphSpacingMultiple: nil, fontSize: 16, alignment: .justified)
+        #expect(view.defaultParagraphStyle?.alignment == .justified)
+        #expect((view.textStorage?.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)?.alignment == .justified)
+        DocumentTextSpacing.apply(to: view, lineHeightMultiple: nil, paragraphSpacingMultiple: nil, fontSize: 16, alignment: .left)
+        #expect((view.textStorage?.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle)?.alignment == .left)
+    }
+
     @Test func partialRedrawIncludesWholeWrappedTable() async throws {
         let previousAppearance = NSApp.appearance
         defer { NSApp.appearance = previousAppearance }

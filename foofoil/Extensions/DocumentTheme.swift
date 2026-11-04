@@ -55,6 +55,7 @@ public struct DocumentThemeTypography: Codable, Equatable {
     public var zoom: Double
     public var lineSpacing: Double?
     public var paragraphSpacing: Double?
+    public var alignment: String? = nil
 }
 
 public struct DocumentTheme: Identifiable, Codable, Equatable {

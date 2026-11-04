@@ -100,6 +100,7 @@ struct TextContentView: View {
                                     textColor: appState.documentTextColor,
                                     lineHeightMultiple: appState.documentLineHeightMultiple,
                                     paragraphSpacingMultiple: appState.documentParagraphSpacingMultiple,
+                                    alignment: appState.supportsDocumentAlignment ? (appState.documentAlignment == "justify" ? .justified : appState.documentAlignment == "left" ? .left : nil) : nil,
                                     codeLineNumbersVisible: appState.codeLanguageID == nil ? nil : appState.showCodeLineNumbers,
                                     appState: appState
                                 )
@@ -349,6 +350,9 @@ struct TextContentView: View {
             if appState.isMarkdownPreview && appState.isMarkdownDocument {
                 appState.refreshMarkdownRendering()
             }
+        }
+        .onChange(of: appState.documentAlignment) { _, _ in
+            if appState.isMarkdownPreview && appState.isMarkdownDocument { appState.refreshMarkdownRendering() }
         }
         // 回退只针对当前内容：换了文件或文本后重新尝试代码预览。
         .onChange(of: appState.text) { _, _ in

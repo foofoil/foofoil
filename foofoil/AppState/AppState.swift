@@ -375,6 +375,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         }
     }
 
+    @Published public var documentAlignment: String? { didSet { saveState() } }
+
     /// 拖动样式滑杆期间不为每一帧写历史；松手后由面板收尾保存。
     var isAdjustingDocumentStyling = false
 
@@ -762,6 +764,7 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         self.documentFontName = nil
         self.documentLineSpacing = nil
         self.documentParagraphSpacing = nil
+        self.documentAlignment = nil
         self.mediaPlaybackMode = .sequentialLoop
         self.extensionSession = nil
         self.extensionFallbackProviderID = nil

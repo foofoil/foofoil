@@ -14,6 +14,7 @@ struct ReadOnlyTextView: View {
     let textColor: NSColor?
     let lineHeightMultiple: Double?
     let paragraphSpacingMultiple: Double?
+    var alignment: NSTextAlignment? = nil
     /// 已识别语言的代码文件才传入：nil 表示普通文本，不创建行号栏；布尔值表示行号是否可见。
     var codeLineNumbersVisible: Bool? = nil
 
@@ -26,6 +27,7 @@ struct ReadOnlyTextView: View {
             textColor: textColor,
             lineHeightMultiple: lineHeightMultiple,
             paragraphSpacingMultiple: paragraphSpacingMultiple,
+            alignment: alignment,
             codeLineNumbersVisible: codeLineNumbersVisible, appState: appState,
             readingSourceID: appState?.readingPositionKey("text")
         )
@@ -38,6 +40,7 @@ struct ReadOnlyTextNSView: NSViewRepresentable, Equatable {
     let textColor: NSColor?
     let lineHeightMultiple: Double?
     let paragraphSpacingMultiple: Double?
+    var alignment: NSTextAlignment? = nil
     let codeLineNumbersVisible: Bool?
     var appState: AppState? = nil
 
@@ -50,6 +53,7 @@ struct ReadOnlyTextNSView: NSViewRepresentable, Equatable {
         lhs.text == rhs.text && lhs.font == rhs.font && lhs.textColor == rhs.textColor
             && lhs.lineHeightMultiple == rhs.lineHeightMultiple
             && lhs.paragraphSpacingMultiple == rhs.paragraphSpacingMultiple
+            && lhs.alignment == rhs.alignment
             && lhs.codeLineNumbersVisible == rhs.codeLineNumbersVisible
             && lhs.appState === rhs.appState && lhs.readingSourceID == rhs.readingSourceID
     }
@@ -96,7 +100,7 @@ struct ReadOnlyTextNSView: NSViewRepresentable, Equatable {
             to: textView,
             lineHeightMultiple: lineHeightMultiple,
             paragraphSpacingMultiple: paragraphSpacingMultiple,
-            fontSize: font.pointSize
+            fontSize: font.pointSize, alignment: alignment
         )
 
         // 留白属于可滚动文档，让滚动条贴近窗口边缘，首尾留白随内容一起滚动。
@@ -130,6 +134,7 @@ struct ReadOnlyTextNSView: NSViewRepresentable, Equatable {
             let textChanged = appliedConfiguration?.text != configuration.text
             let spacingChanged = appliedConfiguration?.lineHeightMultiple != configuration.lineHeightMultiple
                 || appliedConfiguration?.paragraphSpacingMultiple != configuration.paragraphSpacingMultiple
+                || appliedConfiguration?.alignment != configuration.alignment
                 || appliedConfiguration?.font.pointSize != configuration.font.pointSize
             scrollTracker.bind(scrollView, state: configuration.appState, surface: "text", contentChanged: textChanged)
             if textChanged {
@@ -153,7 +158,7 @@ struct ReadOnlyTextNSView: NSViewRepresentable, Equatable {
                     to: textView,
                     lineHeightMultiple: configuration.lineHeightMultiple,
                     paragraphSpacingMultiple: configuration.paragraphSpacingMultiple,
-                    fontSize: configuration.font.pointSize
+                    fontSize: configuration.font.pointSize, alignment: configuration.alignment
                 )
             }
             ruler?.refresh()

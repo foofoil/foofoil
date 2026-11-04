@@ -13,6 +13,10 @@ extension AppState {
     /// 终端使用固定字符网格，不提供文档式行距或段距。
     var supportsDocumentSpacing: Bool { supportsDocumentTextStyling && terminalConfiguration == nil }
 
+    var supportsDocumentAlignment: Bool {
+        supportsDocumentSpacing && extensionSession == nil && !presentsAsCode
+    }
+
     /// 文档箔：内容是一份可读文档，可为其选择内容背景色
     /// （纯文本/笔记、Markdown、CSV、PDF、网页，以及电子书等扩展文档）。
     /// 图片、视频、音频以自身画面为内容，窗口只作画框，不提供背景色设置。
@@ -141,6 +145,7 @@ extension AppState {
             documentZoom = typography.zoom
             documentLineSpacing = typography.lineSpacing
             documentParagraphSpacing = typography.paragraphSpacing
+            documentAlignment = typography.alignment
         }
         searchHighlightHex = theme.highlightHex(isDark: isDark)
         documentThemeId = theme.id
@@ -149,7 +154,7 @@ extension AppState {
 
     var currentThemeTypography: DocumentThemeTypography {
         .init(fontName: documentFontName, fontSize: textFontSize, zoom: documentZoom,
-              lineSpacing: documentLineSpacing, paragraphSpacing: documentParagraphSpacing)
+              lineSpacing: documentLineSpacing, paragraphSpacing: documentParagraphSpacing, alignment: documentAlignment)
     }
 
     /// 新打开的文档默认采用素笺；已有主题（含“无”）或手动色彩保持用户选择。

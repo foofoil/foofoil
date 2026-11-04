@@ -153,6 +153,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable, Sendable {
     public var documentLineSpacing: Double?
     /// 无排版文档内容的段落间距（相对字号的倍数）；为空时沿用通道默认段距。
     public var documentParagraphSpacing: Double?
+    public var documentAlignment: String?
     /// 文档样式选中的主题 ID；为空表示自定义或未选中主题。
     public var documentThemeId: String?
     /// 当前箔的文档外观偏好；默认跟随系统。
@@ -235,6 +236,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable, Sendable {
         documentFontName: String? = nil,
         documentLineSpacing: Double? = nil,
         documentParagraphSpacing: Double? = nil,
+        documentAlignment: String? = nil,
         documentThemeId: String? = nil,
         documentAppearance: DocumentAppearanceMode = .system,
         textPath: String? = nil,
@@ -293,6 +295,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable, Sendable {
         self.documentFontName = documentFontName
         self.documentLineSpacing = documentLineSpacing
         self.documentParagraphSpacing = documentParagraphSpacing
+        self.documentAlignment = documentAlignment
         self.documentThemeId = documentThemeId
         self.documentAppearance = documentAppearance
         self.textPath = textPath
@@ -330,7 +333,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case terminalConfiguration, terminalScrollback
-        case documentReadingPositions, historyIsPinned, isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, searchHighlightHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentThemeId, documentAppearance, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource, showCodeLineNumbers, readOnlyPresentation
+        case documentReadingPositions, historyIsPinned, isCamera, id, imagePath, webURLString, actualWebURLString, originalImageName, imageSource, text, isPinned, opacity, windowFrame, showBorder, imageScale, textFontSize, isMarkdownPreview, createdAt, svgColor, backgroundColorHex, textColorHex, searchHighlightHex, documentFontName, documentLineSpacing, documentParagraphSpacing, documentAlignment, documentThemeId, documentAppearance, textPath, contentKind, sourceFingerprint, storedDisplayTitle, customTitle, thumbnailPath, imageOCRText, imageHasSubject, imageSubjectPath, webZoom, documentZoom, mediaPlaybackMode, isVideoLooping, subtitleAssociations, videoBookmark, customCoverPath, extensionID, extensionStateReference, navigatorPanelSide, navigatorPanelVisibilityMode, navigatorPanelWidth, fileList, documentScrollFile, documentScrollFraction, appleMusicReference, archiveSource, showCodeLineNumbers, readOnlyPresentation
     }
 
     public init(from decoder: Decoder) throws {
@@ -360,6 +363,7 @@ nonisolated public struct WindowConfig: Codable, Identifiable, Sendable {
         documentFontName = try container.decodeIfPresent(String.self, forKey: .documentFontName)
         documentLineSpacing = try container.decodeIfPresent(Double.self, forKey: .documentLineSpacing)
         documentParagraphSpacing = try container.decodeIfPresent(Double.self, forKey: .documentParagraphSpacing)
+        documentAlignment = try container.decodeIfPresent(String.self, forKey: .documentAlignment)
         documentThemeId = try container.decodeIfPresent(String.self, forKey: .documentThemeId)
         documentAppearance = try container.decodeIfPresent(DocumentAppearanceMode.self, forKey: .documentAppearance) ?? .system
         textPath = try container.decodeIfPresent(String.self, forKey: .textPath)

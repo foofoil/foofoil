@@ -90,6 +90,7 @@ extension AppState {
             let customFontFamilyName = self.documentStylingFontName.flatMap { NSFont(name: $0, size: fontSize)?.familyName }
             let lineHeightMultiple = self.documentLineHeightMultiple
             let paragraphSpacingMultiple = self.documentParagraphSpacingMultiple
+            let documentAlignment = self.documentAlignment
             let blocksResources = agentReadOnly
             let resourcePlaceholder = NSLocalizedString("Agent Resource Unavailable", comment: "")
 
@@ -350,7 +351,7 @@ extension AppState {
                             mutableAttr.addAttribute(.paragraphStyle, value: mutableParagraphStyle, range: range)
                         }
 
-                        Self.applyParagraphRangeStyles(to: mutableAttr, fontSize: fontSize)
+                        Self.applyParagraphRangeStyles(to: mutableAttr, fontSize: fontSize, alignment: documentAlignment == "left" ? .left : .justified)
 
                         // 最后处理代码样式，使原生缩进和紧凑行高不再被普通段落规则覆盖。
                         Self.applyCodeRangeStyles(
@@ -668,14 +669,15 @@ extension AppState {
         /// 为正文和引用建立精确范围，避免两端对齐误用于标题、表格与代码块。
         private static func applyParagraphRangeStyles(
             to attributedString: NSMutableAttributedString,
-            fontSize: CGFloat
+            fontSize: CGFloat,
+            alignment: NSTextAlignment
         ) {
             applyMarkedParagraphStyle(
                 to: attributedString,
                 startMarker: MarkdownRenderMarker.paragraphStart,
                 endMarker: MarkdownRenderMarker.paragraphEnd
             ) { style in
-                style.alignment = .justified
+                style.alignment = alignment
             }
 
             applyMarkedParagraphStyle(
@@ -683,7 +685,7 @@ extension AppState {
                 startMarker: MarkdownRenderMarker.quoteStart,
                 endMarker: MarkdownRenderMarker.quoteEnd
             ) { style in
-                style.alignment = .justified
+                style.alignment = alignment
                 style.minimumLineHeight = 0
                 style.maximumLineHeight = 0
                 style.lineSpacing = 0

@@ -27,6 +27,7 @@ struct DocumentStylingPersistenceTests {
             documentFontName: "Menlo-Regular",
             documentLineSpacing: 1.6,
             documentParagraphSpacing: 0.8,
+            documentAlignment: "justify",
             documentAppearance: .dark
         )
 
@@ -39,6 +40,7 @@ struct DocumentStylingPersistenceTests {
         #expect(loaded.documentFontName == "Menlo-Regular")
         #expect(loaded.documentLineSpacing == 1.6)
         #expect(loaded.documentParagraphSpacing == 0.8)
+        #expect(loaded.documentAlignment == "justify")
         #expect(loaded.documentAppearance == .dark)
     }
 
@@ -56,6 +58,7 @@ struct DocumentStylingPersistenceTests {
             documentFontName: "Menlo-Regular",
             documentLineSpacing: 1.7,
             documentParagraphSpacing: 0.5,
+            documentAlignment: "left",
             documentAppearance: .light
         )
         state.loadConfig(config)
@@ -66,6 +69,7 @@ struct DocumentStylingPersistenceTests {
         #expect(state.documentFontName == "Menlo-Regular")
         #expect(state.documentLineSpacing == 1.7)
         #expect(state.documentParagraphSpacing == 0.5)
+        #expect(state.documentAlignment == "left")
         #expect(state.documentAppearance == .light)
     }
 
@@ -89,6 +93,7 @@ struct DocumentStylingPersistenceTests {
         try dropColumn("text_color_hex", from: databaseURL)
         try dropColumn("document_font_name", from: databaseURL)
         try dropColumn("document_line_spacing", from: databaseURL)
+        try dropColumn("document_alignment", from: databaseURL)
         try dropColumn("document_appearance", from: databaseURL)
 
         let migrated = try HistoryDatabase(databaseURL: databaseURL)
@@ -96,6 +101,7 @@ struct DocumentStylingPersistenceTests {
         #expect(legacy.textColorHex == nil, "补列后应回到默认值")
         #expect(legacy.documentFontName == nil)
         #expect(legacy.documentLineSpacing == nil)
+        #expect(legacy.documentAlignment == nil)
         #expect(legacy.documentAppearance == .system)
 
         try migrated.upsert(config)

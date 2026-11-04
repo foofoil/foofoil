@@ -72,6 +72,7 @@ extension AppState {
             self.documentFontName = nil
             self.documentLineSpacing = nil
             self.documentParagraphSpacing = nil
+            self.documentAlignment = nil
             self.mediaPlaybackMode = .sequentialLoop
             self.videoBookmarkData = nil
             self.clearCustomCover()

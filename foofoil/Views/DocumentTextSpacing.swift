@@ -16,22 +16,26 @@ enum DocumentTextSpacing {
         to textView: NSTextView,
         lineHeightMultiple: Double?,
         paragraphSpacingMultiple: Double?,
-        fontSize: CGFloat
+        fontSize: CGFloat,
+        alignment: NSTextAlignment? = nil
     ) {
+        let targetAlignment = alignment ?? .natural
         let targetLineHeightMultiple = lineHeightMultiple ?? 0
         // 段距是相对字号的倍数，原生以点为单位。
         let targetParagraphSpacing = paragraphSpacingMultiple.map { $0 * fontSize } ?? 0
 
         // 只在数值变化时重设，避免每次更新都重置输入属性（影响输入法与撤销）。
         if let current = textView.defaultParagraphStyle {
-            if current.lineHeightMultiple != targetLineHeightMultiple || current.paragraphSpacing != targetParagraphSpacing {
+            if current.lineHeightMultiple != targetLineHeightMultiple || current.paragraphSpacing != targetParagraphSpacing || current.alignment != targetAlignment {
                 let style = (current.mutableCopy() as? NSMutableParagraphStyle) ?? NSMutableParagraphStyle()
+                style.alignment = targetAlignment
                 style.lineHeightMultiple = targetLineHeightMultiple
                 style.paragraphSpacing = targetParagraphSpacing
                 textView.defaultParagraphStyle = style
             }
-        } else if targetLineHeightMultiple != 0 || targetParagraphSpacing != 0 {
+        } else if targetLineHeightMultiple != 0 || targetParagraphSpacing != 0 || targetAlignment != .natural {
             let style = NSMutableParagraphStyle()
+            style.alignment = targetAlignment
             style.lineHeightMultiple = targetLineHeightMultiple
             style.paragraphSpacing = targetParagraphSpacing
             textView.defaultParagraphStyle = style
@@ -46,8 +50,9 @@ enum DocumentTextSpacing {
         ) { value, range, _ in
             let current = (value as? NSParagraphStyle) ?? NSParagraphStyle.default
             guard current.lineHeightMultiple != targetLineHeightMultiple
-                || current.paragraphSpacing != targetParagraphSpacing else { return }
+                || current.paragraphSpacing != targetParagraphSpacing || current.alignment != targetAlignment else { return }
             let style = (current.mutableCopy() as? NSMutableParagraphStyle) ?? NSMutableParagraphStyle()
+            style.alignment = targetAlignment
             style.lineHeightMultiple = targetLineHeightMultiple
             style.paragraphSpacing = targetParagraphSpacing
             updates.append((range, style))

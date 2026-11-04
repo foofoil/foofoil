@@ -103,7 +103,7 @@ nonisolated final class HistoryDatabase {
                         web_url, actual_web_url, image_source, inline_text, is_pinned, opacity,
                         window_frame, show_border, image_scale, text_font_size, is_markdown_preview,
                         svg_color, background_color_hex, text_color_hex, search_highlight_hex,
-                        document_font_name, document_line_spacing, document_paragraph_spacing, document_theme_id,
+                        document_font_name, document_line_spacing, document_paragraph_spacing, document_alignment, document_theme_id,
                         created_at, updated_at, last_opened_at,
                         source_fingerprint, index_status, index_version, video_looping, video_bookmark,
                         custom_cover_path,
@@ -113,7 +113,7 @@ nonisolated final class HistoryDatabase {
                         image_ocr_text, image_has_subject, image_subject_path, apple_music_reference, subtitle_associations, custom_title, archive_source,
                         show_code_line_numbers, read_only_presentation, history_is_pinned, terminal_configuration, terminal_scrollback,
                         document_appearance, document_reading_positions
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     ON CONFLICT(id) DO UPDATE SET
                         content_kind=excluded.content_kind, display_title=excluded.display_title,
                         original_filename=excluded.original_filename, image_path=excluded.image_path,
@@ -130,6 +130,7 @@ nonisolated final class HistoryDatabase {
                         document_font_name=excluded.document_font_name,
                         document_line_spacing=excluded.document_line_spacing,
                         document_paragraph_spacing=excluded.document_paragraph_spacing,
+                        document_alignment=excluded.document_alignment,
                         document_theme_id=excluded.document_theme_id,
                         updated_at=excluded.updated_at,
                         last_opened_at=excluded.last_opened_at,
@@ -164,7 +165,7 @@ nonisolated final class HistoryDatabase {
                         config.windowFrame, config.showBorder, config.imageScale, config.textFontSize,
                         config.isMarkdownPreview, config.svgColor, config.backgroundColorHex,
                         config.textColorHex, config.searchHighlightHex,
-                        config.documentFontName, config.documentLineSpacing, config.documentParagraphSpacing,
+                        config.documentFontName, config.documentLineSpacing, config.documentParagraphSpacing, config.documentAlignment,
                         config.documentThemeId,
                         createdAt, now, now, config.sourceFingerprint, 0, 1, config.mediaPlaybackMode.sqliteValue,
                         config.videoBookmark?.base64EncodedString(),
@@ -520,6 +521,7 @@ nonisolated final class HistoryDatabase {
         try addColumnIfMissing("document_font_name", definition: "document_font_name TEXT")
         try addColumnIfMissing("document_line_spacing", definition: "document_line_spacing REAL")
         try addColumnIfMissing("document_paragraph_spacing", definition: "document_paragraph_spacing REAL")
+        try addColumnIfMissing("document_alignment", definition: "document_alignment TEXT")
         // v15 正文字数+哈希指纹：正文未变时跳过搜索分块重建，避免每次保存都重编码整篇文档。
         try addColumnIfMissing("text_fingerprint", definition: "text_fingerprint TEXT")
         // v16 文档样式面板：选中的主题 ID；为空表示自定义或未选中主题。
@@ -771,6 +773,7 @@ nonisolated final class HistoryDatabase {
                     documentFontName: columns["document_font_name"].flatMap { optionalText(statement, $0) },
                     documentLineSpacing: columns["document_line_spacing"].flatMap { optionalReal(statement, $0) },
                     documentParagraphSpacing: columns["document_paragraph_spacing"].flatMap { optionalReal(statement, $0) },
+                    documentAlignment: columns["document_alignment"].flatMap { optionalText(statement, $0) },
                     documentThemeId: columns["document_theme_id"].flatMap { optionalText(statement, $0) },
                     documentAppearance: columns["document_appearance"].flatMap { optionalText(statement, $0) }
                         .flatMap(DocumentAppearanceMode.init(rawValue:)) ?? .system,
