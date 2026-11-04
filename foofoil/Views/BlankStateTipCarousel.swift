@@ -16,12 +16,15 @@ struct BlankStateTipCarousel: View {
 
     private var tips: [String] {
         [
-            NSLocalizedString("Tip: Drop image, PDF, or Markdown", comment: ""),
+            NSLocalizedString("Tip: Drop files, folders, or images", comment: ""),
             NSLocalizedString("Tip: Hold Command while dragging to move the window", comment: ""),
-            NSLocalizedString("Tip: Try a two-finger pinch", comment: "")
+            NSLocalizedString("Tip: Hold Command and scroll to resize", comment: ""),
+            NSLocalizedString("Tip: Try a two-finger pinch", comment: ""),
+            NSLocalizedString("Tip: Try a three-finger drag", comment: "")
         ] + [
             ("view.togglePin", "Shortcut Tip Pin"),
-            ("file.openURL", "Shortcut Tip URL"),
+            ("window.showAllFoils", "Shortcut Tip Overview"),
+            ("file.toggleIncognito", "Shortcut Tip Incognito"),
             ("file.openClipboardContent", "Shortcut Tip Clipboard")
         ].compactMap { identifier, titleKey in
             guard let shortcut = KeyboardShortcutStore.shared.shortcut(forID: identifier) else { return nil }

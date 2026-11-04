@@ -2723,6 +2723,38 @@
         }
       }
     },
+    "Shortcut Tip Incognito": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ → Toggle incognito mode"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ → 切换无痕模式"
+          }
+        }
+      }
+    },
+    "Shortcut Tip Overview": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ → Open the foil overview anytime"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ → 任何时候打开浮箔总览"
+          }
+        }
+      }
+    },
     "Switch to Incognito Foil": {
       "extractionState": "manual",
       "localizations": {
@@ -2934,6 +2966,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "无痕模式"
+          }
+        }
+      }
+    },
+    "Tip: Drop files, folders, or images": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Drop files, folders, or images"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拖入文件、文件夹或图片"
+          }
+        }
+      }
+    },
+    "Tip: Hold Command and scroll to resize": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hold ⌘ and scroll to resize"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按住 ⌘ 滚动鼠标滚轮改变大小"
+          }
+        }
+      }
+    },
+    "Tip: Try a three-finger drag": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try a three-finger drag"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试试三指拖动"
           }
         }
       }
