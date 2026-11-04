@@ -139,18 +139,7 @@ struct BlankOpenButtons: View {
             }
         }
         .background(NonMovableBackground())
-        .task {
-            refreshClipboard(force: true)
-            // NSPasteboard 没有内容变化通知；只在空箔存在时检查计数，变化后才解析内容。
-            while !Task.isCancelled {
-                do { try await Task.sleep(for: .milliseconds(500)) }
-                catch { return }
-                if NSApp.isActive { refreshClipboard() }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
-            refreshClipboard(force: true)
-        }
+        .onAppear { refreshClipboard(force: true) }
         .onReceive(NotificationCenter.default.publisher(for: .keyboardShortcutsDidChange)) { _ in
             shortcutRevision += 1
         }

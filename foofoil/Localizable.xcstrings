@@ -2483,33 +2483,83 @@
     },
     "File Information": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "File Information" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "文件信息" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File Information"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件信息"
+          }
+        }
       }
     },
     "Open in New Foil": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Open in New Foil" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "在新箔里打开" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open in New Foil"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在新箔里打开"
+          }
+        }
       }
     },
     "Directory Contents": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Directory Contents" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "目录内容" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Directory Contents"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "目录内容"
+          }
+        }
       }
     },
     "Search Or Create Terminal Placeholder": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Search terminals or create a new terminal" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "在终端中搜索或新建终端" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search terminals or create a new terminal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在终端中搜索或新建终端"
+          }
+        }
       }
     },
     "Expose New Terminal": {
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "New Terminal" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "新建终端" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Terminal"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新建终端"
+          }
+        }
       }
     },
     "Browse Clipboard History": {
@@ -2532,8 +2582,18 @@
     "Current Clipboard Item": {
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Current Clipboard Item" } },
-        "zh-Hans": { "stringUnit": { "state": "translated", "value": "当前剪贴板内容" } }
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current Clipboard Item"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前剪贴板内容"
+          }
+        }
       }
     },
     "Clipboard History Copy": {
@@ -16615,6 +16675,54 @@
           "stringUnit": {
             "state": "translated",
             "value": "页码缩略图"
+          }
+        }
+      }
+    },
+    "Text Alignment": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text Alignment"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字对齐"
+          }
+        }
+      }
+    },
+    "Align Left": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Align Left"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "左对齐"
+          }
+        }
+      }
+    },
+    "Justified": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Justified"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "两端对齐"
           }
         }
       }
