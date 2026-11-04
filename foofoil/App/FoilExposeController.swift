@@ -1468,6 +1468,7 @@ final class FoilExposeController {
         let modifiers = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let key = event.charactersIgnoringModifiers?.lowercased()
         if HistorySearchPanel.isSearchPaste(event),
+           HistorySearchPanel.shouldOpenPastedContent(.general),
            panels.contains(where: { $0 === event.window }),
            (event.window?.firstResponder as? NSTextView)?.isEditable == true,
            let delegate = NSApp.delegate as? AppDelegate,

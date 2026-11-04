@@ -150,7 +150,6 @@ final class ClipboardHistorySearch: ObservableObject {
     private var query = ""
     private var task: Task<Void, Never>?
     private var active = false
-    private var activation: AnyCancellable?
     private var copyNotification: AnyCancellable?
     private let load: @Sendable () async -> ClipboardHistorySnapshot
     private let currentContent: @MainActor () -> ClipboardSearchEntry?
@@ -171,10 +170,7 @@ final class ClipboardHistorySearch: ObservableObject {
                     self.filter()
                 }
             }
-        activation = NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)
-            .sink { [weak self] _ in
-                MainActor.assumeIsolated { if self?.active == true { self?.refresh() } }
-            }
+
     }
     func search(_ query: String) {
         self.query = query
@@ -182,7 +178,6 @@ final class ClipboardHistorySearch: ObservableObject {
     }
     func refresh() {
         task?.cancel()
-        access = .unknown
         current = currentContent()
         filter()
         isLoading = true

@@ -18,6 +18,15 @@ final class HistorySearchPanel: NSPanel {
         }
     }
 
+    static func shouldOpenPastedContent(_ pasteboard: NSPasteboard) -> Bool {
+        let fileOptions: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+        if !(pasteboard.readObjects(forClasses: [NSURL.self], options: fileOptions) ?? []).isEmpty { return true }
+        if NSImage(pasteboard: pasteboard) != nil { return true }
+        guard let text = pasteboard.string(forType: .string) else { return true }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.count > 100 || trimmed.rangeOfCharacter(from: .newlines) != nil
+    }
+
     static func isSearchPaste(_ event: NSEvent) -> Bool {
         event.type == .keyDown && !event.isARepeat
             && event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command
@@ -217,7 +226,8 @@ final class HistorySearchWindowController: ObservableObject {
     }
 
     private func openPastedContent() -> Bool {
-        guard let delegate = NSApp.delegate as? AppDelegate else { return false }
+        guard HistorySearchPanel.shouldOpenPastedContent(.general),
+              let delegate = NSApp.delegate as? AppDelegate else { return false }
         if let target = openingTarget,
            let controller = delegate.windowControllers.first(where: { $0.appState === target }) {
             delegate.activateWindow(controller)

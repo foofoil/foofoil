@@ -15,6 +15,23 @@ struct ClipboardHistorySearchTests {
         }
         Issue.record("Clipboard load did not finish")
     }
+    @Test func reopeningSearchReadsCurrentClipboardAgain() async throws {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.setString("First", forType: .string)
+        let search = ClipboardHistorySearch(load: { .init(access: .needsAuthorization, entries: []) },
+                                            currentContent: { .current(pasteboard: pasteboard) })
+        defer { search.stop() }
+        search.search("")
+        try await waitForLoad(search)
+        pasteboard.clearContents()
+        pasteboard.setString("Second", forType: .string)
+        search.search("")
+        #expect(search.entries.first?.content == .text("First"))
+        search.stop()
+        search.search("")
+        #expect(search.entries.first?.content == .text("Second"))
+    }
     @Test func unauthorizedShowsOnlyCurrentAndFiltersIt() async throws {
         let current = entry("current", "Today’s clipboard")
         let history = entry("old", "Old history")
@@ -163,6 +180,36 @@ struct ClipboardHistorySearchTests {
         #expect(search.entries.isEmpty)
         search.search("Fresh")
         #expect(search.entries.map(\.id) == ["fresh"])
+    }
+
+    @Test func refreshKeepsExistingResultsVisibleWhileLoading() async throws {
+        actor Loader {
+            var calls = 0
+            var continuation: CheckedContinuation<ClipboardHistorySnapshot, Never>?
+            let old: ClipboardSearchEntry
+            let fresh: ClipboardSearchEntry
+            init(old: ClipboardSearchEntry, fresh: ClipboardSearchEntry) { self.old = old; self.fresh = fresh }
+            func load() async -> ClipboardHistorySnapshot {
+                calls += 1
+                if calls == 1 { return .init(access: .available, entries: [old]) }
+                return await withCheckedContinuation { continuation = $0 }
+            }
+            func finish() { continuation?.resume(returning: .init(access: .available, entries: [fresh])); continuation = nil }
+        }
+        let loader = Loader(old: entry("old", "Old"), fresh: entry("new", "New"))
+        let search = ClipboardHistorySearch(load: { await loader.load() }, currentContent: { nil })
+        defer { search.stop() }
+        search.search("")
+        try await waitForLoad(search)
+        search.refresh()
+        #expect(search.isLoading && search.entries.map(\.id) == ["old"])
+        for _ in 0..<100 {
+            if await loader.calls == 2 { break }
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        await loader.finish()
+        try await waitForLoad(search)
+        #expect(search.entries.map(\.id) == ["new"])
     }
 
     @Test func unauthorizedCacheNeverExposesPreviousHistory() async throws {

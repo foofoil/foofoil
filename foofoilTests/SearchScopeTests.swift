@@ -681,6 +681,25 @@ struct SearchScopeTests {
 
 @Suite @MainActor
 struct SearchPasteRoutingTests {
+    @Test func singleLineTextRemainsSearchAndMultilineOpens() {
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        pasteboard.setString("  search term  \n", forType: .string)
+        #expect(!HistorySearchPanel.shouldOpenPastedContent(pasteboard))
+        pasteboard.clearContents()
+        pasteboard.setString(String(repeating: "字", count: 100), forType: .string)
+        #expect(!HistorySearchPanel.shouldOpenPastedContent(pasteboard))
+        pasteboard.clearContents()
+        pasteboard.setString(String(repeating: "字", count: 101), forType: .string)
+        #expect(HistorySearchPanel.shouldOpenPastedContent(pasteboard))
+        pasteboard.clearContents()
+        pasteboard.setString("first line\nsecond line", forType: .string)
+        #expect(HistorySearchPanel.shouldOpenPastedContent(pasteboard))
+        pasteboard.clearContents()
+        pasteboard.writeObjects([NSURL(fileURLWithPath: "/tmp/example.txt")])
+        #expect(HistorySearchPanel.shouldOpenPastedContent(pasteboard))
+    }
+
     @Test func recognizesOnlyStandardPasteShortcut() throws {
         func event(_ modifiers: NSEvent.ModifierFlags, _ key: String, repeatKey: Bool = false) throws -> NSEvent {
             try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers,
