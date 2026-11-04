@@ -2,6 +2,8 @@
 
 Local Agents can use the bundled `foil` command. Run `foil guide` for discovery and `foil capabilities WINDOW_ID` for the current content. The CLI can open files, directories, URLs, and clipboard content with `--incognito`; query operation completion with `foil wait --operation ID`. Reading and media control depend on the current backend. Settings → Agent Access manages optional Skill discovery; installation does not prove the Agent has loaded it.
 
+File → Open With lists applications registered for the current file or URL. Its shortcut can be changed in Content Management; content without a file or URL is unavailable.
+
 Supported local files can also be opened from Finder using “Open With → foofoil”.
 
 Blank foils show “What would you like to open? Type here.” followed by the `/` keycap and More options; Quick Open and Exposé retain their full search hints. All three share the `/` options. Disabled local file search hides File and Folder; either disabled Apple Music library or music search hides music categories. Enable buttons update the menu immediately. The Apple Music enable action turns on both library and search settings. An active blank foil keeps the search field focused; system sheets retain their own focus.

@@ -17,7 +17,7 @@ nonisolated struct KeyboardShortcutDefinition: Identifiable, Hashable {
     let noteKey: String?
 
     var displayName: String {
-        NSLocalizedString(titleKey, comment: "")
+        NSLocalizedString(titleKey, tableName: id == "file.openWith" ? "OpenWith" : nil, comment: "")
     }
 
     var note: String? {
@@ -105,6 +105,7 @@ nonisolated enum KeyboardShortcutCatalog {
     static let file: [KeyboardShortcutDefinition] = [
         definition("file.newIncognito", "New Incognito Foil", "n", [.command, .option]),
         definition("file.toggleIncognito", "Toggle Incognito Mode", "\u{1B}", [.option]),
+        definition("file.openWith", "Open With", "o", [.control, .shift]),
         definition("file.share", "Share...", nil, []),
         definition("file.showInformation", "Foil Information", "i", [.command, .shift]),
         definition("file.reset", "Reset to Blank Foil", "k", [.command, .shift])

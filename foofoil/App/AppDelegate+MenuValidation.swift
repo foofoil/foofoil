@@ -50,6 +50,9 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
     }
 
     func updateFileMenu(_ menu: NSMenu) {
+        if let submenu = menu.items.first(where: { $0.submenu?.title == NSLocalizedString("Open With", tableName: "OpenWith", comment: "") })?.submenu {
+            populateOpenWithMenu(submenu, url: openWithURL)
+        }
         let isWebMode = activeReadingState?.webURL != nil
         setMenuItem(withAction: #selector(openInDefaultBrowserAction), in: menu, isHidden: !isWebMode)
         setMenuItem(withAction: #selector(copyWebURLAction), in: menu, isHidden: !isWebMode)
@@ -287,6 +290,10 @@ extension AppDelegate: NSMenuItemValidation, NSMenuDelegate {
         if menuItem.action == #selector(saveAsAction) {
             menuItem.title = activeAppState?.saveAsTitle ?? NSLocalizedString("Save As...", comment: "")
             return activeAppState?.canSaveAs == true
+        }
+
+        if menuItem.action == #selector(openWithAction) {
+            return openWithURL != nil
         }
 
         if menuItem.action == #selector(shareAction) {

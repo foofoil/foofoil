@@ -202,6 +202,13 @@ extension AppDelegate {
         fileMenu.addItem(saveAsItem)
 
 
+        let openWithItem = NSMenuItem(title: NSLocalizedString("Open With", tableName: "OpenWith", comment: ""), action: nil, keyEquivalent: "")
+        openWithItem.submenu = NSMenu(title: NSLocalizedString("Open With", tableName: "OpenWith", comment: ""))
+        if let submenu = openWithItem.submenu { populateOpenWithMenu(submenu, url: nil) }
+        openWithItem.withSymbol("arrow.up.forward.app")
+        openWithItem.target = self
+        fileMenu.addItem(openWithItem)
+
         let shareItem = NSMenuItem(title: NSLocalizedString("Share...", comment: ""), action: #selector(shareAction), keyEquivalent: "")
         shareItem.withSymbol("square.and.arrow.up")
         shareItem.representedObject = "file.share"

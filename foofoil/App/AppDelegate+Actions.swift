@@ -185,6 +185,61 @@ extension AppDelegate {
         return text.isEmpty ? [] : [text]
     }
 
+    var openWithURL: URL? {
+        guard let state = activeReadingState else { return nil }
+        return state.webURL ?? state.currentListableFileURL() ?? state.textURL ?? state.quickLookSourceURL
+    }
+
+    @objc func openWithAction() {
+        guard let url = openWithURL, let view = activeWindowController?.window?.contentView else { return }
+        let menu = NSMenu()
+        populateOpenWithMenu(menu, url: url, includeShortcut: false)
+        menu.popUp(positioning: nil, at: NSPoint(x: view.bounds.midX, y: view.bounds.midY), in: view)
+    }
+
+    func populateOpenWithMenu(_ menu: NSMenu, url: URL?, includeShortcut: Bool = true) {
+        menu.removeAllItems()
+        if includeShortcut {
+            let shortcutItem = NSMenuItem(title: NSLocalizedString("Choose Application...", tableName: "OpenWith", comment: ""), action: #selector(openWithAction), keyEquivalent: "")
+            shortcutItem.target = self
+            shortcutItem.representedObject = "file.openWith"
+            menu.addItem(shortcutItem)
+            menu.addItem(.separator())
+        }
+        guard let url else {
+            applyKeyboardShortcuts(to: menu)
+            return
+        }
+        let applications = NSWorkspace.shared.urlsForApplications(toOpen: url)
+            .filter { $0.standardizedFileURL != Bundle.main.bundleURL.standardizedFileURL }
+            .sorted { $0.deletingPathExtension().lastPathComponent.localizedStandardCompare($1.deletingPathExtension().lastPathComponent) == .orderedAscending }
+        for application in applications {
+            let name = FileManager.default.displayName(atPath: application.path)
+            let item = NSMenuItem(title: (name as NSString).deletingPathExtension, action: #selector(openWithApplicationAction(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = [url, application]
+            let icon = NSWorkspace.shared.icon(forFile: application.path)
+            icon.size = NSSize(width: 16, height: 16)
+            item.image = icon
+            menu.addItem(item)
+        }
+        if applications.isEmpty {
+            let item = NSMenuItem(title: NSLocalizedString("No Supported Applications", tableName: "OpenWith", comment: ""), action: nil, keyEquivalent: "")
+            item.isEnabled = false
+            menu.addItem(item)
+        }
+        applyKeyboardShortcuts(to: menu)
+    }
+
+    @objc func openWithApplicationAction(_ sender: NSMenuItem) {
+        guard let urls = sender.representedObject as? [URL], urls.count == 2 else { return }
+        NSWorkspace.shared.open([urls[0]], withApplicationAt: urls[1], configuration: NSWorkspace.OpenConfiguration()) { _, error in
+            if let error {
+                DispatchQueue.main.async { NSApp.presentError(error) }
+            }
+        }
+    }
+
     @objc func shareAction() {
         guard let controller = activeWindowController,
               let contentView = controller.window?.contentView else {
