@@ -98,10 +98,11 @@ extension AppState {
                 if Task.isCancelled { return }
 
                 let rendered = Self.cmarkToHTML(textToRender)
-                // 在 HTML 导入器接触资源前移除所有图片标记；原始 HTML 已由 cmark 安全模式丢弃。
+                // 在 HTML 导入器接触资源前移除所有图片标记，包括白名单中的原始 HTML 图片。
                 let safeHTML = blocksResources ? Self.agentMarkdownHTML(rendered, placeholder: resourcePlaceholder) : rendered
+                let (sizedHTML, imageSizes) = Self.markdownImageSizeMarkers(safeHTML)
                 // AppKit 的 HTML 导入器不实现表单；用带来源位置的占位链接承载原生 checkbox。
-                let htmlBody = Self.taskInputsForTextKit(MarkdownCodeHighlighter.highlightHTML(safeHTML, isDark: isDark))
+                let htmlBody = Self.taskInputsForTextKit(MarkdownCodeHighlighter.highlightHTML(sizedHTML, isDark: isDark))
                 if Task.isCancelled { return }
 
                 // 根据当前明暗外观显式生成对应配色的 CSS，避免依赖 @media 查询导致 NSAttributedString 在后台解析时颜色固化
@@ -311,6 +312,7 @@ extension AppState {
                         guard !Task.isCancelled else { return }
                         // HTML 导入器不会稳定保留普通段落行高；仅修正常规段落，避免覆盖引用、代码块、列表和表格的独立布局。
                         let mutableAttr = NSMutableAttributedString(attributedString: attr)
+                        Self.applyMarkdownImageSizes(imageSizes, to: mutableAttr)
 
                         // 将 HTML 导入固化的纯黑/纯白前景色替换为语义 labelColor，使文本随系统明暗外观切换。
                         // 放在渲染流程内，避免 MarkdownTextView 每次更新都全量枚举前景色。
@@ -372,6 +374,7 @@ extension AppState {
 
                         // 正文段距设置不应覆盖标题层级：标题上留白大于下留白，贴近所属内容。
                         Self.applyHeadingRangeStyles(to: mutableAttr, fontSize: fontSize, levels: headingLevels)
+                        Self.compactMarkdownImageParagraphs(mutableAttr)
                         // 一览中的改动键位使用语义红色；不需要放开 Markdown 原始 HTML。
                         let changedKeyPairs = Self.markerPairs(
                             in: mutableAttr.string as NSString,
@@ -1121,12 +1124,84 @@ extension AppState {
         nonisolated static func cmarkHTML(_ markdown: String) -> String {
             // 空段直接返回，避免产生空 <p>
             if markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "" }
-            guard let cString = cmark_markdown_to_html(markdown, markdown.utf8.count, 0) else {
-                return ""
+            guard let root = cmark_parse_document(markdown, markdown.utf8.count, 0) else { return "" }
+            defer { cmark_node_free(root) }
+            var replacements: [(String, String)] = []
+            let prefix = "FOOFOILHTML" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+            // 只替换 cmark 识别出的 HTML 节点；代码块和转义文本不受影响。
+            func visit(_ node: OpaquePointer) {
+                var child = cmark_node_first_child(node)
+                while let current = child {
+                    child = cmark_node_next(current)
+                    let type = cmark_node_get_type(current)
+                    if (type == CMARK_NODE_HTML_INLINE || type == CMARK_NODE_HTML_BLOCK),
+                       let literal = cmark_node_get_literal(current),
+                       let safe = safeMarkdownRawHTML(String(cString: literal)) {
+                        let token = prefix + "X\(replacements.count)END"
+                        let text = cmark_node_new(CMARK_NODE_TEXT)!
+                        cmark_node_set_literal(text, token)
+                        let replacement: OpaquePointer
+                        if type == CMARK_NODE_HTML_BLOCK {
+                            replacement = cmark_node_new(CMARK_NODE_PARAGRAPH)!
+                            cmark_node_append_child(replacement, text)
+                        } else {
+                            replacement = text
+                        }
+                        if cmark_node_replace(current, replacement) == 1 {
+                            replacements.append((token, safe))
+                            cmark_node_free(current)
+                        } else {
+                            cmark_node_free(replacement)
+                        }
+                    } else {
+                        visit(current)
+                    }
+                }
             }
-            let result = String(cString: cString)
+            visit(root)
+            guard let cString = cmark_render_html(root, 0) else { return "" }
+            var result = String(cString: cString)
             free(cString)
+            for (token, html) in replacements { result = result.replacingOccurrences(of: token, with: html) }
             return result
+        }
+
+        // 不启用 cmark 的 unsafe 模式：只重建无属性文字标签和受限的本地图片。
+        nonisolated static func safeMarkdownRawHTML(_ raw: String) -> String? {
+            let tag = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if tag.range(of: #"^</?(?:b|strong|i|em|del|s|sub|sup|kbd)>$|^<br\s*/?>$"#,
+                         options: [.regularExpression, .caseInsensitive]) != nil { return tag }
+            guard tag.range(of: #"^<img\s+(?:[a-zA-Z]+\s*=\s*(?:\"[^\"]*\"|'[^']*')\s*)+/?>$"#,
+                            options: [.regularExpression, .caseInsensitive]) != nil else { return nil }
+            let regex = try! NSRegularExpression(pattern: #"([a-zA-Z]+)\s*=\s*(?:\"([^\"]*)\"|'([^']*)')"#)
+            let source = tag as NSString
+            var attributes: [String: String] = [:]
+            for match in regex.matches(in: tag, range: NSRange(location: 0, length: source.length)) {
+                let name = source.substring(with: match.range(at: 1)).lowercased()
+                guard ["src", "alt", "width", "height"].contains(name), attributes[name] == nil else { return nil }
+                let valueRange = match.range(at: 2).location == NSNotFound ? match.range(at: 3) : match.range(at: 2)
+                attributes[name] = source.substring(with: valueRange)
+            }
+            guard let src = attributes["src"], !src.isEmpty,
+                  !src.hasPrefix("/"), !src.contains(":"), !src.contains("%"),
+                  !src.contains("\\"), !src.contains("&"), !src.contains("?"), !src.contains("#"),
+                  !src.components(separatedBy: "/").contains(".."),
+                  src.rangeOfCharacter(from: .controlCharacters) == nil else { return nil }
+            for name in ["width", "height"] {
+                if let value = attributes[name] {
+                    guard value.range(of: #"^[0-9]{1,4}$"#, options: .regularExpression) != nil,
+                          let size = Int(value), (1...4096).contains(size) else { return nil }
+                }
+            }
+            func escape(_ value: String) -> String {
+                value.replacingOccurrences(of: "&", with: "&amp;")
+                    .replacingOccurrences(of: "\"", with: "&quot;")
+                    .replacingOccurrences(of: "<", with: "&lt;")
+                    .replacingOccurrences(of: ">", with: "&gt;")
+            }
+            return "<img" + ["src", "alt", "width", "height"].compactMap { name in
+                attributes[name].map { " \(name)=\"\(escape($0))\"" }
+            }.joined() + ">"
         }
 
         nonisolated static func agentMarkdownHTML(_ html: String, placeholder: String) -> String {
@@ -1134,6 +1209,86 @@ extension AppState {
                 .replacingOccurrences(of: "<", with: "&lt;").replacingOccurrences(of: ">", with: "&gt;")
             guard let regex = try? NSRegularExpression(pattern: "<img\\b[^>]*>", options: [.caseInsensitive]) else { return "" }
             return regex.stringByReplacingMatches(in: html, range: NSRange(html.startIndex..., in: html), withTemplate: NSRegularExpression.escapedTemplate(for: escaped))
+        }
+
+        struct MarkdownImageSize {
+            let marker: String
+            let width: CGFloat?
+            let height: CGFloat?
+        }
+
+        // 导入器会丢失图片尺寸；用唯一文本标记把尺寸关联到对应的原生附件。
+        nonisolated static func markdownImageSizeMarkers(_ html: String) -> (String, [MarkdownImageSize]) {
+            let images = try! NSRegularExpression(pattern: #"<img\b[^>]*>"#, options: .caseInsensitive)
+            let dimension = try! NSRegularExpression(pattern: #"\s(width|height)="([0-9]{1,4})""#, options: .caseInsensitive)
+            let source = html as NSString
+            let prefix = "FOOFOILIMGSIZE" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+            var result = html
+            var sizes: [MarkdownImageSize] = []
+            for match in images.matches(in: html, range: NSRange(location: 0, length: source.length)).reversed() {
+                let tag = source.substring(with: match.range) as NSString
+                var width: CGFloat?
+                var height: CGFloat?
+                for attribute in dimension.matches(in: tag as String, range: NSRange(location: 0, length: tag.length)) {
+                    guard let number = Int(tag.substring(with: attribute.range(at: 2))), (1...4096).contains(number) else { continue }
+                    if tag.substring(with: attribute.range(at: 1)).lowercased() == "width" { width = CGFloat(number) }
+                    else { height = CGFloat(number) }
+                }
+                guard width != nil || height != nil else { continue }
+                let marker = "\(prefix)X\(sizes.count)END"
+                sizes.append(MarkdownImageSize(marker: marker, width: width, height: height))
+                result = (result as NSString).replacingCharacters(in: NSRange(location: match.range.location, length: 0), with: marker)
+            }
+            return (result, sizes)
+        }
+
+        @MainActor static func applyMarkdownImageSizes(_ sizes: [MarkdownImageSize], to text: NSMutableAttributedString) {
+            for size in sizes {
+                let markerRange = (text.string as NSString).range(of: size.marker)
+                guard markerRange.location != NSNotFound else { continue }
+                let imageLocation = NSMaxRange(markerRange)
+                if imageLocation < text.length,
+                   let attachment = text.attribute(.attachment, at: imageLocation, effectiveRange: nil) as? NSTextAttachment,
+                   let image = (attachment.attachmentCell as? NSTextAttachmentCell)?.image
+                       ?? attachment.fileWrapper?.regularFileContents.flatMap(NSImage.init(data:)),
+                   image.size.width > 0, image.size.height > 0,
+                   let copy = image.copy() as? NSImage {
+                    let width = size.width ?? (size.height! * image.size.width / image.size.height)
+                    let height = size.height ?? (size.width! * image.size.height / image.size.width)
+                    copy.size = NSSize(width: width, height: height)
+                    attachment.attachmentCell = NSTextAttachmentCell(imageCell: copy)
+                }
+                text.deleteCharacters(in: markerRange)
+            }
+        }
+
+        // 图片独占段落时，正文倍数行高会把附件高度也放大，造成图片上方多余留白。
+        @MainActor static func compactMarkdownImageParagraphs(_ text: NSMutableAttributedString) {
+            let source = text.string as NSString
+            var location = 0
+            while location < source.length {
+                let range = source.paragraphRange(for: NSRange(location: location, length: 0))
+                location = NSMaxRange(range)
+                var hasImage = false
+                var imageOnly = true
+                for index in range.location..<NSMaxRange(range) {
+                    if source.character(at: index) == 0xFFFC,
+                       text.attribute(.attachment, at: index, effectiveRange: nil) is NSTextAttachment {
+                        hasImage = true
+                    } else if let scalar = UnicodeScalar(source.character(at: index)),
+                              !CharacterSet.whitespacesAndNewlines.contains(scalar) {
+                        imageOnly = false
+                        break
+                    }
+                }
+                guard imageOnly, hasImage else { continue }
+                let style = ((text.attribute(.paragraphStyle, at: range.location, effectiveRange: nil) as? NSParagraphStyle) ?? .default).mutableCopy() as! NSMutableParagraphStyle
+                style.lineHeightMultiple = 1
+                style.minimumLineHeight = 0
+                style.maximumLineHeight = 0
+                style.lineSpacing = 0
+                text.addAttribute(.paragraphStyle, value: style, range: range)
+            }
         }
 
         /// 将单元格内的 inline Markdown 转为 HTML 片段（去除外层 <p> 包裹）

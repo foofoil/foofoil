@@ -57,6 +57,8 @@ Source files with a recognized extension or file name, such as .swift, .kt, .zig
 
 Markdown task lists display read-only checkboxes that reflect the source document. They cannot be toggled in the preview.
 
+Markdown supports selected static HTML text tags and `<img>` tags with relative paths. Other raw HTML is not displayed. HTML images do not load remote URLs; pixel width and height are supported, preserving the original aspect ratio when only one is specified.
+
 Markdown links to existing local files and HTTP(S) websites open in a new incognito foil. Relative file links resolve from the Markdown file’s folder; missing files do not open.
 
 
