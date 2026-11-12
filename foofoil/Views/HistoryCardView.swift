@@ -320,7 +320,7 @@ struct HistoryCardView: View {
                 .frame(width: 60, height: 60)
             } else if let name = config.originalImageName, !name.isEmpty {
                 // 扩展内容（如 EPUB）没有缩略图，用类型图标 + 文件名占位；
-                // Markdown 改用正文推导的标题，避免展示“无标题 Markdown.md”这类文件名。
+                // Markdown 使用历史标题：真实文件优先文件名，未命名文档才展示正文标题。
                 VStack(spacing: 4) {
                     Image(systemName: historyKind.symbolName)
                         .font(.system(size: 24))

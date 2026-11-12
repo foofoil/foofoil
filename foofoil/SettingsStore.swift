@@ -447,12 +447,13 @@ nonisolated public struct WindowConfig: Codable, Identifiable, Sendable {
         }
     }
 
-    /// Markdown 历史标题：优先用正文首个标题，否则用开头文字加省略号；用户改名后保留自定义标题。
+    /// Markdown 历史标题：来源文件有文件名时优先用文件名；无来源的粘贴文档才从正文推导。
     private var markdownHistoryDisplayName: String {
-        if let name = originalImageName?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !name.isEmpty,
-           !name.lowercased().hasSuffix(".md"),
-           !name.lowercased().hasSuffix(".markdown") {
+        // 剪贴板与未命名 Markdown 的 “Untitled Markdown.md” 是托管缓存占位名，不是用户文件名。
+        let isManagedCache = textPath.map { AppState.isManagedCacheURL(URL(fileURLWithPath: $0)) } ?? false
+        if !isManagedCache,
+           let name = originalImageName?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !name.isEmpty {
             return name
         }
         let title = Self.markdownHistoryTitle(from: text)

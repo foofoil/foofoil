@@ -3390,6 +3390,16 @@ struct ClipboardContentDetectionTests {
         renamed.originalImageName = "自定义标题"
         #expect(renamed.historyMenuDisplayName == "自定义标题")
     }
+
+    @Test func markdownHistoryDisplayNamePrefersSourceFileName() throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("notes-\(UUID()).md")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try "# 正文标题\n\n文件名应优先于正文标题".write(to: url, atomically: true, encoding: .utf8)
+        let state = AppState(isIncognito: true)
+        state.openTextFile(url: url)
+        // 真实来源文件名优先；只有托管缓存的未命名 Markdown 才使用正文标题。
+        #expect(state.toConfig().historyMenuDisplayName == url.lastPathComponent)
+    }
 }
 
 @MainActor
