@@ -807,6 +807,14 @@ extension AppState {
                 completion(false)
                 return
             }
+            if SettingsStore.shared.appleMusicLibraryEnabled, AppleMusicLink(url: url) != nil {
+                DispatchQueue.main.async {
+                    guard self.isCurrentDrop(generation), let delegate = NSApp.delegate as? AppDelegate else { completion(false); return }
+                    delegate.openAppleMusicLink(url, isIncognito: self.isIncognito, target: self)
+                    completion(true)
+                }
+                return
+            }
             if url.isFileURL {
                 if let failure = initialFileOpenFailure(url) {
                     reportFileOpenFeedback([failure])

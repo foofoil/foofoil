@@ -39,6 +39,14 @@ nonisolated struct AppleMusicLink: Equatable, Sendable {
     private static func isNumericID(_ value: String) -> Bool {
         !value.isEmpty && value.utf8.allSatisfy { (48...57).contains($0) }
     }
+
+    /// 拖拽的文本或 HTML 可能同时包含封面地址和分享链接。
+    static func first(in text: String) -> URL? {
+        if let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)), AppleMusicLink(url: url) != nil { return url }
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else { return nil }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        return detector.matches(in: text, range: range).compactMap(\.url).first { AppleMusicLink(url: $0) != nil }
+    }
 }
 
 enum CatalogLinkError: LocalizedError {

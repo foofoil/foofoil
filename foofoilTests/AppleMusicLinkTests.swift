@@ -34,6 +34,12 @@ struct AppleMusicLinkTests {
         #expect(AppleMusicLink(url: URL(string: value)!) == nil)
     }
 
+    @Test func findsMusicLinkAmongOtherDragContent() {
+        let text = #"<img src="https://example.com/cover.jpg"><a href="https://music.apple.com/cn/album/example/123">Album</a>"#
+        #expect(AppleMusicLink.first(in: text)?.absoluteString == "https://music.apple.com/cn/album/example/123")
+        #expect(AppleMusicLink.first(in: "https://example.com/cover.jpg") == nil)
+    }
+
     private func catalogSong() throws -> AppleMusicLibraryItem {
         let data = Data(#"{"id":"456","type":"songs","attributes":{"name":"Shared Song","artistName":"Artist","albumName":"Album"}}"#.utf8)
         var item = AppleMusicLibraryItem.song(try JSONDecoder().decode(Song.self, from: data))

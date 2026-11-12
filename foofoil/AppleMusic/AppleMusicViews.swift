@@ -525,8 +525,10 @@ extension AppDelegate {
     }
 
     /// 快捷键直接打开时按需授权；连续粘贴只允许最后一个请求生效。
-    func openAppleMusicLink(_ url: URL, isIncognito: Bool = false) {
+    func openAppleMusicLink(_ url: URL, isIncognito: Bool = false, target: AppState? = nil) {
         guard SettingsStore.shared.appleMusicLibraryEnabled, let link = AppleMusicLink(url: url) else { return }
+        let dropGeneration = target?.currentDropGeneration
+        let routeGeneration = target?.currentMediaRouteGeneration
         appleMusicLinkTask?.cancel()
         appleMusicLinkTask = Task { @MainActor [weak self] in
             do {
@@ -535,9 +537,15 @@ extension AppDelegate {
                 try Task.checkCancellation()
                 let item = try await AppleMusicLibrary.shared.resolve(link)
                 try Task.checkCancellation()
-                self?.openAppleMusic(item, isIncognito: isIncognito)
+                if let target {
+                    guard target.currentDropGeneration == dropGeneration,
+                          target.currentMediaRouteGeneration == routeGeneration,
+                          self?.windowControllers.contains(where: { $0.appState === target }) == true else { return }
+                }
+                self?.openAppleMusic(item, isIncognito: isIncognito, target: target)
             } catch {
                 guard !Task.isCancelled else { return }
+                if let target, (target.currentDropGeneration != dropGeneration || target.currentMediaRouteGeneration != routeGeneration) { return }
                 let alert = NSAlert()
                 alert.messageText = NSLocalizedString("Music Link Open Failed", comment: "")
                 alert.informativeText = error.localizedDescription
@@ -546,12 +554,13 @@ extension AppDelegate {
         }
     }
 
-    func openAppleMusic(_ item: AppleMusicLibraryItem, startingAt track: Track? = nil, isIncognito: Bool = false) {
+    func openAppleMusic(_ item: AppleMusicLibraryItem, startingAt track: Track? = nil, isIncognito: Bool = false, target: AppState? = nil) {
         guard SettingsStore.shared.appleMusicLibraryEnabled else { return }
         appleMusicLinkTask?.cancel()
         appleMusicLinkTask = nil
         HistorySearchWindowController.shared.dismiss()
-        let existing = windowControllers.first { $0.appState.appleMusicReference != nil && $0.appState.isIncognito == isIncognito } ?? blankWindowController(isIncognito: isIncognito)
+        let existing = target.flatMap { state in windowControllers.first { $0.appState === state } }
+            ?? windowControllers.first { $0.appState.appleMusicReference != nil && $0.appState.isIncognito == isIncognito } ?? blankWindowController(isIncognito: isIncognito)
         let state = existing?.appState ?? AppState(isIncognito: isIncognito)
         state.prepareAppleMusic(item)
         state.saveState()

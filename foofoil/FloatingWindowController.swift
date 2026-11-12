@@ -80,6 +80,13 @@ final class FileDropHostingView<Content: View>: NSHostingView<Content> {
 
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         defer { appState.isFileDropTargeted = false }
+        if SettingsStore.shared.appleMusicLibraryEnabled,
+           let url = appleMusicURL(from: sender), let delegate = NSApp.delegate as? AppDelegate {
+            appState.relinquishAgentControl(keepingPresentation: true)
+            appState.currentDropGeneration &+= 1
+            delegate.openAppleMusicLink(url, isIncognito: appState.isIncognito, target: appState)
+            return true
+        }
         let urls = droppedFileURLs(from: sender)
         if !urls.isEmpty {
             // 空箔内按住 Option 拖入文件时走显式无痕入口；当前空箔仍保持原状态。
@@ -95,6 +102,16 @@ final class FileDropHostingView<Content: View>: NSHostingView<Content> {
         guard !providers.isEmpty else { return false }
         appState.handleDrop(providers: providers)
         return true
+    }
+
+    private func appleMusicURL(from sender: any NSDraggingInfo) -> URL? {
+        let types: [NSPasteboard.PasteboardType] = [.URL, .string, .html]
+        for item in sender.draggingPasteboard.pasteboardItems ?? [] {
+            for type in types {
+                if let value = item.string(forType: type), let url = AppleMusicLink.first(in: value) { return url }
+            }
+        }
+        return nil
     }
 
     override func concludeDragOperation(_ sender: (any NSDraggingInfo)?) {
