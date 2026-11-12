@@ -78,6 +78,21 @@ struct CollectionSidebarTests {
         #expect(session.sidebarMode == .folder)
     }
 
+    @Test func exactlyHalfMediaFilesSelectThatMediaList() async throws {
+        let (directory, urls) = try fixture()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let extraNote = directory.appendingPathComponent("extra-note.txt")
+        try "extra note".write(to: extraNote, atomically: true, encoding: .utf8)
+        let state = AppState(isIncognito: true)
+        defer { state.resetContent() }
+        state.openFileCollection(urls + [extraNote], roots: [directory])
+        let session = try #require(state.archiveSession)
+        try await settle(session)
+        #expect(session.sidebarMode == .image)
+        // 打开目录后先临时展开侧栏，鼠标不悬停时再自动收起。
+        #expect(state.isNavigatorPanelExplicitlyVisible)
+    }
+
     @Test func dominantMediaIsSelectedForArchives() async throws {
         let (directory, _) = try fixture()
         defer { try? FileManager.default.removeItem(at: directory) }
@@ -138,13 +153,17 @@ struct CollectionSidebarTests {
     @Test func mixedFilesKeepTheirTreeAndSwitchToAnImageList() async throws {
         let (directory, urls) = try fixture()
         defer { try? FileManager.default.removeItem(at: directory) }
+        // 图片占 40%，低于默认媒体列表阈值，仍以目录树打开。
+        let extraNotes = ["note-2.txt", "note-3.txt"].map { directory.appendingPathComponent($0) }
+        for url in extraNotes { try "extra note".write(to: url, atomically: true, encoding: .utf8) }
+        let mixedURLs = urls + extraNotes
         let state = AppState(isIncognito: true)
         defer { state.resetContent() }
-        #expect(state.handleDroppedFileURLs(urls))
+        #expect(state.handleDroppedFileURLs(mixedURLs))
         let session = try #require(state.archiveSession)
         try await settle(session)
         #expect(session.sidebarMode == .folder)
-        #expect(session.source.localFiles?.count == 3)
+        #expect(session.source.localFiles?.count == 5)
         #expect(session.contribution.items.contains { $0.title == "nested" && $0.parentID == "root" })
         #expect(session.availableSidebarModes == [.folder, .image])
         let note = try #require(session.contribution.items.first { $0.title == "note.txt" })

@@ -535,7 +535,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
                     let counts = self.projectedMediaKinds.values.reduce(into: [FileListKind: Int]()) { $0[$1, default: 0] += 1 }
                     let dominant = CollectionSidebarMode.allCases.first {
                         guard let kind = $0.kind, total > 0 else { return false }
-                        return counts[kind, default: 0] > total * 2 / 3
+                        return counts[kind, default: 0] * 2 >= total
                     }
                     self.source.dominantMediaMode = dominant
                     if self.source.sidebarMode == nil { self.source.sidebarMode = dominant ?? .folder }
