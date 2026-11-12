@@ -66,6 +66,27 @@ struct AppleMusicSearchTests {
         #expect(!model.isMusicAuthorized)
     }
 
+    @Test func rewritingSameQueryKeepsExpandedMusicResults() async throws {
+        let albums = try (0..<20).map { try album("more-\($0)") }
+        var requests = 0
+        let model = HistorySearchViewModel(historySearch: { _ in [] }, fileSearch: { _, done in done(.results([])) },
+                                          cameraAvailable: { false }, musicSearch: { _ in requests += 1; return albums },
+                                          musicAuthorized: { true }, musicEnabled: { true })
+        model.query = "more"
+        try await waitUntil { !model.isSearching }
+        #expect(requests == 1)
+        #expect(model.visibleMusicResults(in: .albums).count == 12)
+        model.expandMusicResults(in: .albums)
+        let expanded = model.visibleMusicResults(in: .albums).count
+        #expect(expanded > 12)
+        // 空箔内点击“更多”会先让输入框失去焦点，再回填相同文本；不能因此重跑搜索。
+        model.query = model.query
+        #expect(model.expandedMusicCategories.contains(.albums))
+        #expect(model.visibleMusicResults(in: .albums).count == expanded)
+        #expect(requests == 1)
+        model.stop()
+    }
+
     @Test func lateMusicResultsPreserveKeyboardSelectionAndOpenMusic() async throws {
         let rows = [history("First"), history("Second")]
         let item = try song("123", title: "Song")

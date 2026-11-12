@@ -91,10 +91,13 @@ final class HistorySearchViewModel: ObservableObject {
             return
         }
         activeScope = scope
+        // 相同文本不会触发 didSet；空查询切到新范围时仍需主动加载该范围结果。
+        let needsSearch = query.isEmpty
         query = ""
         highlightedScopeIndex = 0
         shouldSelectAll = false
         focusRequest += 1
+        if needsSearch { performSearch() }
     }
 
     func clearActiveScope() {
@@ -107,21 +110,22 @@ final class HistorySearchViewModel: ObservableObject {
 
     @Published var query = "" {
         didSet {
-            if !isResetting {
-                if isPickingScope {
-                    highlightedScopeIndex = 0
-                    if query.contains(" ") {
-                        let parts = query.dropFirst().split(separator: " ", maxSplits: 1, omittingEmptySubsequences: false)
-                        let token = String(parts[0])
-                        if let matched = availableScopes.first(where: { $0.matches(filter: token) }) {
-                            selectScope(matched)
-                            query = parts.count > 1 ? String(parts[1]) : ""
-                            return
-                        }
+            // 空箔内点击结果按钮后输入框会重新获得焦点，SwiftUI 可能回写相同文本；
+            // 只有真正变化才重新搜索，避免“更多”等操作被当成一次新搜索。
+            guard !isResetting, oldValue != query else { return }
+            if isPickingScope {
+                highlightedScopeIndex = 0
+                if query.contains(" ") {
+                    let parts = query.dropFirst().split(separator: " ", maxSplits: 1, omittingEmptySubsequences: false)
+                    let token = String(parts[0])
+                    if let matched = availableScopes.first(where: { $0.matches(filter: token) }) {
+                        selectScope(matched)
+                        query = parts.count > 1 ? String(parts[1]) : ""
+                        return
                     }
                 }
-                performSearch()
             }
+            performSearch()
         }
     }
     @Published private(set) var mode: HistorySearchMode = .history
