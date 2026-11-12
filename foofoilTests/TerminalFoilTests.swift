@@ -7,6 +7,94 @@ import SwiftTerm
 @MainActor
 @Suite(.sharedApplicationState, .serialized)
 struct TerminalFoilTests {
+    @Test func ordinaryShellWheelStillScrollsLocalHistory() throws {
+        let view = FoilTerminalView(frame: NSRect(x: 0, y: 0, width: 720, height: 460))
+        view.feed(text: (0..<100).map { "line \($0)\r\n" }.joined())
+        let before = view.getTerminal().getTopVisibleRow()
+        let cg = try #require(CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1,
+            wheel1: 1, wheel2: 0, wheel3: 0))
+        #expect(view.handleTerminalPointerEvent(try #require(NSEvent(cgEvent: cg))))
+        #expect(view.getTerminal().getTopVisibleRow() < before)
+    }
+
+    @Test func tuiWheelReportsBothDirectionsThroughPTY() async throws {
+        let root = try fixture(); defer { try? FileManager.default.removeItem(at: root) }
+        let captured = root.appendingPathComponent("mouse-bytes")
+        let session = TerminalSession(configuration: .init(shellPath: "/bin/zsh", workingDirectory: root.path,
+            environment: ["ZDOTDIR": root.path, "HISTFILE": "/dev/null"],
+            startupCommands: "stty raw -echo; printf '\\033[?1049h\\033[?1003h\\033[?1006hMOUSE_READY'; cat > \(TerminalBootstrap.quote(captured.path))"))
+        defer { session.stop() }
+        session.start()
+        try await waitFor { String(decoding: session.view.getTerminal().getBufferAsData(), as: UTF8.self).contains("MOUSE_READY") }
+        func wheel(_ delta: Int32, shift: Bool = false) throws -> NSEvent {
+            let cg = try #require(CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1,
+                wheel1: delta, wheel2: 0, wheel3: 0))
+            if shift { cg.flags = .maskShift }
+            return try #require(NSEvent(cgEvent: cg))
+        }
+        #expect(session.view.handleTerminalPointerEvent(try wheel(1)))
+        #expect(session.view.handleTerminalPointerEvent(try wheel(-1)))
+        try await waitFor { ((try? Data(contentsOf: captured).count) ?? 0) >= 18 }
+        let bytes = try String(contentsOf: captured, encoding: .utf8)
+        #expect(bytes.contains("\u{1b}[<64;"))
+        #expect(bytes.contains("\u{1b}[<65;"))
+        #expect(bytes.filter { $0 == "M" }.count == 2)
+        let before = try Data(contentsOf: captured)
+        #expect(session.view.handleTerminalPointerEvent(try wheel(1, shift: true)))
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(try Data(contentsOf: captured) == before)
+        session.view.feed(text: "\u{1b}[?1002h")
+        let drag = try #require(NSEvent.mouseEvent(with: .leftMouseDragged, location: NSPoint(x: 20, y: 20),
+            modifierFlags: [], timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+        #expect(session.view.handleTerminalPointerEvent(drag))
+        try await waitFor { (try? String(contentsOf: captured, encoding: .utf8).contains("\u{1b}[<32;")) == true }
+    }
+
+    @Test func shiftSelectionSurvivesModifierReleaseAndRemoteClipboardWorks() throws {
+        let state = AppState(isIncognito: true)
+        state.prepareTerminal(.init(), start: false)
+        let controller = FloatingWindowController(appState: state)
+        defer { controller.closeWithoutTerminalPrompt() }
+        let view = try #require(state.terminalSession?.view)
+        let window = try #require(controller.window)
+        window.contentView = view
+        defer { window.contentView = nil }
+        view.feed(text: "copy this terminal text\r\n\u{1b}[?1003h\u{1b}[?1006h")
+        func pointer(_ type: NSEvent.EventType, x: CGFloat, shift: Bool) throws -> NSEvent {
+            try #require(NSEvent.mouseEvent(with: type, location: NSPoint(x: x, y: view.frame.height - 12),
+                modifierFlags: shift ? .shift : [], timestamp: 0, windowNumber: window.windowNumber,
+                context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+        }
+        window.sendEvent(try pointer(.leftMouseDown, x: 20, shift: true))
+        #expect(view.hasLocalSelectionGesture)
+        window.sendEvent(try pointer(.leftMouseDragged, x: 2, shift: false))
+        window.sendEvent(try pointer(.leftMouseDragged, x: 150, shift: false))
+        window.sendEvent(try pointer(.leftMouseUp, x: 150, shift: false))
+        #expect(!view.hasLocalSelectionGesture)
+        #expect(view.allowMouseReporting)
+        let board = NSPasteboard.general
+        let saved = board.pasteboardItems?.map { item in
+            item.types.compactMap { type in item.data(forType: type).map { (type, $0) } }
+        } ?? []
+        defer {
+            board.clearContents()
+            board.writeObjects(saved.map { values in
+                let item = NSPasteboardItem()
+                for (type, data) in values { item.setData(data, forType: type) }
+                return item
+            })
+        }
+        view.copy(view)
+        #expect(board.string(forType: .string)?.contains("copy this") == true)
+        let remoteText = "远端 OpenCode clipboard"
+        let osc = "\u{1b}]52;c;" + Data(remoteText.utf8).base64EncodedString() + "\u{7}"
+        for byte in osc.utf8 { view.dataReceived(slice: [byte][...]) }
+        #expect(board.string(forType: .string) == remoteText)
+        let stTerminated = "\u{1b}]52;;" + Data("ST clipboard".utf8).base64EncodedString() + "\u{1b}\\"
+        view.dataReceived(slice: Array(stTerminated.utf8)[...])
+        #expect(board.string(forType: .string) == "ST clipboard")
+    }
+
     @Test func markedInputTracksUTF16ReplacementAndCandidateGeometry() throws {
         let view = FoilTerminalView(frame: NSRect(x: 0, y: 0, width: 720, height: 460))
         let window = NSWindow(contentRect: view.frame, styleMask: [.borderless], backing: .buffered, defer: false)

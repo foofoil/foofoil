@@ -237,6 +237,111 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
 }
 
 final class FoilTerminalView: LocalProcessTerminalView {
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        installClipboardHandler()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        installClipboardHandler()
+    }
+
+    private func installClipboardHandler() {
+        // SwiftTerm macOS 缺少 TerminalDelegate → TerminalViewDelegate 的 OSC 52 转发。
+        // 复用引擎的流式解析，保留 SSH 分片与 BEL/ST 终止符处理，不支持读取剪贴板。
+        getTerminal().parser.oscHandlers[52] = { [weak self] payload in
+            guard let self, let separator = payload.firstIndex(of: UInt8(ascii: ";")) else { return }
+            let destinations = payload[..<separator]
+            guard destinations.isEmpty || destinations.contains(UInt8(ascii: "c")),
+                  let content = Data(base64Encoded: Data(payload[payload.index(after: separator)...])) else { return }
+            self.terminalDelegate?.clipboardCopy(source: self, content: content)
+        }
+    }
+
+    private var isSelectingWithShift = false
+    private var wheelRemainder: CGFloat = 0
+
+    /// SwiftTerm 的鼠标入口不是 open，由窗口在命中终端时分发；Shift 选择锁定到整段手势结束。
+    func handleTerminalPointerEvent(_ event: NSEvent) -> Bool {
+        switch event.type {
+        case .scrollWheel:
+            handleTerminalScrollWheel(event)
+        case .leftMouseDown:
+            isSelectingWithShift = event.modifierFlags.contains(.shift)
+            window?.makeFirstResponder(self)
+            withLocalSelection { super.mouseDown(with: event) }
+        case .leftMouseDragged:
+            if allowMouseReporting, !isSelectingWithShift, getTerminal().mouseMode == .buttonEventTracking {
+                // 上游仅在 anyEvent 模式发送拖动；1002 模式也必须把按键期间的移动交给 TUI。
+                let terminal = getTerminal()
+                let hit = terminalMouseHit(event)
+                let flags = terminal.encodeButton(button: 0, release: false,
+                    shift: event.modifierFlags.contains(.shift), meta: event.modifierFlags.contains(.option),
+                    control: event.modifierFlags.contains(.control))
+                terminal.sendMotion(buttonFlags: flags, x: hit.col, y: hit.row, pixelX: hit.x, pixelY: hit.y)
+            } else {
+                withLocalSelection { super.mouseDragged(with: event) }
+            }
+        case .leftMouseUp:
+            withLocalSelection { super.mouseUp(with: event) }
+            isSelectingWithShift = false
+        case .mouseMoved where isSelectingWithShift:
+            break
+        default:
+            return false
+        }
+        return true
+    }
+
+    var hasLocalSelectionGesture: Bool { isSelectingWithShift }
+
+    private func withLocalSelection(_ action: () -> Void) {
+        let reporting = allowMouseReporting
+        if isSelectingWithShift { allowMouseReporting = false }
+        defer { allowMouseReporting = reporting }
+        action()
+    }
+
+    private func handleTerminalScrollWheel(_ event: NSEvent) {
+        let terminal = getTerminal()
+        guard allowMouseReporting, terminal.mouseMode != .off,
+              !event.modifierFlags.contains(.shift), !isSelectingWithShift else {
+            wheelRemainder = 0
+            super.scrollWheel(with: event)
+            return
+        }
+        // 触控板按字符行累计像素，避免每个细小位移都变成一次滚轮按键。
+        if event.phase == .began { wheelRemainder = 0 }
+        let height = max(1, ceil(CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)))
+        let delta = event.hasPreciseScrollingDeltas ? event.scrollingDeltaY / height : event.scrollingDeltaY
+        if delta == 0 { return }
+        if wheelRemainder * delta < 0 { wheelRemainder = 0 }
+        wheelRemainder += delta
+        let pending = Int(abs(wheelRemainder))
+        let steps = min(32, pending)
+        guard steps > 0 else { return }
+        let up = wheelRemainder > 0
+        wheelRemainder -= CGFloat(pending) * (up ? 1 : -1)
+        let hit = terminalMouseHit(event)
+        let flags = terminal.encodeButton(button: up ? 4 : 5, release: false,
+            shift: false, meta: event.modifierFlags.contains(.option), control: event.modifierFlags.contains(.control))
+        for _ in 0..<steps {
+            terminal.sendEvent(buttonFlags: flags, x: hit.col, y: hit.row, pixelX: hit.x, pixelY: hit.y)
+        }
+    }
+
+    private func terminalMouseHit(_ event: NSEvent) -> (col: Int, row: Int, x: Int, y: Int) {
+        let terminal = getTerminal()
+        let point = convert(event.locationInWindow, from: nil)
+        let width = max(1, font.advancement(forGlyph: font.glyph(withName: "W")).width)
+        let height = max(1, ceil(CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)))
+        return (min(terminal.cols - 1, max(0, Int(point.x / width))),
+                min(terminal.rows - 1, max(0, Int((frame.height - point.y) / height))),
+                Int(max(0, min(bounds.width, point.x))),
+                Int(max(0, min(bounds.height, bounds.height - point.y))))
+    }
+
     private var markedInput = ""
     private var markedSelection = NSRange(location: 0, length: 0)
     private var compositionView: TerminalCompositionView?

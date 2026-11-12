@@ -347,6 +347,15 @@ public class FloatingWindow: NSWindow {
             return
         }
 
+        if !modifiers.contains(.command),
+           let terminal = (windowController as? FloatingWindowController)?.appState.terminalSession?.view,
+           terminal.window === self,
+           (terminal.hasLocalSelectionGesture && [.leftMouseDragged, .leftMouseUp, .mouseMoved].contains(event.type)
+            || contentView?.hitTest(event.locationInWindow) === terminal),
+           terminal.handleTerminalPointerEvent(event) {
+            return
+        }
+
         if event.type == .keyDown,
            (windowController as? FloatingWindowController)?.appState.terminalConfiguration != nil,
            !modifiers.contains(.command) {
