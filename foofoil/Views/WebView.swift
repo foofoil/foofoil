@@ -33,6 +33,11 @@ struct WebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let configuration = WKWebViewConfiguration()
         WebContainedFullscreen.install(on: configuration)
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: Self.imeEnterGuardScript,
+            injectionTime: .atDocumentStart,
+            forMainFrameOnly: false
+        ))
         if appState.isArchivePreview { configuration.websiteDataStore = .nonPersistent() }
         configuration.userContentController.add(
             context.coordinator,
@@ -59,6 +64,17 @@ struct WebView: NSViewRepresentable {
         context.coordinator.setupObservers(webView: webView)
         return webView
     }
+
+    // WebKit can deliver the IME-confirming Enter after compositionend, with
+    // isComposing already false. 229 still identifies the IME-handled key.
+    static let imeEnterGuardScript = """
+    window.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' && event.keyCode === 229) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+        }
+    }, true);
+    """
 
     static func dismantleNSView(_ nsView: WKWebView, coordinator: Coordinator) {
         nsView.configuration.userContentController.removeScriptMessageHandler(forName: WebSearchFrames.handlerName, contentWorld: .defaultClient)

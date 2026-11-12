@@ -6,6 +6,31 @@ import WebKit
 @MainActor
 @Suite(.serialized)
 struct WebContainedFullscreenTests {
+    @Test func imeConfirmationDoesNotReachPageEnterHandler() async throws {
+        let configuration = WKWebViewConfiguration()
+        configuration.userContentController.addUserScript(WKUserScript(
+            source: WebView.imeEnterGuardScript, injectionTime: .atDocumentStart, forMainFrameOnly: false
+        ))
+        let webView = WKWebView(frame: .zero, configuration: configuration)
+        let waiter = NavigationWaiter()
+        webView.navigationDelegate = waiter
+        webView.loadHTMLString("<textarea></textarea>", baseURL: nil)
+        await waiter.waitForFinish()
+        let result = try await webView.callAsyncJavaScript("""
+            const input = document.querySelector('textarea');
+            let received = 0;
+            input.addEventListener('keydown', () => received++);
+            const ime = new KeyboardEvent('keydown', {key: 'Enter', keyCode: 229, bubbles: true, cancelable: true});
+            input.dispatchEvent(ime);
+            const normal = new KeyboardEvent('keydown', {key: 'Enter', keyCode: 13, bubbles: true, cancelable: true});
+            input.dispatchEvent(normal);
+            const other = new KeyboardEvent('keydown', {key: 'a', keyCode: 229, bubbles: true, cancelable: true});
+            input.dispatchEvent(other);
+            return ime.defaultPrevented && !normal.defaultPrevented && !other.defaultPrevented && received === 2;
+            """, arguments: [:], in: nil, contentWorld: .page)
+        #expect(result as? Bool == true)
+    }
+
     @Test func fillsViewportAndRestoresStylesWithoutMovingVideo() async throws {
         try await withPage {
             webView in
