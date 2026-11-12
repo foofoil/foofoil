@@ -91,13 +91,19 @@ extension AppState {
         let session = ArchiveSession(source: source, sourceLease: sourceLease)
         session.windowState = presentationWindowState
         archiveSession = session
+        // 新目录从空导航重新投影，便于在首批内容到达时临时展开侧栏。
+        builtInNavigatorContributions = []
         session.locateVolumes = { [weak self, weak session] in
             guard let session else { return }
             self?.openArchive(url: session.source.primaryURL)
         }
         session.onChange = { [weak self, weak session] in
             guard let self, let session, self.archiveSession === session else { return }
+            let wasEmpty = self.builtInNavigatorContributions.isEmpty
             self.builtInNavigatorContributions = session.displayedContributions
+            if wasEmpty, !self.builtInNavigatorContributions.isEmpty {
+                self.revealNavigatorPanelAfterContentOpen()
+            }
             let ids = session.displayedContributions.map(\.id)
             if !ids.contains(self.activeNavigatorContributionID ?? "") {
                 self.activeNavigatorContributionID = ids.first

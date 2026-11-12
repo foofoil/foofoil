@@ -2161,6 +2161,29 @@ struct FoofoilTests {
         #expect(state.id == originalID)
     }
 
+    @Test func openingFileListRevealsNavigatorThenAutoHides() async throws {
+        let first = try writeTestPNG(name: "reveal-list-a.png")
+        let second = try writeTestPNG(name: "reveal-list-b.png")
+        defer { for url in [first, second] { try? FileManager.default.removeItem(at: url) } }
+        let state = AppState(isIncognito: true)
+        defer { state.resetContent() }
+        state.installFileList(kind: .image, urls: [first, second], preservesIdentity: true)
+        #expect(state.isNavigatorPanelExplicitlyVisible)
+        try await Task.sleep(for: .seconds(3.2))
+        #expect(!state.isNavigatorPanelExplicitlyVisible)
+    }
+
+    @Test func navigatorOpenRevealOnlyAppliesToHoverMode() {
+        let state = AppState(isIncognito: true)
+        defer { state.resetContent() }
+        state.setNavigatorPanelVisibilityMode(.hidden)
+        state.revealNavigatorPanelAfterContentOpen()
+        #expect(!state.isNavigatorPanelExplicitlyVisible)
+        state.setNavigatorPanelVisibilityMode(.always)
+        state.revealNavigatorPanelAfterContentOpen()
+        #expect(!state.isNavigatorPanelExplicitlyVisible)
+    }
+
     @Test func movingFileListItemsUpdatesNavigatorAndHistoryOrder() throws {
         let first = try writeTestPNG(name: "move-list-a.png")
         let second = try writeTestPNG(name: "move-list-b.png")

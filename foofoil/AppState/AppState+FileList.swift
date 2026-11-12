@@ -108,6 +108,7 @@ extension AppState {
         sourceFingerprint = nil
         syncFileListNavigator()
         scheduleImageListSlideshowAdvance()
+        revealNavigatorPanelAfterContentOpen()
     }
 
     func openFileGroup(_ group: FileListGroup, preservesIdentity: Bool, title: String? = nil) {
@@ -154,6 +155,7 @@ extension AppState {
         mediaPlaybackMode = .sequentialLoop
         isBatchUpdating = false
         presentFileListItem(id: items[0].id, rotatesIdentity: false)
+        revealNavigatorPanelAfterContentOpen()
     }
 
     /// 安装音频列表：CUE 与 SACD ISO 各自成容器分区，普通音频按直接父目录成目录分区，
@@ -226,6 +228,7 @@ extension AppState {
         mediaPlaybackMode = .sequentialLoop
         isBatchUpdating = false
         presentFileListItem(id: currentID, rotatesIdentity: false)
+        revealNavigatorPanelAfterContentOpen()
         // 正在呈现的容器由播放会话自行安装分区；不要同文件再开临时会话展开，避免并发会话/设备争用。
         if let presented = pendingSACD.firstIndex(where: {
             $0.resolvingSymlinksInPath().standardizedFileURL.path
@@ -1313,6 +1316,7 @@ extension AppState {
         mediaPlaybackMode = .sequentialLoop
         isBatchUpdating = false
         presentFileListItem(id: currentID, rotatesIdentity: false)
+        revealNavigatorPanelAfterContentOpen()
     }
 
     func appendCueSheets(urls: [URL]) {

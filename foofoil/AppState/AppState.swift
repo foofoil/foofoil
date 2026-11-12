@@ -241,6 +241,8 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         }
     }
     @Published var isNavigatorPanelExplicitlyVisible = false
+    /// 打开目录/列表时临时展开侧栏的计时任务；鼠标悬停时由正常悬停规则接管。
+    var navigatorOpenRevealWorkItem: DispatchWorkItem?
     /// 最近一次侧边栏模式切换的反馈，面板据此闪一下红框（始终显示）或灰框（自动）。
     @Published var navigatorModeFeedback: NavigatorModeFeedback?
     let navigatorHover = NavigatorHoverState()

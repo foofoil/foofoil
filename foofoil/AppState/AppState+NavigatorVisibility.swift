@@ -18,6 +18,23 @@ struct NavigatorModeFeedback: Equatable {
 extension AppState {
     /// 切换到“自动”后，面板临时展开的时长，让灰框反馈可见。
     static let navigatorModeRevealDuration: TimeInterval = 1.2
+    /// 打开目录或列表时先展示侧栏的时长；鼠标未停留则到时收起。
+    static let navigatorOpenRevealDuration: TimeInterval = 3
+
+    /// 打开目录或列表时先展开侧栏，避免鼠标不在箔片上时看不到目录。
+    /// 到时只撤销临时展开标记；若鼠标正悬停，正常悬停判定会继续保留面板。
+    func revealNavigatorPanelAfterContentOpen() {
+        guard navigatorPanelVisibilityMode == .onHover else { return }
+        navigatorOpenRevealWorkItem?.cancel()
+        isNavigatorPanelExplicitlyVisible = true
+        let work = DispatchWorkItem { [weak self] in
+            guard let self, self.navigatorPanelVisibilityMode == .onHover else { return }
+            self.isNavigatorPanelExplicitlyVisible = false
+            self.navigatorOpenRevealWorkItem = nil
+        }
+        navigatorOpenRevealWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.navigatorOpenRevealDuration, execute: work)
+    }
 
     func cycleNavigatorPanelVisibilityMode() {
         setNavigatorPanelVisibilityMode(navigatorPanelVisibilityMode.next)
@@ -25,6 +42,8 @@ extension AppState {
 
     func setNavigatorPanelVisibilityMode(_ mode: NavigatorPanelVisibilityMode) {
         guard mode != navigatorPanelVisibilityMode else { return }
+        navigatorOpenRevealWorkItem?.cancel()
+        navigatorOpenRevealWorkItem = nil
         navigatorPanelVisibilityMode = mode
         isNavigatorPanelExplicitlyVisible = false
 
