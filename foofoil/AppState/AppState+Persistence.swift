@@ -186,6 +186,7 @@ extension AppState {
             } else {
                 self.actualWebURL = nil
             }
+            self.bookmarkedWebURL = nil
             if config.sourceFingerprint == KeyboardShortcutsOverview.sourceFingerprint {
                 self.textURL = nil
                 self.text = KeyboardShortcutsOverview.markdown()
@@ -275,7 +276,7 @@ extension AppState {
                 id: id,
                 imagePath: videoResource?.url.path ?? imageURL?.path,
                 isCamera: isCamera,
-                webURLString: webURL?.absoluteString,
+                webURLString: (bookmarkedWebURL ?? webURL)?.absoluteString,
                 actualWebURLString: actualWebURL?.absoluteString,
                 originalImageName: originalImageName,
                 imageSource: imageSource,

@@ -53,6 +53,37 @@ struct HistoryFavoriteMenuTests {
         #expect(HistoryRepository.shared.config(id: first.id) != nil)
     }
 
+    @Test func favoritingWebFoilStoresCurrentURLWithoutChangingVisitOrder() throws {
+        let delegate = AppDelegate()
+        delegate.historyMenu = NSMenu()
+        let state = AppState()
+        state.isBatchUpdating = true
+        state.webURL = URL(string: "https://example.com/start")
+        state.actualWebURL = URL(string: "https://example.com/current")
+        state.originalImageName = "Example"
+        state.isBatchUpdating = false
+        let controller = FloatingWindowController(appState: state)
+        delegate.windowControllers = [controller]
+        delegate.activeWindowProvider = { controller.window }
+        defer {
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+            controller.close()
+        }
+        #expect(HistoryRepository.shared.upsert(state.toConfig()))
+        let visit = try #require(HistoryRepository.shared.visitDates(id: state.id))
+        let order = HistoryRepository.shared.recent(limit: Int.max).map(\.id)
+        delegate.updateHistoryMenu()
+        delegate.toggleCurrentFoilFavoriteAction()
+        let saved = try #require(HistoryRepository.shared.config(id: state.id))
+        #expect(saved.historyIsPinned)
+        // 书签保存当前页面，而不是最初输入的地址。
+        #expect(saved.webURLString == "https://example.com/current")
+        #expect(saved.actualWebURLString == "https://example.com/current")
+        // 更新地址不应改变访问顺序。
+        #expect(HistoryRepository.shared.visitDates(id: state.id)?.last == visit.last)
+        #expect(HistoryRepository.shared.recent(limit: Int.max).map(\.id) == order)
+    }
+
     @Test func favoriteShortcutUsesCommandDAndFollowsUserOverrides() throws {
         let definition = try #require(KeyboardShortcutCatalog.definition(withID: "history.toggleFavorite"))
         #expect(definition.defaultShortcut?.keyEquivalent == "d")

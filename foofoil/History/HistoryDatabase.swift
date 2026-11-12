@@ -331,6 +331,25 @@ nonisolated final class HistoryDatabase {
         }
     }
 
+    /// 收藏网页时把历史主地址改为当前页面，并同步元数据搜索块；访问顺序保持不变。
+    func updateWebURL(id: UUID, url: String) throws {
+        try queue.sync {
+            try transaction {
+                guard var config = try queryConfigs("SELECT * FROM history_items WHERE id = ?",
+                                                    bindings: [id.uuidString]).first else { return }
+                config.webURLString = url
+                config.actualWebURLString = url
+                let displayTitle = displayTitle(for: config, kind: config.contentKind ?? HistoryContentKind.infer(from: config))
+                try deleteChunks(historyID: id, kinds: [0])
+                try executePrepared(
+                    "UPDATE history_items SET display_title = ?, web_url = ?, actual_web_url = ?, updated_at = ? WHERE id = ?",
+                    bindings: [displayTitle, url, url, Date().timeIntervalSince1970, id.uuidString]
+                )
+                try insertChunk(historyID: id, title: displayTitle, kind: 0, ordinal: 0, pageNumber: nil, text: url)
+            }
+        }
+    }
+
     func remove(id: UUID) throws {
         try queue.sync { try transaction { try deleteItem(id: id) } }
     }

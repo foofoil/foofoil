@@ -432,6 +432,7 @@ extension AppState {
             self.webURL = cachedURL
             retainFileAccess(to: url)
             self.actualWebURL = nil
+            self.bookmarkedWebURL = nil
         }
 
         nonisolated static func readTextContent(from url: URL) throws -> String {

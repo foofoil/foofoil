@@ -56,6 +56,8 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
     public func touch(id: UUID) { try? database?.touch(id: id) }
     public func remove(id: UUID) { _ = remove(ids: [id]) }
     public func updateThumbnailPath(id: UUID, path: String?) { try? database?.updateThumbnailPath(id: id, path: path) }
+    /// 只更新网页历史的主地址，不触碰访问顺序与索引状态；收藏网页时使用。
+    public func updateWebURL(id: UUID, url: String) { try? database?.updateWebURL(id: id, url: url) }
 
     @discardableResult
     func remove(ids: Set<UUID>) -> Bool {

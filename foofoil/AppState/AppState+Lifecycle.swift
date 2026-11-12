@@ -51,6 +51,7 @@ extension AppState {
             self.imageURL = nil
             self.webURL = nil
             self.actualWebURL = nil
+            self.bookmarkedWebURL = nil
             self.textURL = nil
             self.text = ""
             // 重置后的箔没有内容，上一次的排版结果一并丢弃，避免残留到下一篇文档的预览。

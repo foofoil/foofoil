@@ -464,6 +464,9 @@ public class AppState: NSObject, ObservableObject, Identifiable {
         }
     }
 
+    /// 收藏网页时固定下来的历史主地址；WebView 仍加载 `webURL`，因此收藏动作不会触发页面重载。
+    var bookmarkedWebURL: URL?
+
     @Published public var textURL: URL? {
         didSet {
             saveState()

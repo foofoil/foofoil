@@ -137,10 +137,18 @@ extension AppDelegate {
     @objc func toggleCurrentFoilFavoriteAction() {
         guard let state = currentFoilForFavorite else { return }
         HistoryManager.shared.flushPendingListSaves()
+        let existing = HistoryRepository.shared.config(id: state.id)
+        let addingFavorite = existing?.historyIsPinned != true
+        // 收藏网页时以用户当前所在页面作为历史主地址；只更新记录，不触发 WebView 重载。
+        if addingFavorite, state.webURL != nil, let currentURL = state.actualWebURL {
+            state.bookmarkedWebURL = currentURL
+        }
         // 新内容先建立历史；已有记录只改收藏状态，避免保存窗口时顺带重排访问顺序。
-        if HistoryRepository.shared.config(id: state.id) == nil {
+        if existing == nil {
             state.saveState()
             HistoryManager.shared.flushPendingListSaves()
+        } else if addingFavorite, let bookmarked = state.bookmarkedWebURL {
+            HistoryRepository.shared.updateWebURL(id: state.id, url: bookmarked.absoluteString)
         }
         guard let config = HistoryRepository.shared.config(id: state.id) else {
             state.toast.showFavoriteResult(pinned: true, succeeded: false)
