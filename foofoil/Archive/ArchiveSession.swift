@@ -419,6 +419,10 @@ nonisolated final class ArchivePreviewLease: Sendable {
                 self.busy = false
                 self.onChange?()
                 self.windowState?.saveState()
+                // 用户手动选择媒体列表后也生成历史缩略图，关闭目录时与自动判定一样展示为媒体列表。
+                if mode.kind != nil, let index = self.index {
+                    self.prepareHistoryThumbnail(index: index, mode: mode)
+                }
             } catch {
                 guard !Task.isCancelled, self.generation == token else { return }
                 self.busy = false
@@ -592,7 +596,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
                 guard generated, !Task.isCancelled,
                       let current = HistoryRepository.shared.config(id: id)?.archiveSource,
                       current.volumes == thumbnailSource.volumes, current.localFiles == thumbnailSource.localFiles,
-                      current.dominantMediaMode == mode else { return }
+                      current.historyMediaMode == mode else { return }
                 let data = try Data(contentsOf: temporary)
                 try ContentCache.shared.write(data, to: destination)
                 HistoryRepository.shared.updateThumbnailPath(id: id, path: destination.path)

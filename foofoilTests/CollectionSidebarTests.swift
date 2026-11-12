@@ -150,6 +150,45 @@ struct CollectionSidebarTests {
         #expect(state.toConfig().archiveSource?.dominantMediaMode == .image)
     }
 
+    @Test func manuallySelectedMediaModeControlsHistoryPresentation() throws {
+        let volume = ArchiveSource.Volume(path: "/tmp/mixed-album", bookmark: nil)
+        var source = ArchiveSource(volumes: [volume], displayName: "Mixed Album", sidebarMode: .audio)
+        let config = WindowConfig(id: UUID(), imagePath: volume.path, originalImageName: "Mixed Album",
+                                  contentKind: .archive, archiveSource: source)
+        #expect(source.historyMediaMode == .audio)
+        #expect(config.historyMenuSymbolName == CollectionSidebarMode.audio.folderHistorySymbol)
+        // 用户明确切回目录树时，历史仍显示普通目录，而不是之前的媒体列表。
+        source.sidebarMode = .folder
+        #expect(source.historyMediaMode == nil)
+        // 旧记录没有显式选择时继续沿用自动判定的媒体类型。
+        source.sidebarMode = nil
+        source.dominantMediaMode = .video
+        #expect(source.historyMediaMode == .video)
+    }
+
+    @Test func manuallySelectedMediaModeGeneratesHistoryThumbnail() async throws {
+        let (directory, urls) = try fixture()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let state = AppState(isIncognito: false)
+        defer {
+            state.resetContent()
+            if let config = HistoryRepository.shared.config(id: state.id) { HistoryManager.shared.removeFromHistory(config) }
+        }
+        state.openFileCollection(urls, roots: [directory])
+        let session = try #require(state.archiveSession)
+        try await settle(session)
+        session.setSidebarMode(.image)
+        try await settle(session)
+        for _ in 0..<300 {
+            if HistoryRepository.shared.config(id: state.id)?.thumbnailPath != nil { break }
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        let config = try #require(HistoryRepository.shared.config(id: state.id))
+        #expect(config.archiveSource?.sidebarMode == .image)
+        #expect(config.historyMenuSymbolName == CollectionSidebarMode.image.folderHistorySymbol)
+        #expect(config.thumbnailPath != nil)
+    }
+
     @Test func mixedFilesKeepTheirTreeAndSwitchToAnImageList() async throws {
         let (directory, urls) = try fixture()
         defer { try? FileManager.default.removeItem(at: directory) }

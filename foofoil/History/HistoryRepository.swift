@@ -133,7 +133,7 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                                             isClipboardContent: config.isClipboardContent,
                                             historyIsPinned: config.historyIsPinned,
                                             isFolderCollection: config.isFolderCollection,
-                                            folderMediaSymbol: config.archiveSource?.dominantMediaMode?.folderHistorySymbol)
+                                            folderMediaSymbol: config.archiveSource?.historyMediaMode?.folderHistorySymbol)
                     }
                 } catch {
                     NSLog("最近历史读取失败：%@", error.localizedDescription)
@@ -171,7 +171,7 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                         isClipboardContent: best.sourceFingerprint?.hasPrefix("clipboard:") == true,
                         historyIsPinned: best.historyIsPinned,
                         isFolderCollection: best.isFolderCollection,
-                        folderMediaSymbol: try database.config(id: best.id)?.archiveSource?.dominantMediaMode?.folderHistorySymbol
+                        folderMediaSymbol: try database.config(id: best.id)?.archiveSource?.historyMediaMode?.folderHistorySymbol
                     ))
                 }
                 return results.sorted { lhs, rhs in
@@ -201,7 +201,7 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                                                matchedSnippet: addresses.first, matchedPageNumber: nil, score: 0,
                                                terminalConfiguration: config.terminalConfiguration, historyIsPinned: config.historyIsPinned,
                                             isFolderCollection: config.isFolderCollection,
-                                            folderMediaSymbol: config.archiveSource?.dominantMediaMode?.folderHistorySymbol)
+                                            folderMediaSymbol: config.archiveSource?.historyMediaMode?.folderHistorySymbol)
                 }
             } catch {
                 NSLog("打开范围历史读取失败：%@", error.localizedDescription)

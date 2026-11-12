@@ -12,6 +12,13 @@ nonisolated public struct ArchiveSource: Codable, Sendable, Equatable {
     var dominantMediaMode: CollectionSidebarMode? = nil
     var name: String { displayName ?? primaryURL.lastPathComponent }
     var primaryURL: URL { URL(fileURLWithPath: volumes[0].path) }
+
+    /// 历史记录展示的媒体模式：用户选择的侧栏模式优先，未选择时才沿用自动判定。
+    /// 目录树模式不占用媒体图标，仍按普通目录展示。
+    var historyMediaMode: CollectionSidebarMode? {
+        guard let sidebarMode else { return dominantMediaMode }
+        return sidebarMode.kind == nil ? nil : sidebarMode
+    }
 }
 
 nonisolated struct ArchiveEntry: Identifiable, Sendable, Equatable {
