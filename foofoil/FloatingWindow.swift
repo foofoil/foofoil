@@ -351,9 +351,12 @@ public class FloatingWindow: NSWindow {
            let terminal = (windowController as? FloatingWindowController)?.appState.terminalSession?.view,
            terminal.window === self,
            (terminal.hasLocalSelectionGesture && [.leftMouseDragged, .leftMouseUp, .mouseMoved].contains(event.type)
-            || contentView?.hitTest(event.locationInWindow) === terminal),
-           terminal.handleTerminalPointerEvent(event) {
-            return
+            || contentView?.hitTest(event.locationInWindow) === terminal) {
+            // 终端事件在窗口层截获，不能依赖 AppKit 的默认点击激活流程。
+            if event.type == .leftMouseDown, !isKeyWindow {
+                activateForWindowDrag()
+            }
+            if terminal.handleTerminalPointerEvent(event) { return }
         }
 
         if event.type == .keyDown,
