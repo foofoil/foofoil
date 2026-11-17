@@ -319,6 +319,46 @@ struct FoilExposeViewTests {
         }
     }
 
+    @Test func openFoilContextMenuShowsShortcutsAndClosesWindowInsteadOfDeletingHistory() throws {
+        let foilController = FloatingWindowController(appState: AppState(config: WindowConfig(id: UUID(), text: "Body")))
+        defer {
+            foilController.close()
+            HistoryManager.shared.removeFromHistory(foilController.appState.toConfig())
+        }
+        let item = FoilExposeItem(id: foilController.appState.id, controller: foilController, isHistoryEntry: false,
+                                 title: "Open note", symbolName: "note.text", contentKind: .note, thumbnailPath: nil,
+                                 hasHistoryRecord: true)
+        let model = FoilExposeModel(items: [item], historyItems: [], fileSearch: { _, _ in }, cancelFiles: {}, musicEnabled: { false })
+        defer { model.stopFileSearch() }
+        let grid = FoilExposeGrid(model: model)
+        grid.frame = NSRect(x: 0, y: 0, width: 1240, height: 900)
+        grid.update(model: model)
+        let collection = try #require(grid.documentView as? NSCollectionView)
+        collection.layoutSubtreeIfNeeded()
+        let card = try #require(collection.item(at: IndexPath(item: 0, section: 0)))
+        let event = try #require(NSEvent.mouseEvent(with: .rightMouseDown, location: .zero, modifierFlags: [],
+            timestamp: 0, windowNumber: 0, context: nil, eventNumber: 0, clickCount: 1, pressure: 1))
+        let menu = try #require(card.view.menu(for: event))
+        for (title, key) in [("Change Title", "e"), ("Foil Information Menu", "i")] {
+            let entry = try #require(menu.items.first { $0.title == NSLocalizedString(title, comment: "") })
+            #expect(entry.keyEquivalent == key)
+            #expect(entry.keyEquivalentModifierMask == .command)
+        }
+        let favorite = try #require(menu.items.first { $0.title == NSLocalizedString("Favorite History", comment: "") })
+        let shortcut = KeyboardShortcutStore.shared.shortcut(forID: "history.toggleFavorite")
+        #expect(favorite.keyEquivalent == shortcut?.keyEquivalent)
+        #expect(favorite.keyEquivalentModifierMask == shortcut?.modifiers)
+        let close = try #require(menu.items.first { $0.title == NSLocalizedString("Close (ContextMenu)", comment: "") })
+        #expect(close.keyEquivalent == "\u{8}")
+        #expect(close.keyEquivalentModifierMask == .command)
+        #expect(close.image != nil)
+        #expect(!menu.items.contains { $0.title == NSLocalizedString("Delete History Record", comment: "") })
+        var closed: UUID?
+        model.onCloseItem = { closed = $0.id }
+        #expect(NSApp.sendAction(try #require(close.action), to: close.target, from: close))
+        #expect(closed == item.id)
+    }
+
     @Test func selectionUpdatesKeepNativeCollectionItemsAlive() throws {
         let model = model()
         let grid = FoilExposeGrid(model: model)

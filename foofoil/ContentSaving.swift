@@ -287,6 +287,7 @@ extension AppDelegate {
 
     func presentContentImagePanel(_ image: CGImage, name: String) {
         let panel = NSSavePanel()
+        panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
         panel.title = NSLocalizedString("Save Content Image", comment: "")
         panel.canCreateDirectories = true
         let options = ContentImageSaveOptions(panel: panel, name: name)
@@ -306,6 +307,7 @@ extension AppDelegate {
     }
     func presentContentSavePanel(_ content: ContentSavePayload, name: String?, title: String = NSLocalizedString("Save As...", comment: "")) {
         let panel = NSSavePanel()
+        panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
         panel.title = title
         panel.allowedContentTypes = [content.contentType]
         panel.canCreateDirectories = true

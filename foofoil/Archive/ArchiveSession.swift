@@ -762,6 +762,7 @@ nonisolated final class ArchivePreviewLease: Sendable {
         let origin = itemLocations[id]?.origin ?? self
         guard let index = origin.index else { return }
         let panel = NSSavePanel()
+        panel.directoryURL = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
         panel.nameFieldStringValue = entry.id == "root" ? source.primaryURL.deletingPathExtension().lastPathComponent : entry.name
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let destination = panel.url else { return }

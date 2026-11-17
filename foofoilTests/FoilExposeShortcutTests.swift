@@ -250,6 +250,77 @@ struct FoilExposeShortcutTests {
         #expect(actions.count == 4)
     }
 
+    @Test @MainActor func openFoilCommandBackspaceClosesWindowAndKeepsHistorySeparate() throws {
+        let controller = FoilExposeController.shared
+        let previous = controller.model
+        let foilController = FloatingWindowController(appState: AppState(config: WindowConfig(id: UUID(), text: "Body")))
+        let item = FoilExposeItem(id: foilController.appState.id, controller: foilController, isHistoryEntry: false,
+                                 title: "Open note", symbolName: "note.text", contentKind: .note, thumbnailPath: nil,
+                                 hasHistoryRecord: true)
+        let model = FoilExposeModel(items: [item], historyItems: [], fileSearch: { _, _ in }, cancelFiles: {}, musicEnabled: { false })
+        controller.model = model
+        defer {
+            controller.model = previous
+            model.stopFileSearch()
+            foilController.close()
+            HistoryManager.shared.removeFromHistory(foilController.appState.toConfig())
+        }
+        var actions: [String] = []
+        model.onTogglePinned = { _ in actions.append("favorite") }
+        model.onRenameItem = { _ in actions.append("rename") }
+        model.onShowInformation = { _ in actions.append("info") }
+        model.onCloseItem = { _ in actions.append("close") }
+        model.onClearHistoryItem = { _ in actions.append("delete") }
+        func event(_ key: String, modifiers: NSEvent.ModifierFlags = [], code: UInt16 = 0, repeating: Bool = false) throws -> NSEvent {
+            try #require(NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: modifiers,
+                timestamp: 0, windowNumber: 0, context: nil, characters: key, charactersIgnoringModifiers: key,
+                isARepeat: repeating, keyCode: code))
+        }
+        let favorite = try #require(KeyboardShortcutStore.shared.shortcut(forID: "history.toggleFavorite"))
+        #expect(controller.handleKeyEvent(try event(favorite.keyEquivalent, modifiers: favorite.modifiers)) == nil)
+        for key in ["e", "i"] { #expect(controller.handleKeyEvent(try event(key, modifiers: .command)) == nil) }
+        model.searchText = "Open"
+        let backspace = try event("\u{7f}", code: 51)
+        let close = try event("\u{7f}", modifiers: .command, code: 51)
+        #expect(controller.handleKeyEvent(backspace) === backspace)
+        #expect(actions == ["favorite", "rename", "info"])
+        #expect(controller.handleKeyEvent(close) == nil)
+        #expect(controller.handleKeyEvent(try event("\u{7f}", modifiers: .command, code: 51, repeating: true)) == nil)
+        #expect(actions == ["favorite", "rename", "info", "close"])
+        model.searchText = ""
+        #expect(controller.handleKeyEvent(backspace) === backspace)
+        #expect(controller.handleKeyEvent(close) == nil)
+        #expect(actions == ["favorite", "rename", "info", "close", "close"])
+        model.searchText = "/"
+        #expect(controller.handleKeyEvent(close) === close)
+        #expect(actions.count == 5)
+    }
+
+    @Test @MainActor func overviewCloseRemovesWindowControllerAndPreservesHistoryRecord() throws {
+        let overview = FoilExposeController.shared
+        #expect(!overview.isShowing)
+        let delegate = try #require(NSApp.delegate as? AppDelegate)
+        let state = AppState(config: WindowConfig(id: UUID(), text: "Overview close regression"))
+        let foil = FloatingWindowController(appState: state)
+        delegate.windowControllers.append(foil)
+        state.saveState()
+        defer {
+            overview.dismiss()
+            foil.close()
+            HistoryManager.shared.removeFromHistory(state.toConfig())
+        }
+        overview.show()
+        let model = try #require(overview.model)
+        let item = try #require(model.currentItems.first { $0.id == state.id && !$0.isHistoryEntry })
+        #expect(HistoryRepository.shared.config(id: state.id) != nil)
+        model.onCloseItem(item)
+        #expect(!delegate.windowControllers.contains { $0 === foil })
+        #expect(HistoryRepository.shared.config(id: state.id) != nil)
+        #expect(!model.currentItems.contains { $0.id == state.id && !$0.isHistoryEntry })
+        #expect(model.currentItems.contains { $0.id == state.id && $0.isHistoryEntry })
+        #expect(overview.isShowing)
+    }
+
     @Test @MainActor func overviewAlertsKeepBackgroundVisibleAndCompleteAsSheets() async throws {
         let screen = try #require(NSScreen.main)
         let model = FoilExposeModel(items: [], historyItems: [], fileSearch: { _, _ in }, cancelFiles: {}, musicEnabled: { false })

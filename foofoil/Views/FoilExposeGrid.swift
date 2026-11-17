@@ -926,15 +926,17 @@ private final class ExposeNativeCard: NSView {
         let favorite = KeyboardShortcutStore.shared.shortcut(forID: "history.toggleFavorite")
         if foil.hasHistoryRecord {
             add(foil.historyIsPinned ? "Unfavorite History" : "Favorite History", #selector(toggleFavorite), symbol: foil.historyIsPinned ? "bookmark.slash" : "bookmark",
-                key: foil.isHistoryEntry ? favorite?.keyEquivalent ?? "" : "", modifiers: foil.isHistoryEntry ? favorite?.modifiers ?? [] : [])
+                key: favorite?.keyEquivalent ?? "", modifiers: favorite?.modifiers ?? [])
         }
-        if foil.canRenameTitle { add("Change Title", #selector(rename), symbol: "pencil", key: foil.isHistoryEntry ? "e" : "", modifiers: .command) }
-        if foil.canShowInformation { add("Foil Information Menu", #selector(showInformation), symbol: "info.circle", key: foil.isHistoryEntry ? "i" : "", modifiers: .command) }
+        if foil.canRenameTitle { add("Change Title", #selector(rename), symbol: "pencil", key: "e", modifiers: .command) }
+        if foil.canShowInformation { add("Foil Information Menu", #selector(showInformation), symbol: "info.circle", key: "i", modifiers: .command) }
         if foil.isHistoryEntry { add("Delete History Record", #selector(deleteHistory), symbol: "trash", key: "\u{8}", modifiers: .command) }
+        if foil.canCloseWindow { add("Close (ContextMenu)", #selector(closeWindow), symbol: "xmark.circle", key: "\u{8}", modifiers: .command) }
         return menu.items.isEmpty ? nil : menu
     }
     @objc private func toggleFavorite() { if let foil { model?.onTogglePinned(foil) } }
     @objc private func showInformation() { if let foil { model?.onShowInformation(foil) } }
     @objc private func rename() { if let foil { model?.onRenameItem(foil) } }
+    @objc private func closeWindow() { if let foil { model?.onCloseItem(foil) } }
     @objc private func deleteHistory() { if let foil { model?.onClearHistoryItem(foil) } }
 }

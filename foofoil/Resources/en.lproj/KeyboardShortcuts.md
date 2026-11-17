@@ -171,6 +171,7 @@ Editing shortcuts apply to text fields or selectable content, depending on focus
 - Esc cancels scope selection, or dismisses the overview; composing text is handled by the input method first.
 - Backspace clears the selected search scope when the query is empty; during composition, it deletes input method text first.
 - ⇧⌘D toggles the Favorites history filter; its binding can be changed in Settings → Keyboard Shortcuts. With a history item highlighted, ⌘Backspace deletes the record, ⌘E changes its title, ⌘D toggles its favorite status, and ⌘I opens Foil Information. These shortcuts appear alongside icons in the item’s context menu. Composition and scope selection keep their input behavior.
+- With an open foil highlighted, ⌘E changes its title, ⌘D toggles its favorite status, and ⌘I opens foil information (Favorite follows its configured shortcut). ⌘⌫ closes the highlighted window and keeps its history record; holding the key does not close more windows. Context menus show these shortcuts. Backspace continues to edit search text and input method compositions.
 - {{clipboardShortcut}} opens clipboard content.
 
 Paste an Apple Music song, album, or public playlist sharing link into Quick Open to preview it and press Return to open a music foil. Open Clipboard Content also opens these links directly as music. Explicit links work when Apple Music library search is disabled; music access authorization and content availability in your region still apply. Shared content does not need to be added to your library and can be restored from history.

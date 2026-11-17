@@ -108,6 +108,7 @@ struct FoilExposeItem: Identifiable {
     var requiresHistoryClearConfirmation: Bool { isHistoryEntry && historyIsPinned }
     var canShowInformation: Bool { isHistoryEntry || (controller != nil && controller?.appState.isBlank == false) }
 
+    var canCloseWindow: Bool { !isHistoryEntry && controller != nil }
     var window: NSWindow? { controller?.window }
     var isSearchCommand: Bool { id == Self.terminalCommandID || id == Self.urlCommandID }
     var isNewFoil: Bool { !isSearchCommand && controller == nil && !isHistoryEntry && musicItem == nil && clipboardEntry == nil && id != Self.cameraCommandID }
@@ -334,6 +335,7 @@ final class FoilExposeModel: ObservableObject {
     var onDismiss: () -> Void = {}
     var onClearHistory: (FoilExposeHistoryCategory) -> Void = { _ in }
     var onClearHistoryItem: (FoilExposeItem) -> Void = { _ in }
+    var onCloseItem: (FoilExposeItem) -> Void = { _ in }
     var onTogglePinned: (FoilExposeItem) -> Void = { _ in }
     var onRenameItem: (FoilExposeItem) -> Void = { _ in }
     var onShowInformation: (FoilExposeItem) -> Void = { _ in }
@@ -1078,6 +1080,7 @@ final class FoilExposeController {
         model.onOpenClipboard = { [weak self, weak model] in self?.openClipboard(isIncognito: model?.isOptionPressed == true) }
         model.onClearHistory = { [weak self] category in self?.confirmClearHistory(category) }
         model.onClearHistoryItem = { [weak self] item in self?.clearHistoryItem(item) }
+        model.onCloseItem = { [weak self] item in self?.closeItem(item) }
         model.onTogglePinned = { [weak self] item in
             guard let self, let model = self.model else { return }
             guard let config = HistoryRepository.shared.config(id: item.id) else {
@@ -1351,6 +1354,29 @@ final class FoilExposeController {
         }
     }
 
+    private func closeItem(_ item: FoilExposeItem) {
+        guard item.canCloseWindow, let controller = item.controller, !isPresentingSystemUI,
+              let model, !panels.contains(where: { $0.attachedSheet != nil }) else { return }
+        isPresentingSystemUI = true
+        let state = controller.appState.readingState
+        let settings = SettingsStore.shared
+        let needsConfirmation = controller.appState.terminalSession?.needsCloseConfirmation == true
+            || (state.isAudioDocument && state.isMediaPlaying && settings.confirmClosingPlayingAudio
+                && !settings.keepAudioPlayingInBackground)
+        // 确认框需要临时让出总览层级；普通关闭保持总览可见，避免闪烁。
+        if needsConfirmation { panels.forEach { $0.orderOut(nil) } }
+        defer {
+            isPresentingSystemUI = false
+            let controllers = (NSApp.delegate as? AppDelegate)?.windowControllers ?? []
+            model.refreshItems(open: Self.collectItems(from: controllers), history: Self.collectHistoryItems())
+            if needsConfirmation { panels.forEach { $0.orderFront(nil) } }
+            focusPanel()
+        }
+        if let delegate = NSApp.delegate as? AppDelegate,
+           !delegate.confirmClosingPlayingAudio(for: controller) { return }
+        controller.close()
+    }
+
     private func renameItem(_ item: FoilExposeItem) {
         guard item.canRenameTitle, !isPresentingSystemUI,
               let model, let panel = panels.first, panel.attachedSheet == nil else { return }
@@ -1491,18 +1517,22 @@ final class FoilExposeController {
                 model.requestSearchFieldFocus()
                 return nil
             }
-            // 历史条目快捷键优先于主菜单；组合输入及下拉框选择仍交给输入框。
-            if !isComposing, !model.isChoosingScope, let item = model.highlightedItem, item.isHistoryEntry {
-                if KeyboardShortcutStore.shared.matches(event, identifier: "history.toggleFavorite") {
+            // 条目快捷键优先于主菜单；组合输入及下拉框选择仍交给输入框。
+            if !isComposing, !model.isChoosingScope, let item = model.highlightedItem, item.isHistoryEntry || item.controller != nil {
+                if item.hasHistoryRecord, KeyboardShortcutStore.shared.matches(event, identifier: "history.toggleFavorite") {
                     model.onTogglePinned(item)
                     return nil
                 }
                 if modifiers.intersection([.command, .shift, .option, .control]) == .command {
                     if key == "e", item.canRenameTitle { model.onRenameItem(item); return nil }
-                    if key == "i" { model.onShowInformation(item); return nil }
+                    if key == "i", item.canShowInformation { model.onShowInformation(item); return nil }
                 }
+                // ⌘⌫ 根据高亮项关闭窗口或删除历史；关闭窗口保留历史记录。
                 if event.keyCode == 51, modifiers.intersection([.command, .shift, .option, .control]) == .command {
-                    if !event.isARepeat { model.onClearHistoryItem(item) }
+                    if !event.isARepeat {
+                        if item.canCloseWindow { model.onCloseItem(item) }
+                        else if item.isHistoryEntry { model.onClearHistoryItem(item) }
+                    }
                     return nil
                 }
             }

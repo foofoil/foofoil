@@ -13,8 +13,10 @@ struct TerminalFoilView: View {
     var body: some View {
         VStack(spacing: 0) {
             if let previous = session.previousOutput {
-                TerminalPreviousOutputView(search: appState.contentSearch, isHidden: $session.isPreviousOutputHidden, previousOutput: previous, showsNewSession: session.state != .waiting,
-                    onClear: { appState.clearPreviousTerminalOutput() })
+                VStack(spacing: 0) {
+                    TerminalPreviousOutputView(search: appState.contentSearch, isHidden: $session.isPreviousOutputHidden, previousOutput: previous, showsNewSession: session.state != .waiting,
+                        onClear: { appState.clearPreviousTerminalOutput() })
+                }
                     .id(session.id)
                     // 历史记录的标题及关闭按钮必须位于搜索栏下方。
                     .padding(.top, search.isPresented && !session.isPreviousOutputHidden ? 40 : 0)
