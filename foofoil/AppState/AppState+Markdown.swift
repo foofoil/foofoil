@@ -98,8 +98,21 @@ extension AppState {
                 if Task.isCancelled { return }
 
                 let rendered = Self.cmarkToHTML(textToRender)
+                let mermaidBlocks = MarkdownMermaidBlock.blocks(in: rendered)
+                var previewHTML = rendered
+                var diagrams: [(marker: String, image: NSImage)] = []
+                if !mermaidBlocks.isEmpty {
+                    let prefix = "FOOFOILMERMAID" + UUID().uuidString.replacingOccurrences(of: "-", with: "")
+                    for (index, block) in mermaidBlocks.enumerated().reversed() {
+                        guard !Task.isCancelled else { return }
+                        guard let image = await MarkdownMermaidRenderer.shared.render(block.source, isDark: isDark) else { continue }
+                        let marker = "\(prefix)X\(index)END"
+                        diagrams.append((marker, image))
+                        previewHTML = (previewHTML as NSString).replacingCharacters(in: block.htmlRange, with: "<p>\(marker)</p>")
+                    }
+                }
                 // 在 HTML 导入器接触资源前移除所有图片标记，包括白名单中的原始 HTML 图片。
-                let safeHTML = blocksResources ? Self.agentMarkdownHTML(rendered, placeholder: resourcePlaceholder) : rendered
+                let safeHTML = blocksResources ? Self.agentMarkdownHTML(previewHTML, placeholder: resourcePlaceholder) : previewHTML
                 let (sizedHTML, imageSizes) = Self.markdownImageSizeMarkers(safeHTML)
                 // AppKit 的 HTML 导入器不实现表单；用带来源位置的占位链接承载原生 checkbox。
                 let htmlBody = Self.taskInputsForTextKit(MarkdownCodeHighlighter.highlightHTML(sizedHTML, isDark: isDark))
@@ -300,6 +313,7 @@ extension AppState {
                 </html>
                 """
 
+                let renderedDiagrams = diagrams
                 await MainActor.run {
                     guard !Task.isCancelled else { return }
                     if let data = htmlContent.data(using: .utf8),
@@ -374,6 +388,14 @@ extension AppState {
 
                         // 正文段距设置不应覆盖标题层级：标题上留白大于下留白，贴近所属内容。
                         Self.applyHeadingRangeStyles(to: mutableAttr, fontSize: fontSize, levels: headingLevels)
+                        for (marker, image) in renderedDiagrams {
+                            let range = (mutableAttr.string as NSString).range(of: marker)
+                            guard range.location != NSNotFound else { continue }
+                            let attachment = NSTextAttachment()
+                            attachment.attachmentCell = MarkdownMermaidAttachmentCell(imageCell: image)
+                            mutableAttr.replaceCharacters(in: range, with: "\u{FFFC}")
+                            mutableAttr.addAttribute(.attachment, value: attachment, range: NSRange(location: range.location, length: 1))
+                        }
                         Self.compactMarkdownImageParagraphs(mutableAttr)
                         // 一览中的改动键位使用语义红色；不需要放开 Markdown 原始 HTML。
                         let changedKeyPairs = Self.markerPairs(

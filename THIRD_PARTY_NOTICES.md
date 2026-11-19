@@ -2,6 +2,14 @@
 
 foofoil includes the following third-party software. These notices are provided for attribution and do not change the MIT License that applies to foofoil's original source code.
 
+## Mermaid 12.3.0
+
+Project: <https://github.com/mermaid-js/mermaid/tree/mermaid%4012.3.0>
+
+Used to render Mermaid fenced code blocks offline in Markdown preview. foofoil bundles the unmodified `dist/mermaid.min.js` from the [published npm package](https://www.npmjs.com/package/mermaid/v/12.3.0) as `mermaid-12.3.0.min.js`. Its SHA-256 is `336df803d87a38b70a01e736e666c8f7601d2ce42f5e47c8fafe5d721074b9a3`.
+
+The [Mermaid bundle licenses](foofoil/Resources/mermaid-LICENSES.txt) ship alongside the script as `mermaid-LICENSES.txt`. This file includes Mermaid's MIT license, the bundled dependencies' notices, and the source locations for elkjs and ELK under the Eclipse Public License 2.0.
+
 ## cmark 0.31.2
 
 Project: <https://github.com/commonmark/cmark>
