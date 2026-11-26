@@ -752,7 +752,13 @@ private final class ExposeNativeCard: NSView {
         setAccessibilityLabel([badge.stringValue, annotation + title, foil?.terminalConfiguration?.ssh != nil ? NSLocalizedString("Terminal SSH", comment: "") : "", subtitle].filter { !$0.isEmpty }.joined(separator: " "))
         setAccessibilityRole(action == nil ? .staticText : .button)
         toolTip = subtitle.isEmpty ? title : title + "\n" + subtitle
-        if !compact, let path = foil?.thumbnailPath {
+        let isTerminal = foil?.contentKind == .terminal
+        imageLayer.contentsGravity = isTerminal ? .resizeAspect : .resizeAspectFill
+        if isTerminal, let image = foil?.controller?.appState.terminalSession?.view.thumbnail() {
+            imageLayer.contents = image
+            icon.isHidden = true
+        } else if (!compact || (terminalStyle && isTerminal)), let path = foil?.thumbnailPath,
+                  !(isTerminal && foil?.controller?.appState.isIncognito == true) {
             let loader = FoilExposeThumbnailLoader()
             self.loader = loader
             imageSubscription = loader.$image.sink { [weak self] image in
@@ -847,6 +853,7 @@ private final class ExposeNativeCard: NSView {
         }
         subtitleLabel.frame = NSRect(x: 50 + artworkInset, y: 31, width: max(0, bounds.width - 65 - copyInset - artworkInset), height: 16)
         if terminalStyle {
+            imageLayer.frame = NSRect(x: 8, y: (bounds.height - 48) / 2, width: 48, height: 48)
             icon.frame = NSRect(x: 18, y: (bounds.height - 30) / 2, width: 30, height: 30)
             let titleX: CGFloat = typeIcon.isHidden ? 64 : 86
             typeIcon.frame = NSRect(x: 64, y: 17, width: 16, height: 16)

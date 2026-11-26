@@ -41,6 +41,10 @@ final class FoilExposeThumbnailLoader: ObservableObject {
     }()
     @Published private(set) var image: NSImage?
 
+    static func invalidate(path: String) {
+        cache.removeObject(forKey: path as NSString)
+    }
+
     func load(path: String?) async {
         guard let path, FileManager.default.fileExists(atPath: path) else {
             image = nil

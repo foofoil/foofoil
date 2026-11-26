@@ -19,7 +19,7 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
     /// Shell 自行结束后通知宿主；宿主据此关闭箔片，不再停留在已结束界面。
     var onSessionEnded: (() -> Void)?
     private var snapshotSave: Task<Void, Never>?
-    private var hasStarted = false
+    private(set) var hasStarted = false
     /// 标记本次结束来自 Shell 自身退出，而不是宿主主动停止。
     private var endedByShell = false
     let view = FoilTerminalView(frame: NSRect(x: 0, y: 0, width: 720, height: 460))
@@ -84,6 +84,7 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
             view.feed(text: "\u{1b}[\(min(cursor.x + 1, terminal.cols))G")
             view.needsDisplay = true
         }
+        view.invalidateThumbnail()
         previousOutput = nil
     }
 
@@ -121,11 +122,11 @@ final class TerminalSession: NSObject, ObservableObject, @preconcurrency LocalPr
         do {
             let launch = try TerminalBootstrap(configuration: configuration, terminalID: id)
             bootstrap = launch
-            hasStarted = true
             state = .running
             view.startProcess(executable: launch.shell, args: launch.arguments,
                               environment: launch.environment.map { "\($0.key)=\($0.value)" }, currentDirectory: launch.workingDirectory)
-            managedPID = view.process.running ? view.process.shellPid : nil
+            hasStarted = view.process.running
+            managedPID = hasStarted ? view.process.shellPid : nil
             if !view.process.running { state = .failed("TERMINAL_START_FAILED"); launch.cleanup(); bootstrap = nil }
         } catch { state = .failed((error as? AgentFailure)?.code ?? "TERMINAL_START_FAILED") }
     }
@@ -478,6 +479,8 @@ final class FoilTerminalView: LocalProcessTerminalView {
     override func setNeedsDisplay(_ invalidRect: NSRect) {
         super.setNeedsDisplay(invalidRect)
         searchOverlay?.needsDisplay = true
+        // SwiftTerm 的同步输出也可能在没有新 PTY 数据时结束并重绘。
+        invalidateThumbnail()
     }
     private var searchCurrent = 0
     private var searchColor = NSColor.systemYellow
@@ -566,6 +569,41 @@ final class FoilTerminalView: LocalProcessTerminalView {
         }
     }
 
+    private struct ThumbnailState: Equatable {
+        let bounds: NSRect
+        let topRow: Int
+    }
+    private var cachedThumbnail: (state: ThumbnailState, image: CGImage)?
+
+    func invalidateThumbnail() { cachedThumbnail = nil }
+
+    /// 只在卡片取图或保存历史时绘制终端画布，直接生成缩略图尺寸的位图。
+    func thumbnail() -> CGImage? {
+        guard window != nil, !bounds.isEmpty else { return nil }
+        let state = ThumbnailState(bounds: bounds, topRow: getTerminal().getTopVisibleRow())
+        if let cachedThumbnail, cachedThumbnail.state == state { return cachedThumbnail.image }
+
+        let scale = min(1, CGFloat(HistoryThumbnailGenerator.pixelSize) / max(bounds.width, bounds.height))
+        guard let context = CGContext(
+            data: nil, width: Int(ceil(bounds.width * scale)), height: Int(ceil(bounds.height * scale)),
+            bitsPerComponent: 8, bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+        ) else { return nil }
+        context.scaleBy(x: scale, y: scale)
+        context.translateBy(x: -bounds.minX, y: -bounds.minY)
+        NSGraphicsContext.saveGraphicsState()
+        defer { NSGraphicsContext.restoreGraphicsState() }
+        NSGraphicsContext.current = NSGraphicsContext(cgContext: context, flipped: isFlipped)
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            nativeBackgroundColor.setFill()
+            bounds.fill()
+            draw(bounds)
+        }
+        guard let image = context.makeImage() else { return nil }
+        cachedThumbnail = (state, image)
+        return image
+    }
+
     var outputDidChange: (() -> Void)?
     private var readyMarker: [UInt8] = []
     private var readyPrefix: [UInt8] = []
@@ -601,7 +639,9 @@ final class FoilTerminalView: LocalProcessTerminalView {
         let visible = removingReadyMarker(slice)
         for output in keyboardProtocol.receive(visible[...]) {
             switch output {
-            case .display(let bytes): super.dataReceived(slice: bytes[...])
+            case .display(let bytes):
+                super.dataReceived(slice: bytes[...])
+                invalidateThumbnail()
             case .reply(let text): send(txt: text)
             }
         }
@@ -628,7 +668,11 @@ final class FoilTerminalView: LocalProcessTerminalView {
 
     override func processTerminated(_ source: LocalProcess, exitCode: Int32?) {
         clearMarkedInput()
-        if !readyPrefix.isEmpty { super.dataReceived(slice: readyPrefix[...]); readyPrefix.removeAll() }
+        if !readyPrefix.isEmpty {
+            super.dataReceived(slice: readyPrefix[...])
+            readyPrefix.removeAll()
+            invalidateThumbnail()
+        }
         keyboardProtocol = TerminalKeyboardProtocol()
         super.processTerminated(source, exitCode: exitCode)
     }
@@ -637,7 +681,10 @@ final class FoilTerminalView: LocalProcessTerminalView {
     private var installedDarkPalette: Bool?
 
     func applyDocumentStyle(font: NSFont, foregroundColor: NSColor?, backgroundColor: NSColor?) {
-        if self.font != font { self.font = font }
+        if self.font != font {
+            self.font = font
+            invalidateThumbnail()
+        }
         // 只在样式改变时重设默认色，避免无关重绘覆盖 Shell/TUI 的运行期配色。
         guard installedDarkPalette == nil || documentForegroundColor != foregroundColor || documentBackgroundColor != backgroundColor else { return }
         documentForegroundColor = foregroundColor
@@ -646,6 +693,7 @@ final class FoilTerminalView: LocalProcessTerminalView {
     }
 
     private func refreshDocumentColors() {
+        invalidateThumbnail()
         effectiveAppearance.performAsCurrentDrawingAppearance {
             nativeForegroundColor = documentForegroundColor ?? .textColor
             nativeBackgroundColor = documentBackgroundColor ?? .textBackgroundColor

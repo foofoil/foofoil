@@ -2323,6 +2323,7 @@ public class FloatingWindowController: NSWindowController, NSWindowDelegate {
            }) ?? false) == false {
             AppleMusicPlaybackController.stopIfActive()
         }
+        appState.persistTerminalThumbnailForHistory()
         appState.terminalSession?.stop()
         appState.persistManagedTextIfNeeded(createIfNeeded: !appState.isIncognito)
         appState.endExtensionSessionOnWindowClose()

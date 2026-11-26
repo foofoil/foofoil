@@ -285,7 +285,10 @@ public class AppDelegate: NSObject, NSApplicationDelegate {
         // 进程退出只会自动归还 hog，不会恢复采样率；先停 PCM 引擎，再等待扩展恢复设备。
         AppleMusicPlaybackController.stopIfActive()
         AudioPlaybackController.stopAllOutputsForTermination()
-        let terminalClosures = windowControllers.compactMap { $0.appState.terminalSession?.stop() }
+        let terminalClosures = windowControllers.compactMap { controller in
+            controller.appState.persistTerminalThumbnailForHistory()
+            return controller.appState.terminalSession?.stop()
+        }
         Task { @MainActor in
             for task in terminalClosures { await task.value }
             await ExtensionHost.shared.shutdownAndWait()

@@ -40,6 +40,10 @@ final class HistorySearchThumbnailLoader: ObservableObject {
     }()
     @Published var image: NSImage?
 
+    static func invalidate(path: String) {
+        cache.removeObject(forKey: path as NSString)
+    }
+
     func load(path: String?) async {
         guard let path else { image = nil; return }
         if let cached = Self.cache.object(forKey: path as NSString) { image = cached; return }

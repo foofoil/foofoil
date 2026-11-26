@@ -235,6 +235,13 @@ public enum HistoryThumbnailGenerator {
         return (try? ContentCache.shared.write(data as Data, to: destinationURL)) != nil
     }
 
+    /// 保留终端画面比例，复用历史缩略图的缓存位置与清理规则。
+    nonisolated static func writeTerminalThumbnail(_ image: CGImage, historyID: UUID) -> URL? {
+        let url = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("foofoil/Thumbnails/\(historyID.uuidString).heic")
+        return write(image, to: url) ? url : nil
+    }
+
     /// 将视图已展示的封面写入该窗口的历史缩略图并返回落盘路径。
     /// 无 imagePath 的扩展音频走不到后台索引，这是它们唯一的缩略图来源。
     public static func writeDisplayedArtwork(_ image: NSImage, historyID: UUID) -> URL? {

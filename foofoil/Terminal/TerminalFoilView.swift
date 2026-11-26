@@ -223,6 +223,18 @@ extension AppState {
             }
         }
     }
+
+    func persistTerminalThumbnailForHistory() {
+        guard !isIncognito, let terminalSession, terminalSession.hasStarted,
+              terminalSession.configuration.ssh == nil || terminalSession.hasConnected,
+              let config = HistoryRepository.shared.config(id: id), config.contentKind == .terminal,
+              let image = terminalSession.view.thumbnail(),
+              let url = HistoryThumbnailGenerator.writeTerminalThumbnail(image, historyID: id) else { return }
+        HistoryRepository.shared.updateThumbnailPath(id: id, path: url.path)
+        FoilExposeThumbnailLoader.invalidate(path: url.path)
+        HistorySearchThumbnailLoader.invalidate(path: url.path)
+    }
+
     func configureTerminalSnapshotSaving() {
         terminalSession?.onOutputSnapshotChanged = isIncognito ? nil : { [weak self] in self?.saveState() }
         let session = terminalSession

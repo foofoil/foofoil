@@ -7,6 +7,80 @@ import SwiftTerm
 @MainActor
 @Suite(.sharedApplicationState, .serialized)
 struct TerminalFoilTests {
+    @Test func terminalThumbnailCapturesOnlyAfterVisualChanges() throws {
+        let view = FoilTerminalView(frame: NSRect(x: 0, y: 0, width: 720, height: 460))
+        #expect(view.thumbnail() == nil)
+        let window = NSWindow(contentRect: view.frame, styleMask: [], backing: .buffered, defer: false)
+        window.contentView = view
+        defer { window.contentView = nil }
+
+        let first = try #require(view.thumbnail())
+        #expect(max(first.width, first.height) == HistoryThumbnailGenerator.pixelSize)
+        #expect(view.thumbnail() === first)
+
+        view.dataReceived(slice: Array("foofoil thumbnail".utf8)[...])
+        view.dataReceived(slice: Array(" updated".utf8)[...])
+        let updated = try #require(view.thumbnail())
+        #expect(updated !== first)
+        #expect(updated.dataProvider?.data != first.dataProvider?.data)
+        #expect(view.thumbnail() === updated)
+
+        view.setFrameSize(NSSize(width: 600, height: 460))
+        let resized = try #require(view.thumbnail())
+        #expect(resized.width == 600)
+        #expect(view.thumbnail() === resized)
+
+        let lines = (0..<100).map { "line \($0)\r\n" }.joined()
+        view.dataReceived(slice: Array(lines.utf8)[...])
+        let bottom = try #require(view.thumbnail())
+        view.scroll(toPosition: 0)
+        let scrolled = try #require(view.thumbnail())
+        #expect(scrolled.dataProvider?.data != bottom.dataProvider?.data)
+        #expect(view.thumbnail() === scrolled)
+    }
+
+    @Test(arguments: [false, true])
+    func closingTerminalSavesThumbnailOnlyForRegularHistory(isIncognito: Bool) async throws {
+        let root = try fixture()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let state = AppState(isIncognito: isIncognito)
+        let thumbnailURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("foofoil/Thumbnails/\(state.id.uuidString).heic")
+        defer {
+            if let config = HistoryRepository.shared.config(id: state.id) {
+                HistoryManager.shared.removeFromHistory(config)
+            }
+            try? FileManager.default.removeItem(at: thumbnailURL)
+        }
+        state.prepareTerminal(.init(shellPath: "/bin/zsh", workingDirectory: root.path,
+            environment: ["ZDOTDIR": root.path, "HISTFILE": "/dev/null"],
+            startupCommands: "printf terminal-thumbnail-ready"), start: true)
+        let session = try #require(state.terminalSession)
+        defer { session.stop() }
+        let controller = FloatingWindowController(appState: state)
+        let window = try #require(controller.window)
+        window.contentView = session.view
+        try await waitFor {
+            String(decoding: session.view.getTerminal().getBufferAsData(), as: UTF8.self)
+                .contains("terminal-thumbnail-ready")
+        }
+
+        #expect(!FileManager.default.fileExists(atPath: thumbnailURL.path))
+        controller.closeWithoutTerminalPrompt()
+        await session.stop().value
+
+        let path = HistoryRepository.shared.config(id: state.id)?.thumbnailPath
+        if isIncognito {
+            #expect(path == nil)
+            #expect(!FileManager.default.fileExists(atPath: thumbnailURL.path))
+        } else {
+            #expect(path == thumbnailURL.path)
+            let savedPath = try #require(path)
+            let image = try #require(NSImage(contentsOfFile: savedPath))
+            #expect(image.size.width > 0)
+        }
+    }
+
     @Test func ordinaryShellWheelStillScrollsLocalHistory() throws {
         let view = FoilTerminalView(frame: NSRect(x: 0, y: 0, width: 720, height: 460))
         view.feed(text: (0..<100).map { "line \($0)\r\n" }.joined())
