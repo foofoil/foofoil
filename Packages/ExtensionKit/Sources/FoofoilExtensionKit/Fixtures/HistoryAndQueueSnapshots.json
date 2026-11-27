@@ -1,0 +1,348 @@
+{
+  "comment": "Distributable history, restore, and queue snapshots. No commercial ISO, DSF, or machine-specific DAC UID. Host WindowConfig is a representative subset the host decoder accepts; ExtensionStateStore wraps the session payload as Data.",
+  "restoredSessionRequest": {
+    "kind": "restoredSession",
+    "extensionID": "app.foofoil.extension.hifi",
+    "stateReference": "00000000-0000-0000-0000-0000000000bb"
+  },
+  "genericMediaCommands": [
+    {
+      "commandID": "media.transport",
+      "contractVersion": 1,
+      "action": { "kind": "play" },
+      "session": {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "providerID": "test.generic-audio",
+        "request": {
+          "kind": "singleFile",
+          "resource": { "url": "file:///tmp/fixture.dsf" }
+        },
+        "presentation": { "kind": "text", "titleKey": "Test", "body": "Fixture" },
+        "capabilities": [
+          {
+            "declaration": {
+              "id": "media.transport",
+              "scope": "session",
+              "contractVersion": 1,
+              "dependencies": []
+            },
+            "state": "active"
+          }
+        ],
+        "mediaPlayback": {
+          "state": "paused",
+          "position": 0,
+          "duration": 2,
+          "isSeekable": true
+        }
+      }
+    },
+    {
+      "commandID": "media.transport",
+      "contractVersion": 1,
+      "action": { "kind": "selectDevice", "deviceID": "opaque-device" },
+      "session": {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "providerID": "test.generic-audio",
+        "request": {
+          "kind": "singleFile",
+          "resource": { "url": "file:///tmp/fixture.dsf" }
+        },
+        "presentation": { "kind": "text", "titleKey": "Test", "body": "Fixture" },
+        "capabilities": [
+          {
+            "declaration": {
+              "id": "media.transport",
+              "scope": "session",
+              "contractVersion": 1,
+              "dependencies": []
+            },
+            "state": "active"
+          }
+        ],
+        "mediaPlayback": {
+          "state": "paused",
+          "position": 0,
+          "duration": 2,
+          "isSeekable": true
+        }
+      }
+    }
+  ],
+  "sessions": [
+    {
+      "name": "generic-external-file-queue",
+      "comment": "Host-owned external files projected as an extension queue. Item IDs are opaque to generic UI.",
+      "session": {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "providerID": "test.generic-audio",
+        "request": {
+          "kind": "fileCollection",
+          "resources": [
+            { "url": "file:///tmp/fixture-a.dsf" },
+            { "url": "file:///tmp/fixture-b.dsf" }
+          ]
+        },
+        "presentation": { "kind": "text", "titleKey": "Test", "body": "Fixture" },
+        "capabilities": [
+          {
+            "declaration": {
+              "id": "media.playback-queue",
+              "scope": "session",
+              "contractVersion": 1,
+              "dependencies": []
+            },
+            "state": "active"
+          },
+          {
+            "declaration": {
+              "id": "ui.navigator",
+              "scope": "presentation",
+              "contractVersion": 1,
+              "dependencies": []
+            },
+            "state": "active"
+          }
+        ],
+        "mediaPlayback": {
+          "state": "paused",
+          "position": 1,
+          "duration": 2,
+          "isSeekable": true
+        },
+        "playbackQueue": {
+          "contractVersion": 1,
+          "items": [
+            { "id": "file:0", "title": "A", "duration": 2, "isPlayable": true },
+            { "id": "file:1", "title": "B", "duration": 2, "isPlayable": true }
+          ],
+          "currentItemID": "file:0",
+          "repeatMode": "off",
+          "isShuffled": false,
+          "revision": 0
+        },
+        "navigatorContributions": [
+          {
+            "id": "generic.playback-queue",
+            "contractVersion": 1,
+            "titleLocalizationKey": "Queue",
+            "style": "flat",
+            "selectionMode": "single",
+            "items": [
+              { "id": "file:0", "title": "A", "isEnabled": true, "isCurrent": true },
+              { "id": "file:1", "title": "B", "isEnabled": true, "isCurrent": false }
+            ],
+            "selectedItemIDs": ["file:0"],
+            "allowedActions": ["activate", "move"],
+            "revision": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "generic-container-queue",
+      "comment": "Container tracks share one authorized resource. Track IDs are extension-private; move is forbidden.",
+      "session": {
+        "id": "00000000-0000-0000-0000-000000000002",
+        "providerID": "test.generic-audio",
+        "request": {
+          "kind": "singleFile",
+          "resource": { "url": "file:///tmp/fixture-disc.iso" }
+        },
+        "presentation": { "kind": "text", "titleKey": "Test", "body": "Fixture" },
+        "capabilities": [
+          {
+            "declaration": {
+              "id": "media.playback-queue",
+              "scope": "session",
+              "contractVersion": 1,
+              "dependencies": []
+            },
+            "state": "active"
+          },
+          {
+            "declaration": {
+              "id": "ui.navigator",
+              "scope": "presentation",
+              "contractVersion": 1,
+              "dependencies": []
+            },
+            "state": "active"
+          }
+        ],
+        "mediaPlayback": {
+          "state": "paused",
+          "position": 0,
+          "duration": 60,
+          "isSeekable": true
+        },
+        "playbackQueue": {
+          "contractVersion": 1,
+          "items": [
+            { "id": "track:stereo:01", "title": "Track One", "subtitle": "Fixture Artist", "duration": 60, "isPlayable": true },
+            { "id": "track:stereo:02", "title": "Track Two", "subtitle": "Fixture Artist", "duration": 90, "isPlayable": true }
+          ],
+          "currentItemID": "track:stereo:01",
+          "repeatMode": "off",
+          "isShuffled": false,
+          "revision": 0,
+          "title": "Fixture Album"
+        },
+        "navigatorContributions": [
+          {
+            "id": "generic.container-tracks",
+            "contractVersion": 1,
+            "titleLocalizationKey": "Queue",
+            "style": "flat",
+            "selectionMode": "single",
+            "items": [
+              { "id": "track:stereo:01", "title": "Track One", "subtitle": "Fixture Artist", "badge": "1:00", "isEnabled": true, "isCurrent": true },
+              { "id": "track:stereo:02", "title": "Track Two", "subtitle": "Fixture Artist", "badge": "1:30", "isEnabled": true, "isCurrent": false }
+            ],
+            "selectedItemIDs": ["track:stereo:01"],
+            "allowedActions": ["activate"],
+            "revision": 0
+          }
+        ]
+      }
+    },
+    {
+      "name": "legacy-hifi-container-queue",
+      "comment": "Current Hi-Fi container wire shape. Host FileListItem.id is not this track ID.",
+      "session": {
+        "id": "00000000-0000-0000-0000-000000000003",
+        "extensionID": "app.foofoil.extension.hifi",
+        "providerID": "audio.hifi",
+        "request": {
+          "kind": "singleFile",
+          "resource": { "url": "file:///tmp/fixture-disc.iso" }
+        },
+        "presentation": { "kind": "text", "titleKey": "Test", "body": "Fixture" },
+        "stateReference": "00000000-0000-0000-0000-0000000000bb",
+        "capabilities": [
+          {
+            "declaration": {
+              "id": "media.playback-queue",
+              "scope": "session",
+              "contractVersion": 1,
+              "dependencies": []
+            },
+            "state": "active"
+          },
+          {
+            "declaration": {
+              "id": "session.seekable",
+              "scope": "session",
+              "contractVersion": 1,
+              "dependencies": []
+            },
+            "state": "active"
+          },
+          {
+            "declaration": {
+              "id": "ui.navigator",
+              "scope": "presentation",
+              "contractVersion": 1,
+              "dependencies": []
+            },
+            "state": "active"
+          }
+        ],
+        "mediaPlayback": {
+          "state": "paused",
+          "position": 12.5,
+          "duration": 60,
+          "isSeekable": true
+        },
+        "playbackQueue": {
+          "contractVersion": 1,
+          "items": [
+            { "id": "track:stereo:01", "title": "Track One", "subtitle": "Fixture Artist", "duration": 60, "isPlayable": true },
+            { "id": "track:stereo:02", "title": "Track Two", "subtitle": "Fixture Artist", "duration": 90, "isPlayable": true }
+          ],
+          "currentItemID": "track:stereo:01",
+          "repeatMode": "off",
+          "isShuffled": false,
+          "revision": 0,
+          "title": "Fixture Album"
+        },
+        "navigatorContributions": [
+          {
+            "id": "hifi.playback-queue",
+            "contractVersion": 1,
+            "titleLocalizationKey": "Hi-Fi Audio",
+            "style": "flat",
+            "selectionMode": "single",
+            "items": [
+              { "id": "track:stereo:01", "title": "Track One", "subtitle": "Fixture Artist", "badge": "1:00", "isEnabled": true, "isCurrent": true },
+              { "id": "track:stereo:02", "title": "Track Two", "subtitle": "Fixture Artist", "badge": "1:30", "isEnabled": true, "isCurrent": false }
+            ],
+            "selectedItemIDs": ["track:stereo:01"],
+            "allowedActions": ["activate"],
+            "revision": 0
+          }
+        ]
+      }
+    }
+  ],
+  "hostHistory": {
+    "comment": "Host persists authorization, file list, and a stateReference. The extension payload is a ContentSession JSON blob in ExtensionStateStore, not inlined here.",
+    "windowConfig": {
+      "id": "00000000-0000-0000-0000-000000000010",
+      "text": "",
+      "isPinned": false,
+      "opacity": 1,
+      "contentKind": 8,
+      "extensionID": "app.foofoil.extension.hifi",
+      "extensionStateReference": "00000000-0000-0000-0000-0000000000bb",
+      "mediaPlaybackMode": "sequentialLoop",
+      "fileList": {
+        "kind": "audio",
+        "currentID": "sacd:00000000-0000-0000-0000-0000000000cc:0:track:stereo:01",
+        "title": "Fixture Album",
+        "items": [
+          {
+            "id": "sacd:00000000-0000-0000-0000-0000000000cc:0:track:stereo:01",
+            "path": "/tmp/fixture-disc.iso",
+            "displayName": "Track One",
+            "cue": {
+              "startCueFrames": 0,
+              "endCueFrames": 4500,
+              "title": "Track One",
+              "artist": "Fixture Artist",
+              "album": "Fixture Album",
+              "trackNumber": "1",
+              "sectionID": "00000000-0000-0000-0000-0000000000cc",
+              "cueSheetPath": "/tmp/fixture-disc.iso",
+              "containerTrackID": "track:stereo:01"
+            }
+          },
+          {
+            "id": "sacd:00000000-0000-0000-0000-0000000000cc:1:track:stereo:02",
+            "path": "/tmp/fixture-disc.iso",
+            "displayName": "Track Two",
+            "cue": {
+              "startCueFrames": 4500,
+              "endCueFrames": 11250,
+              "title": "Track Two",
+              "artist": "Fixture Artist",
+              "album": "Fixture Album",
+              "trackNumber": "2",
+              "sectionID": "00000000-0000-0000-0000-0000000000cc",
+              "cueSheetPath": "/tmp/fixture-disc.iso",
+              "containerTrackID": "track:stereo:02"
+            }
+          }
+        ],
+        "sections": [
+          {
+            "id": "00000000-0000-0000-0000-0000000000cc",
+            "title": "Fixture Album",
+            "cueSheetPath": "/tmp/fixture-disc.iso",
+            "format": "sacd"
+          }
+        ]
+      }
+    }
+  }
+}

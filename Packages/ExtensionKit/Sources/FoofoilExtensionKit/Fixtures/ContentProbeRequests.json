@@ -1,0 +1,18 @@
+[
+  {
+    "commandID": "content.probe",
+    "contractVersion": 1,
+    "resource": {
+      "url": "file:///tmp/fixture-disc.iso"
+    },
+    "maxReadBytes": 2097152
+  },
+  {
+    "commandID": "content.probe",
+    "contractVersion": 1,
+    "resource": {
+      "url": "file:///tmp/ordinary.iso"
+    },
+    "maxReadBytes": 2097152
+  }
+]

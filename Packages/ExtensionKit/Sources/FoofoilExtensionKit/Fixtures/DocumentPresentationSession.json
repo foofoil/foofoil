@@ -1,0 +1,50 @@
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "extensionID": "app.foofoil.extension.ebook",
+  "providerID": "ebook.epub",
+  "request": {
+    "kind": "singleFile",
+    "resource": { "url": "file:///tmp/example.epub" }
+  },
+  "presentation": {
+    "kind": "document",
+    "url": "file:///tmp/foofoil-ebook/session/chapter-0000.html"
+  },
+  "capabilities": [
+    {
+      "declaration": {
+        "id": "ui.navigator",
+        "contractVersion": 1,
+        "scope": "presentation",
+        "dependencies": []
+      },
+      "state": "active"
+    },
+    {
+      "declaration": {
+        "id": "ui.navigator-actions",
+        "contractVersion": 1,
+        "scope": "presentation",
+        "dependencies": []
+      },
+      "state": "active"
+    }
+  ],
+  "commands": [],
+  "navigatorContributions": [
+    {
+      "id": "ebook.toc",
+      "contractVersion": 1,
+      "titleLocalizationKey": "Table of Contents",
+      "style": "outline",
+      "selectionMode": "single",
+      "items": [
+        { "id": "toc:0", "title": "第一章", "isEnabled": true, "isCurrent": true },
+        { "id": "toc:0.1", "parentID": "toc:0", "title": "第一节", "isEnabled": true, "isCurrent": false }
+      ],
+      "selectedItemIDs": ["toc:0"],
+      "allowedActions": ["activate"],
+      "revision": 0
+    }
+  ]
+}

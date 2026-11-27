@@ -1,0 +1,127 @@
+{
+  "comment": "Application-scope audio device service v1. Sent through ABI perform_application_command, not perform_command. Device IDs are synthetic and distributable.",
+  "requests": [
+    {
+      "comment": "Refresh the device list without changing leases.",
+      "body": {
+        "command": "snapshot",
+        "clientID": "00000000-0000-0000-0000-0000000000aa"
+      }
+    },
+    {
+      "comment": "Return PCM output to the system default and drop this client's exclusive lease.",
+      "body": {
+        "command": "selectSystemDefault",
+        "clientID": "00000000-0000-0000-0000-0000000000aa"
+      }
+    },
+    {
+      "comment": "Take exclusive PCM on a stable device UID. Runtime requires selectedDeviceID, sourceSampleRate, and channelCount.",
+      "body": {
+        "command": "prepareExclusivePCM",
+        "clientID": "00000000-0000-0000-0000-0000000000aa",
+        "selectedDeviceID": "test-dac-uid",
+        "sourceSampleRate": 96000,
+        "channelCount": 2
+      }
+    },
+    {
+      "comment": "Release this client's exclusive PCM lease.",
+      "body": {
+        "command": "releasePCM",
+        "clientID": "00000000-0000-0000-0000-0000000000aa"
+      }
+    },
+    {
+      "comment": "Release every exclusive PCM lease held by the runtime.",
+      "body": {
+        "command": "releaseAllPCM",
+        "clientID": "00000000-0000-0000-0000-0000000000aa"
+      }
+    }
+  ],
+  "unknownFieldRequest": {
+    "command": "snapshot",
+    "clientID": "00000000-0000-0000-0000-0000000000aa",
+    "futureField": true
+  },
+  "invalidRequests": [
+    {
+      "comment": "Unknown command must not decode as AudioDeviceServiceCommand.",
+      "body": {
+        "command": "unknown",
+        "clientID": "00000000-0000-0000-0000-0000000000aa"
+      }
+    },
+    {
+      "comment": "Kit decodes prepareExclusivePCM without device fields; Runtime rejects it before taking a lease.",
+      "body": {
+        "command": "prepareExclusivePCM",
+        "clientID": "00000000-0000-0000-0000-0000000000aa"
+      }
+    }
+  ],
+  "snapshots": [
+    {
+      "comment": "Idle system-default route. Optional exclusive fields omitted.",
+      "body": {
+        "contractVersion": 1,
+        "devices": [
+          {
+            "id": "system-default-uid",
+            "displayName": "MacBook Speakers",
+            "isSystemDefault": true,
+            "isConnected": true,
+            "hasHardwareVolume": true,
+            "supportedDoPRates": [],
+            "supportsExclusiveMode": false,
+            "supportedPCMSampleRates": [44100, 48000]
+          },
+          {
+            "id": "test-dac-uid",
+            "displayName": "Fixture DAC",
+            "isSystemDefault": false,
+            "isConnected": true,
+            "hasHardwareVolume": false,
+            "supportedDoPRates": [64, 128, 256],
+            "supportsExclusiveMode": true,
+            "supportedPCMSampleRates": [44100, 48000, 88200, 96000, 176400, 192000]
+          }
+        ],
+        "pcmRouteMode": "systemDefault",
+        "revision": 0
+      }
+    },
+    {
+      "comment": "Exclusive PCM held by the requesting client.",
+      "body": {
+        "contractVersion": 1,
+        "devices": [
+          {
+            "id": "test-dac-uid",
+            "displayName": "Fixture DAC",
+            "isSystemDefault": false,
+            "isConnected": true,
+            "hasHardwareVolume": false,
+            "supportedDoPRates": [64, 128, 256],
+            "supportsExclusiveMode": true,
+            "supportedPCMSampleRates": [44100, 96000]
+          }
+        ],
+        "pcmRouteMode": "exclusiveDevice",
+        "selectedPCMDeviceID": "test-dac-uid",
+        "activeClientID": "00000000-0000-0000-0000-0000000000aa",
+        "activeDeviceID": "test-dac-uid",
+        "activeSampleRate": 96000,
+        "sourceSampleRate": 96000,
+        "sampleRateMatched": true,
+        "statusDescription": "Fixture DAC",
+        "revision": 1
+      }
+    }
+  ],
+  "legacyDeviceDescriptor": {
+    "id": "legacy",
+    "displayName": "Legacy DAC"
+  }
+}

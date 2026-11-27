@@ -1,0 +1,628 @@
+[
+  {
+    "commandID": "media.transport",
+    "contractVersion": 1,
+    "action": {
+      "kind": "pause"
+    },
+    "session": {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "providerID": "test.generic-audio",
+      "request": {
+        "kind": "singleFile",
+        "resource": {
+          "url": "file:///tmp/fixture.dsf"
+        }
+      },
+      "presentation": {
+        "kind": "text",
+        "titleKey": "Test",
+        "body": "Fixture"
+      },
+      "capabilities": [
+        {
+          "declaration": {
+            "id": "media.transport",
+            "scope": "session",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        },
+        {
+          "declaration": {
+            "id": "ui.navigator-actions",
+            "scope": "presentation",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        },
+        {
+          "declaration": {
+            "id": "ui.navigator",
+            "scope": "presentation",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        }
+      ],
+      "mediaPlayback": {
+        "state": "paused",
+        "position": 0,
+        "duration": 2,
+        "isSeekable": true
+      },
+      "navigatorContributions": [
+        {
+          "id": "hifi.playback-queue",
+          "contractVersion": 1,
+          "titleLocalizationKey": "Queue",
+          "style": "flat",
+          "selectionMode": "single",
+          "items": [
+            {
+              "id": "file:0",
+              "title": "file:0",
+              "isEnabled": true,
+              "isCurrent": true
+            },
+            {
+              "id": "file:1",
+              "title": "file:1",
+              "isEnabled": true,
+              "isCurrent": false
+            }
+          ],
+          "selectedItemIDs": [
+            "file:0"
+          ],
+          "allowedActions": [
+            "activate",
+            "move"
+          ],
+          "revision": 0
+        }
+      ]
+    }
+  },
+  {
+    "commandID": "media.transport",
+    "contractVersion": 1,
+    "action": {
+      "kind": "seek",
+      "position": 0.5
+    },
+    "session": {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "providerID": "test.generic-audio",
+      "request": {
+        "kind": "singleFile",
+        "resource": {
+          "url": "file:///tmp/fixture.dsf"
+        }
+      },
+      "presentation": {
+        "kind": "text",
+        "titleKey": "Test",
+        "body": "Fixture"
+      },
+      "capabilities": [
+        {
+          "declaration": {
+            "id": "media.transport",
+            "scope": "session",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        },
+        {
+          "declaration": {
+            "id": "ui.navigator-actions",
+            "scope": "presentation",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        },
+        {
+          "declaration": {
+            "id": "ui.navigator",
+            "scope": "presentation",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        }
+      ],
+      "mediaPlayback": {
+        "state": "paused",
+        "position": 0,
+        "duration": 2,
+        "isSeekable": true
+      },
+      "navigatorContributions": [
+        {
+          "id": "hifi.playback-queue",
+          "contractVersion": 1,
+          "titleLocalizationKey": "Queue",
+          "style": "flat",
+          "selectionMode": "single",
+          "items": [
+            {
+              "id": "file:0",
+              "title": "file:0",
+              "isEnabled": true,
+              "isCurrent": true
+            },
+            {
+              "id": "file:1",
+              "title": "file:1",
+              "isEnabled": true,
+              "isCurrent": false
+            }
+          ],
+          "selectedItemIDs": [
+            "file:0"
+          ],
+          "allowedActions": [
+            "activate",
+            "move"
+          ],
+          "revision": 0
+        }
+      ]
+    }
+  },
+  {
+    "commandID": "media.transport",
+    "contractVersion": 1,
+    "action": {
+      "kind": "refresh"
+    },
+    "session": {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "providerID": "test.generic-audio",
+      "request": {
+        "kind": "singleFile",
+        "resource": {
+          "url": "file:///tmp/fixture.dsf"
+        }
+      },
+      "presentation": {
+        "kind": "text",
+        "titleKey": "Test",
+        "body": "Fixture"
+      },
+      "capabilities": [
+        {
+          "declaration": {
+            "id": "media.transport",
+            "scope": "session",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        },
+        {
+          "declaration": {
+            "id": "ui.navigator-actions",
+            "scope": "presentation",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        },
+        {
+          "declaration": {
+            "id": "ui.navigator",
+            "scope": "presentation",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        }
+      ],
+      "mediaPlayback": {
+        "state": "paused",
+        "position": 0,
+        "duration": 2,
+        "isSeekable": true
+      },
+      "navigatorContributions": [
+        {
+          "id": "hifi.playback-queue",
+          "contractVersion": 1,
+          "titleLocalizationKey": "Queue",
+          "style": "flat",
+          "selectionMode": "single",
+          "items": [
+            {
+              "id": "file:0",
+              "title": "file:0",
+              "isEnabled": true,
+              "isCurrent": true
+            },
+            {
+              "id": "file:1",
+              "title": "file:1",
+              "isEnabled": true,
+              "isCurrent": false
+            }
+          ],
+          "selectedItemIDs": [
+            "file:0"
+          ],
+          "allowedActions": [
+            "activate",
+            "move"
+          ],
+          "revision": 0
+        }
+      ]
+    }
+  },
+  {
+    "commandID": "ui.navigator.action",
+    "contractVersion": 1,
+    "action": {
+      "contributionID": "hifi.playback-queue",
+      "kind": "activate",
+      "itemIDs": [
+        "file:0"
+      ]
+    },
+    "session": {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "providerID": "test.generic-audio",
+      "request": {
+        "kind": "singleFile",
+        "resource": {
+          "url": "file:///tmp/fixture.dsf"
+        }
+      },
+      "presentation": {
+        "kind": "text",
+        "titleKey": "Test",
+        "body": "Fixture"
+      },
+      "capabilities": [
+        {
+          "declaration": {
+            "id": "media.transport",
+            "scope": "session",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        },
+        {
+          "declaration": {
+            "id": "ui.navigator-actions",
+            "scope": "presentation",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        },
+        {
+          "declaration": {
+            "id": "ui.navigator",
+            "scope": "presentation",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        }
+      ],
+      "mediaPlayback": {
+        "state": "paused",
+        "position": 0,
+        "duration": 2,
+        "isSeekable": true
+      },
+      "navigatorContributions": [
+        {
+          "id": "hifi.playback-queue",
+          "contractVersion": 1,
+          "titleLocalizationKey": "Queue",
+          "style": "flat",
+          "selectionMode": "single",
+          "items": [
+            {
+              "id": "file:0",
+              "title": "file:0",
+              "isEnabled": true,
+              "isCurrent": true
+            },
+            {
+              "id": "file:1",
+              "title": "file:1",
+              "isEnabled": true,
+              "isCurrent": false
+            }
+          ],
+          "selectedItemIDs": [
+            "file:0"
+          ],
+          "allowedActions": [
+            "activate",
+            "move"
+          ],
+          "revision": 0
+        }
+      ]
+    }
+  },
+  {
+    "commandID": "ui.navigator.action",
+    "contractVersion": 1,
+    "action": {
+      "contributionID": "hifi.playback-queue",
+      "kind": "move",
+      "itemIDs": [
+        "file:1"
+      ],
+      "movePosition": "end"
+    },
+    "session": {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "providerID": "test.generic-audio",
+      "request": {
+        "kind": "singleFile",
+        "resource": {
+          "url": "file:///tmp/fixture.dsf"
+        }
+      },
+      "presentation": {
+        "kind": "text",
+        "titleKey": "Test",
+        "body": "Fixture"
+      },
+      "capabilities": [
+        {
+          "declaration": {
+            "id": "media.transport",
+            "scope": "session",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        },
+        {
+          "declaration": {
+            "id": "ui.navigator-actions",
+            "scope": "presentation",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        },
+        {
+          "declaration": {
+            "id": "ui.navigator",
+            "scope": "presentation",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        }
+      ],
+      "mediaPlayback": {
+        "state": "paused",
+        "position": 0,
+        "duration": 2,
+        "isSeekable": true
+      },
+      "navigatorContributions": [
+        {
+          "id": "hifi.playback-queue",
+          "contractVersion": 1,
+          "titleLocalizationKey": "Queue",
+          "style": "flat",
+          "selectionMode": "single",
+          "items": [
+            {
+              "id": "file:0",
+              "title": "file:0",
+              "isEnabled": true,
+              "isCurrent": true
+            },
+            {
+              "id": "file:1",
+              "title": "file:1",
+              "isEnabled": true,
+              "isCurrent": false
+            }
+          ],
+          "selectedItemIDs": [
+            "file:0"
+          ],
+          "allowedActions": [
+            "activate",
+            "move"
+          ],
+          "revision": 0
+        }
+      ]
+    }
+  },
+  {
+    "commandID": "media.transport",
+    "contractVersion": 1,
+    "action": {
+      "kind": "next"
+    },
+    "session": {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "providerID": "test.generic-audio",
+      "request": {
+        "kind": "singleFile",
+        "resource": {
+          "url": "file:///tmp/fixture.dsf"
+        }
+      },
+      "presentation": {
+        "kind": "text",
+        "titleKey": "Test",
+        "body": "Fixture"
+      },
+      "capabilities": [
+        {
+          "declaration": {
+            "id": "media.transport",
+            "scope": "session",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        },
+        {
+          "declaration": {
+            "id": "ui.navigator-actions",
+            "scope": "presentation",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        },
+        {
+          "declaration": {
+            "id": "ui.navigator",
+            "scope": "presentation",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        }
+      ],
+      "mediaPlayback": {
+        "state": "paused",
+        "position": 0,
+        "duration": 2,
+        "isSeekable": true
+      },
+      "navigatorContributions": [
+        {
+          "id": "hifi.playback-queue",
+          "contractVersion": 1,
+          "titleLocalizationKey": "Queue",
+          "style": "flat",
+          "selectionMode": "single",
+          "items": [
+            {
+              "id": "file:0",
+              "title": "file:0",
+              "isEnabled": true,
+              "isCurrent": true
+            },
+            {
+              "id": "file:1",
+              "title": "file:1",
+              "isEnabled": true,
+              "isCurrent": false
+            }
+          ],
+          "selectedItemIDs": [
+            "file:0"
+          ],
+          "allowedActions": [
+            "activate",
+            "move"
+          ],
+          "revision": 0
+        }
+      ]
+    }
+  },
+  {
+    "commandID": "media.transport",
+    "contractVersion": 1,
+    "action": {
+      "kind": "previous"
+    },
+    "session": {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "providerID": "test.generic-audio",
+      "request": {
+        "kind": "singleFile",
+        "resource": {
+          "url": "file:///tmp/fixture.dsf"
+        }
+      },
+      "presentation": {
+        "kind": "text",
+        "titleKey": "Test",
+        "body": "Fixture"
+      },
+      "capabilities": [
+        {
+          "declaration": {
+            "id": "media.transport",
+            "scope": "session",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        },
+        {
+          "declaration": {
+            "id": "ui.navigator-actions",
+            "scope": "presentation",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        },
+        {
+          "declaration": {
+            "id": "ui.navigator",
+            "scope": "presentation",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        }
+      ],
+      "mediaPlayback": {
+        "state": "paused",
+        "position": 0,
+        "duration": 2,
+        "isSeekable": true
+      },
+      "navigatorContributions": [
+        {
+          "id": "hifi.playback-queue",
+          "contractVersion": 1,
+          "titleLocalizationKey": "Queue",
+          "style": "flat",
+          "selectionMode": "single",
+          "items": [
+            {
+              "id": "file:0",
+              "title": "file:0",
+              "isEnabled": true,
+              "isCurrent": true
+            },
+            {
+              "id": "file:1",
+              "title": "file:1",
+              "isEnabled": true,
+              "isCurrent": false
+            }
+          ],
+          "selectedItemIDs": [
+            "file:0"
+          ],
+          "allowedActions": [
+            "activate",
+            "move"
+          ],
+          "revision": 0
+        }
+      ]
+    }
+  }
+]

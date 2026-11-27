@@ -1,0 +1,68 @@
+[
+  {
+    "commandID": "session.lifecycle",
+    "contractVersion": 1,
+    "operation": "restore",
+    "session": {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "providerID": "test.generic-audio",
+      "request": {
+        "kind": "singleFile",
+        "resource": {
+          "url": "file:///tmp/fixture.dsf"
+        }
+      },
+      "presentation": {
+        "kind": "text",
+        "titleKey": "Test",
+        "body": "Fixture"
+      },
+      "capabilities": [
+        {
+          "declaration": {
+            "id": "session.lifecycle",
+            "scope": "session",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        }
+      ]
+    },
+    "restoration": {
+      "currentItemID": "file:1",
+      "position": 1
+    }
+  },
+  {
+    "commandID": "session.lifecycle",
+    "contractVersion": 1,
+    "operation": "close",
+    "session": {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "providerID": "test.generic-audio",
+      "request": {
+        "kind": "singleFile",
+        "resource": {
+          "url": "file:///tmp/fixture.dsf"
+        }
+      },
+      "presentation": {
+        "kind": "text",
+        "titleKey": "Test",
+        "body": "Fixture"
+      },
+      "capabilities": [
+        {
+          "declaration": {
+            "id": "session.lifecycle",
+            "scope": "session",
+            "contractVersion": 1,
+            "dependencies": []
+          },
+          "state": "active"
+        }
+      ]
+    }
+  }
+]
