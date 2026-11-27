@@ -1,0 +1,358 @@
+# Hi-Fi 阶段性交接：DSF / DoP 与统一音频体验
+
+> 策略更新（2026-09-29）：本文保留为阶段性技术方案/验收记录。扩展/插件仅是开发手段，最终产品不提供扩展概念；Hi-Fi、EPUB 等能力随浮箔统一交付。本文涉及按需安装、独立插件发布、Registry 或扩展管理入口的旧产品路线不再适用；源码名称、协议边界与当时的验证记录仍可参考，不代表当前实现或发布承诺。当前说明见[开发与交付说明](../README.md)。
+
+> 更新日期：2026-09-07
+>
+> 当前里程碑：Stereo DSD64 DSF/DFF 已在 SMSL DAC 上实机播放；DSD128 / DSD256 均已通过真实硬件验证。5.0 DFF 在立体声 DAC 上走 MLFT/MRGT 折混，设备提供 5/6/8 声道 DoP 格式时按 5.0/5.1/7.1 输出；因暂无环绕 DoP DAC，多声道输出实测暂缓。未压缩立体声 SACD ISO（3-in-14）已在同一 SMSL 上实机播放：CUE 式曲目列表、Seek、DoP 出声及自然续播均已确认。DAC 释放屏障与切歌播放意图已提交；设备断开/占用/Hog/睡眠恢复也已通过真实 DAC 手测。DST / SACD 多声道仍未做。
+>
+> 用途：新会话中的 agent 应先读本文，再读 `foofoil_DSF_DFF_SACD_ISO_Technical_Plan_v2.md`，保留三个仓库的现有改动并从第 9 节继续。
+
+## 1. 仓库与模块边界
+
+项目已经拆为三个兄弟仓库：
+
+```text
+foofoil/
+├── foofoil/         # macOS 宿主、窗口、统一列表、音频 UI、Provider 路由
+├── extension-kit/   # 独立 Swift Package；Manifest、Session、capability、C ABI
+└── hifi/            # 独立 Hi-Fi 扩展；DSD parser、DoP、HAL、Runtime
+```
+
+边界必须保持：
+
+- `foofoil` 拥有与格式无关的交互：封面、metadata 呈现、播放控件、外部文件列表、拖拽排序、当前项图标、键盘/系统媒体键、循环/随机、自动续播和窗口状态；
+- `extension-kit` 只定义稳定、可序列化、跨仓库的通用契约；`ExtensionContentFamily.audio` 用来把扩展格式归入宿主音频家族；
+- `hifi` 拥有高级格式解析、DSD 数据、DoP、HAL、设备探测和独占资源，不依赖宿主的 `FileListState`、SwiftUI View 或 `NSImage`；
+- 外部 MP3/FLAC/DSF 等文件共享一个宿主 `FileListState(kind: .audio)`。选择当前项后才由 Provider Resolver 决定 Built-in Audio 或 `audio.hifi`；
+- SACD ISO Track 没有独立 URL。第一版把同一 ISO 的曲目投影成宿主 `FileListState`（与 CUE 相同的专辑标题、曲目行、时长 badge、不可重排），插件 Session 持有 TOC/出流真相；不得生成临时 DSF 或自绘第二套列表。
+
+## 2. 当前可工作的播放链路
+
+```text
+宿主 FileListState 当前项
+→ Provider Resolver
+→ audio.hifi 单文件 ContentSession
+→ Hi-Fi in-process C ABI Runtime
+→ DSFRawStream / DFFRawStream / SACDRawStream（DSF channel-block + LSB-first 归一化；DFF/SACD 交织 + MSB-first）
+→ DSFDoPSource / DoPOutputTimeline
+→ SPSCFloatRingBuffer
+→ CoreAudio HAL IOProc
+→ USB DoP DAC
+```
+
+当前确认范围：
+
+- 容器：DSF、raw DFF，以及未压缩立体声 SACD ISO（DST 压缩 DFF/ISO 仍拒绝）；
+- 编码：raw DSD；
+- 声道：立体声已实测；5.0 DFF 按设备能力输出 5ch / 5.1（补静音 LFE）/ 7.1 或折成立体声对；
+- 已实测：DSD64 / 2.8224 MHz 的 DSF 立体声与 DFF 立体声（SMSL），以及 DSD256 / 11.2896 MHz；5.0 DFF 在 SMSL 上为立体声折混；
+- 输出：DoP，经 CoreAudio HAL 和 Hog Mode 输出到 USB DAC；
+- 操作：播放、暂停、Seek、播完续播、单曲循环、顺序/顺序循环/随机、上一项/下一项和设备选择；
+- 宿主一致性：普通音频与 DSD 可混合进入同一列表，支持追加、删除、拖拽重排、时长 badge、当前项动态图标、鼠标 hover、空格键、列表键盘操作和系统媒体键；
+- 呈现：Built-in 与 Hi-Fi 共用 `AudioPresentationView`，复用同目录/内嵌封面加载、通用 metadata、播放条和底部进度线；右上技术信息已有浅色封面所需黑色阴影；
+- 实时稳定性：HAL 输出时间线统一重写 DoP marker，奇数帧 underrun 后也不会沿用 producer 的旧 marker 相位；Runtime 状态回传 `underrunCount`；
+- 安全范围：Hi-Fi Session 存活期间持有当前文件 bookmark 对应的 security-scoped access。
+
+不要把下列能力误认为已完成：
+
+- DST DFF 或 SACD 多声道 / DST ISO 播放；
+- 5.0/5.1/7.1 DoP 在环绕 DAC 上的真实硬件回归（代码已按格式探测选择，SMSL 上仍走立体声折混；因暂无相应设备暂缓）；
+- 完整的 Session 恢复；
+- Release 插件安装/升级验收；
+- 独立 Engine Service/XPC。当前 Runtime 是进程内动态插件，只是对象边界保持 C ABI/JSON 可迁移设计。
+
+## 3. 统一列表的现行设计
+
+这是已经确定的架构，不要退回旧方案：
+
+```text
+普通音频文件 ─┐
+DSF 文件 ─────┼→ Host FileListState → builtin.file-list Navigator → 同一套 UI
+DFF 文件 ─────┤                         │
+SACD ISO ─────┘                         └→ activate 当前 URL / 容器曲目
+                                            → Provider Resolver
+                                            → Built-in 或 Hi-Fi
+                                            （ISO 曲目复用同一 Session）
+```
+
+具体规则：
+
+1. Hi-Fi manifest 通过 `contentFamily: "audio"` 声明 DSF/DFF 属于宿主音频家族，宿主不硬编码后缀；
+2. 文件分类、混合追加、排序、删除、当前项与播放模式只存一份，归宿主所有；
+3. Hi-Fi 对外部文件只建立当前项的 `singleFile` Session，不复制宿主列表；
+4. `media.playback-queue` / `ui.navigator` 仍保留在扩展契约与 Runtime 中，作为旧 `fileCollection` 兼容和未来 SACD 虚拟 Track 的基础；
+5. 列表上一项/下一项优先执行宿主 navigator；只有没有宿主列表时才回退扩展旧队列；
+6. 播放结束先按宿主播放模式推进当前项，单曲循环才直接重播当前 Hi-Fi Session。
+
+## 4. 已提交修复与硬件验证
+
+### 4.1 DAC 释放屏障（已提交，手测通过）
+
+`foofoil` `666e149`：宿主在启动新的原生/扩展播放器前等待 `hifi.close` 完成。用户已确认 DSD ↔ PCM、DSD → DSD、快速连点与暂停切换。
+
+切歌播放/暂停意图：`foofoil` `4f5ae49`。暂停后切歌保持暂停，播放中切歌立即起播；自然播完仍自动续播。
+
+### 4.2 设备恢复与结构化错误（真实 DAC 手测已通过）
+
+以下场景已于 2026-09-04 使用真实 DAC 完成验收：
+
+1. 播放中拔掉 USB DAC → 约 1 秒内显示「输出设备已断开」，DAC 不得留在 DSD64 / 176.4 kHz；
+2. 播放中睡眠再唤醒 → 保持暂停，DAC 回到普通 PCM，点播放仍能进 DSD；
+3. 选择被占用的设备或 Hog 失败 → 显示占用/独占失败，而不是底层 `String(describing:)`；
+4. 起播失败（无效文件、不支持的 DoP 速率）→ 右上角为本地化错误，不是枚举 dump。
+
+实现要点：非实时队列监听 `DeviceIsAlive`、设备列表、Hog owner 和 `willSleep`；断开时跳过对已消失设备的 format 写入；失败码经 `HiFiPlaybackError.localizationKey` 由宿主本地化。
+
+### 4.3 raw DFF（立体声已手测；5.0 折混已手测）
+
+- 立体声 DFF（`SLFT`/`SRGT`，DSD64 raw）已在 SMSL 上正常播放；
+- 5.0 DFF（`MLFT`/`MRGT`/`C`/`LS`/`RS`）曾因只接受 2 声道而无法建 Session；现按设备 DoP 格式依次尝试 5ch → 6ch（ITU 5.1，LFE 静音）→ 8ch → 立体声 `MLFT`/`MRGT`；
+- SMSL 无 5/6/8 声道 176.4 kHz 整数格式，5.0 文件走立体声折混；环绕 DAC 上的 5.0/5.1 输出尚未实机确认；
+- 右上角状态会标明 `5ch · DoP`、`5.0→5.1 · DoP` 或 `5ch→Stereo · DoP`；
+- DST 压缩 DFF 仍然不可播放。
+
+### 4.4 未压缩立体声 SACD ISO（列表、Seek、出声、自然续播已手测）
+
+实测盘：Gunter Wand / NDR《Beethoven Symphonies Nos.2 & 6》ISO（TWOCHTOC only，3-in-14，9 曲，约 3.1 GB）。输出仍是 SMSL USB AUDIO DSD64 DoP。
+
+用户已确认：
+
+1. 拖入 ISO 后宿主列表为 CUE 式：专辑标题、CUE 徽标、曲目标题、左侧序号、时长 badge，不可重排；
+2. Seek 松手后定位正确，不中断播放；
+3. 出声与同一套录音的 DSF 一致，不再是恒定高压线噪声或一截一截的音乐。
+
+实现要点，不要退回去：
+
+- 未压缩扇区的 `frame_info_count` 只计数，4 字节 DST 表仅 `dstEncoded` 时存在；
+- 类型 2 包若以 `00 00 00` 开头且本扇区有 1…3 字节尾巴，这 3 字节是标记不是 DSD；尾巴仍是音频，必须接上。24 bit 全 0 按帧注入会听成恒定电流声；
+- 同一扇区可能在凑满一帧后还有下一帧的开头。必须先吃完本扇区所有音频包和尾巴，再出帧；中途 return 会丢掉约 672 字节，听感不连续；
+- 帧布局与 DFF 相同：逐字节 LRLR、MSB-first。不要按 16-bit 字交错拆；
+- Seek：按约 14 扇区 / 3 帧落到附近 LSN，再靠 `frame_start` 对齐；`HALDSFPlaybackEngine.play` 在 Hog 之前 seek 流；
+- 曲目文字块前常见 `02 00 00 00`（条目数，小端），然后才是 type + C 字符串；跳过该头才能读到 `Sinfonie Nr.2 …` 而不是退回 `Track 1`；
+- SACD 自然播完由宿主列表切到下一曲。Runtime 在切项时若上一曲已到结尾，必须继续 `play`：播完时会话的活动标记已清除（旧实现为 `playingSessionID`，现为 `isActive`），不能只看「当前是否在播」。暂停后再点下一曲仍保持暂停。此续播路径已通过连续两曲实听确认。
+
+不要把下列情况当成已验收：DST ISO、SACD 多声道、普通 `.iso`。
+
+### 4.5 DSD 顺序无缝连播（2026-09-09，自动测试通过，待 DAC 实听）
+
+- 相同 DSD 采样率、兼容输出声道映射、16 sample 对齐的曲目，在同一 HAL 会话的 ring 中连续生产；不停止 IOProc、不释放 Hog、不恢复格式。HAL 时间线继续统一修正 DoP marker 相位。
+- `DoPPlaybackSequence` 在 reader 上打开后继 DSF/DFF/未压缩 SACD 曲目，以已消费帧数确定当前曲目与局部进度；预读不能提前推进宿主列表。
+- 宿主普通 DSD 文件列表以连续 DSF/DFF 集合建会话，每次命令通过队列 items 传入当前允许的顺序；随机/单曲模式只保留当前曲。状态轮询发现后继变动时丢弃旧缓冲并从当前进度重启。宿主仍持有列表和播放模式。
+- 不兼容格式、非整 DoP 帧边界、混合 PCM/DSD 边界和列表末尾回到首曲仍走普通切换。下一文件无法打开时先排空当前曲，再由普通切曲路径报告错误。
+- 已验证三曲 payload 完整、奇数帧边界 marker 连续、预读/输出位置分离、seek 偏移、不兼容后继终止，以及宿主排序/模式/选中项同步。验证环境当前没有 DoP DAC，不能视为实机无缝听感验收。
+
+## 5. 不可回退的 DoP 数据约束
+
+这里曾出现“DAC 显示 DSD64，但输出巨大杂音”。根因是一个 DoP frame 内两个 DSD 字节的时间顺序颠倒。
+
+必须保持：
+
+1. DSF `bitsPerSample == 1` 为字节内 LSB-first；读取后逐字节 bit-reverse，使 oldest bit at MSB；
+2. 16-bit DoP payload 中，最早 8 个 DSD sample 放高字节，后 8 个放低字节；
+3. marker 在 24-bit word 的最高字节，逐 frame 以 `0x05` / `0xFA` 交替，同一 frame 左右声道 marker 相同；
+4. SMSL 的 32-bit packed physical format 中，24-bit DoP word 位于高 24 位，最低 8 位为零；
+5. Float32 virtual stream 映射必须可逆，不能经过音量、混音、SRC 或 DSP。
+
+```swift
+word = (marker << 16) | (firstChronologicalByte << 8) | secondChronologicalByte
+packed32 = word << 8
+floatSample = Float32(Int32(bitPattern: packed32)) / 2_147_483_648
+```
+
+不要改成 `first | (second << 8)`。DoP silence payload 为 `0x69, 0x69`，marker 仍须连续交替。
+
+## 6. 硬件验证记录
+
+实测设备：`SMSL USB AUDIO`。测试机器 UID：
+
+```text
+AppleUSBAudioEngine:SMSL:SMSL USB AUDIO:141200:1
+```
+
+DSD64 DoP carrier 为 176.4 kHz：
+
+```text
+2,822,400 DSD samples/s ÷ 16 DSD samples/DoP frame = 176,400 frames/s
+```
+
+已验证组合：
+
+- physical：176400 Hz、Stereo、integer LPCM，兼容 24-bit aligned-high / 32-bit packed；
+- virtual：176400 Hz、Stereo、Float32；
+- physical 与 virtual 分开配置；
+- HAL callback 在该设备上使用一个 active interleaved buffer、2 channels；
+- 连续合法 marker 会使 DAC 从 `176` 切到 `DSD64`；停止会恢复原 physical/virtual format；
+- Hog Mode 释放时必须重新读取实际 owner，不能只依赖最初写入值。
+
+DFF 补充：
+
+- 立体声 raw DFF DSD64 已在同一 SMSL 上播放；
+- 5.0 raw DFF 在该设备上折成 `MLFT`/`MRGT` 立体声 DoP；不要把「能出声」当成 5.0 环绕已验收。
+
+SACD ISO 补充：
+
+- 未压缩立体声 3-in-14 ISO 已在同一 SMSL 上播放；Seek 与列表已确认；
+- SACD 曲目自然结束后自动续播下一曲已通过连续两曲实听；
+- 不要把 DST 或多声道 ISO 当成同一验收。
+
+采样率补充：
+
+- DSD256 已通过真实硬件播放验证；
+- DSD128 已由用户确认通过真实硬件验证（2026-09-07）。
+
+## 7. 代码地图
+
+### `hifi`
+
+- `ExtensionManifest.json`：匹配 `dsf` / `dff`，对 `iso` 使用 sniff；声明 `enhancementDomain`、`contentFamily: audio` 和已接通 capability；DST DFF/ISO 仍拒绝播放；
+- `build-plugin`：构建、组装并签名 `.foofoilextension`；
+- `Sources/HiFiExtensionCore/DSDContainerParser.swift`：DSF/DFF descriptor parser；ISO 走 `SACDISOParser`，不映射整盘；
+- `Sources/HiFiExtensionCore/SACDISOParser.swift`、`SACDAudioSector.swift`、`SACDRawStream.swift`：Scarlet Book TOC、扇区拆包、未压缩立体声曲目流；
+- `Sources/HiFiExtensionCore/DSFRawStream.swift`、`DFFRawStream.swift`：DSF channel-block / DFF 交织读取；DFF 可按 `outputMap` 输出原声道、5.1/7.1 补静音或立体声对；
+- `Sources/HiFiExtensionCore/DoPFrameEncoder.swift`、`DoPOutputTimeline.swift`、`DSFDoPSource.swift`：DoP 数据与连续输出时间线；
+- `Sources/HiFiExtensionCore/HiFiPlaybackError.swift`、`DeviceLifecycleWatch.swift`：结构化错误与拔出/占用/睡眠监听；
+- `Sources/HiFiExtensionCore/SPSCFloatRingBuffer.swift`：实时线程固定容量 ring；
+- `Sources/HiFiExtensionCore/CoreAudioDeviceCatalog.swift`、`CoreAudioHALFormatProbe.swift`：设备、格式、Hog Mode 和诊断；`plan` 按精确声道数匹配 DoP carrier；
+- `Sources/HiFiExtensionCore/HALDSFPlaybackEngine.swift`：worker、预缓冲、IOProc、停止和设备恢复；按 `playbackOutputMaps()` 选择输出布局；
+- `Sources/HiFiExtensionRuntime/Runtime.swift`：C ABI Runtime、按设备 UID 的播放器仲裁、命令与设备状态；
+- `Sources/HiFiInspect`、`HiFiHALProbe`、`HiFiRuntimeSmoke`：诊断 CLI；
+- `Tests/HiFiExtensionCoreTests`：核心测试（含错误码与 DFF 流）。
+
+### `extension-kit`
+
+- `Sources/FoofoilExtensionKit/ExtensionModels.swift`：`ExtensionContentFamily` 与 provider manifest；
+- `Sources/FoofoilExtensionKit/MediaPlaybackContracts.swift`：播放、queue、设备选择值类型及校验；
+- `Sources/FoofoilExtensionABI`：稳定 C ABI header。
+
+### `foofoil`
+
+- `foofoil/FileList.swift`、`AppState/AppState+FileList.swift`：统一外部音频列表、CUE/SACD 曲目投影、拖拽排序、导航和播放模式；
+- `foofoil/ExtensionKit/ExtensionHost.swift`：provider 路由、Debug runtime 装载及可等待 close；
+- `foofoil/ExtensionKit/InProcessContentProvider.swift`：C ABI JSON 到内部 Provider 的适配；
+- `foofoil/ExtensionKit/ExtensionAudioModeView.swift`：扩展状态到宿主媒体控制协议的适配；
+- `foofoil/Views/AudioPresentationView.swift`：Built-in / Hi-Fi 共用封面、metadata 和控件；
+- `foofoil/AppState/AppState+ContentOpen.swift`：异步 provider 路由、原生媒体切换与状态命令；
+- `foofoil/AppState/AppState.swift`：Session retain/release 及 close 屏障；
+- `foofoil/App/AppDelegate+Actions.swift`：打开面板包含扩展音频类型；
+- `run`：构建宿主、构建并注入兄弟仓库 Hi-Fi Debug bundle、重签并启动。
+
+## 8. 实时线程约束
+
+文件 worker 负责文件 I/O、DSF block 拆分、DFF 交织拆分、SACD 扇区组装、bit reversal、声道映射、DoP 编码和 ring 写入。HAL callback 只能读取预分配 ring、写现有 output buffer、补合法 DoP silence 和更新 atomic 计数。Ring 的 `channelCount` 随当前 physical format 变化，不再写死为 2。
+
+HAL callback 禁止文件 I/O、锁、内存分配、JSON、日志或 Swift collection 扩容。当前 ring 容量 131072 frame，预缓冲 32768 frame，worker chunk 4096 frame。
+
+每个 DSD Runtime Session 持有自己的 `HALDSFPlaybackEngine`，应用级控制入口按设备 UID 仲裁。同一设备同时只有一个独占输出；开始接管前必须完成旧 PCM/DSD 输出的暂停与资源释放。不同设备互不抢占，跟随系统输出不登记独占所有者，可多箔同时播放。
+
+## 9. 当前状态与下一步
+
+2026-09-07 产品决策：DSD 仅通过 DoP 输出，不实现 DSD → PCM fallback，也不提供 Automatic / Prefer DoP / Always PCM 策略。这是范围排除，不是待办。无兼容设备、设备被占用或初始化失败时停止并说明原因；曲目和封面仍可展示，播放时显示实际 DoP 模式、倍率和设备。普通 PCM 的设备选择与系统默认回退保持独立。Runtime 的 `outputPolicy: "automatic"` 是遗留字段，待另行调整代码，不代表已实现转换。
+
+2026-09-07 Session 进度恢复增补（宿主 `9e7f752`、Hi-Fi `d1fedb7` 已提交）：
+
+- 宿主用新建的 Hi-Fi Session 依次恢复保存的容器 Track ID 和播放位置，完成后才交给视图；历史重开保持暂停，不自动起播，也不主动释放另一窗口的 PCM 独占 lease。
+- 进度以新曲目时长为上限；忽略非有限数值和负值。旧 Track ID 不存在或不可播放时，不把其进度套到第一曲。
+- 播放中每五秒保存一次扩展快照，不刷新历史排序；暂停、Seek 等命令仍立即保存。异常退出可能丢失最近约五秒进度，未承诺崩溃时精确恢复。
+- Runtime 对未持有播放器的会话执行 pause 时保留自身位置，不停止另一会话；覆盖恢复后尚未起播时重复暂停的路径。
+- 验证：宿主全量 `xcodebuild test`、Hi-Fi 33 项核心测试、ExtensionKit 8 项契约测试及 Runtime `--self-test` 均通过；已通过宿主 `./run` 构建、注入插件并启动。
+- 用户已确认本轮 Session 恢复实测无问题（2026-09-07），历史重开、曲目及播放位置恢复验收通过。
+- 多个箔争用独占设备已完成按 UID 仲裁修复并提交，自动化通过，待实机回归（见第 9.1 节）；用户此前报告其他已测场景未发现问题。记住上次选择的 DAC 仍未完成。已有音频资源的 metadata 未发现问题，不再列专项 metadata 待办。
+
+2026-09-07 历史记录恢复修复（宿主 `8b91e2c` 已提交）：
+
+- 历史打开外部扩展资源时，使用保存的 `ContentRequest`（含安全范围书签）重新建立 Runtime Session；不再直接复用关闭后失效的 Session UUID。
+- 可用性判断覆盖 `./run` 注入的开发 Runtime，避免因没有正式安装记录而显示「扩展会话不可用」。
+- 建会话全程持有安全范围授权并用书签解析后 URL 做 sniff，使 SACD ISO 在重启/文件移动后仍可匹配。
+- 同目录封面书签与当前曲目文件授权独立于 `imagePath` 恢复；书签恢复授权后调用方重读一次，历史重开可显示同目录/内嵌封面且不再重复弹目录授权。
+- 已展示封面落盘为历史缩略图（扩展音频不走后台索引）；历史卡片无 `imagePath` 时也可渲染；统一音频列表推断为 `.audio`，剪枝按列表项存活保留。
+- 新建窗口与复用窗口均保留历史 UUID、宿主混合列表顺序和当前项；连续载入历史时旧恢复任务不能覆盖新内容或清除新任务的加载状态。
+- 宿主全量测试（`xcodebuild test`）通过；历史重开播放与封面显示已获用户验收；播放位置和容器曲目恢复见上方本轮增补。记住上次选择的 DAC 仍未完成。
+
+截至本文更新时：
+
+- `hifi` `9b09bce`：raw DFF、5.0 输出布局、设备恢复、未压缩立体声 SACD ISO 出流；
+- `extension-kit` `1c3c923`：`MediaPlaybackQueueSnapshot.title` 供容器专辑标题使用；旧 queue JSON 仍可解码；
+- `foofoil` 已提交 DAC 释放屏障 `666e149`、切歌播放意图 `4f5ae49` 与 seek-on-release `0f77844`；ISO sniff、CUE 式曲目列表（曲名 + 左侧序号）与 Session 复用见 `9782820`；
+- 第 4.1 节切换手测、第 4.2 节设备恢复手测均已通过；第 4.3 节立体声 DFF 与 5.0 折混已通过；第 4.4 节 SACD ISO 列表/Seek/出声及自然续播已通过；
+- DSD128 / DSD256 均已通过真实硬件验证；环绕 5.0/5.1/7.1 DoP 因暂无相应 DAC 暂缓；
+- 通用输出设备选择的首版代码已接通：未安装 Hi-Fi 时 PCM 仍走系统默认；安装 Hi-Fi 后，普通 PCM 可在右上角选择系统默认或其它设备独占输出，独占时会尝试把设备切到音源采样率；DSD 右上角同样可切换支持当前 DSD rate 的设备；
+- 设备目录、PCM Hog/格式 lease 与偏好保存在 Hi-Fi 的 application-scope 服务中，宿主只负责把 `AVAudioEngine` 路由到已准备好的设备；旧 ABI runtime 仍可加载；
+- 上述通用设备选择已通过自动化构建/契约测试；普通 PCM 单曲的设备切换、支持设备按音源采样率工作，以及切换后从原位置续播已通过真实设备验证；其余场景见第 9.1 节；
+- 核心测试以 `swift test` 为准；本地 ISO 存在时 `SACDISOParserTests` 会对照同专辑 DSF 前 16384 字节。
+
+### 9.1 通用输出设备选择验收与已知问题
+
+当前进度（2026-09-07）：宿主 `7d6576d`、Hi-Fi `8ba3210` 已提交跨箔独占交接修复。代码实现、自动化验证、构建及 Debug 插件注入已完成；本轮实机交接验收尚未收到确认。
+
+2026-09-07 用户反馈：多个箔之间争用独占设备存在问题，其余已测场景未发现问题。本条不推定未提供素材或设备的全部组合均已覆盖。
+
+- 已有验证记录：普通 PCM 单曲设备切换、支持设备按音源采样率输出、切换后从原位置续播；系统默认跟随、采样率/SRC 呈现、DSD 设备禁用项、PCM ↔ DSD 切换、暂停/关闭、拔出/睡眠及插件禁用相关场景，用户本轮未报告其他问题。
+- **已实现、待实机回归：多个箔争用独占设备。** 本轮统一 PCM 与 DSD 的设备交接：同一 UID 的新播放先等待旧箔暂停/释放，再起播；旧箔保留位置及暂停意图。跟随系统输出不参与抢占，不同 DAC 可独立播放。
+- 根因：旧宿主仲裁仅覆盖 PCM，Runtime 又用全局单一 PCM lease/DSD 引擎；释放 lease 不等于暂停宿主 AVAudioEngine。现在宿主统一串行交接，Runtime 按 UID 管理 PCM leases、每个 DSD 会话持有独立引擎，ABI 控制调用统一加锁，HAL callback 不受影响。
+- 选择 DAC 但未播放时不抢占；每个 PCM 箔保留自身路由选择，其他箔切到系统默认只释放自己的 lease。删除打开 DSD 时全局 releaseAllPCM 的路径。延迟到达的旧状态不能覆盖已被抢占后的暂停状态。
+- 自动化：新增统一仲裁测试覆盖同设备交接顺序、不同 DAC、退出独占后系统默认不被暂停、快速接管与旧 owner 延迟释放。宿主全量测试最终通过（168 项 Swift Testing、7 项 UI）；Hi-Fi 33 项核心测试和 Runtime smoke test 通过。首次全量曾触发 CustomTextEditor 窗口销毁崩溃，相关测试组及最终全量重跑通过，未修改文本编辑器。
+- 已通过 `foofoil/./run` 构建并注入最新插件；设备探测确认 SMSL 在线且支持 DSD64/128/256 DoP，并已打开交接样本 Stereo DSD64 DSF。未据此宣称出声或跨箔交接实测通过。
+- 回归重点：PCM→PCM、PCM→DSD、DSD→PCM、DSD→DSD；旧箔恢复进度、快速连点、切换 DAC、不同 DAC 并发、多个系统默认输出并发及系统默认输出不被独占箔自动暂停。此前实测结论不替代本轮仲裁变更的硬件回归。
+- **未完成：记住上次选择的 DAC。** 保存稳定设备 UID，重开时重新检查设备是否在线、是否支持当前 DSD 倍率，并恢复选择；保持暂停，不自动抢占输出。已有应用级 PCM 偏好服务不等于 Hi-Fi 的 DAC 选择恢复已经完成。
+
+建议下一步顺序：
+
+1. 实机回归本轮按设备 UID 的跨箔独占交接修复；
+2. 实现记住上次选择的 DAC，并验证重开、断开和重连场景；
+3. 环绕 5.0/5.1/7.1 DoP 等具备相应 DAC 后再做实机回归；
+4. 后续按需求推进 DST、SACD 多声道和正式 Release 安装、升级、签名流程，单独评估 Engine Service/XPC。
+
+DSD64 / DSD128 / DSD256 以及本轮历史 Session 恢复已通过实测。DSD 仅通过 DoP 输出，不实现 PCM 转换；设备不可用时明确提示，切换和恢复不得遗留独占资源。
+
+### 9.2 metadata 与 Session 恢复范围
+
+- metadata：已有音频资源未发现信息或封面问题，继续使用现有能力；不列专项 parser 或补 metadata 待办。以后出现具体问题再按样本处理。
+- Session 恢复：新建 Runtime 会话、混合列表顺序和当前项、封面、容器曲目与播放位置恢复已通过用户验证；重开保持暂停，不复用旧 Session UUID。
+- 剩余设备偏好需求是记住上次选择的 DAC，见第 9.1 节；不再笼统将整套 Session 恢复列为未完成。
+
+## 10. 新会话启动清单
+
+1. 分别读取 `hifi/AGENTS.md`、本文和总技术方案；如修改其它仓库，再读对应 `AGENTS.md`；
+2. 在 `hifi`、`foofoil`、`extension-kit` 分别执行 `git status --short`，保留全部现有修改；
+3. 先运行 Hi-Fi 核心测试、ExtensionKit 测试和 `foofoil/run` 建立基线；
+4. 第 4.2 节设备恢复手测已经通过；修改 encoder、bit order 或 Hog 释放顺序时仍须补回归测试；
+5. 不要重新猜测 176.4 kHz 来源，也不要重做已通过的 DoP silence/Hog Mode spike；
+6. 修改 encoder、DSF bit order、physical/virtual format 或 callback layout 前，先阅读第 5、6、8 节并补回归测试；
+7. 不要把外部 DSF 列表重新塞回 Hi-Fi `fileCollection` queue；
+8. 应用代码变更后执行 `cd foofoil && ./run`，真实设备与 GUI 最终由用户验收。
+
+## 11. 常用命令
+
+```sh
+# Hi-Fi 核心测试
+cd hifi
+SWIFTPM_MODULECACHE_OVERRIDE=/tmp/foofoil-hifi-swiftpm-cache \
+CLANG_MODULE_CACHE_PATH=/tmp/foofoil-hifi-clang-cache \
+swift test --disable-sandbox --scratch-path /tmp/foofoil-hifi-build
+
+# ExtensionKit 测试
+cd ../extension-kit
+swift test --disable-sandbox --scratch-path /tmp/foofoil-extension-kit-build
+
+# 构建、注入插件并启动宿主
+cd ../foofoil
+./run
+
+# 用户终端中的文件/设备诊断
+cd ../hifi
+swift run hifi-inspect --devices
+swift run hifi-inspect --stream-check '/path/to/file.dsf'
+swift run hifi-inspect --stream-check '/path/to/file.dff'
+swift run hifi-inspect --stream-check '/path/to/disc.iso'
+```
+
+Codex 受限沙箱可能无法访问 CoreAudio device、CoreSimulator 或用户 SwiftPM cache。真实硬件和 GUI 结论以用户桌面会话执行结果为准。
+
+## 12. 关联文档
+
+- 总体技术方案：`docs/foofoil_DSF_DFF_SACD_ISO_Technical_Plan_v2.md`
+- 宿主扩展系统方案：`../../foofoil/foofoil/docs/foofoil_Extension_System_Implementation_Plan.md`
+- 扩展部署记录：`../../foofoil/foofoil/docs/phase0-extensionkit-deployment.md`
+- DoP open Standard 1.1：<https://dsd-guide.com/sites/default/files/white-papers/DoP_openStandard_1v1.pdf>
+- Sony DSF File Format Specification 1.01：<https://dsd-guide.com/sites/default/files/white-papers/DSFFileFormatSpec_E.pdf>

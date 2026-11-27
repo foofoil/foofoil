@@ -1,0 +1,71 @@
+# Hi-Fi for foofoil
+
+Advanced local audio playback module for [foofoil](https://github.com/foofoil/foofoil). **Requires foofoil.**
+
+Hi-Fi is developed as an internal foofoil module, not a standalone player. It ships with foofoil. Extension/plugin bundles are only a development and integration mechanism; users do not install or update Hi-Fi separately.
+
+The module implements high-resolution and DSD playback for foofoil: DSF/DFF, uncompressed stereo SACD ISO, APE with CUE sheets (Monkey's Audio decoded in-extension to exclusive PCM), SACD DST (in progress), enhanced handling of formats the system already plays, output-device selection, DoP, and music-oriented session features. Playback lists are projected through foofoil's shared navigator, not a private sidebar.
+
+[简体中文](README.zh-CN.md)
+
+## Status
+
+The current tree is the Phase 0 development prototype extracted from foofoil's `hifi-ext` branch:
+
+- DSF / raw DFF / uncompressed stereo SACD ISO → DoP → CoreAudio HAL → USB DAC
+- Stereo DSD64 DSF and stereo DFF verified on an SMSL DAC; 5.0 DFF uses surround DoP when the device allows it, otherwise a stereo fold
+- Uncompressed stereo SACD ISO is sniffed (`SACDMTOC`), shown as a CUE-like host list (titles + track numbers), and played from Stereo Area 3-in-14/3-in-16 without writing temporary DSF. List, seek, and sound verified on SMSL
+- APE (Monkey's Audio, BSD-3 decoder vendored as `Sources/MACLib`) is decoded in-extension and played as bit-perfect exclusive PCM through CoreAudio HAL with Hog Mode; single `.ape` opens whole-disc, and a sibling or opened `.cue` projects CUE track lists with seeking and track advance. Listening verification on a DAC is pending user confirmation
+- Host session commands for play, pause, progress, output-device selection, and device release on close
+
+Not yet a shipping release. DSD playback is DoP-only; DSD → PCM conversion is out of scope. DSD64/128/256 and history track/position restore are hardware/user-verified. Per-device PCM/DSD handoff is implemented and awaiting hardware regression; system-default playback is excluded from arbitration. Remembering the last selected DAC remains unfinished. Other tested device scenarios have no reported issues. Existing metadata needs no additional work. Later scope includes DST / SACD multichannel, process-isolation evaluation, and integration into signed/notarized foofoil releases.
+
+See [docs/hifi-phase0-dsf-playback-handoff.md](docs/hifi-phase0-dsf-playback-handoff.md) and [docs/foofoil_DSF_DFF_SACD_ISO_Technical_Plan_v2.md](docs/foofoil_DSF_DFF_SACD_ISO_Technical_Plan_v2.md).
+
+## Requirements
+
+- [foofoil](https://github.com/foofoil/foofoil) (host app)
+- macOS 15 or later, Apple silicon
+- Xcode / Swift 6 for building from source
+
+Compatible Extension API: v1 (`extensionAPI.min` / `max` in `ExtensionManifest.json`).
+
+## Local Playback Test
+
+For a real hardware check, keep `hifi` as a sibling of `foofoil` and start the host with its `./run` script, which builds this package and injects `Hi-Fi.foofoilextension` into the Debug app:
+
+```sh
+cd ../foofoil
+./run
+```
+
+Then drop a Stereo DSD64 `.dsf` onto a foil, or File → Open. Use the host playback controls for play/pause and output-device selection. Do not use Xcode ⌘R for this path: it builds foofoil without injecting the plugin.
+
+To build the bundle by itself:
+
+```sh
+./build-plugin /tmp/foofoil-hifi-plugin
+```
+
+This produces `Hi-Fi.foofoilextension`. The app’s `./package-dmg` script embeds this module inside `foofoil.app` for unified distribution. Bundle names and ABI identifiers remain internal implementation details.
+
+## Tests and Tools
+
+```sh
+swift test
+swift run hifi-inspect --help
+swift run hifi-hal-probe
+```
+
+`HiFiExtensionRuntime` exports `foofoil_extension_create` and exchanges JSON value messages with the host. It does not import SwiftUI or pass in-process views across the ABI.
+
+## Related Repositories
+
+| Repository | Role |
+| --- | --- |
+| [foofoil](https://github.com/foofoil/foofoil) | App that integrates and distributes the audio capability. |
+| [extension-kit](https://github.com/foofoil/extension-kit) | Extension API contracts, ABI header, and Manifest schema |
+
+## License
+
+Hi-Fi is licensed under the [MIT License](LICENSE), copyright © 2026 Beijing Memory Vision Technology Co., Ltd.
