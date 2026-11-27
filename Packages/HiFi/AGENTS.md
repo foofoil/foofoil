@@ -2,7 +2,7 @@
 
 ## Product Strategy (2026-09-29)
 
-Extensions/plugins are a development mechanism only. The final product has no user-facing extension concept: content capabilities ship with foofoil, without separate installation, enablement, or updates. Keep internal module boundaries and existing ABI/type names where useful; they do not imply a public plugin platform or independent release compatibility promise. Do not plan a Registry, marketplace, or Extension Manager as a product feature. Management code/UI remains available for future reuse, but the app hides its entry points and disables startup update checks and installation prompts. Do not delete the underlying extension implementation merely to hide the product concept. The app’s `./run` embeds sibling Hi-Fi and EPUB modules for Debug; `./package-dmg` embeds them for Release distribution.
+Extensions/plugins are a development mechanism only. The final product has no user-facing extension concept: content capabilities ship with foofoil, without separate installation, enablement, or updates. Keep internal module boundaries and existing ABI/type names where useful; they do not imply a public plugin platform or independent release compatibility promise. Do not plan a Registry, marketplace, or Extension Manager as a product feature. Management code/UI remains available for future reuse, but the app hides its entry points and disables startup update checks and installation prompts. Do not delete the underlying extension implementation merely to hide the product concept. The app’s `./run` embeds the Hi-Fi, EPUB, and Video modules from `Packages/` for Debug; `./package-dmg` embeds them for Release distribution.
 
 ## Project Overview
 
@@ -47,7 +47,7 @@ Current scope is raw DSF/DFF and uncompressed stereo SACD ISO → DoP → CoreAu
   ```
 
 - Use `swift run hifi-inspect` and `swift run hifi-hal-probe` for container and device checks that unit tests cannot cover.
-- After a change that affects playback or the extension bundle, rebuild from the sibling foofoil repo with `./run` (not Xcode ⌘R) so the Debug plugin is injected, then open a Stereo DSD64 `.dsf` on a DoP-capable DAC. Report what was verified. Skip the app launch only if the change cannot affect runtime behavior.
+- After a change that affects playback or the extension bundle, rebuild from the repository root with `./run` (not Xcode ⌘R) so the Debug module is injected, then open a Stereo DSD64 `.dsf` on a DoP-capable DAC. Report what was verified. Skip the app launch only if the change cannot affect runtime behavior.
 - Treat new warnings as defects. Do not silence warnings without addressing or documenting the underlying reason.
 
 ## Change Discipline

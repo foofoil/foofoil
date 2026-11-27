@@ -346,7 +346,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
                 A71000000000000000000003,
-				F30F01013139000100F30F01 /* XCLocalSwiftPackageReference "../extension-kit" */,
+				F30F01013139000100F30F01 /* XCLocalSwiftPackageReference "Packages/ExtensionKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AB7D0D0C2FFB8BC800ED4438 /* Products */;
@@ -913,9 +913,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		F30F01013139000100F30F01 /* XCLocalSwiftPackageReference "../extension-kit" */ = {
+		F30F01013139000100F30F01 /* XCLocalSwiftPackageReference "Packages/ExtensionKit" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = "../extension-kit";
+			relativePath = "Packages/ExtensionKit";
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -926,12 +926,12 @@
         A71000000000000000000002 = {isa = XCSwiftPackageProductDependency; package = A71000000000000000000003; productName = SwiftTerm; };
 		F30F01023139000100F30F01 /* FoofoilExtensionKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = F30F01013139000100F30F01 /* XCLocalSwiftPackageReference "../extension-kit" */;
+			package = F30F01013139000100F30F01 /* XCLocalSwiftPackageReference "Packages/ExtensionKit" */;
 			productName = FoofoilExtensionKit;
 		};
 		F30F01033139000100F30F01 /* FoofoilExtensionKit */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = F30F01013139000100F30F01 /* XCLocalSwiftPackageReference "../extension-kit" */;
+			package = F30F01013139000100F30F01 /* XCLocalSwiftPackageReference "Packages/ExtensionKit" */;
 			productName = FoofoilExtensionKit;
 		};
 /* End XCSwiftPackageProductDependency section */

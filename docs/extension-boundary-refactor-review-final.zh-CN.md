@@ -1,6 +1,8 @@
 # 扩展边界重构评审终稿
 
 > 策略更新（2026-09-29）：本文保留为阶段性技术方案/验收记录。扩展/插件仅是开发手段，最终产品不提供扩展概念；Hi-Fi、EPUB 等能力随浮箔统一交付。本文涉及按需安装、独立插件发布、Registry 或扩展管理入口的旧产品路线不再适用；源码名称、协议边界与当时的验证记录仍可参考，不代表当前实现或发布承诺。当前说明见[开发与交付说明](extension-support.zh-CN.md)。
+>
+> 仓库布局更新（2026-11-27）：相关模块已合并到本仓库 `Packages/`；下文源码路径中的 `extension-kit/`、`hifi/` 等前缀按当前布局更新。
 
 日期：2026-09-10  
 状态：收尾阶段 0–6 全部完成，全部实机/界面手动项已由用户复验通过，最终验收通过；进度见[收尾 checklist](extension-boundary-refactor-closeout-checklist.zh-CN.md)
@@ -91,8 +93,8 @@
 位置：
 
 - `foofoil/AppState/AppState+ContentOpen.swift:1048-1057`
-- `extension-kit/Sources/FoofoilExtensionKit/MediaPlaybackContracts.swift:47-58`
-- `extension-kit/Sources/FoofoilExtensionKit/MediaTransport.swift:97-104`
+- `Packages/ExtensionKit/Sources/FoofoilExtensionKit/MediaPlaybackContracts.swift:47-58`
+- `Packages/ExtensionKit/Sources/FoofoilExtensionKit/MediaTransport.swift:97-104`
 
 `seekExtensionPlayback(to:)` 只检查 `isSeekable`，没有检查 `MediaPlaybackSnapshot.allows(.seek)`。它先把 position 写回 `extensionSession`，然后发送 seek。当扩展通过 `availableActions` 显式禁用 seek 时，请求会被契约校验拒绝，失败只写日志，宿主乐观位置不会回滚。
 
@@ -111,7 +113,7 @@
 
 - `foofoil/ExtensionSupport/Presentation/AppState+ExtensionQueue.swift:39-58`
 - `foofoil/AppState/AppState+ContentOpen.swift:982,1010,1077`
-- `hifi/Sources/HiFiExtensionRuntime/Runtime.swift:565-587`
+- `Packages/HiFi/Sources/HiFiExtensionRuntime/Runtime.swift:565-587`
 
 `sessionByApplyingHostPlaybackSequence` 无法在宿主文件列表中映射当前扩展项目时，收集到的 ID 为空，随后把队列替换为当前单曲。该快照随媒体或导航操作发送给 hifi 后，Runtime 会据此覆盖 `record.sequenceIDs`，导致 `record.successors` 为空并打断后继播放。
 
@@ -193,7 +195,7 @@
 - `foofoil/App/AppDelegate+MenuSetup.swift:530-559`
 - `foofoil/App/AppDelegate+Actions.swift:25-28`
 - `foofoil/AppState/AppState+ContentOpen.swift:962-969`
-- `hifi/Sources/HiFiExtensionRuntime/Runtime.swift:366-392`
+- `Packages/HiFi/Sources/HiFiExtensionRuntime/Runtime.swift:366-392`
 
 项目没有已发布的 P0 宿主或扩展，因此 P0 支持窗口已按当前 AGENTS 关闭；本阶段落实代码清理。不过兼容层并非全部未执行：当前 P1 hifi 仍声明 `ui.commands` 并返回包含 `hifi.*` 的 commands；宿主扩展菜单点击后，`performExtensionCommand` 会通过 `HiFiLegacyAdapter.mediaAction` 把这些命令翻译为公共媒体动作。
 
@@ -214,8 +216,8 @@
 
 位置：
 
-- `hifi/Sources/HiFiExtensionRuntime/MediaActionMessages.swift:24-33`
-- `hifi/Sources/HiFiExtensionRuntime/Runtime.swift:103-154,488-549,592+`
+- `Packages/HiFi/Sources/HiFiExtensionRuntime/MediaActionMessages.swift:24-33`
+- `Packages/HiFi/Sources/HiFiExtensionRuntime/Runtime.swift:103-154,488-549,592+`
 
 当前公共 `media.transport` 被解码后，又通过 `MediaPlaybackMessage.runtimeCommand` 映射成 `hifi.play` 等字符串；生命周期恢复直接调用 `hifi.pause` 和 `hifi.seek`，导航也复用 `hifi.navigator.*`。因此，只关闭 callback 的外部旧命令入口可以消除协议兼容，但 hifi 内部仍依赖旧协议命名。
 
@@ -235,7 +237,7 @@
 位置：
 
 - `foofoil/ExtensionSupport/Presentation/ExtensionPlaybackSupport.swift:45-61`
-- `hifi/Sources/HiFiExtensionRuntime/Runtime.swift:1014-1100`
+- `Packages/HiFi/Sources/HiFiExtensionRuntime/Runtime.swift:1014-1100`
 
 公共契约允许扩展显式提供 `availableActions`，缺省时宿主根据状态、`isSeekable` 和队列长度推导。hifi 当前不发送该字段，宿主设备菜单又会通过兼容层读取旧 command 的 `isEnabled`，形成两套状态来源。
 

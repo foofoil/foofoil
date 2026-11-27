@@ -2,7 +2,7 @@
 
 ## Product Strategy (2026-09-29)
 
-Extensions/plugins are a development mechanism only. The final product has no user-facing extension concept: content capabilities ship with foofoil, without separate installation, enablement, or updates. Keep internal module boundaries and existing ABI/type names where useful; they do not imply a public plugin platform or independent release compatibility promise. Do not plan a Registry, marketplace, or Extension Manager as a product feature. Management code/UI remains available for future reuse, but the app hides its entry points and disables startup update checks and installation prompts. Do not delete the underlying extension implementation merely to hide the product concept. The app’s `./run` embeds sibling Hi-Fi and EPUB modules for Debug; `./package-dmg` embeds them for Release distribution.
+Extensions/plugins are a development mechanism only. The final product has no user-facing extension concept: content capabilities ship with foofoil, without separate installation, enablement, or updates. Keep internal module boundaries and existing ABI/type names where useful; they do not imply a public plugin platform or independent release compatibility promise. Do not plan a Registry, marketplace, or Extension Manager as a product feature. Management code/UI remains available for future reuse, but the app hides its entry points and disables startup update checks and installation prompts. Do not delete the underlying extension implementation merely to hide the product concept. The app’s `./run` embeds the Hi-Fi, EPUB, and Video modules from `Packages/` for Debug; `./package-dmg` embeds them for Release distribution.
 
 ## Project Overview
 

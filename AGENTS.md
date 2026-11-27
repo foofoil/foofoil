@@ -2,7 +2,7 @@
 
 ## Product Strategy (2026-09-29)
 
-Extensions/plugins are a development mechanism only. The final product has no user-facing extension concept: content capabilities ship with foofoil, without separate installation, enablement, or updates. Keep internal module boundaries and existing ABI/type names where useful; they do not imply a public plugin platform or independent release compatibility promise. Do not plan a Registry, marketplace, or Extension Manager as a product feature. Management code/UI is retained behind `ExtensionProductPolicy.exposesUserManagement` (currently false); do not delete it. This policy hides settings/menu entry points and disables startup catalog refresh and install prompts, without disabling content runtimes. The app’s `./run` embeds sibling Hi-Fi and EPUB modules for Debug; `./package-dmg` embeds them for Release distribution.
+Extensions/plugins are a development mechanism only. The final product has no user-facing extension concept: content capabilities ship with foofoil, without separate installation, enablement, or updates. Keep internal module boundaries and existing ABI/type names where useful; they do not imply a public plugin platform or independent release compatibility promise. Do not plan a Registry, marketplace, or Extension Manager as a product feature. Management code/UI is retained behind `ExtensionProductPolicy.exposesUserManagement` (currently false); do not delete it. This policy hides settings/menu entry points and disables startup catalog refresh and install prompts, without disabling content runtimes. The app’s `./run` embeds the Hi-Fi, EPUB, and Video modules from `Packages/` for Debug; `./package-dmg` embeds them for Release distribution.
 
 ## Project Overview
 
@@ -10,13 +10,13 @@ foofoil is a lightweight macOS reference app built for keeping useful content vi
 
 The app is written in Swift and uses SwiftUI for most interface code, with AppKit where direct macOS window, menu, text, or visual-effect control is required. It also uses native Apple frameworks for web content, PDFs, OCR, images, file types, and persistence.
 
-Reusable Extension API contracts live in the sibling `extension-kit` repository; this app links it as a local Swift package at `../extension-kit`. Capability modules such as Hi-Fi and EPUB live in sibling repositories and are embedded by the app scripts rather than compiled in the Core app target. Host loading and UI stay here; existing Manager/Registry code is legacy implementation infrastructure.
+This is a single repository with internal Swift packages under `Packages/`: `ExtensionKit` holds the reusable Extension API contracts, and `HiFi`, `EBook`, and `Video` hold capability modules. The app links `Packages/ExtensionKit` as a local Swift package. Capability modules are embedded by the app scripts rather than compiled into the Core app target. Host loading and UI stay in `foofoil/`; existing Manager/Registry code is legacy implementation infrastructure.
 
 Host extension code lives in `foofoil/ExtensionSupport/`: `Runtime` owns providers, loading, sessions and optional device services; `Management` owns installation, compatibility negotiation and Registry; `Presentation` owns host UI, playback adapters and host queue projection. There is no `Compatibility` layer: legacy Hi-Fi fallbacks are deleted and must not be reintroduced. Keep playback controllers separate from views. `foofoil/Extensions/` remains Swift/system type extensions, not plugins. Xcode uses a filesystem-synchronized source group, so moves within the source root need no per-file project entries.
 
 Prefer negotiated capabilities and opaque IDs. Never add Hi-Fi identifiers or command parsing to generic host paths. There are no historical users: the P0 support window is closed, so do not retain legacy session/media/navigation/restore or content-probe fallbacks for unreleased P0 protocols, and do not support old-host/new-extension or new-host/old-extension combinations; local development data may be cleared when needed. Device services have no fixed Hi-Fi ID fallback. See `docs/extension-boundary-refactor-review-final.zh-CN.md` for the current cleanup plan, ownership and verification.
 
-When editing the app together with `extension-kit` or `hifi`, open `foofoil.xcworkspace` rather than `foofoil.xcodeproj`. Command-line builds can keep using `foofoil.xcodeproj`.
+When editing the app together with `Packages/ExtensionKit`, `Packages/HiFi`, `Packages/EBook`, or `Packages/Video`, open `foofoil.xcworkspace` rather than `foofoil.xcodeproj`. Command-line builds can keep using `foofoil.xcodeproj`.
 
 ## Core Product Principles
 

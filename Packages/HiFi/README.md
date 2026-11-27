@@ -32,10 +32,10 @@ Compatible Extension API: v1 (`extensionAPI.min` / `max` in `ExtensionManifest.j
 
 ## Local Playback Test
 
-For a real hardware check, keep `hifi` as a sibling of `foofoil` and start the host with its `./run` script, which builds this package and injects `Hi-Fi.foofoilextension` into the Debug app:
+For a real hardware check, run the host's `./run` script from the repository root; it builds `Packages/HiFi` and injects `Hi-Fi.foofoilextension` into the Debug app:
 
 ```sh
-cd ../foofoil
+cd ../..
 ./run
 ```
 
@@ -59,12 +59,12 @@ swift run hifi-hal-probe
 
 `HiFiExtensionRuntime` exports `foofoil_extension_create` and exchanges JSON value messages with the host. It does not import SwiftUI or pass in-process views across the ABI.
 
-## Related Repositories
+## Related Modules
 
-| Repository | Role |
+| Module | Role |
 | --- | --- |
-| [foofoil](https://github.com/foofoil/foofoil) | App that integrates and distributes the audio capability. |
-| [extension-kit](https://github.com/foofoil/extension-kit) | Extension API contracts, ABI header, and Manifest schema |
+| [foofoil](../../README.md) | App that integrates and distributes the audio capability. |
+| [ExtensionKit](../ExtensionKit/README.md) | Extension API contracts, ABI header, and Manifest schema |
 
 ## License
 

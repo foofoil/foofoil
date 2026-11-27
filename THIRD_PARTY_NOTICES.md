@@ -260,3 +260,19 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+## Bundled Capability Modules
+
+### FFmpeg 8.0.1 (Video)
+
+The `Packages/Video` module statically links a reduced FFmpeg 8.0.1 build under
+LGPL-2.1-or-later. No GPL or nonfree components are enabled. See
+[`Packages/Video/ThirdParty/NOTICE.md`](Packages/Video/ThirdParty/NOTICE.md)
+and [`Packages/Video/ThirdParty/FFmpeg/COPYING.LGPLv2.1`](Packages/Video/ThirdParty/FFmpeg/COPYING.LGPLv2.1)
+for the full notice, source location, build configuration, and relink terms.
+
+### Monkey's Audio (Hi-Fi)
+
+The `Packages/HiFi` module vendors the Monkey's Audio decoder under the
+3-clause BSD license. See
+[`Packages/HiFi/Sources/MACLib/ThirdParty/MAC/LICENSE-Monkeys-Audio.txt`](Packages/HiFi/Sources/MACLib/ThirdParty/MAC/LICENSE-Monkeys-Audio.txt).

@@ -1,6 +1,8 @@
 # 扩展边界重构收尾 checklist
 
 > 策略更新（2026-09-29）：本文保留为阶段性技术方案/验收记录。扩展/插件仅是开发手段，最终产品不提供扩展概念；Hi-Fi、EPUB 等能力随浮箔统一交付。本文涉及按需安装、独立插件发布、Registry 或扩展管理入口的旧产品路线不再适用；源码名称、协议边界与当时的验证记录仍可参考，不代表当前实现或发布承诺。当前说明见[开发与交付说明](extension-support.zh-CN.md)。
+>
+> 仓库布局更新（2026-11-27）：相关模块已合并到本仓库 `Packages/`；下文旧路径与“仓库”表述按当时记录保留，当前命令请使用 `Packages/ExtensionKit`、`Packages/HiFi` 等目录。
 
 日期：2026-09-10  
 状态：收尾阶段 0–6 全部完成；全部实机/界面手动项已由用户复验通过，最终验收通过  
@@ -240,10 +242,10 @@
   - 残留标识审查：通用宿主 Swift 源码检索 `audio.hifi`、`app.foofoil.extension.hifi`、`hifi.`、`SACDMTOC` 均无命中（仅 `hifispeaker.2` SF Symbol 与历史 docs 示例）；`ExtensionSupport/Compatibility/` 已不存在。
 - smoke 命令与 fixture（无占位参数）：
   ```sh
-  # hifi 仓库根目录
+  # Packages/HiFi
   swift run hifi-runtime-smoke --self-test \
-    ../extension-kit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json \
-    ../extension-kit/Sources/FoofoilExtensionKit/Fixtures/MediaNavigationRequests.json
+    ../ExtensionKit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json \
+    ../ExtensionKit/Sources/FoofoilExtensionKit/Fixtures/MediaNavigationRequests.json
   ```
 - 跳过项：`CueSheetTests/exclusivePlaybackSurvivesTrackChangesAndPause()`（需要真实 DAC 独占，未注入插件时跳过，不计为通过）。
 - PCM 同采样率连播/CUE 首次播放：排查期间加入的临时诊断日志已移除、未保留噪声；用户复验通过。

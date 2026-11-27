@@ -1,11 +1,13 @@
 # foofoil 扩展职责收敛与主项目减负计划
 
 > 策略更新（2026-09-29）：本文保留为阶段性技术方案/验收记录。扩展/插件仅是开发手段，最终产品不提供扩展概念；Hi-Fi、EPUB 等能力随浮箔统一交付。本文涉及按需安装、独立插件发布、Registry 或扩展管理入口的旧产品路线不再适用；源码名称、协议边界与当时的验证记录仍可参考，不代表当前实现或发布承诺。当前说明见[开发与交付说明](extension-support.zh-CN.md)。
+>
+> 仓库布局更新（2026-11-27）：`extension-kit`、`hifi`、`ebook`、`video` 已合并到本仓库 `Packages/`。本文中的旧路径仅保留作历史记录；当前对应目录为 `Packages/ExtensionKit`、`Packages/HiFi`、`Packages/EBook`、`Packages/Video`。
 
 日期：2026-09-09  
 状态：阶段 0–6 已完成。2026-09-10 用户确认阶段 5 手动实机回归通过。收尾阶段 0–3 完成后，P0 支持窗口已关闭：`ExtensionSupport/Compatibility/` 与 `HiFiLegacyAdapter` 已删除，hifi 不再贡献旧 `hifi.*` 菜单命令，媒体/设备状态统一走公共 `availableActions` 与设备快照。下文 §12.2 的兼容退出条件视为已满足，不再保留未发布 P0 适配；其历史内容仅作记录。
 
-范围：兄弟仓库 `foofoil`、`extension-kit`、`hifi`。本文中的源码路径均相对各自仓库根目录。
+范围：合并前的 `foofoil`、`extension-kit`、`hifi`。本文中的源码路径保留当时的仓库相对路径；当前布局见文首更新说明。
 
 ## 1. 问题与目标
 
@@ -20,8 +22,8 @@
 | foofoil/foofoil | 25,452 |
 | 其中 AppState | 5,610 |
 | 其中 ExtensionKit | 3,783 |
-| extension-kit/Sources | 1,453 |
-| hifi/Sources | 5,534 |
+| Packages/ExtensionKit/Sources | 1,453 |
+| Packages/HiFi/Sources | 5,534 |
 
 这些数值只描述源码规模，不能推导安装包、启动时间或内存开销；本轮不承诺性能收益。
 
@@ -254,13 +256,13 @@ xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platfor
 - 通用关闭可重复调用；关闭成功后运行时记录已移除。释放失败会返回错误并保留可重试记录，不再先删除记录后忽略 stop 错误。宿主关闭失败目前仍记录日志，自动重试和向上抛错不在本批范围。
 - 正常恢复保持暂停，不获取输出设备；正在播放的会话拒绝恢复。旧曲目消失时不套用其位置；合法位置按新曲目长度及 DSD 定位粒度限制。损坏的历史位置由宿主省略，在线非法消息仍拒绝。
 
-完整协议说明在兄弟仓库 `extension-kit/docs/session-lifecycle-v1.zh-CN.md`。`stateReference` 的含义保留；本版只传通用曲目 ID 和位置，不定义私有恢复 blob。
+完整协议说明在 `Packages/ExtensionKit/docs/session-lifecycle-v1.zh-CN.md`。`stateReference` 的含义保留；本版只传通用曲目 ID 和位置，不定义私有恢复 blob。
 
 ### 验证与兼容范围
 
 - extension-kit `swift test`：13 项测试通过，覆盖共享 fixture、版本/能力状态、非法参数、未知字段及未知操作。
 - hifi `swift test`：36 项测试通过。
-- hifi `swift run hifi-runtime-smoke --self-test ../extension-kit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json`：使用同一 fixture 经真实 C ABI 验证新协议，同时执行旧导航/定位命令；覆盖恢复位置、缺失曲目、时长限制、非法消息拒绝、重复关闭及运行时记录释放。测试不播放合成 DSF。
+- `Packages/HiFi` 执行 `swift run hifi-runtime-smoke --self-test ../ExtensionKit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json`：使用同一 fixture 经真实 C ABI 验证新协议，同时执行旧导航/定位命令；覆盖恢复位置、缺失曲目、时长限制、非法消息拒绝、重复关闭及运行时记录释放。测试不播放合成 DSF。
 - 宿主单元测试：205 项通过、1 项硬件测试跳过、0 项失败；展开参数化测试后为 220 次通过。新增通用 Provider ID、旧插件能力缺失、未知契约版本、新会话 UUID 和损坏历史位置的请求构造回归。
 - 这些测试证明消息格式互通和旧命令继续可用，不等同于所有已发布宿主/插件二进制组合的完整验证。完整版本矩阵仍是阶段 0 的后续事项。
 - `./run` 已成功重建应用和新版 Hi-Fi 插件、签名注入并启动应用。仓库内未找到真实 DSF/DFF 听音文件，本批未执行真实 DAC 回归；合成 fixture 不能替代听音验证。
@@ -276,7 +278,7 @@ xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platfor
 
 ### 已实现
 
-- extension-kit 新增 `media.transport` v1 和 `ui.navigator-actions` v1，分别承载 `MediaPlaybackAction` 与已有 `NavigatorAction`；继续复用 ABI v1 `perform_command`。完整消息说明为兄弟仓库 `extension-kit/docs/media-navigation-v1.zh-CN.md`。
+- extension-kit 新增 `media.transport` v1 和 `ui.navigator-actions` v1，分别承载 `MediaPlaybackAction` 与已有 `NavigatorAction`；继续复用 ABI v1 `perform_command`。完整消息说明为 `Packages/ExtensionKit/docs/media-navigation-v1.zh-CN.md`。
 - 媒体动作覆盖 play、pause、refresh、previous、next、seek、selectDevice。宿主界面直接使用公共动作，Provider 按能力发送新消息；旧 Hi-Fi 在适配层编码为原命令。无能力的新协议不试发，实际新协议调用失败不自动重放旧命令。
 - AppState 的执行流程按动作识别暂停、起播、设备切换和状态检查点，不再解析 hifi.play/pause/status/device 字符串。旧菜单贡献的私有命令只在兼容入口翻译；其他扩展的自定义命令保留原通道。保持现有代次检查、五秒状态保存节流和独占交接顺序。
 - hifi 接收通用导航动作，并根据 Runtime 真实曲目列表再次验证项目、贡献、移动目标和操作权限。宿主不再为新插件改写导航快照后发送 Hi-Fi 命令；SACD 队列仍禁止排序，Hi-Fi 仍不支持删除曲目。
@@ -320,7 +322,7 @@ xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platfor
 | `AppState+HiFiLegacyQueue` | 不透明 ID 盖章与 1:1 资源对应；不再解析 `file:` / 曲目序号 | 扩展解释私有 ID | 列表选择 → 通用 activate | 容器切曲、文件队列裁剪后资源仍指向原文件 |
 | `HiFiLegacyAdapter+ContentProbe` | 仅未声明 `content.probe` 的旧 Hi-Fi 读主 TOC | hifi `content.probe` | 打开 `.iso` → 探测 | 普通 ISO 拒绝；SACD 主 TOC 接受 |
 
-配置（允许保留 Hi-Fi 标识）：`hifi/ExtensionManifest.json` 的 `audio.hifi`、安装/偏好中的扩展 ID、`UserDefaults` 键 `app.foofoil.extension.hifi.preferred-pcm-device-uid`（扩展私有）。
+配置（允许保留 Hi-Fi 标识）：`Packages/HiFi/ExtensionManifest.json` 的 `audio.hifi`、安装/偏好中的扩展 ID、`UserDefaults` 键 `app.foofoil.extension.hifi.preferred-pcm-device-uid`（扩展私有）。
 
 文案：本地化键如 “Hi-Fi Playback Failed”“Hi-Fi Output Device”；不作为协议。
 
@@ -368,7 +370,7 @@ xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platfor
 
 ### 12.3 Fixture
 
-共享、可分发，位于 `extension-kit/Sources/FoofoilExtensionKit/Fixtures/`。目录说明：`extension-kit/docs/phase0-baseline-fixtures.zh-CN.md`。
+共享、可分发，位于 `Packages/ExtensionKit/Sources/FoofoilExtensionKit/Fixtures/`。目录说明：`Packages/ExtensionKit/docs/phase0-baseline-fixtures.zh-CN.md`。
 
 | 文件 | 用途 |
 | --- | --- |
@@ -395,14 +397,14 @@ xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platfor
 可重复命令：
 
 ```sh
-# extension-kit
+# Packages/ExtensionKit
 swift test
 
-# hifi
+# Packages/HiFi
 swift test
 swift run hifi-runtime-smoke --self-test \
-  ../extension-kit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json \
-  ../extension-kit/Sources/FoofoilExtensionKit/Fixtures/MediaNavigationRequests.json
+  ../ExtensionKit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json \
+  ../ExtensionKit/Sources/FoofoilExtensionKit/Fixtures/MediaNavigationRequests.json
 
 # foofoil
 xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platform=macOS' -only-testing:foofoilTests
@@ -589,8 +591,8 @@ xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platfor
 | foofoil/foofoil | 25,452 | 25,981 |
 | 其中 AppState 目录 | 5,610 | 5,440 |
 | 宿主扩展支持目录（原 ExtensionKit） | 3,783 | 4,477 |
-| extension-kit/Sources | 1,453 | 1,764 |
-| hifi/Sources | 5,534 | 6,006 |
+| Packages/ExtensionKit/Sources | 1,453 | 1,764 |
+| Packages/HiFi/Sources | 5,534 | 6,006 |
 
 ExtensionSupport 当前：Runtime 1,599 行、Management 1,561 行、Presentation 1,092 行、Compatibility 225 行。AppState 目录数字不包含现位于 Presentation 的队列桥接，不能将移动的行数认作逻辑删除。
 

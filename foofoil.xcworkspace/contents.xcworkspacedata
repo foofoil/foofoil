@@ -5,15 +5,15 @@
       location = "group:foofoil.xcodeproj">
    </FileRef>
    <FileRef
-      location = "group:../extension-kit">
+      location = "group:Packages/ExtensionKit">
    </FileRef>
    <FileRef
-      location = "group:../hifi">
+      location = "group:Packages/HiFi">
    </FileRef>
    <FileRef
-      location = "group:../ebook">
+      location = "group:Packages/EBook">
    </FileRef>
    <FileRef
-      location = "group:../video">
+      location = "group:Packages/Video">
    </FileRef>
 </Workspace>

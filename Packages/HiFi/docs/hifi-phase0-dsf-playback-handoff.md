@@ -6,24 +6,25 @@
 >
 > 当前里程碑：Stereo DSD64 DSF/DFF 已在 SMSL DAC 上实机播放；DSD128 / DSD256 均已通过真实硬件验证。5.0 DFF 在立体声 DAC 上走 MLFT/MRGT 折混，设备提供 5/6/8 声道 DoP 格式时按 5.0/5.1/7.1 输出；因暂无环绕 DoP DAC，多声道输出实测暂缓。未压缩立体声 SACD ISO（3-in-14）已在同一 SMSL 上实机播放：CUE 式曲目列表、Seek、DoP 出声及自然续播均已确认。DAC 释放屏障与切歌播放意图已提交；设备断开/占用/Hog/睡眠恢复也已通过真实 DAC 手测。DST / SACD 多声道仍未做。
 >
-> 用途：新会话中的 agent 应先读本文，再读 `foofoil_DSF_DFF_SACD_ISO_Technical_Plan_v2.md`，保留三个仓库的现有改动并从第 9 节继续。
+> 用途：新会话中的 agent 应先读本文，再读 `foofoil_DSF_DFF_SACD_ISO_Technical_Plan_v2.md`，保留各模块的现有改动并从第 9 节继续。
 
 ## 1. 仓库与模块边界
 
-项目已经拆为三个兄弟仓库：
+2026-11-27 起，原先并列的模块仓库已合并到 foofoil 仓库的 `Packages/` 下：
 
 ```text
 foofoil/
-├── foofoil/         # macOS 宿主、窗口、统一列表、音频 UI、Provider 路由
-├── extension-kit/   # 独立 Swift Package；Manifest、Session、capability、C ABI
-└── hifi/            # 独立 Hi-Fi 扩展；DSD parser、DoP、HAL、Runtime
+├── foofoil/            # macOS 宿主、窗口、统一列表、音频 UI、Provider 路由
+└── Packages/
+    ├── ExtensionKit/   # Manifest、Session、capability、C ABI
+    └── HiFi/           # Hi-Fi 模块；DSD parser、DoP、HAL、Runtime
 ```
 
 边界必须保持：
 
 - `foofoil` 拥有与格式无关的交互：封面、metadata 呈现、播放控件、外部文件列表、拖拽排序、当前项图标、键盘/系统媒体键、循环/随机、自动续播和窗口状态；
-- `extension-kit` 只定义稳定、可序列化、跨仓库的通用契约；`ExtensionContentFamily.audio` 用来把扩展格式归入宿主音频家族；
-- `hifi` 拥有高级格式解析、DSD 数据、DoP、HAL、设备探测和独占资源，不依赖宿主的 `FileListState`、SwiftUI View 或 `NSImage`；
+- `Packages/ExtensionKit` 只定义稳定、可序列化、跨模块的通用契约；`ExtensionContentFamily.audio` 用来把扩展格式归入宿主音频家族；
+- `Packages/HiFi` 拥有高级格式解析、DSD 数据、DoP、HAL、设备探测和独占资源，不依赖宿主的 `FileListState`、SwiftUI View 或 `NSImage`；
 - 外部 MP3/FLAC/DSF 等文件共享一个宿主 `FileListState(kind: .audio)`。选择当前项后才由 Provider Resolver 决定 Built-in Audio 或 `audio.hifi`；
 - SACD ISO Track 没有独立 URL。第一版把同一 ISO 的曲目投影成宿主 `FileListState`（与 CUE 相同的专辑标题、曲目行、时长 badge、不可重排），插件 Session 持有 TOC/出流真相；不得生成临时 DSF 或自绘第二套列表。
 
@@ -235,7 +236,7 @@ SACD ISO 补充：
 - `foofoil/AppState/AppState+ContentOpen.swift`：异步 provider 路由、原生媒体切换与状态命令；
 - `foofoil/AppState/AppState.swift`：Session retain/release 及 close 屏障；
 - `foofoil/App/AppDelegate+Actions.swift`：打开面板包含扩展音频类型；
-- `run`：构建宿主、构建并注入兄弟仓库 Hi-Fi Debug bundle、重签并启动。
+- `run`：构建宿主、构建并注入 `Packages/HiFi` 的 Debug bundle、重签并启动。
 
 ## 8. 实时线程约束
 
@@ -326,21 +327,21 @@ DSD64 / DSD128 / DSD256 以及本轮历史 Session 恢复已通过实测。DSD �
 
 ```sh
 # Hi-Fi 核心测试
-cd hifi
+cd Packages/HiFi
 SWIFTPM_MODULECACHE_OVERRIDE=/tmp/foofoil-hifi-swiftpm-cache \
 CLANG_MODULE_CACHE_PATH=/tmp/foofoil-hifi-clang-cache \
 swift test --disable-sandbox --scratch-path /tmp/foofoil-hifi-build
 
 # ExtensionKit 测试
-cd ../extension-kit
+cd ../ExtensionKit
 swift test --disable-sandbox --scratch-path /tmp/foofoil-extension-kit-build
 
-# 构建、注入插件并启动宿主
-cd ../foofoil
+# 构建、注入模块并启动宿主
+cd ../..
 ./run
 
 # 用户终端中的文件/设备诊断
-cd ../hifi
+cd Packages/HiFi
 swift run hifi-inspect --devices
 swift run hifi-inspect --stream-check '/path/to/file.dsf'
 swift run hifi-inspect --stream-check '/path/to/file.dff'

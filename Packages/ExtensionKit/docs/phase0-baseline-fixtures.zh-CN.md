@@ -26,12 +26,12 @@ smoke 只对 `snapshot` 走真实 ABI，不调用 `prepareExclusivePCM`，不替
 ## 验证
 
 ```sh
-# extension-kit
+# Packages/ExtensionKit
 swift test
 
-# hifi
+# Packages/HiFi
 swift test
 swift run hifi-runtime-smoke --self-test \
-  ../extension-kit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json \
-  ../extension-kit/Sources/FoofoilExtensionKit/Fixtures/MediaNavigationRequests.json
+  ../ExtensionKit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json \
+  ../ExtensionKit/Sources/FoofoilExtensionKit/Fixtures/MediaNavigationRequests.json
 ```

@@ -2,9 +2,9 @@
 
 Internal development-module contracts for [foofoil](https://github.com/foofoil/foofoil).
 
-This package is the independent source for Extension API v1: the stable C ABI, Manifest schema, capability identifiers, content-request and session value types, navigator and media contracts, compatibility fixtures, and contract tests. It supports independently developed foofoil modules and their integration tests. Extension/plugin terminology describes development internals only; the final product exposes these capabilities as part of foofoil, without separate plugin installation or updates.
+This package is the internal source for Extension API v1: the stable C ABI, Manifest schema, capability identifiers, content-request and session value types, navigator and media contracts, compatibility fixtures, and contract tests. It supports the app's capability modules and their integration tests. Extension/plugin terminology describes development internals only; the final product exposes these capabilities as part of foofoil, without separate plugin installation or updates.
 
-Loading and UI stay in foofoil. Hi-Fi and EPUB implementations live in sibling repositories and are embedded by the app build/distribution scripts. Existing installation and Registry code is legacy infrastructure, not the product distribution strategy.
+Loading and UI stay in the host app. Hi-Fi, EPUB, and Video implementations live under `Packages/` in the same repository and are embedded by the app build/distribution scripts. Existing installation and Registry code is legacy infrastructure, not the product distribution strategy.
 
 ## What This Package Provides
 
@@ -22,11 +22,11 @@ The current internal binary boundary is the C ABI and JSON value messages. Swift
 
 ## Use in a Development Module
 
-Add the package as a sibling checkout:
+Add the package from the repository's `Packages/` directory (for example, from `Packages/HiFi`):
 
 ```swift
 dependencies: [
-    .package(path: "../extension-kit")
+    .package(path: "../ExtensionKit")
 ]
 ```
 
@@ -52,12 +52,14 @@ See the Manifest schema at `Sources/FoofoilExtensionKit/Resources/ExtensionManif
 swift test
 ```
 
-## Related Repositories
+## Related Modules
 
-| Repository | Role |
+| Module | Role |
 | --- | --- |
-| [foofoil](https://github.com/foofoil/foofoil) | macOS app, module integration, and distribution |
-| [hifi](https://github.com/foofoil/hifi) | Hi-Fi audio module for foofoil |
+| [foofoil](../../README.md) | macOS app, module integration, and distribution |
+| [Hi-Fi](../HiFi/README.md) | Hi-Fi audio module for foofoil |
+| [EBook](../EBook/README.md) | EPUB parsing and reading |
+| [Video](../Video/README.md) | Enhanced video playback |
 
 [简体中文](README.zh-CN.md)
 

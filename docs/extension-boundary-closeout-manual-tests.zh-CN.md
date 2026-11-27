@@ -13,7 +13,7 @@
    ```sh
    cd foofoil && ./run
    ```
-2. 记录：foofoil / extension-kit / hifi 提交号、macOS 版本、DAC 型号或 UID（`cd ../hifi && swift run hifi-inspect --devices`）。
+2. 记录：foofoil 提交号、macOS 版本、DAC 型号或 UID（`cd Packages/HiFi && swift run hifi-inspect --devices`）。
 3. 准备文件：DSF/DFF、SACD ISO（如有）、普通 PCM（wav/flac/mp3，44.1/48/96 kHz）。
 4. 可选观察日志：
    ```sh

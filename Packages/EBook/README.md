@@ -2,9 +2,9 @@
 
 EPUB reading module for [foofoil](https://github.com/foofoil/foofoil). Requires foofoil; it is not a standalone reader.
 
-EPUB is delivered as a foofoil capability, with no separate user installation or updates. Extension/plugin bundles are only a development and integration mechanism. The sibling app’s `./run` and `./package-dmg` scripts embed this module for local testing and distribution.
+EPUB is delivered as a foofoil capability, with no separate user installation or updates. Extension/plugin bundles are only a development and integration mechanism. The host app’s `./run` and `./package-dmg` scripts embed this module from `Packages/EBook` for local testing and distribution.
 
-This repository owns EPUB container/package/navigation parsing, chapter HTML rendering, and the `foofoil_extension_create` runtime that speaks JSON value messages. The table of contents is projected through foofoil's shared navigator panel; there is no private sidebar or custom host view.
+This module owns EPUB container/package/navigation parsing, chapter HTML rendering, and the `foofoil_extension_create` runtime that speaks JSON value messages. The table of contents is projected through foofoil's shared navigator panel; there is no private sidebar or custom host view.
 
 ## Scope (v1)
 

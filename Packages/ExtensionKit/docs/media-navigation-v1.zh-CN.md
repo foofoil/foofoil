@@ -68,12 +68,12 @@
 共享 fixture 为 `Sources/FoofoilExtensionKit/Fixtures/MediaNavigationRequests.json`。契约测试验证编码与解码，hifi smoke 测试使用同一文件经真实 C ABI 执行：
 
 ```sh
-# extension-kit 仓库
+# Packages/ExtensionKit
 swift test
 
-# hifi 仓库
+# Packages/HiFi
 swift test
-swift run hifi-runtime-smoke --self-test ../extension-kit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json ../extension-kit/Sources/FoofoilExtensionKit/Fixtures/MediaNavigationRequests.json
+swift run hifi-runtime-smoke --self-test ../ExtensionKit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json ../ExtensionKit/Sources/FoofoilExtensionKit/Fixtures/MediaNavigationRequests.json
 ```
 
 smoke 覆盖暂停、定位、刷新、前后切曲、激活、排序、非法参数和导航动作拒绝，并保留关闭/恢复的兼容回归。合成 DSF 不用于起播或真实设备切换；play 和 selectDevice 的硬件行为仍需真实 DAC 回归。

@@ -43,12 +43,12 @@ v1 只覆盖现有媒体快照可表达的曲目与位置。`ContentSession.stat
 ## 验证命令
 
 ```sh
-# extension-kit 仓库
+# Packages/ExtensionKit
 swift test
 
-# hifi 仓库，要求兄弟 extension-kit 检出包含本契约
+# Packages/HiFi
 swift test
-swift run hifi-runtime-smoke --self-test ../extension-kit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json
+swift run hifi-runtime-smoke --self-test ../ExtensionKit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json
 ```
 
 smoke 测试使用合成 DSF 元数据，检查旧命令兼容、新协议恢复、错误拒绝、关闭幂等与记录释放；不播放合成音频，不代替真实 DAC 回归。

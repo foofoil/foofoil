@@ -32,10 +32,10 @@ Hi-Fi 是 foofoil 的内部开发模块，不能作为独立播放器运行，�
 
 ## 本地播放验收
 
-要在真实设备上试播，请把 `hifi` 放在 `foofoil` 的兄弟目录，并用宿主仓库的 `./run` 启动：它会构建本包，并把 `Hi-Fi.foofoilextension` 注入 Debug 应用。
+要在真实设备上试播，请从仓库根目录运行宿主的 `./run`：它会构建 `Packages/HiFi`，并把 `Hi-Fi.foofoilextension` 注入 Debug 应用。
 
 ```sh
-cd ../foofoil
+cd ../..
 ./run
 ```
 
@@ -59,12 +59,12 @@ swift run hifi-hal-probe
 
 `HiFiExtensionRuntime` 导出 `foofoil_extension_create`，与宿主交换 JSON 值消息，不导入 SwiftUI，也不把进程内 View 传入 ABI。
 
-## 相关仓库
+## 相关模块
 
-| 仓库 | 职责 |
+| 模块 | 职责 |
 | --- | --- |
-| [foofoil](https://github.com/foofoil/foofoil) | 整合并统一交付音频能力的应用 |
-| [extension-kit](https://github.com/foofoil/extension-kit) | 扩展 API 契约、ABI 头文件和 Manifest Schema |
+| [foofoil](../../README.zh-CN.md) | 整合并统一交付音频能力的应用 |
+| [ExtensionKit](../ExtensionKit/README.zh-CN.md) | 扩展 API 契约、ABI 头文件和 Manifest Schema |
 
 ## 许可证
 

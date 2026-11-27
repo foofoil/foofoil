@@ -189,15 +189,18 @@ ZIP、TAR 及其常见压缩变体、7z、RAR，以及漫画包、APK、JAR、KR
 - macOS 26.5 或更高版本。
 - 从源码构建需要支持项目所配置 macOS SDK 的 Xcode。
 
-完整开发环境使用以下兄弟仓库布局：
+应用及其内部模块位于同一个仓库：
 
 ```text
-workspace/
-├── foofoil/        # 应用、窗口、内容展示、搜索与 CLI
-├── extension-kit/  # 必需的内部模块契约 Swift 包
-├── hifi/           # Hi-Fi 音频
-├── ebook/          # EPUB 解析与阅读
-└── video/          # 增强视频播放
+foofoil/
+├── foofoil/           # 应用、窗口、内容展示、搜索与 CLI
+├── Packages/
+│   ├── ExtensionKit/  # 必需的内部模块契约 Swift 包
+│   ├── HiFi/          # Hi-Fi 音频
+│   ├── EBook/         # EPUB 解析与阅读
+│   └── Video/         # 增强视频播放
+├── foofoil.xcodeproj
+└── foofoil.xcworkspace
 ```
 
 在 `foofoil` 仓库运行：
@@ -208,9 +211,9 @@ workspace/
 
 脚本构建 Debug 应用，构建并嵌入 Hi-Fi、EPUB 和视频模块，然后重启浮箔。缺少某个模块的 `build-plugin` 时会跳过，相应能力不可用。视频默认包含，可用 `./run --without-video` 排除。
 
-包含视频模块时，首次构建需要联网从 `ffmpeg.org` 下载固定版本的 FFmpeg 源码（约 11 MB），校验 SHA-256 后在本机编译，无需手动安装 FFmpeg。下载和编译产物缓存在 `video/.build/`，后续构建复用缓存；损坏的下载缓存会自动重新下载。首次运行或打包可能因此耗时较长，下载失败后可直接重试原命令。
+包含视频模块时，首次构建需要联网从 `ffmpeg.org` 下载固定版本的 FFmpeg 源码（约 11 MB），校验 SHA-256 后在本机编译，无需手动安装 FFmpeg。下载和编译产物缓存在 `Packages/Video/.build/`，后续构建复用缓存；损坏的下载缓存会自动重新下载。首次运行或打包可能因此耗时较长，下载失败后可直接重试原命令。
 
-使用 Xcode 联合编辑时打开 `foofoil.xcworkspace`，选择 `foofoil` Scheme 和 **My Mac**，按需配置开发签名团队。Xcode ⌘R 不会构建并嵌入相邻模块；验证完整内容体验请使用 `./run`。
+使用 Xcode 联合编辑时打开 `foofoil.xcworkspace`，选择 `foofoil` Scheme 和 **My Mac**，按需配置开发签名团队。Xcode ⌘R 不会构建并嵌入 `Packages/` 下的模块；验证完整内容体验请使用 `./run`。
 
 仅构建主应用：
 
@@ -235,7 +238,7 @@ xcodebuild test \
 
 Hi-Fi、EPUB 和视频随应用统一交付，用户无需安装、启用或更新插件。源码中的扩展／插件是内部开发机制；相关 ABI、Manifest 和保留的管理代码见[模块开发说明](docs/extension-support.zh-CN.md)。
 
-`./package-dmg` 构建 Release 应用、嵌入上述模块并生成 DMG，完整默认打包需要上述五个仓库。`--without-video` 可排除视频模块；`--no-sign` 生成本地验证包，`--sign` 使用 Developer ID 签名与公证，需要配置相应凭据，打包成功后，交互式终端会询问是否将应用安装到 `/Applications`。签名配置见脚本头部。
+`./package-dmg` 构建 Release 应用、嵌入 `Packages/` 下的模块并生成 DMG。`--without-video` 可排除视频模块；`--no-sign` 生成本地验证包，`--sign` 使用 Developer ID 签名与公证，需要配置相应凭据。打包成功后，交互式终端会询问是否将应用安装到 `/Applications`；当前账户无写入权限时会请求管理员授权。签名配置见脚本头部。
 
 ## 轻量化设计与贡献
 

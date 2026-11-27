@@ -2,7 +2,7 @@
 
 > 策略更新（2026-09-29）：本文保留为阶段性技术方案/验收记录。扩展/插件仅是开发手段，最终产品不提供扩展概念；Hi-Fi、EPUB 等能力随浮箔统一交付。本文涉及按需安装、独立插件发布、Registry 或扩展管理入口的旧产品路线不再适用；源码名称、协议边界与当时的验证记录仍可参考，不代表当前实现或发布承诺。当前说明见[开发与交付说明](../README.md)。
 
-本文以 2026-09-13 的相邻 `extension-kit`、`hifi`、`foofoil` 工作树为实施基线；`ebook` 当前只有本方案，尚无 Swift 包或运行时实现。下文路径除特别说明外均相对于对应项目根目录。实施时遵守各项目 `AGENTS.md`；本文中的边界值是 v1 产品限制，修改时须同步实现、测试与 README。
+本文以 2026-09-13 的相邻 `extension-kit`、`hifi`、`foofoil` 工作树为实施基线；`ebook` 当时只有本方案，尚无 Swift 包或运行时实现。2026-11-27 这些模块已合并到 foofoil 仓库的 `Packages/`，下文涉及路径与命令时以当前单仓库布局为准。实施时遵守各目录的 `AGENTS.md`；本文中的边界值是 v1 产品限制，修改时须同步实现、测试与 README。
 
 ## 0. 目标与已确认决策
 
@@ -14,13 +14,13 @@
 
 已确认决策：
 
-- **富文本方案**：新增 `document` presentation 契约，宿主用 `WKWebView` 渲染章节 HTML；跨 `extension-kit`、`ebook`、`foofoil` 三个仓库实施。
+- **富文本方案**：新增 `document` presentation 契约，宿主用 `WKWebView` 渲染章节 HTML；跨 `Packages/ExtensionKit`、`Packages/EBook` 与宿主实施。
 - **命名**：
   - Extension ID：`app.foofoil.extension.ebook`
   - Provider ID：`ebook.epub`
   - Bundle：`EBook.foofoilextension`
   - 模块：`EBookExtensionCore` / `EBookExtensionRuntime`
-- **调试注入**：`foofoil/run` 同时构建并注入 `../hifi` 与 `../ebook` 的开发插件。
+- **调试注入**：`foofoil/run` 同时构建并注入 `Packages/HiFi` 与 `Packages/EBook` 的开发模块。
 - **单文件约束**：扩展一个会话只接受一个 `.epub`；同一箔内再次打开会按宿主既有行为关闭旧会话并替换。
 - **侧边目录**：复用现有 `ui.navigator` 树形面板与 `ui.navigator.action`，不新增扩展私有侧栏。
 - **阅读可达性**：书籍目录之外，提供按 spine 顺序排列的“全部章节”分组，确保每个支持的正文项都可访问；目录动作支持章节内锚点。
@@ -33,7 +33,7 @@
 - 宿主已有通用 `NavigatorPanelView`：支持 `ui.navigator` 的 `flat` / `outline` 两种样式、`parentID` 层级、`isCurrent` 选中态，并通过 `ui.navigator.action` 把行点击路由回扩展。
 - 宿主 `ExtensionStateStore` 对会话 payload 有 **1 MiB** 上限，且每次目录动作都会重新持久化整个 `ContentSession`。因此章节 HTML **不能**放进 presentation，只能放本地文件 URL。
 - `hifi` 是扩展的参考实现：独立 Swift 包、`ExtensionManifest.json`、`Bundle/Info.plist`、`build-plugin`、`foofoil_extension_create`，且不依赖 `extension-kit`（自己用 `JSONSerialization` 拼 JSON）。
-- 宿主默认扩展会话来自 DEBUG 的 `./run` 注入；`foofoil/run` 当前只处理 `../hifi`。
+- 宿主默认扩展会话来自 DEBUG 的 `./run` 注入；合并前 `foofoil/run` 只处理 `Packages/HiFi`，合并后同时处理 `Packages/EBook` 与 `Packages/Video`。
 - `NavigatorItem` 的 `isEnabled` / `isCurrent` 都是必填 JSON 字段；Swift 初始化器默认值不等于 Codable 缺省值。
 - 宿主恢复路径是 `open(savedSession.request)` → `restorePlayback(from:in:)`，后者向 fresh session 发送 `session.lifecycle`。参照 `foofoil/AppState/AppState+ContentOpen.swift`、`foofoil/ExtensionSupport/Runtime/ExtensionSessionLifecycle.swift`。
 - 宿主在后台执行扩展调用，`ExtensionLoader` 用每个 runtime 的 `callLock` 串行化 C ABI；同一 runtime 服务多个窗口。目录动作的宿主异步入口还需按第 4.3 节保证提交顺序和过期回包隔离。
@@ -89,14 +89,14 @@ JSON 形态（`ContentSession.presentation`）：
 - 加入含 Unicode／百分号编码 fragment 的 URL round-trip；非法 URL 的拒绝由宿主策略测试覆盖。
 - 加入完整 document 会话 fixture，含两级目录、显式布尔值，执行 `ContentSession` 解码和现有 navigator validator。新增“缺失 `isCurrent` 解码失败”的用例，防止 JSON 手写端再次漏字段。
 
-验证：`cd extension-kit && swift test`。
+验证：`cd Packages/ExtensionKit && swift test`。
 
 ## 3. ebook（新 Swift 包）
 
 ### 3.1 目录结构
 
 ```text
-ebook/
+Packages/EBook/
 ├── Package.swift
 ├── ExtensionManifest.json
 ├── Bundle/Info.plist
@@ -134,7 +134,7 @@ ebook/
   - `.executable(name: "ebook-inspect", targets: ["EBookInspect"])`
   - `.executable(name: "ebook-runtime-smoke", targets: ["EBookRuntimeSmoke"])`
 - 目标：Core、Runtime、两个可执行、`EBookExtensionCoreTests`。Core 依赖 Foundation / Compression，Runtime 依赖 Core；Runtime 的 C ABI 导出和 JSON 编解码沿用 hifi 模式，不引入宿主 Swift 类型。
-- 声明第一方本地 package 依赖 `.package(path: "../extension-kit")`，仅供 smoke／契约测试依赖 `FoofoilExtensionKit` 和 `FoofoilExtensionABI`；生产 Core/Runtime 不依赖它。smoke 经真实 ABI 获取字节，再使用 kit 解码和校验，不以字典字段检查替代契约验证。`build-plugin` 只构建 `EBookExtensionRuntime` product，交付的 dylib 不得链接 kit；该项在脚本与 `otool -L` 检查中验证。
+- 声明第一方本地 package 依赖 `.package(path: "../ExtensionKit")`，仅供 smoke／契约测试依赖 `FoofoilExtensionKit` 和 `FoofoilExtensionABI`；生产 Core/Runtime 不依赖它。smoke 经真实 ABI 获取字节，再使用 kit 解码和校验，不以字典字段检查替代契约验证。`build-plugin` 只构建 `EBookExtensionRuntime` product，交付的 dylib 不得链接 kit；该项在脚本与 `otool -L` 检查中验证。
 - 不引入任何第三方依赖；ZIP/HTML 使用系统框架（`Foundation`、`Compression`）。
 
 ### 3.3 `ExtensionManifest.json`
@@ -341,7 +341,8 @@ ZIP 解压以实际输出增量计数并提前停止；CRC、长度、引用循�
 验证：
 
 ```sh
-cd ebook
+# 从 foofoil 仓库根目录开始
+cd Packages/EBook
 swift test
 swift run ebook-runtime-smoke --self-test
 ```
@@ -416,7 +417,7 @@ swift run ebook-runtime-smoke --self-test
 
 修改：`foofoil.xcworkspace/contents.xcworkspacedata`
 
-- 追加 `../ebook` FileRef，便于三仓库联编调试。
+- 追加 `Packages/EBook` FileRef，便于宿主与模块联编调试。
 
 ### 4.7 测试与打开入口
 
@@ -443,15 +444,15 @@ swift run ebook-runtime-smoke --self-test
 ## 6. 验证清单
 
 ```sh
-# 从包含 extension-kit / ebook / foofoil 的父目录开始
+# 从 foofoil 仓库根目录开始
 # 1. 契约
-cd extension-kit && swift test
+cd Packages/ExtensionKit && swift test
 
 # 2. 扩展
-cd ../ebook && swift test && swift run ebook-runtime-smoke --self-test
+cd ../EBook && swift test && swift run ebook-runtime-smoke --self-test
 
 # 3. 宿主
-cd ../foofoil && xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platform=macOS'
+cd ../.. && xcodebuild test -project foofoil.xcodeproj -scheme foofoil -destination 'platform=macOS'
 
 # 4. 运行与手动验证
 ./run
@@ -492,7 +493,7 @@ cd ../foofoil && xcodebuild test -project foofoil.xcodeproj -scheme foofoil -des
 
 ## 9. 实施依据
 
-- 项目实际契约：`extension-kit/Sources/FoofoilExtensionKit/ContentSession.swift`、`NavigatorContribution.swift`、`NavigatorActionRequest.swift`、`SessionLifecycle.swift`。
+- 项目实际契约：`Packages/ExtensionKit/Sources/FoofoilExtensionKit/ContentSession.swift`、`NavigatorContribution.swift`、`NavigatorActionRequest.swift`、`SessionLifecycle.swift`。
 - 宿主实际行为：`foofoil/foofoil/ExtensionSupport/Runtime/ExtensionLoader.swift`、`InProcessContentProvider.swift`、`ExtensionSessionLifecycle.swift`、`ExtensionStateStore.swift`，以及 `foofoil/foofoil/AppState/AppState+ContentOpen.swift`。
 - [Apple COMPRESSION_ZLIB](https://developer.apple.com/documentation/compression/compression_zlib)：Compression 的输出为 raw DEFLATE；仍须自行校验 ZIP 元数据与 CRC。
 - [Apple WKContentRuleList](https://developer.apple.com/documentation/webkit/wkcontentrulelist) 与 [JavaScript 开关](https://developer.apple.com/documentation/webkit/wkwebpagepreferences/allowscontentjavascript)：资源规则与脚本开关分别实施。

@@ -7,7 +7,7 @@ let package = Package(
     name: "video", platforms: [.macOS(.v15)],
     products: [.library(name: "VideoExtensionRuntime", type: .dynamic, targets: ["VideoExtensionRuntime"]),
                .executable(name: "video-inspect", targets: ["VideoInspect"])],
-    dependencies: [.package(path: "../extension-kit")],
+    dependencies: [.package(path: "../ExtensionKit")],
     targets: [
         .target(name: "VideoDecoder", publicHeadersPath: "include",
                 cSettings: [.unsafeFlags(["-I" + prefix + "/include", "-fobjc-arc"])],
@@ -17,7 +17,7 @@ let package = Package(
                     .linkedFramework("AVFoundation"), .linkedFramework("AudioToolbox"),
                     .linkedFramework("VideoToolbox"), .linkedFramework("CoreMedia"),
                     .linkedFramework("CoreVideo"), .linkedFramework("IOSurface"), .linkedFramework("AppKit")]),
-        .target(name: "VideoExtensionRuntime", dependencies: ["VideoDecoder", .product(name: "FoofoilExtensionKit", package: "extension-kit"), .product(name: "FoofoilExtensionABI", package: "extension-kit")]),
+        .target(name: "VideoExtensionRuntime", dependencies: ["VideoDecoder", .product(name: "FoofoilExtensionKit", package: "ExtensionKit"), .product(name: "FoofoilExtensionABI", package: "ExtensionKit")]),
         .executableTarget(name: "VideoInspect", dependencies: ["VideoExtensionRuntime", "VideoDecoder"]),
         .testTarget(name: "VideoExtensionTests", dependencies: ["VideoExtensionRuntime", "VideoDecoder"], resources: [.copy("Fixtures")])
     ])

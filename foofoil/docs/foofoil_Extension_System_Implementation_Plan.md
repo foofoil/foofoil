@@ -1,6 +1,8 @@
 # foofoil（浮箔）扩展系统实施方案
 
 > 策略更新（2026-09-29）：本文保留为阶段性技术方案/验收记录。扩展/插件仅是开发手段，最终产品不提供扩展概念；Hi-Fi、EPUB 等能力随浮箔统一交付。本文涉及按需安装、独立插件发布、Registry 或扩展管理入口的旧产品路线不再适用；源码名称、协议边界与当时的验证记录仍可参考，不代表当前实现或发布承诺。当前说明见[开发与交付说明](../../docs/extension-support.zh-CN.md)。
+>
+> 仓库布局更新（2026-11-27）：相关模块已合并到本仓库 `Packages/`，第 5、6 节的独立仓库、独立版本与独立 Release 设想不再适用；当前布局见[开发与交付说明](../../docs/extension-support.zh-CN.md)。
 
 ## 1. 目标
 
@@ -234,7 +236,7 @@ README 随后给出 foofoil 的安装入口、扩展内安装方式和兼容版�
 
 公开复用契约、Manifest Schema、ABI 头文件和扩展构建支持位于 `foofoil/extension-kit`。
 宿主 Loader、Installer、Registry 客户端及 UI 继续由 `foofoil/foofoil` 持有，并通过本地 Swift
-package 依赖 `../extension-kit`。正式能力在首个公开 Release 前必须位于对应短名仓库，避免继续
+package 依赖 `Packages/ExtensionKit`。正式能力在首个公开 Release 前必须位于对应短名仓库，避免继续
 形成与 Core 同步发版的事实耦合。`foofoil/hifi` 已从原 `hifi-ext` 功能分支抽出。
 
 各扩展独立维护：

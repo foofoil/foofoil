@@ -8,7 +8,7 @@ struct DeviceServiceMessageTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("extension-kit/Sources/FoofoilExtensionKit/Fixtures/AudioDeviceServiceMessages.json")
+            .appendingPathComponent("ExtensionKit/Sources/FoofoilExtensionKit/Fixtures/AudioDeviceServiceMessages.json")
         return try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
     }
 

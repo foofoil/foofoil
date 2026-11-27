@@ -1,8 +1,8 @@
 # Video
 
-An independently versioned built-in video capability for foofoil. The host controls inclusion at build time; users do not install or enable it.
+A built-in video capability bundled with foofoil. The host controls inclusion at build time; users do not install or enable it. The module lives at `Packages/Video` in the foofoil repository.
 
-Run `./scripts/build-ffmpeg`, `swift test`, then `./build-plugin /tmp/video-bundles - release`.
+Run `./scripts/build-ffmpeg`, `swift test`, then `./build-plugin /tmp/video-bundles - release` from this directory.
 The host's `./run` and `./package-dmg` accept `--with-video` (default) and `--without-video`.
 
 Supports local MKV/AVI with H.264, HEVC, MPEG-4 ASP/Xvid; AAC, AC3, EAC3, DTS/DTS-HD MA, TrueHD and MP3.

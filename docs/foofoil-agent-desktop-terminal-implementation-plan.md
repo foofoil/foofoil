@@ -5,7 +5,7 @@
 
 ## 1. 执行约定
 
-后续 Agent 开始前读取当前用户要求、适用的 `AGENTS.md`、产品方案和本文；涉及兄弟仓库时再读取该仓库的指令。代码入口是当前源码中的参考位置，不要求机械照搬为新文件或新抽象。
+后续 Agent 开始前读取当前用户要求、适用的 `AGENTS.md`、产品方案和本文；涉及 `Packages/` 模块时再读取对应目录的指令。代码入口是当前源码中的参考位置，不要求机械照搬为新文件或新抽象。
 
 - 按步骤依赖执行。一次推进一个可验证的交付单元，不跨越未通过的门槛。
 - 每步完成后勾选真实完成项，并填写第 8 节交接记录。只有实现、测试、必要手工验证均通过，才能将步骤状态改为“完成”。
@@ -292,7 +292,7 @@ Release／签名验证证据（适用时）：
 - 最终 Release 构建（Apple Development，正式 Release entitlements）退出 0，无新增源码警告。此前一条 XMLParser 参数重名警告已修复并重建；仍有既有 CoreSimulator 版本提示及 AppIntents metadata skipped。
 - 对最终 Release app／内嵌 foil 执行 codesign --verify（应用含 --deep --strict，CLI --strict）均通过；只停止本次构建路径的旧 Release 进程以确保运行新二进制，不终止其他安装路径。
 - 最终 Release 实际 CLI 验证通过：四命令、旧 show 在关闭后重试不重建、同路径 60 次更新、修订冲突、Markdown 警告、调用方隔离、SVG／PNG、SVG 切换文本、错误、临时目录安装／升级／卸载及第三方同名命令保护。原始报告 build/agent-cli-results-1792224175.json；没有安装到用户 PATH。
-- 未修改兄弟模块契约，因此不单独重跑兄弟仓库测试；./run 会按既有流程构建、嵌入兄弟模块。接下来只补持久化相关回归及最终 ./run，不将完整首轮失败记录抹为全通过。
+- 未修改模块契约，因此不单独重跑 `Packages/` 内的包测试；./run 会按既有流程构建、嵌入这些模块。接下来只补持久化相关回归及最终 ./run，不将完整首轮失败记录抹为全通过。
 
 持久化相关补测：HistorySearchTests、FileReferenceLifecycleTests、FoilInformationTests、DocumentThemeTests、AppleMusicPersistenceTests、IncognitoFoilTests 已实际运行，全部通过；准确测试计数与最后 ./run 结果后附。此前命令中的 HistoryRepositoryTests 不是当前 Scheme 的实际 suite，未计入覆盖；已改用实际存在的历史搜索及仓库消费者套件补测。
 

@@ -1,6 +1,6 @@
 #!/bin/zsh
 #
-# package-dmg - 构建 foofoil Release app，内嵌所有一方插件并打包为 DMG。
+# package-dmg - 构建 foofoil Release app，内嵌所有一方模块并打包为 DMG。
 #
 # 与 ./run 的区别：run 面向本地调试（Debug + 注入开发插件），
 # package-dmg 面向分发（Release + 内嵌插件 + DMG）。两者都不会写入安装记录。
@@ -37,10 +37,10 @@ APP_NAME="foofoil"
 CONFIGURATION="Release"
 DESTINATION='platform=macOS'
 
-# 一方插件：<仓库相对目录>:<bundle 名>:<构建配置>
+# 一方模块：<仓库内相对目录>:<bundle 名>:<构建配置>
 EXTENSION_DEFS=(
-    "../hifi:Hi-Fi.foofoilextension:release"
-    "../ebook:EBook.foofoilextension:release"
+    "Packages/HiFi:Hi-Fi.foofoilextension:release"
+    "Packages/EBook:EBook.foofoilextension:release"
 )
 
 SCRIPT_DIR="${0:A:h}"
@@ -163,7 +163,7 @@ if [[ ! -d "$APP_PATH" ]]; then
 fi
 
 if (( INCLUDE_VIDEO )); then
-    EXTENSION_DEFS+=("../video:Video.foofoilextension:release")
+    EXTENSION_DEFS+=("Packages/Video:Video.foofoilextension:release")
 fi
 # 每次明确清理可选模块，避免排除视频的包残留上一次构建的副本。
 rm -rf "$APP_PATH/Contents/PlugIns/Video.foofoilextension"
@@ -279,34 +279,85 @@ if [[ -t 0 && -t 1 ]]; then
     print -n "是否立即安装到 /Applications/foofoil.app？已有版本将被替换 (y/N) "
     read -r reply || reply=""
     if [[ "$reply" == [yY]* ]]; then
-        install_tmp="$(mktemp -d /Applications/.foofoil-install.XXXXXXXX)" || {
-            print -u2 "无法在 /Applications 创建临时目录，请检查写入权限。"
+        install_helper="$(mktemp "${TMPDIR:-/tmp}/foofoil-install.XXXXXXXX")" || {
+            print -u2 "无法创建安装脚本临时文件。"
             exit 1
         }
-        if ! ditto "$APP_PATH" "$install_tmp/$APP_NAME.app"; then
-            rm -rf "$install_tmp"
-            print -u2 "复制应用失败，原有版本未更改。"
-            exit 1
-        fi
-        if [[ -e "/Applications/$APP_NAME.app" || -L "/Applications/$APP_NAME.app" ]]; then
-            if ! mv "/Applications/$APP_NAME.app" "$install_tmp/previous.app"; then
-                rm -rf "$install_tmp"
-                print -u2 "无法替换现有应用，请检查写入权限。"
-                exit 1
-            fi
-        fi
-        if ! mv "$install_tmp/$APP_NAME.app" "/Applications/$APP_NAME.app"; then
-            if [[ -e "$install_tmp/previous.app" || -L "$install_tmp/previous.app" ]]; then
-                mv "$install_tmp/previous.app" "/Applications/$APP_NAME.app" || {
-                    print -u2 "恢复原应用失败，备份保留在 $install_tmp/previous.app"
-                    exit 1
-                }
-            fi
-            rm -rf "$install_tmp"
-            print -u2 "安装失败。"
-            exit 1
-        fi
+        cat > "$install_helper" <<'INSTALL_SCRIPT'
+#!/bin/sh
+set -eu
+
+source_app=$1
+destination=$2
+parent=${destination%/*}
+base=${destination##*/}
+install_tmp=
+keep_backup=0
+
+cleanup() {
+    if [ -n "$install_tmp" ] && [ "$keep_backup" -eq 0 ]; then
         rm -rf "$install_tmp"
-        print "已安装: /Applications/$APP_NAME.app"
+    fi
+}
+trap cleanup EXIT
+
+install_tmp=$(mktemp -d "$parent/.foofoil-install.XXXXXXXX") || {
+    echo "无法在 $parent 创建临时目录，请检查写入权限。" >&2
+    exit 1
+}
+if ! ditto "$source_app" "$install_tmp/$base"; then
+    echo "复制应用失败，原有版本未更改。" >&2
+    exit 1
+fi
+had_previous=0
+if [ -e "$destination" ] || [ -L "$destination" ]; then
+    had_previous=1
+    if ! mv "$destination" "$install_tmp/previous.app"; then
+        echo "无法替换现有应用，请检查写入权限。" >&2
+        exit 1
+    fi
+fi
+if ! mv "$install_tmp/$base" "$destination"; then
+    if [ "$had_previous" -eq 1 ]; then
+        if ! mv "$install_tmp/previous.app" "$destination"; then
+            keep_backup=1
+            echo "安装失败，且无法恢复原应用；备份保留在 $install_tmp/previous.app" >&2
+            exit 1
+        fi
+    fi
+    echo "安装失败，原有版本已恢复。" >&2
+    exit 1
+fi
+echo "已安装: $destination"
+INSTALL_SCRIPT
+        chmod 700 "$install_helper"
+        install_status=0
+        if [[ -w "/Applications" ]]; then
+            if /bin/zsh "$install_helper" "$APP_PATH" "/Applications/$APP_NAME.app"; then
+                install_status=0
+            else
+                install_status=$?
+            fi
+        else
+            print "需要管理员权限写入 /Applications。"
+            if /usr/bin/osascript - "$install_helper" "$APP_PATH" "/Applications/$APP_NAME.app" <<'APPLESCRIPT'
+on run argv
+    set helperPath to item 1 of argv
+    set sourcePath to item 2 of argv
+    set destinationPath to item 3 of argv
+    do shell script "/bin/zsh " & quoted form of helperPath & " " & quoted form of sourcePath & " " & quoted form of destinationPath with administrator privileges
+end run
+APPLESCRIPT
+            then
+                install_status=0
+            else
+                install_status=$?
+            fi
+        fi
+        rm -f "$install_helper"
+        if (( install_status != 0 )); then
+            print -u2 "安装未完成。"
+            exit 1
+        fi
     fi
 fi

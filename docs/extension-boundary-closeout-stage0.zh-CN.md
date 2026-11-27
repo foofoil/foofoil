@@ -17,7 +17,7 @@
 
 foofoil/AGENTS 已关闭未发布 P0 的支持窗口，不再重新询问此决策。不改变 C ABI v1 函数表、公共能力命名及 DoP-only 策略；保留当前版本重启、资源授权和会话恢复。没有清空开发数据的必要，本阶段不清数据。
 
-extension-kit/AGENTS 仍有“既有宿主/扩展继续加载”的一般兼容要求，适用于公共 ABI/契约，不应据此重新引入已关闭的未发布 P0 支持。阶段 4 同步说明其范围。hifi/AGENTS 中部分硬件状态是旧记录，最终手动结论以具体版本的验证记录为准。
+`Packages/ExtensionKit/AGENTS.md` 仍有“既有宿主/扩展继续加载”的一般兼容要求，适用于公共 ABI/契约，不应据此重新引入已关闭的未发布 P0 支持。阶段 4 同步说明其范围。`Packages/HiFi/AGENTS.md` 中部分硬件状态是旧记录，最终手动结论以具体版本的验证记录为准。
 
 用户此前已确认 PCM/CUE 问题解决，本阶段未重做听音，不把该确认扩展为后续改动已验收。
 
@@ -116,16 +116,16 @@ extension-kit/AGENTS 仍有“既有宿主/扩展继续加载”的一般兼容�
 | hifi 公共 lifecycle/media-navigation fixture 经 ABI smoke | 退出 0；包含现存公共及内部旧路径，不代表 P0 清理已完成；未对合成数据播放或获取 DAC |
 | foofoil 单元测试 | xcresult 汇总：223 项，219 通过、3 失败、1 跳过；参数化设备汇总 235 通过、3 失败、1 跳过；退出 65 |
 
-命令（分别在对应仓库根目录）：
+命令（分别在对应包目录执行；2026-11-27 起位于 `Packages/`）：
 
 ```sh
-# extension-kit 与 hifi 各自执行
+# Packages/ExtensionKit 与 Packages/HiFi 各自执行
 swift test
 
-# hifi
+# Packages/HiFi
 swift run hifi-runtime-smoke --self-test \
-  ../extension-kit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json \
-  ../extension-kit/Sources/FoofoilExtensionKit/Fixtures/MediaNavigationRequests.json
+  ../ExtensionKit/Sources/FoofoilExtensionKit/Fixtures/SessionLifecycleRequests.json \
+  ../ExtensionKit/Sources/FoofoilExtensionKit/Fixtures/MediaNavigationRequests.json
 
 # foofoil：本阶段只采集单元测试基线，最终阶段仍需完整 test
 xcodebuild test -project foofoil.xcodeproj -scheme foofoil \

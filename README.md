@@ -187,15 +187,18 @@ Automatic cleanup of history for missing files is enabled by default. It removes
 - macOS 26.5 or later.
 - Xcode supporting the configured macOS SDK for source builds.
 
-Use this sibling checkout layout for the complete development environment:
+The app and its internal modules live in one repository:
 
 ```text
-workspace/
-├── foofoil/        # App, windows, content presentation, search, and CLI
-├── extension-kit/  # Required internal contracts Swift package
-├── hifi/           # Hi-Fi audio
-├── ebook/          # EPUB parsing and reading
-└── video/          # Enhanced video playback
+foofoil/
+├── foofoil/           # App, windows, content presentation, search, and CLI
+├── Packages/
+│   ├── ExtensionKit/  # Required internal contracts Swift package
+│   ├── HiFi/          # Hi-Fi audio
+│   ├── EBook/         # EPUB parsing and reading
+│   └── Video/         # Enhanced video playback
+├── foofoil.xcodeproj
+└── foofoil.xcworkspace
 ```
 
 From the `foofoil` repository, run:
@@ -206,9 +209,9 @@ From the `foofoil` repository, run:
 
 The script builds the Debug app, builds and embeds Hi-Fi, EPUB, and video modules, then restarts foofoil. A module is skipped if its `build-plugin` script is missing, leaving its capabilities unavailable. Video is included by default; use `./run --without-video` to omit it.
 
-With video included, the first build requires internet access to download a pinned FFmpeg source release (about 11 MB) from `ffmpeg.org`, verify its SHA-256 checksum, and compile it locally. No manual FFmpeg installation is needed. Downloads and build products are cached in `video/.build/` for subsequent builds; corrupt download caches are automatically downloaded again. The first run or packaging build may therefore take longer. If a download fails, retry the same command.
+With video included, the first build requires internet access to download a pinned FFmpeg source release (about 11 MB) from `ffmpeg.org`, verify its SHA-256 checksum, and compile it locally. No manual FFmpeg installation is needed. Downloads and build products are cached in `Packages/Video/.build/` for subsequent builds; corrupt download caches are automatically downloaded again. The first run or packaging build may therefore take longer. If a download fails, retry the same command.
 
-For editing across modules in Xcode, open `foofoil.xcworkspace`, select the `foofoil` scheme and **My Mac**, and configure a development signing team if requested. Xcode ⌘R does not build and embed sibling modules; use `./run` to verify the complete content experience.
+For editing across modules in Xcode, open `foofoil.xcworkspace`, select the `foofoil` scheme and **My Mac**, and configure a development signing team if requested. Xcode ⌘R does not build and embed the modules under `Packages/`; use `./run` to verify the complete content experience.
 
 To build only the app target:
 
@@ -233,7 +236,7 @@ xcodebuild test \
 
 Hi-Fi, EPUB, and video ship with the app. Users do not install, enable, or update plugins. Extensions/plugins in the source are an internal development mechanism; see the [module guide](docs/extension-support.zh-CN.md) (Chinese) for the ABI, manifests, and retained management implementation.
 
-`./package-dmg` builds the Release app, embeds these modules, and creates a DMG. Complete default packaging requires all five repositories above. Use `--without-video` to omit video, `--no-sign` for a local validation package, or `--sign` for Developer ID signing and notarization with the required credentials. After packaging, an interactive terminal offers to install the app into `/Applications`. See the script header for setup.
+`./package-dmg` builds the Release app, embeds the modules under `Packages/`, and creates a DMG. Use `--without-video` to omit video, `--no-sign` for a local validation package, or `--sign` for Developer ID signing and notarization with the required credentials. After packaging, an interactive terminal offers to install the app into `/Applications`; if the current account cannot write there, the script requests administrator authorization. See the script header for setup.
 
 ## Lightweight by Design, Open to Contributions
 

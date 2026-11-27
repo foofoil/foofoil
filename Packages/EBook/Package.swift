@@ -12,8 +12,8 @@ let package = Package(
         .executable(name: "ebook-runtime-smoke", targets: ["EBookRuntimeSmoke"])
     ],
     dependencies: [
-        // 仅 smoke／契约测试使用，生产 Core/Runtime 不依赖 extension-kit。
-        .package(path: "../extension-kit")
+        // 仅 smoke／契约测试使用，生产 Core/Runtime 不依赖 ExtensionKit。
+        .package(path: "../ExtensionKit")
     ],
     targets: [
         .target(name: "EBookExtensionCore"),
@@ -26,7 +26,7 @@ let package = Package(
                 "EBookExtensionCore",
                 "EBookExtensionRuntime",
                 "EBookTestSupport",
-                .product(name: "FoofoilExtensionKit", package: "extension-kit")
+                .product(name: "FoofoilExtensionKit", package: "ExtensionKit")
             ]
         ),
         .testTarget(

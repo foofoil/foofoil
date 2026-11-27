@@ -4,7 +4,7 @@
 
 > 产品决策（2026-09-07）：DSD 仅通过 DoP 输出，不实现 DSD → PCM fallback，不提供 Automatic / Prefer DoP / Always PCM 转换策略。DoP 不可用时停止并明确提示；普通 PCM 设备路由不受影响。
 >
-> 文档状态：2026-09-04 按三个独立仓库的现行实现与硬件验收结果校准（v2）。`foofoil` 是宿主应用，`extension-kit` 是稳定扩展契约，`hifi` 是独立第一方扩展。
+> 文档状态：2026-09-04 按当时的三个独立仓库实现与硬件验收结果校准（v2）；2026-11-27 起已合并为单仓库多包布局。`foofoil` 是宿主应用，`Packages/ExtensionKit` 是稳定扩展契约，`Packages/HiFi` 是内置第一方模块。
 >
 > 核心结论：DSF、DFF、SACD ISO、DST、DoP、专业设备路由等高级音频能力不进入 foofoil Core，而由第一方可选组件 **Hi-Fi** 提供；SACD ISO 等多曲目内容使用 foofoil 现有列表界面呈现，不在插件中另造曲目列表 UI。
 
@@ -221,12 +221,14 @@ Hi-Fi 不向 Core 暴露 Swift/C++ decoder 对象、`NSView`、`NSImage`、文�
 
 ## 5. 扩展声明与 Provider 选择
 
-Hi-Fi 已从宿主拆为独立兄弟仓库，并独立 Release。开发工作区布局为：
+Hi-Fi 作为宿主的内置模块随 foofoil 统一交付。2026-11-27 起模块合并到同一仓库，布局为：
 
 ```text
-foofoil/         # 宿主应用
-extension-kit/   # 扩展契约 Swift Package
-hifi/            # Hi-Fi 扩展
+foofoil/
+├── foofoil/           # 宿主应用
+└── Packages/
+    ├── ExtensionKit/  # 扩展契约 Swift Package
+    └── HiFi/          # Hi-Fi 模块
 ```
 
 Manifest 概念示例：

@@ -8,11 +8,19 @@ VERSION=8.0.1
 SHA=05ee0b03119b45c0bdb4df654b96802e909e0a752f72e4fe3794f487229e5a41
 ARCHIVE="$ROOT/.build/ffmpeg-$VERSION.tar.xz"
 mkdir -p "$ROOT/.build"
-[[ -f "$ARCHIVE" ]] || curl -fL "https://ffmpeg.org/releases/ffmpeg-$VERSION.tar.xz" -o "$ARCHIVE"
-print "$SHA  $ARCHIVE" | shasum -a 256 -c -
+# 下载中断不能留下可复用的半成品；损坏缓存重新下载，校验通过后再替换。
+if ! [[ -f "$ARCHIVE" ]] || ! print "$SHA  $ARCHIVE" | shasum -a 256 -c -; then
+    DOWNLOAD=$(mktemp "$ARCHIVE.download.XXXXXX")
+    trap 'rm -f "$DOWNLOAD"' EXIT
+    curl -fL --retry 2 --connect-timeout 20 "https://ffmpeg.org/releases/ffmpeg-$VERSION.tar.xz" -o "$DOWNLOAD"
+    print "$SHA  $DOWNLOAD" | shasum -a 256 -c -
+    mv -f "$DOWNLOAD" "$ARCHIVE"
+    trap - EXIT
+fi
 tar -xf "$ARCHIVE" -C "$ROOT/.build"
 cd "$ROOT/.build/ffmpeg-$VERSION"
-[[ ! -f Makefile ]] || make clean
+# 源码包自带 Makefile，但 configure 成功后才具备清理所需的配置。
+[[ ! -f ffbuild/config.mak ]] || make clean
 ./configure --prefix="$PREFIX" --cc=clang --arch=arm64 --target-os=darwin \
  --disable-debug --disable-everything --disable-autodetect --disable-programs --disable-doc \
  --disable-network --disable-avdevice --disable-avfilter \

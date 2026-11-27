@@ -2,9 +2,9 @@
 
 [foofoil](https://github.com/foofoil/foofoil) 的内部开发模块契约。
 
-本仓库是 Extension API v1 的独立来源：稳定 C ABI、Manifest Schema、capability 标识、Content Request / Session 值类型、导航与媒体契约、兼容性 fixture 以及契约测试。它支持内部模块的独立开发与集成测试。扩展/插件仅是开发手段；最终产品将这些能力作为浮箔自身功能交付，不提供单独安装或更新插件的流程。
+本包是 Extension API v1 的内部来源：稳定 C ABI、Manifest Schema、capability 标识、Content Request / Session 值类型、导航与媒体契约、兼容性 fixture 以及契约测试。它支持内部模块的开发与集成测试。扩展/插件仅是开发手段；最终产品将这些能力作为浮箔自身功能交付，不提供单独安装或更新插件的流程。
 
-加载与界面由 foofoil 持有。Hi-Fi 和 EPUB 实现位于兄弟仓库，由应用构建与分发脚本统一嵌入。现有安装和 Registry 代码属于遗留基础设施，不代表产品分发策略。
+加载与界面由宿主应用持有。Hi-Fi、EPUB 和视频实现位于同一仓库的 `Packages/` 下，由应用构建与分发脚本统一嵌入。现有安装和 Registry 代码属于遗留基础设施，不代表产品分发策略。
 
 ## 本包提供的内容
 
@@ -22,11 +22,11 @@
 
 ## 在开发模块中使用
 
-将本包作为兄弟目录检出：
+从仓库的 `Packages/` 目录引用本包（例如在 `Packages/HiFi` 中）：
 
 ```swift
 dependencies: [
-    .package(path: "../extension-kit")
+    .package(path: "../ExtensionKit")
 ]
 ```
 
@@ -52,12 +52,14 @@ Manifest Schema 见 `Sources/FoofoilExtensionKit/Resources/ExtensionManifest.sch
 swift test
 ```
 
-## 相关仓库
+## 相关模块
 
-| 仓库 | 职责 |
+| 模块 | 职责 |
 | --- | --- |
-| [foofoil](https://github.com/foofoil/foofoil) | macOS 应用、模块集成与统一分发 |
-| [hifi](https://github.com/foofoil/hifi) | foofoil 的 Hi-Fi 音频模块 |
+| [foofoil](../../README.zh-CN.md) | macOS 应用、模块集成与统一分发 |
+| [Hi-Fi](../HiFi/README.zh-CN.md) | foofoil 的 Hi-Fi 音频模块 |
+| [EBook](../EBook/README.md) | EPUB 解析与阅读 |
+| [Video](../Video/README.zh-CN.md) | 增强视频播放 |
 
 [English](README.md)
 

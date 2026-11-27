@@ -52,7 +52,7 @@ struct ContentProbeMessageTests {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
-            .appendingPathComponent("extension-kit/Sources/FoofoilExtensionKit/Fixtures/ContentProbeRequests.json")
+            .appendingPathComponent("ExtensionKit/Sources/FoofoilExtensionKit/Fixtures/ContentProbeRequests.json")
         let requests = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [[String: Any]])
         #expect(!requests.isEmpty)
         for request in requests {
