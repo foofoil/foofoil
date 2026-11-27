@@ -1,0 +1,13 @@
+{
+  "id": "app.foofoil.extension.video", "name": "Video", "version": "0.1.0",
+  "extensionAPI": {"min": 1, "max": 1},
+  "system": {"minMacOS": "15.0", "architectures": ["arm64"]},
+  "providers": [{"id": "video.files", "role": "primary", "contentFamily": "video",
+    "contentTypes": [{"extensions": ["mkv", "avi"], "strategy": "extension"}]}],
+  "capabilities": [
+    {"id": "media.transport", "contractVersion": 1, "scope": "session"},
+    {"id": "session.lifecycle", "contractVersion": 1, "scope": "session"},
+    {"id": "session.seekable", "contractVersion": 1, "scope": "session"},
+    {"id": "ui.commands", "contractVersion": 1, "scope": "presentation"}
+  ]
+}
