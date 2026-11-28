@@ -193,7 +193,8 @@ nonisolated public final class HistoryRepository: @unchecked Sendable {
                 return try database.configs(kind: kind).compactMap { config -> HistorySearchResult? in
                     let title = config.historyMenuDisplayName
                     let addresses = kind == .web ? [config.webURLString, config.actualWebURLString].compactMap { $0 } : []
-                    guard query.isEmpty || ([title] + addresses + (config.terminalConfiguration.map { [$0.historySubtitle] } ?? [])).contains(where: {
+                    let searchableAddresses = addresses.compactMap(WebAddressSearchText.make(from:))
+                    guard query.isEmpty || ([title] + searchableAddresses + (config.terminalConfiguration.map { [$0.historySubtitle] } ?? [])).contains(where: {
                         $0.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
                     }) else { return nil }
                     return HistorySearchResult(id: config.id, title: title, contentKind: kind,

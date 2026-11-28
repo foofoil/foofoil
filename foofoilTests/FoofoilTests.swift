@@ -62,6 +62,24 @@ struct HistorySearchTests {
         #expect(results.first?.id == titleID)
     }
 
+    @Test func webHistorySearchMatchesHostAndPathOnly() async throws {
+        let (repository, directory) = try repository()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let id = UUID()
+        #expect(repository.upsert(WindowConfig(
+            id: id,
+            webURLString: "https://example.com/guide/start?token=secret#intro",
+            originalImageName: "Docs",
+            contentKind: .web
+        )))
+
+        #expect((await repository.search("example.com/guide")).map(\.id) == [id])
+        #expect((await repository.search("guide/start")).map(\.id) == [id])
+        #expect((await repository.search("https")).isEmpty)
+        #expect((await repository.search("token=secret")).isEmpty)
+        #expect((await repository.search("intro")).isEmpty)
+    }
+
     @Test func supportsMultiKeywordAcrossDifferentChunksAndCascadingDelete() async throws {
         let (repository, directory) = try repository()
         defer { try? FileManager.default.removeItem(at: directory) }

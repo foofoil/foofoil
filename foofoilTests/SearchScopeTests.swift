@@ -269,14 +269,17 @@ struct SearchScopeTests {
         let repository = HistoryRepository(databaseURL: directory.appendingPathComponent("history.sqlite3"))
         var web = WindowConfig(id: UUID(), contentKind: .web)
         web.customTitle = "Reference website"
-        web.webURLString = "https://example.com/docs"
-        web.actualWebURLString = "https://redirect.test/guide"
+        web.webURLString = "https://example.com/docs?token=secret#intro"
+        web.actualWebURLString = "https://redirect.test/guide?ref=1"
         let terminal = WindowConfig(id: UUID(), contentKind: .terminal)
         #expect(repository.upsert(web))
         #expect(repository.upsert(terminal))
         #expect(await repository.searchOpeningHistory("", kind: .web).map(\.id) == [web.id])
         for query in ["REFERENCE", "example.com", "redirect.test"] {
             #expect(await repository.searchOpeningHistory(query, kind: .web).map(\.id) == [web.id])
+        }
+        for query in ["https", "token=secret", "ref=1", "intro"] {
+            #expect(await repository.searchOpeningHistory(query, kind: .web).isEmpty)
         }
         #expect(await repository.searchOpeningHistory("no match", kind: .web).isEmpty)
         #expect(await repository.searchOpeningHistory("", kind: .terminal).map(\.id) == [terminal.id])

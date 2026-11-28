@@ -2,7 +2,7 @@ import Foundation
 import SQLite3
 
 nonisolated final class HistoryDatabase {
-    static let schemaVersion = 28
+    static let schemaVersion = 29
 
     private let queue = DispatchQueue(label: "com.foofoil.history.database", qos: .utility)
     private var connection: OpaquePointer?
@@ -192,8 +192,11 @@ nonisolated final class HistoryDatabase {
                         try config.documentReadingPositions.map { String(decoding: try JSONEncoder().encode($0), as: UTF8.self) }
                     ])
 
+                // 网页地址只索引主机名与路径；协议、端口、参数和片段不参与搜索。
                 let metadata = (
-                    [config.webURLString, config.actualWebURLString, config.appleMusicReference?.subtitle].compactMap { $0 }
+                    [config.webURLString, config.actualWebURLString].compactMap { $0 }
+                        .compactMap(WebAddressSearchText.make(from:))
+                    + [config.appleMusicReference?.subtitle].compactMap { $0 }
                     + (config.fileList?.items.map(\.displayName) ?? [])
                 ).joined(separator: " ")
                 try insertChunk(historyID: config.id, title: title, kind: 0, ordinal: 0, pageNumber: nil, text: metadata)
@@ -316,7 +319,9 @@ nonisolated final class HistoryDatabase {
                     "UPDATE history_items SET display_title = ?, custom_title = ?, file_list = ?, updated_at = ? WHERE id = ?",
                     bindings: [displayTitle, config.customTitle, encodeFileList(config.fileList), Date().timeIntervalSince1970, id.uuidString]
                 )
-                let metadata = [config.webURLString, config.actualWebURLString].compactMap { $0 }.joined(separator: " ")
+                let metadata = [config.webURLString, config.actualWebURLString].compactMap { $0 }
+                    .compactMap(WebAddressSearchText.make(from:))
+                    .joined(separator: " ")
                 try insertChunk(historyID: id, title: displayTitle, kind: 0, ordinal: 0, pageNumber: nil, text: metadata)
                 if [.note, .text, .markdown, .csv].contains(config.contentKind ?? .note) {
                     try insertTextChunks(historyID: id, title: displayTitle, kind: 1, text: config.text)
@@ -345,7 +350,8 @@ nonisolated final class HistoryDatabase {
                     "UPDATE history_items SET display_title = ?, web_url = ?, actual_web_url = ?, updated_at = ? WHERE id = ?",
                     bindings: [displayTitle, url, url, Date().timeIntervalSince1970, id.uuidString]
                 )
-                try insertChunk(historyID: id, title: displayTitle, kind: 0, ordinal: 0, pageNumber: nil, text: url)
+                let metadata = WebAddressSearchText.make(from: url) ?? ""
+                try insertChunk(historyID: id, title: displayTitle, kind: 0, ordinal: 0, pageNumber: nil, text: metadata)
             }
         }
     }
@@ -429,6 +435,31 @@ nonisolated final class HistoryDatabase {
         }
     }
 
+    /// 旧版本把完整网页地址写进元数据块；升级后只保留主机名与路径。
+    private func reindexWebAddressChunks() throws {
+        var entries: [(UUID, String, String)] = []
+        try withStatement("""
+            SELECT id, display_title, web_url, actual_web_url
+            FROM history_items
+            WHERE web_url IS NOT NULL OR actual_web_url IS NOT NULL
+            """, bindings: []) { statement in
+            while sqlite3_step(statement) == SQLITE_ROW {
+                guard let id = UUID(uuidString: text(statement, 0)) else { continue }
+                let metadata = [optionalText(statement, 2), optionalText(statement, 3)]
+                    .compactMap { $0 }
+                    .compactMap(WebAddressSearchText.make(from:))
+                    .joined(separator: " ")
+                entries.append((id, text(statement, 1), metadata))
+            }
+        }
+        for (id, title, metadata) in entries {
+            try transaction {
+                try deleteChunks(historyID: id, kinds: [0])
+                try insertChunk(historyID: id, title: title, kind: 0, ordinal: 0, pageNumber: nil, text: metadata)
+            }
+        }
+    }
+
     func searchDatabaseSize() -> Int64 {
         let paths = [databaseURL.path, databaseURL.path + "-wal", databaseURL.path + "-shm"]
         return paths.reduce(0) { total, path in
@@ -506,6 +537,10 @@ nonisolated final class HistoryDatabase {
         if previousVersion >= 1 && previousVersion < 5 {
             // v5 新增视频安全范围书签（Base64 文本）；沙盒授权仅随进程有效，靠它在重启后恢复访问。
             try execute("ALTER TABLE history_items ADD COLUMN video_bookmark TEXT")
+        }
+        if previousVersion < 29 {
+            // v29 网页地址只索引主机名与路径；重建旧元数据块，避免协议、参数和片段继续命中。
+            try reindexWebAddressChunks()
         }
         if previousVersion >= 1 && previousVersion < 6 {
             // v6 只保存扩展命名空间和状态引用，扩展 payload 仍由 ExtensionStateStore 管理。

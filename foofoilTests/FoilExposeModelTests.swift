@@ -80,6 +80,19 @@ struct FoilExposeModelTests {
         #expect(model.selectedIndex == 0)
     }
 
+    @Test func historySearchMatchesWebAddressHostAndPathOnly() {
+        var web = FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true,
+                                 title: "Reference", symbolName: "globe", contentKind: .web, thumbnailPath: nil)
+        web.webURLString = "https://example.com/guide/start?token=secret#intro"
+        let model = makeModel(items: [makeItem()], historyItems: [web, makeItem(isHistoryEntry: true)])
+        model.searchText = "example.com/guide"
+        #expect(model.currentItems.map(\.id) == [web.id])
+        for query in ["https", "token=secret", "intro"] {
+            model.searchText = query
+            #expect(model.currentItems.isEmpty)
+        }
+    }
+
     @Test func terminalScopeKeepsCreationFirstAndSelectsMatchingHistory() {
         let history = (0..<5).map { index in
             FoilExposeItem(id: UUID(), controller: nil, isHistoryEntry: true,

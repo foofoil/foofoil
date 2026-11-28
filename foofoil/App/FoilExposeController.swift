@@ -122,9 +122,13 @@ struct FoilExposeItem: Identifiable {
         return trimmed.prefix(bodyPreviewCharacterLimit) + "…"
     }
 
-    /// 关键字匹配：标题不区分大小写与变音符号的包含匹配。
+    /// 关键字匹配：标题不区分大小写与变音符号的包含匹配；网页记录同时匹配
+    /// 主机名与路径组成的地址文本，不匹配协议、端口、参数和片段。
     func matches(query: String) -> Bool {
-        title.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+        if title.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil { return true }
+        return [webURLString, actualWebURLString].compactMap { $0 }.contains {
+            WebAddressSearchText.matches($0, query: query)
+        }
     }
 }
 
@@ -534,15 +538,12 @@ final class FoilExposeModel: ObservableObject {
     var clipboardCount: Int { clipboardItems.count }
     var isInlineOpeningScope: Bool { activeScope == .url || activeScope == .terminal }
 
-    /// 两个打开范围只匹配对应历史，网址同时匹配标题、输入地址与重定向地址。
+    /// 两个打开范围只匹配对应历史；网址同时匹配标题与主机名加路径的地址文本。
     private var openingScopeHistory: [FoilExposeItem] {
         historyItems.filter { item in
             guard item.contentKind == (activeScope == .url ? .web : .terminal) else { return false }
             return searchQuery.isEmpty || item.matches(query: searchQuery)
                 || item.terminalConfiguration?.historySubtitle.range(of: searchQuery, options: [.caseInsensitive, .diacriticInsensitive]) != nil
-                || (activeScope == .url && [item.webURLString, item.actualWebURLString].compactMap { $0 }.contains {
-                    $0.range(of: searchQuery, options: [.caseInsensitive, .diacriticInsensitive]) != nil
-                })
         }
     }
 
