@@ -31,6 +31,8 @@ nonisolated struct AudioTrackInfo {
     var bitDepth: Int?
     var bitRate: Double?
     var channelCount: Int?
+    /// MIDI 轨道上的乐器 / 端口名；多轨时以 · 连接，与曲名分开显示。
+    var instrumentName: String?
     var artwork: NSImage?
     /// 封面来自音频同目录文件时记录其位置；不参与持久化。
     var sidecarCoverURL: URL?
@@ -80,8 +82,13 @@ nonisolated enum MediaDurationLoader {
             }
         }
 
-        if kind == .audio, let timing = AudioMetadataLoader.playbackTiming(for: url) {
-            return timing.duration
+        if kind == .audio {
+            if AudioMetadataLoader.isMIDI(url) {
+                return AudioMetadataLoader.midiDuration(for: url)
+            }
+            if let timing = AudioMetadataLoader.playbackTiming(for: url) {
+                return timing.duration
+            }
         }
 
         let asset = AVURLAsset.media(url: url)
@@ -101,21 +108,26 @@ nonisolated enum AudioMetadataLoader {
     static func load(from url: URL, includeArtwork: Bool = true) async -> AudioTrackInfo {
         var info = AudioTrackInfo.fallback(fileName: url.lastPathComponent)
         info.formatName = formatName(for: url)
-        let asset = AVURLAsset.media(url: url)
-        let metadata = ((try? await asset.load(.commonMetadata)) ?? [])
-            + ((try? await asset.load(.metadata)) ?? [])
-        await applyMetadata(metadata, to: &info, includeArtwork: includeArtwork)
+        if isMIDI(url) {
+            // MIDI 没有 PCM 音轨，AVAsset 只会返回空元数据；改读 SMF 的 meta events。
+            applyMIDIMetadata(from: url, to: &info)
+        } else {
+            let asset = AVURLAsset.media(url: url)
+            let metadata = ((try? await asset.load(.commonMetadata)) ?? [])
+                + ((try? await asset.load(.metadata)) ?? [])
+            await applyMetadata(metadata, to: &info, includeArtwork: includeArtwork)
 
-        if let tracks = try? await asset.loadTracks(withMediaType: .audio), let track = tracks.first {
-            if let rate = try? await track.load(.estimatedDataRate), rate > 0 {
-                info.bitRate = Double(rate)
+            if let tracks = try? await asset.loadTracks(withMediaType: .audio), let track = tracks.first {
+                if let rate = try? await track.load(.estimatedDataRate), rate > 0 {
+                    info.bitRate = Double(rate)
+                }
+                if let descriptions = try? await track.load(.formatDescriptions) {
+                    applyFormatDescriptions(descriptions, to: &info)
+                }
             }
-            if let descriptions = try? await track.load(.formatDescriptions) {
-                applyFormatDescriptions(descriptions, to: &info)
+            if info.bitDepth == nil {
+                info.bitDepth = flacBitDepth(for: url)
             }
-        }
-        if info.bitDepth == nil {
-            info.bitDepth = flacBitDepth(for: url)
         }
 
         if includeArtwork, info.artwork == nil,
@@ -146,6 +158,100 @@ nonisolated enum AudioMetadataLoader {
         }
         return AudioTrackInfo.fallbackPresentationSize
     }
+
+    /// MIDI/SMF 没有 PCM 音轨，按系统 MIDI 类型识别；`.mid`、`.midi`、`.kar` 都归入 `public.midi-audio`。
+    static func isMIDI(_ url: URL) -> Bool {
+        guard let type = UTType(filenameExtension: url.pathExtension.lowercased()) else { return false }
+        return type.conforms(to: .midi)
+    }
+
+    /// 列表时长按 SMF 的速度表计算；不要用文件大小或固定 120 BPM 估算。
+    static func midiDuration(for url: URL) -> Double? {
+        let sequencer = AVAudioSequencer()
+        guard (try? sequencer.load(from: url, options: [])) != nil else { return nil }
+        guard let seconds = sequencer.tracks.map(\.lengthInSeconds).max(),
+              seconds.isFinite, seconds > 0 else { return nil }
+        return seconds
+    }
+
+    /// 读取 SMF 的标题、作者等 meta events；不启动音频引擎，也不合成声音。
+    private static func applyMIDIMetadata(from url: URL, to info: inout AudioTrackInfo) {
+        // SMF 没有独立的“序列标题”事件；只有第一轨（format 1 的 conductor track）的
+        // track name 可以当曲名。后续轨道常写着 SmartMusic SoftSynth 等设备名，
+        // 不能直接采用，否则所有文件都会显示同一个合成器名。
+        let trackNames = SMFTrackNamesParser.trackNames(in: url)
+        if let title = normalizedMIDITrackName(trackNames.first ?? nil),
+           !isPlaceholderMIDITrackName(title) {
+            info.taggedTitle = title
+            info.title = title
+        }
+
+        // 乐器名仍然保留为次级信息；同一合成器的多个通道名去重后只显示一次。
+        var seenInstruments = Set<String>()
+        var instruments: [String] = []
+        for (index, rawName) in trackNames.enumerated() {
+            guard let name = normalizedMIDITrackName(rawName) else { continue }
+            if index == 0, info.taggedTitle == name { continue }
+            let key = normalizedMIDIInstrumentKey(name)
+            guard seenInstruments.insert(key).inserted else { continue }
+            instruments.append(name)
+        }
+        if !instruments.isEmpty {
+            info.instrumentName = instruments.joined(separator: " · ")
+        }
+
+        let sequencer = AVAudioSequencer()
+        guard (try? sequencer.load(from: url, options: [])) != nil else { return }
+        let values = sequencer.userInfo
+        func text(_ key: AVAudioSequencer.InfoDictionaryKey) -> String? {
+            guard let value = values[key.rawValue] else { return nil }
+            let text = String(describing: value).trimmingCharacters(in: .whitespacesAndNewlines)
+            return text.isEmpty ? nil : text
+        }
+        info.artist = text(.artist) ?? info.artist
+        info.album = text(.album) ?? info.album
+        info.composer = text(.composer) ?? info.composer
+        info.genre = text(.genre) ?? info.genre
+        info.year = text(.year) ?? info.year
+        info.trackNumber = text(.trackNumber) ?? info.trackNumber
+        info.formatName = "MIDI"
+    }
+
+    private static func normalizedMIDITrackName(_ name: String?) -> String? {
+        guard let value = name?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else { return nil }
+        return value
+    }
+
+    private static func normalizedMIDIInstrumentKey(_ name: String) -> String {
+        name
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .replacingOccurrences(of: "\\s*\\d+$", with: "", options: .regularExpression)
+            .lowercased()
+    }
+
+    /// 常见 MIDI 设备/合成器名不是曲名；匹配时退回文件名。
+    private static func isPlaceholderMIDITrackName(_ name: String) -> Bool {
+        let normalized = name
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .lowercased()
+        let base = normalized.replacingOccurrences(
+            of: "\\s*\\d+$", with: "", options: .regularExpression
+        )
+        if base.hasPrefix("smartmusic") { return true }
+        return placeholderMIDITrackNames.contains(base)
+    }
+
+    private static let placeholderMIDITrackNames: Set<String> = [
+        "microsoft gs wavetable synth", "gs wavetable synth", "wavetable synth",
+        "general midi", "gm", "midi", "midi out", "midi port", "midi synth",
+        "dls synth", "apple dls synth", "coreaudio", "core audio",
+        "fluidsynth", "fluid synth", "timidity", "synthesizer", "synth",
+        "conductor", "conductor track", "master track", "tempo track",
+        "untitled", "unknown"
+    ]
 
     /// 用 AudioFile 的采样帧数计算真实时长；FLAC 不要用 AVAsset.duration。
     static func playbackTiming(for url: URL) -> AudioPlaybackTiming? {
@@ -495,6 +601,7 @@ nonisolated enum AudioMetadataLoader {
         case "aif", "aiff", "aifc": return "AIFF"
         case "caf": return "CAF"
         case "flac": return "FLAC"
+        case "mid", "midi", "kar": return "MIDI"
         case "au", "snd": return "AU"
         default: return nil
         }
@@ -521,6 +628,122 @@ nonisolated enum AudioMetadataLoader {
         ]
         return String(bytes.map { $0 == 0 ? " " : Character(UnicodeScalar($0)) })
             .trimmingCharacters(in: .whitespaces)
+    }
+}
+
+/// 按轨道顺序读取 SMF 的 track name。format 1 中后续轨道名是乐器/端口名，
+/// 例如 SmartMusic SoftSynth，不能把第一个找到的名称当曲名。
+private enum SMFTrackNamesParser {
+    static func trackNames(in url: URL) -> [String?] {
+        guard let data = try? Data(contentsOf: url, options: .mappedIfSafe) else { return [] }
+        let bytes = [UInt8](data)
+        guard bytes.count >= 14,
+              bytes[0] == 0x4D, bytes[1] == 0x54, bytes[2] == 0x68, bytes[3] == 0x64,
+              let headerLengthValue = readUInt32(bytes, at: 4) else { return [] }
+        let headerLength = Int(headerLengthValue)
+        guard headerLength >= 6 else { return [] }
+
+        var names: [String?] = []
+        var chunkOffset = 8 + headerLength
+        while chunkOffset + 8 <= bytes.count {
+            guard let chunkLengthValue = readUInt32(bytes, at: chunkOffset + 4) else { return names }
+            let chunkLength = Int(chunkLengthValue)
+            let bodyStart = chunkOffset + 8
+            let bodyEnd = bodyStart + chunkLength
+            guard chunkLength >= 0, bodyEnd <= bytes.count else { return names }
+            if bytes[chunkOffset] == 0x4D, bytes[chunkOffset + 1] == 0x54,
+               bytes[chunkOffset + 2] == 0x72, bytes[chunkOffset + 3] == 0x6B {
+                names.append(trackName(in: bytes, start: bodyStart, end: bodyEnd))
+            }
+            chunkOffset = bodyEnd
+        }
+        return names
+    }
+
+    private static func trackName(in bytes: [UInt8], start: Int, end: Int) -> String? {
+        var index = start
+        var runningStatus: UInt8?
+        while index < end {
+            guard let (_, afterDelta) = readVariableLength(bytes, at: index, end: end) else { return nil }
+            index = afterDelta
+            guard index < end else { return nil }
+
+            var status = bytes[index]
+            if status < 0x80 {
+                guard let runningStatus else { return nil }
+                status = runningStatus
+            } else {
+                index += 1
+                runningStatus = status < 0xF0 ? status : nil
+            }
+
+            if status == 0xFF {
+                guard index < end else { return nil }
+                let type = bytes[index]
+                index += 1
+                guard let (length, dataStart) = readVariableLength(bytes, at: index, end: end) else { return nil }
+                index = dataStart
+                guard length >= 0, index + length <= end else { return nil }
+                if type == 0x03 {
+                    return decodeText(bytes[index..<(index + length)])
+                }
+                index += length
+                continue
+            }
+
+            if status == 0xF0 || status == 0xF7 {
+                guard let (length, dataStart) = readVariableLength(bytes, at: index, end: end) else { return nil }
+                index = dataStart
+                guard length >= 0, index + length <= end else { return nil }
+                index += length
+                continue
+            }
+
+            let dataCount: Int
+            switch status & 0xF0 {
+            case 0x80, 0x90, 0xA0, 0xB0, 0xE0: dataCount = 2
+            case 0xC0, 0xD0: dataCount = 1
+            default:
+                switch status {
+                case 0xF1, 0xF3: dataCount = 1
+                case 0xF2: dataCount = 2
+                default: dataCount = 0
+                }
+            }
+            guard index + dataCount <= end else { return nil }
+            index += dataCount
+        }
+        return nil
+    }
+
+    private static func readVariableLength(_ bytes: [UInt8], at offset: Int, end: Int) -> (Int, Int)? {
+        var value = 0
+        var index = offset
+        for _ in 0..<4 {
+            guard index < end else { return nil }
+            let byte = bytes[index]
+            index += 1
+            value = (value << 7) | Int(byte & 0x7F)
+            if byte & 0x80 == 0 { return (value, index) }
+        }
+        return nil
+    }
+
+    private static func readUInt32(_ bytes: [UInt8], at offset: Int) -> UInt32? {
+        guard offset >= 0, offset + 4 <= bytes.count else { return nil }
+        return (UInt32(bytes[offset]) << 24)
+            | (UInt32(bytes[offset + 1]) << 16)
+            | (UInt32(bytes[offset + 2]) << 8)
+            | UInt32(bytes[offset + 3])
+    }
+
+    private static func decodeText(_ slice: ArraySlice<UInt8>) -> String? {
+        let data = Data(slice)
+        let text = String(data: data, encoding: .utf8)
+            ?? String(data: data, encoding: .isoLatin1)
+        guard let trimmed = text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else { return nil }
+        return trimmed
     }
 }
 

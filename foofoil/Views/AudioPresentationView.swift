@@ -174,7 +174,12 @@ struct AudioPresentationView<Controller: MediaTransportControlling>: View {
     }
 
     private var tertiaryLine: String? {
-        joined([info.album, info.year, info.trackNumber.map(AudioMetadataLoader.formatTrackNumber), info.genre])
+        joined([instrumentLine, info.album, info.year, info.trackNumber.map(AudioMetadataLoader.formatTrackNumber), info.genre])
+    }
+
+    private var instrumentLine: String? {
+        guard let instrument = info.instrumentName else { return nil }
+        return String(format: NSLocalizedString("MIDI Instrument Format", comment: ""), instrument)
     }
 
     private var technicalLine: String? {

@@ -71,6 +71,7 @@ Markdown links to existing local files and HTTP(S) websites open in a new incogn
 | Type | Common formats | Notes |
 | --- | --- | --- |
 | Audio | MP3, M4A, AAC, WAV, AIFF, FLAC, etc. | Play music and recordings |
+| MIDI | .mid, .midi, .kar | Played with the system General MIDI synthesizer. The file name (or the sequence's own title, when present) is used as the title; track and instrument names are shown as secondary information. Volume follows the system output; per-track mixing and instrument settings are not exposed. |
 | Video | MP4, MOV, M4V; MKV and AVI in builds with additional video support | MKV/AVI support includes H.264, HEVC and Xvid video, common audio tracks including DTS and TrueHD, and audio/subtitle selection. Text subtitles use globally configurable styles; PGS uses bitmap subtitles. |
 | Fragmented MP4 segments | .m4s | Opened as audio or video according to the track in the file's initialization data; segments without it (such as those lacking the moov box) cannot be played |
 | Hi-Fi audio | DSF, DFF, APE | DSF and DFF require a DoP-capable audio device; DST-compressed DFF is not supported |

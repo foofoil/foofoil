@@ -88,7 +88,7 @@
 
 ### Hi-Fi：从无损专辑到 DSD 与 SACD
 
-除 MP3、AAC、ALAC、FLAC、WAV、AIFF 等常见音频外，浮箔也把 **DSF、DFF、SACD ISO 与 APE/CUE** 纳入同一个原生 macOS 播放体验：
+除 MP3、AAC、ALAC、FLAC、WAV、AIFF、MIDI 等常见音频外，浮箔也把 **DSF、DFF、SACD ISO 与 APE/CUE** 纳入同一个原生 macOS 播放体验：
 
 - **DSD 与 DoP 输出。** DSF、raw DFF 通过 DoP 输出到兼容 DAC，已验证 DSD64、DSD128、DSD256。
 - **直接播放 SACD ISO。** 读取未压缩立体声区域，以曲目列表浏览、切轨和定位，无需先转换为 DSF。

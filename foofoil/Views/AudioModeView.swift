@@ -91,7 +91,7 @@ struct AudioModeView: View {
 
     @ViewBuilder
     private var outputDeviceOverlay: some View {
-        if let snapshot = controller.deviceServiceSnapshot {
+        if !controller.isMIDIPlayback, let snapshot = controller.deviceServiceSnapshot {
             VStack(alignment: .trailing, spacing: 6) {
                 AppKitPopupMenuButton(
                     title: pcmOutputStatus(snapshot),

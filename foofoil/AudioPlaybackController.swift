@@ -28,10 +28,14 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     @Published private(set) var volume: Float = 1.0
     @Published private(set) var deviceServiceSnapshot: AudioDeviceServiceSnapshot?
     @Published private(set) var deviceFailureMessage: String?
+    /// MIDI 由 AVMIDIPlayer 独立合成，不走 PCM 引擎、独占设备与音量链路。
+    @Published private(set) var isMIDIPlayback = false
     var isScrubbing = false
     var isLooping: Bool
 
     private let appStateID: UUID
+    private var midiPlayer: AVMIDIPlayer?
+    private var midiCompletionGeneration: UInt64 = 0
     private var engineStorage: AVAudioEngine?
     private var engine: AVAudioEngine {
         if let engineStorage { return engineStorage }
@@ -227,7 +231,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
 
     func play() {
         playbackIntentHandler?(true)
-        guard audioFile != nil, segmentFrames > 0 else { return }
+        guard midiPlayer != nil || (audioFile != nil && segmentFrames > 0) else { return }
         routeGeneration &+= 1
         let generation = routeGeneration
         let ownerID = deviceServiceClientID
@@ -248,6 +252,13 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
                     isCurrent: { [weak self] in self?.routeGeneration == generation }
                 )
                 guard generation == self.routeGeneration else { return }
+                if self.isMIDIPlayback {
+                    // 从独占 PCM 切来时，先等旧租约真正归还，再让系统默认输出开始合成。
+                    await self.deviceCommandTail?.value
+                    guard generation == self.routeGeneration else { return }
+                    self.startMIDIPlaybackNow()
+                    return
+                }
                 if ExtensionHost.shared.isAudioDeviceServiceAvailable {
                     if let deviceID = self.selectedOutputDeviceID,
                        self.isLeaseReusable(deviceID: deviceID), self.engineStorage != nil {
@@ -282,6 +293,41 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         schedule(from: currentTime, play: true)
     }
 
+    /// AVMIDIPlayer 自带系统 GM 合成器，直接输出到系统默认设备；音量交给系统输出。
+    private func startMIDIPlaybackNow() {
+        guard isMIDIPlayback, let player = midiPlayer else { return }
+        MediaRemoteCommandCoordinator.shared.activate(self, title: mediaTitle)
+        if duration > 0, currentTime >= duration - 0.05 {
+            currentTime = 0
+        }
+        player.currentPosition = min(duration, max(0, currentTime))
+        midiCompletionGeneration &+= 1
+        let generation = midiCompletionGeneration
+        player.play { [weak self] in
+            DispatchQueue.main.async {
+                guard let self,
+                      self.isMIDIPlayback,
+                      self.midiCompletionGeneration == generation else { return }
+                self.handleMIDIPlaybackEnd()
+            }
+        }
+        isPlaying = true
+        MediaRemoteCommandCoordinator.shared.update(self)
+    }
+
+    private func handleMIDIPlaybackEnd() {
+        midiCompletionGeneration &+= 1
+        if isLooping {
+            currentTime = 0
+            startMIDIPlaybackNow()
+            return
+        }
+        isPlaying = false
+        currentTime = duration
+        MediaRemoteCommandCoordinator.shared.update(self)
+        notifyPlaybackFinished()
+    }
+
     func pause() {
         AudioPlaybackCoordinator.shared.cancel(ownerID: deviceServiceClientID)
         playbackIntentHandler?(false)
@@ -294,6 +340,14 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     /// 短暂重枚举，恢复播放时的重启/重钉/心跳逻辑会接住）。自然播完连播时保留租约，
     /// 同速率无需任何 HAL 操作。独占下连引擎一起停掉，恢复时重建 ioProc。
     func stopOutput(releaseLease: Bool = true) {
+        if isMIDIPlayback {
+            refreshCurrentTime()
+            midiCompletionGeneration &+= 1
+            midiPlayer?.stop()
+            isPlaying = false
+            MediaRemoteCommandCoordinator.shared.update(self)
+            return
+        }
         refreshCurrentTime()
         // stop/reset 会触发旧段完成回调，必须先失效，避免暂停被误判为播完并自动切歌。
         scheduleGeneration &+= 1
@@ -343,6 +397,8 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         AudioPlaybackCoordinator.shared.cancel(ownerID: deviceServiceClientID)
         refreshCurrentTime()
         scheduleGeneration &+= 1
+        midiCompletionGeneration &+= 1
+        midiPlayer?.stop()
         queuedSuccessor = nil
         playerNode.stop()
         engineStorage?.stop()
@@ -394,6 +450,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     }
 
     func selectSystemDefaultOutput() {
+        guard !isMIDIPlayback else { return }
         selectedOutputDeviceID = nil
         hasLoadedOutputPreference = true
         routeGeneration &+= 1
@@ -402,6 +459,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     }
 
     func selectExclusiveOutput(deviceID: String) {
+        guard !isMIDIPlayback else { return }
         routeGeneration &+= 1
         let generation = routeGeneration
         selectedOutputDeviceID = deviceID
@@ -414,17 +472,22 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     }
 
     func toggleMute() {
+        guard supportsVolumeControl else { return }
         isMuted.toggle()
         applyVolume()
     }
 
     func setVolume(_ newValue: Float) {
+        guard supportsVolumeControl else { return }
         volume = max(0, min(1, newValue))
         if volume > 0, isMuted {
             isMuted = false
         }
         applyVolume()
     }
+
+    /// AVMIDIPlayer 没有音量接口，MIDI 下隐藏音量控件，交给系统输出音量。
+    var supportsVolumeControl: Bool { !isMIDIPlayback }
 
     var volumeIconName: String {
         if isMuted || volume <= 0 { return "speaker.slash.fill" }
@@ -437,6 +500,11 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     func seek(to time: Double) {
         let clamped = min(duration, max(0, time))
         currentTime = clamped
+        if isMIDIPlayback {
+            midiPlayer?.currentPosition = clamped
+            MediaRemoteCommandCoordinator.shared.update(self)
+            return
+        }
         schedule(from: clamped, play: isPlaying || playerNode.isPlaying)
         MediaRemoteCommandCoordinator.shared.update(self)
     }
@@ -468,8 +536,18 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         }
         scheduleGeneration &+= 1
         queuedSuccessor = nil
+        midiCompletionGeneration &+= 1
+        midiPlayer?.stop()
         playerNode.stop()
         isPlaying = false
+
+        if AudioMetadataLoader.isMIDI(url) {
+            loadMIDI(url: url, identity: identity, autoplay: autoplay)
+            return
+        }
+        midiPlayer = nil
+        isMIDIPlayback = false
+
         do {
             let access = PlaybackFileAccess(url: url)
             let file = try AVAudioFile(forReading: url)
@@ -540,6 +618,42 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
         }
     }
 
+    private func loadMIDI(url: URL, identity: PlaybackContentIdentity, autoplay: Bool) {
+        // 从 PCM 或独占输出切到 MIDI 时先释放原有引擎与租约；MIDI 不使用本控制器的 AVAudioEngine。
+        stopOutput()
+        midiPlayer = nil
+        isMIDIPlayback = true
+        audioFile = nil
+        segmentFrames = 0
+        startFrame = 0
+        sampleRate = 0
+        sourceChannelCount = 0
+
+        let access = PlaybackFileAccess(url: url)
+        do {
+            let player = try AVMIDIPlayer(contentsOf: url, soundBankURL: nil)
+            player.prepareToPlay()
+            midiPlayer = player
+            currentFileAccess = access
+            currentFileURL = url
+            loadedContentIdentity = identity
+            duration = max(0, player.duration)
+            currentTime = 0
+            NSLog("AudioPlaybackController loaded MIDI %@ duration=%.2f", url.lastPathComponent, duration)
+            MediaRemoteCommandCoordinator.shared.activate(self, title: mediaTitle)
+            if autoplay { play() }
+        } catch {
+            NSLog("AudioPlaybackController failed to open MIDI \(url.path): \(error.localizedDescription)")
+            midiPlayer = nil
+            isMIDIPlayback = false
+            currentFileAccess = nil
+            currentFileURL = nil
+            loadedContentIdentity = nil
+            duration = 0
+            currentTime = 0
+        }
+    }
+
     private func reconnect(format: AVAudioFormat) {
         // AVAudioEngine 不支持运行中改图；历史恢复和 CUE 切轨前先完整停止并重置。
         playerNode.stop()
@@ -551,6 +665,11 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     }
 
     private func refreshDeviceService() async {
+        guard !isMIDIPlayback else {
+            deviceServiceSnapshot = nil
+            deviceFailureMessage = nil
+            return
+        }
         guard ExtensionHost.shared.isAudioDeviceServiceAvailable else {
             deviceServiceSnapshot = nil
             return
@@ -614,6 +733,7 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     }
 
     private func handleSystemDevicesChanged() async {
+        guard !isMIDIPlayback else { return }
         guard ExtensionHost.shared.isAudioDeviceServiceAvailable else { return }
         let previousMode = deviceServiceSnapshot?.pcmRouteMode
         let previousPrepared = preparedDeviceID
@@ -711,6 +831,15 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     }
 
     private func pauseForExclusiveHandoff() async throws {
+        if isMIDIPlayback {
+            playbackIntentHandler?(false)
+            routeGeneration &+= 1
+            midiCompletionGeneration &+= 1
+            midiPlayer?.stop()
+            isPlaying = false
+            MediaRemoteCommandCoordinator.shared.update(self)
+            return
+        }
         playbackIntentHandler?(false)
         routeGeneration &+= 1
         stopEngineForRouteChange()
@@ -1424,6 +1553,11 @@ final class AudioPlaybackController: ObservableObject, MediaTransportControlling
     }
 
     private func refreshCurrentTime() {
+        if isMIDIPlayback {
+            guard isPlaying, let player = midiPlayer else { return }
+            currentTime = min(duration, max(0, player.currentPosition))
+            return
+        }
         guard isPlaying, sampleRate > 0 else { return }
         guard let nodeTime = playerNode.lastRenderTime,
               let playerTime = playerNode.playerTime(forNodeTime: nodeTime) else { return }

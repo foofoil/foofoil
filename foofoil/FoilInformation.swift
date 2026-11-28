@@ -24,6 +24,7 @@ nonisolated enum FoilInformation {
             rows.append(Row(key: key, value: value))
         }
         add("Foil Info Track Title", info.taggedTitle)
+        add("Foil Info Instrument", info.instrumentName)
         add("Foil Info Album", info.album)
         add("Foil Info Artist", info.artist)
         add("Foil Info Album Artist", info.albumArtist)

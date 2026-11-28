@@ -2241,6 +2241,38 @@
         }
       }
     },
+    "Foil Info Instrument": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instrument"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "乐器"
+          }
+        }
+      }
+    },
+    "MIDI Instrument Format": {
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Instrument: %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "乐器：%@"
+          }
+        }
+      }
+    },
     "Foil Info Album": {
       "localizations": {
         "en": {

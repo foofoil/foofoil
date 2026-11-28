@@ -374,8 +374,14 @@ extension AppState {
             Task { @MainActor [weak self] in
                 defer { self?.endPendingContentOpen() }
                 let playable = await FragmentedMP4PlaybackCopy.prepare(for: url)
-                let asset = AVURLAsset.media(url: playable)
-                let isPlayable = (try? await asset.load(.isPlayable)) ?? false
+                let isPlayable: Bool
+                if AudioMetadataLoader.isMIDI(url) {
+                    // SMF 没有 PCM 音轨，AVAsset 的 isPlayable 恒为 false；用实际播放器验证文件可解析。
+                    isPlayable = (try? AVMIDIPlayer(contentsOf: url, soundBankURL: nil)) != nil
+                } else {
+                    let asset = AVURLAsset.media(url: playable)
+                    isPlayable = (try? await asset.load(.isPlayable)) ?? false
+                }
                 guard let self else {
                     if holdsSecurityAccess { url.stopAccessingSecurityScopedResource() }
                     return

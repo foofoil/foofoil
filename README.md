@@ -86,7 +86,7 @@ From an album cover in a desktop corner to a subtitled video beside your work, f
 
 ### Hi-Fi: Lossless Albums, DSD, and SACD
 
-Alongside common formats such as MP3, AAC, ALAC, FLAC, WAV, and AIFF, foofoil brings **DSF, DFF, SACD ISO, and APE/CUE** into one native macOS playback experience:
+Alongside common formats such as MP3, AAC, ALAC, FLAC, WAV, AIFF, and MIDI, foofoil brings **DSF, DFF, SACD ISO, and APE/CUE** into one native macOS playback experience:
 
 - **DSD over DoP.** Send DSF and raw DFF to a compatible DAC through DoP, with DSD64, DSD128, and DSD256 verified.
 - **Play SACD ISO directly.** Browse tracks, switch songs, and seek within the uncompressed stereo area without first converting the image to DSF.
