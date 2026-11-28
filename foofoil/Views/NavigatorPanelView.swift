@@ -133,7 +133,7 @@ struct NavigatorPanelView: View {
         let availableModes = session.availableSidebarModes
         return HStack(spacing: 8) {
             ForEach(availableModes, id: \.self) { mode in
-                Button { session.setSidebarMode(mode) } label: {
+                Button { switchCollectionMode(mode, session: session) } label: {
                     Image(systemName: mode.symbol)
                         .frame(width: 30, height: 28)
                         .foregroundStyle(selectedMode == mode ? Color.accentColor : Color.secondary)
@@ -149,6 +149,22 @@ struct NavigatorPanelView: View {
         }
         .padding(.horizontal, 12).padding(.top, 6)
         .background(NonMovableBackground())
+    }
+
+    /// 媒体播放中切换目录类型会停止播放，先让用户确认再重建列表。
+    private func switchCollectionMode(_ mode: CollectionSidebarMode, session: ArchiveSession) {
+        guard session.requiresMediaInterruptionConfirmation(for: mode) else {
+            session.setSidebarMode(mode)
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = NSLocalizedString("Switch Directory Type While Playing Title", comment: "")
+        alert.informativeText = NSLocalizedString("Switch Directory Type While Playing Message", comment: "")
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: NSLocalizedString("Switch and Stop Playback", comment: ""))
+        alert.addButton(withTitle: NSLocalizedString("Cancel", comment: ""))
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        session.setSidebarMode(mode)
     }
 
     private func localizedTitle(for contribution: NavigatorContribution) -> String {

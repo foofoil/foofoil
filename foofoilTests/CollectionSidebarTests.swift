@@ -37,6 +37,31 @@ struct CollectionSidebarTests {
         }
     }
 
+    @Test func switchingCollectionModeConfirmsWhileMediaIsPlaying() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let audio = directory.appendingPathComponent("track.mp3")
+        let secondAudio = directory.appendingPathComponent("track2.mp3")
+        try Data().write(to: audio)
+        try Data().write(to: secondAudio)
+        let state = AppState(isIncognito: true)
+        defer { state.resetContent() }
+        state.openFileCollection([audio, secondAudio], roots: [directory])
+        let session = try #require(state.archiveSession)
+        try await settle(session)
+        session.setSidebarMode(.audio)
+        try await settle(session)
+        let preview = state.readingState
+        #expect(preview.isAudioDocument)
+        #expect(!session.requiresMediaInterruptionConfirmation(for: .folder))
+        preview.isMediaPlaying = true
+        #expect(session.requiresMediaInterruptionConfirmation(for: .folder))
+        #expect(!session.requiresMediaInterruptionConfirmation(for: .audio))
+        preview.isMediaPlaying = false
+        #expect(!session.requiresMediaInterruptionConfirmation(for: .folder))
+    }
+
     private func fixture() throws -> (URL, [URL]) {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         let nested = directory.appendingPathComponent("nested")

@@ -2815,6 +2815,57 @@
         }
       }
     },
+    "Switch Directory Type While Playing Message": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switching the directory type will stop the currently playing audio or video."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换目录类型会停止正在播放的音频或视频。"
+          }
+        }
+      }
+    },
+    "Switch Directory Type While Playing Title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Media Is Playing"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "媒体正在播放"
+          }
+        }
+      }
+    },
+    "Switch and Stop Playback": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Switch and Stop Playback"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "切换并停止播放"
+          }
+        }
+      }
+    },
     "Switch to Incognito Foil": {
       "extractionState": "manual",
       "localizations": {

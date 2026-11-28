@@ -314,6 +314,11 @@ nonisolated final class ArchivePreviewLease: Sendable {
     }
 
     var sidebarMode: CollectionSidebarMode { source.sidebarMode ?? .folder }
+    /// 切换目录类型会重建预览并停止当前播放；播放中的音视频需要先确认。
+    func requiresMediaInterruptionConfirmation(for mode: CollectionSidebarMode) -> Bool {
+        guard mode != sidebarMode, let preview, preview.isMediaPlaying else { return false }
+        return preview.isAudioDocument || preview.isVideoDocument
+    }
     var displayedContributions: [NavigatorContribution] {
         guard sidebarMode != .folder else { return [contribution] }
         if let contributions = preview?.navigatorContributions, !contributions.isEmpty { return contributions }
