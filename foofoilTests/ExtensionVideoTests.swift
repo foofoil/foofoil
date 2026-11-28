@@ -22,6 +22,14 @@ import FoofoilExtensionKit
         #expect(HistoryContentKind.infer(from: state.toConfig()) == .video)
         state.extensionSession = nil
     }
+    @Test func extensionVideoHidesVisualBorderWhenBorderIsOff() {
+        let state = AppState()
+        state.extensionSession = session()
+        #expect(state.supportsBorderToggle)
+        #expect(!state.hidesVisualBorder(windowIsFullScreen: false, windowShowBorder: true))
+        #expect(state.hidesVisualBorder(windowIsFullScreen: false, windowShowBorder: false))
+        #expect(state.hidesVisualBorder(windowIsFullScreen: true, windowShowBorder: true))
+    }
     @Test func videoVolumeIsSoftwareVolumeWithoutDeviceService() {
         let state = AppState()
         let controller = ExtensionAudioPlaybackController(appState: state, session: session())

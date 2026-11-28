@@ -51,9 +51,10 @@ struct FoilContentView: View {
     public var body: some View {
         // 网页和图片都支持仅隐藏视觉边框；网页切换边框不应改变窗口的缩放规则。
         // 仅允许可切换边框的类型进入无边框模式；固定边框类型始终保留代码箔式的边框。
-        let shouldHideBorder = windowState.isFullScreen
-            || (appState.agentReadOnly && !windowState.showBorder)
-            || ((appState.isCamera || appState.imageURL != nil || appState.webURL != nil || appState.isAudioDocument) && appState.supportsBorderToggle && !appState.showBorder)
+        let shouldHideBorder = appState.hidesVisualBorder(
+            windowIsFullScreen: windowState.isFullScreen,
+            windowShowBorder: windowState.showBorder
+        )
         // 网页即使同时保留了截图缓存，也不能套用图片无边框模式的最小尺寸规则。
         let isImageMode = appState.usesImagePresentation
         let usesCompactMinimumSize = isImageMode && !appState.effectiveShowBorder

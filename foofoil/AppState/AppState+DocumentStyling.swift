@@ -47,6 +47,13 @@ extension AppState {
         return isCamera || isVideoDocument || (imageURL != nil && webURL == nil) || webURL != nil || isAudioDocument
     }
 
+    /// 当前内容是否应隐藏视觉边框。包内预览的窗口与内容状态可能不同，
+    /// 全屏与边框取值由实际窗口传入；可切换边框的内容在关闭边框后即无边框显示。
+    /// 扩展视频（如 MKV/AVI）不占用 `imageURL`，统一由 `supportsBorderToggle` 覆盖。
+    func hidesVisualBorder(windowIsFullScreen: Bool, windowShowBorder: Bool) -> Bool {
+        windowIsFullScreen || (supportsBorderToggle && !windowShowBorder)
+    }
+
     /// 兼容别名：不同命名习惯下指向同一判断结果。
     public var supportsBorderMode: Bool { supportsBorderToggle }
     public var canToggleBorder: Bool { supportsBorderToggle }
